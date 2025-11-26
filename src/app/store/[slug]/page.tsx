@@ -182,7 +182,7 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
                                         <p className="text-slate-500 text-sm mb-4 line-clamp-2">{product.description}</p>
                                         <div className="flex items-center justify-between">
                                             <span className="text-lg font-bold text-slate-900">${product.price}</span>
-                                            <Link href={`/chat/${slug}?product=${product.id}`}>
+                                            <Link href={`/store/${slug}/product/${product.id}`}>
                                                 <Button size="sm" variant="outline" className="rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors">
                                                     Ver
                                                 </Button>

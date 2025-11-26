@@ -1,16 +1,13 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { ProductForm } from "./product-form"
+import { ProductForm } from "../components/product-form"
 import { createClient } from "@/lib/supabase/server"
-
-export const dynamic = 'force-dynamic'
+import { redirect } from "next/navigation"
 
 export default async function NewProductPage() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-        throw new Error("Unauthorized")
-    }
+    if (!user) redirect("/login")
 
     const { data: profile } = await supabase
         .from("profiles")
@@ -18,9 +15,7 @@ export default async function NewProductPage() {
         .eq("id", user.id)
         .single()
 
-    if (!profile?.organization_id) {
-        throw new Error("No organization found")
-    }
+    if (!profile?.organization_id) redirect("/dashboard")
 
     return (
         <DashboardLayout>

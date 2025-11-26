@@ -31,13 +31,48 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
     useEffect(() => {
         setIsMounted(true)
+
+        // Get product ID from URL if present
+        const urlParams = new URLSearchParams(window.location.search)
+        const productId = urlParams.get('product')
+
         // Fetch products and agent on mount
         getStoreProducts(slug).then((data) => {
             if (data) {
                 setProducts(data.products)
                 setAgent(data.agent)
 
-                // Set initial greeting
+                // If product ID is in URL, show that product immediately
+                if (productId) {
+                    const foundProduct = data.products.find((p: any) => p.id === productId)
+
+                    if (foundProduct) {
+                        setMessages([
+                            {
+                                id: '1',
+                                role: 'assistant',
+                                content: `¡Hola! Veo que estás interesado en el ${foundProduct.name}. ¿Te gustaría agregarlo al carrito o tienes alguna pregunta sobre este producto?`,
+                                timestamp: new Date()
+                            },
+                            {
+                                id: '2',
+                                role: 'assistant',
+                                content: `Aquí están los detalles:`,
+                                product: {
+                                    id: foundProduct.id,
+                                    name: foundProduct.name,
+                                    price: foundProduct.price,
+                                    image_url: foundProduct.image_url || foundProduct.images?.[0] || 'https://via.placeholder.com/300',
+                                    description: foundProduct.description || ''
+                                },
+                                timestamp: new Date()
+                            }
+                        ])
+                        return
+                    }
+                }
+
+                // Default greeting if no product in URL
                 setMessages([{
                     id: '1',
                     role: 'assistant',
