@@ -83,7 +83,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         })
     }, [slug])
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!input.trim()) return
 
         const userMsg: Message = {
@@ -94,44 +94,82 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }
 
         setMessages(prev => [...prev, userMsg])
+        const currentInput = input
         setInput("")
 
-        // Simulate AI response with real product search
-        setTimeout(() => {
-            const lowerInput = input.toLowerCase()
+        try {
+            // Call AI agent API
+            const response = await fetch('/api/ai-chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: currentInput,
+                    chatId: localStorage.getItem(`chatId_${slug}`),
+                    slug
+                })
+            })
 
-            // Simple keyword search
-            const foundProduct = products.find(p =>
-                p.name.toLowerCase().includes(lowerInput) ||
-                p.description?.toLowerCase().includes(lowerInput)
-            )
-
-            if (foundProduct) {
-                const productMsg: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
-                    content: `¡He encontrado esto para ti! El ${foundProduct.name} es una excelente opción.`,
-                    product: {
-                        id: foundProduct.id,
-                        name: foundProduct.name,
-                        price: foundProduct.price,
-                        image_url: foundProduct.image_url || 'https://via.placeholder.com/300',
-                        description: foundProduct.description || ''
-                    },
-                    timestamp: new Date()
-                }
-                setMessages(prev => [...prev, productMsg])
-            } else {
-                // Fallback if no product found
-                const aiMsg: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
-                    content: 'Entiendo lo que buscas. ¿Podrías ser más específico? Tenemos varios productos disponibles.',
-                    timestamp: new Date()
-                }
-                setMessages(prev => [...prev, aiMsg])
+            if (!response.ok) {
+                throw new Error('Failed to get response from AI')
             }
-        }, 1000)
+
+            const data = await response.json()
+
+            // Save chatId for future messages
+            if (data.chatId) {
+                localStorage.setItem(`chatId_${slug}`, data.chatId)
+            }
+
+            // Process actions from AI (show products, add to cart, etc.)
+            if (data.actions && data.actions.length > 0) {
+                for (const action of data.actions) {
+                    if (action.type === 'show_product' && action.data.product) {
+                        // Add product card message
+                        const productMsg: Message = {
+                            id: (Date.now() + Math.random()).toString(),
+                            role: 'assistant',
+                            content: action.data.message || '',
+                            product: action.data.product,
+                            timestamp: new Date()
+                        }
+                        setMessages(prev => [...prev, productMsg])
+                    } else if (action.type === 'add_to_cart' && action.data.product_id) {
+                        // Add to cart via Zustand
+                        const product = products.find(p => p.id === action.data.product_id)
+                        if (product) {
+                            addItem({
+                                id: product.id,
+                                name: product.name,
+                                price: product.price,
+                                image_url: product.image_url || product.images?.[0]
+                            }, action.data.quantity || 1)
+                        }
+                    }
+                }
+            }
+
+            // Add AI response message
+            const aiMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: data.message,
+                timestamp: new Date()
+            }
+            setMessages(prev => [...prev, aiMsg])
+
+        } catch (error: any) {
+            console.error('Error calling AI agent:', error)
+            // Fallback error message
+            const errorMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'assistant',
+                content: 'Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?',
+                timestamp: new Date()
+            }
+            setMessages(prev => [...prev, errorMsg])
+        }
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
