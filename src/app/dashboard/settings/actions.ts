@@ -1,0 +1,128 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+import { revalidatePath } from "next/cache"
+
+export interface SettingsData {
+    profile: {
+        id: string
+        full_name: string | null
+        email: string | null
+        role: string
+    }
+    organization: {
+        id: string
+        name: string
+        slug: string
+        contact_email: string | null
+        industry: string | null
+        settings: any
+    }
+}
+
+export async function getSettingsData(): Promise<SettingsData> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    // Fetch profile and organization in parallel
+    const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single()
+
+    if (profileError || !profile) {
+        throw new Error("Profile not found")
+    }
+
+    const { data: organization, error: orgError } = await supabase
+        .from("organizations")
+        .select("*")
+        .eq("id", profile.organization_id)
+        .single()
+
+    if (orgError || !organization) {
+        throw new Error("Organization not found")
+    }
+
+    return {
+        profile: {
+            id: profile.id,
+            full_name: profile.full_name,
+            email: user.email || null, // Email comes from Auth User, not profile table usually
+            role: profile.role
+        },
+        organization: {
+            id: organization.id,
+            name: organization.name,
+            slug: organization.slug,
+            contact_email: organization.contact_email,
+            industry: organization.industry,
+            settings: organization.settings || {}
+        }
+    }
+}
+
+export async function updateProfile(fullName: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    const { error } = await supabase
+        .from("profiles")
+        .update({ full_name: fullName })
+        .eq("id", user.id)
+
+    if (error) {
+        throw new Error(`Failed to update profile: ${error.message}`)
+    }
+
+    revalidatePath("/dashboard/settings")
+    return { success: true }
+}
+
+export async function updateOrganization(data: {
+    name: string
+    slug: string
+    contact_email?: string
+    industry?: string
+    logo_url?: string
+    settings?: any
+}) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    // Verify user belongs to the organization they are trying to update
+    // (Implicitly handled by getting org_id from profile, but good to be explicit)
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.organization_id) throw new Error("No organization found")
+
+    const { error } = await supabase
+        .from("organizations")
+        .update({
+            name: data.name,
+            slug: data.slug,
+            contact_email: data.contact_email,
+            industry: data.industry,
+            logo_url: data.logo_url,
+            settings: data.settings
+        })
+        .eq("id", profile.organization_id)
+
+    if (error) {
+        throw new Error(`Failed to update organization: ${error.message}`)
+    }
+
+    revalidatePath("/dashboard/settings")
+    return { success: true }
+}

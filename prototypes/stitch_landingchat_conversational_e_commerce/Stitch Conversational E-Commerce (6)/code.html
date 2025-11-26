@@ -1,0 +1,363 @@
+<html><head>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Manrope%3Awght%40400%3B500%3B700%3B800&amp;family=Noto+Sans%3Awght%40400%3B500%3B700%3B900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<title>Stitch Design</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+</head>
+<body>
+<div class="relative flex h-auto min-h-screen w-full flex-col bg-white group/design-root overflow-x-hidden" style='font-family: Manrope, "Noto Sans", sans-serif;'>
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#f0f2f4] px-10 py-3">
+<div class="flex items-center gap-4 text-[#111418]">
+<div class="size-4">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-[#111418] text-lg font-bold leading-tight tracking-[-0.015em]">LandingChat</h2>
+</div>
+<div class="flex flex-1 justify-end gap-8">
+<div class="flex items-center gap-9">
+<a class="text-[#111418] text-sm font-medium leading-normal" href="#">Inicio</a>
+<a class="text-[#111418] text-sm font-medium leading-normal" href="#">Productos</a>
+<a class="text-[#111418] text-sm font-medium leading-normal" href="#">Sobre Nosotros</a>
+<a class="text-[#111418] text-sm font-medium leading-normal" href="#">Contacto</a>
+</div>
+<div class="flex gap-2">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#2b7cee] text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Iniciar Sesión</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#f0f2f4] text-[#111418] text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Registrarse</span>
+</button>
+</div>
+</div>
+</header>
+<div class="px-40 flex flex-1 justify-center py-5">
+<div class="layout-content-container flex flex-col max-w-[960px] flex-1">
+<div class="@container">
+<div class="@[480px]:p-4">
+<div class="flex min-h-[480px] flex-col gap-6 bg-cover bg-center bg-no-repeat @[480px]:gap-8 @[480px]:rounded-lg items-center justify-center p-4" style='background-image: linear-gradient(rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%), url("https://lh3.googleusercontent.com/aida-public/AB6AXuBIGLoIc3p3Jeo-XVaSFFf70eFMu6olPPIAoUykUsUEdxGKDRQHbmhsC7CjThrjwRWrtp7Xrf2kJuE0VhHq7s-9iON37UUfSd4cloqhpTTpXp94xd9Nvo1onZ5T2Xf9qVpYqnYjg8R6JNwJS5Gr1hD5_CO2CbwZhVHsmXK1_zXSZYWdKZIM1lTbBypDeXmy-ZlJruOSfBBcYLDETpukn-U2f0UFHB0I7mS_uuucNzIvlTtPL_wpSgmxFEucADeipkClELW6N643DX8");'>
+<div class="flex flex-col gap-2 text-center">
+<h1 class="text-white text-4xl font-black leading-tight tracking-[-0.033em] @[480px]:text-5xl @[480px]:font-black @[480px]:leading-tight @[480px]:tracking-[-0.033em]">
+                      Encuentra tu producto ideal, chateando
+                    </h1>
+<h2 class="text-white text-sm font-normal leading-normal @[480px]:text-base @[480px]:font-normal @[480px]:leading-normal">
+                      Descubre nuestra colección de muebles y accesorios para el hogar. Chatea con nuestros expertos para encontrar la pieza perfecta para tu espacio.
+                    </h2>
+</div>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 @[480px]:h-12 @[480px]:px-5 bg-[#2b7cee] text-white text-sm font-bold leading-normal tracking-[0.015em] @[480px]:text-base @[480px]:font-bold @[480px]:leading-normal @[480px]:tracking-[0.015em]">
+<span class="truncate">Iniciar Chat</span>
+</button>
+</div>
+</div>
+</div>
+<div class="px-4 py-6">
+<h2 class="text-[#111418] text-[22px] font-bold leading-tight tracking-[-0.015em] pb-3">Explora por Categoría</h2>
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+<a class="flex flex-col items-center gap-2 p-3 bg-[#f8f9fb] rounded-lg hover:bg-[#f0f2f4] transition-colors duration-200" href="#">
+<div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBXtRG8fsIybrIYR0wSnuch_XZM8e_jIiWdnDcUCh2wSJKynrKxLOb7TR_IFMEoJ2hrfmbdAnERYpTSBjl7jxHP2yuMCLqHqgXZ-H_blhkCqV47aio1VsBMCCbzaSZyfiqcwFcpyclcdLON-iroRgf-6MH1NHJ5Njqo2bhOrIw6NR_qPzezYPcB3ymGawjLI1uko2MsMm9_zjNHAOY4V_wPo-TenvpcqZk95ijuCh47QaiS3SgGHO3ouMS9FM1vg7iDNkG5aqFD3NQ");'></div>
+<p class="text-[#111418] text-sm font-medium leading-normal text-center">Salas</p>
+</a>
+<a class="flex flex-col items-center gap-2 p-3 bg-[#f8f9fb] rounded-lg hover:bg-[#f0f2f4] transition-colors duration-200" href="#">
+<div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAeyzT_SVqHFv58S1V9NIzCsIY05BYT4CHSFTROZso6BW9frFgNP96fXNwHP87aXLAoqi_mW08PSTkHsOS9vxhqhT2h2yhuADa7IgiRNDOfmq_Rjqsj2k43nEP7rmJwYrYOYWgKgz16da7vAxzh28BeIkJ2nQhDbU1DiD9KBaEpRRbTcmVKm3S0ucMWY5woVYkfSvFlTmKWRXrLx8yNW8AmVBluYbDE_TMzz75vfWjjYkedoNkbYhyq5-TRKMWKZ-xLIeKkZ9YFS8g");'></div>
+<p class="text-[#111418] text-sm font-medium leading-normal text-center">Comedores</p>
+</a>
+<a class="flex flex-col items-center gap-2 p-3 bg-[#f8f9fb] rounded-lg hover:bg-[#f0f2f4] transition-colors duration-200" href="#">
+<div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAlOh-ypZ_1FmsOTNbs5HY_4P1r-6busqaiuwFZtplSHP2kmRj8kMvTIDlKn-m2sc46Mw6FxkZq48RBb9tMgjxvbYJMHRBqIvmdE2NeLv7Nsi4TNB94JUPofN-kUGKkZmO4JrOSDwM57gccbQU08OQFRrYuNY8hnsOKAkdeg_TH3A78pGKIuwSo2rruCOE5026MfeM13ZlQtmyOZFDRHUNBscpyGBhj0G6LEtNwfB4iK9uaBLpo1mkAiaEuO3tZI0YKgU8V-sU2UwE");'></div>
+<p class="text-[#111418] text-sm font-medium leading-normal text-center">Dormitorios</p>
+</a>
+<a class="flex flex-col items-center gap-2 p-3 bg-[#f8f9fb] rounded-lg hover:bg-[#f0f2f4] transition-colors duration-200" href="#">
+<div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<p class="text-[#111418] text-sm font-medium leading-normal text-center">Oficina</p>
+</a>
+<a class="flex flex-col items-center gap-2 p-3 bg-[#f8f9fb] rounded-lg hover:bg-[#f0f2f4] transition-colors duration-200" href="#">
+<div class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<p class="text-[#111418] text-sm font-medium leading-normal text-center">Decoración</p>
+</a>
+</div>
+</div>
+<h2 class="text-[#111418] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Productos Destacados</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4">
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBXtRG8fsIybrIYR0wSnuch_XZM8e_jIiWdnDcUCh2wSJKynrKxLOb7TR_IFMEoJ2hrfmbdAnERYpTSBjl7jxHP2yuMCLqHqgXZ-H_blhkCqV47aio1VsBMCCbzaSZyfiqcwFcpyclcdLON-iroRgf-6MH1NHJ5Njqo2bhOrIw6NR_qPzezYPcB3ymGawjLI1uko2MsMm9_zjNHAOY4V_wPo-TenvpcqZk95ijuCh47QaiS3SgGHO3ouMS9FM1vg7iDNkG5aqFD3NQ");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Sofá Modular 'Aurora'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Diseño flexible y moderno para cualquier espacio.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAeyzT_SVqHFv58S1V9NIzCsIY05BYT4CHSFTROZso6BW9frFgNP96fXNwHP87aXLAoqi_mW08PSTkHsOS9vxhqhT2h2yhuADa7IgiRNDOfmq_Rjqsj2k43nEP7rmJwYrYOYWgKgz16da7vAxzh28BeIkJ2nQhDbU1DiD9KBaEpRRbTcmVKm3S0ucMWY5woVYkfSvFlTmKWRXrLx8yNW8AmVBluYbDE_TMzz75vfWjjYkedoNkbYhyq5-TRKMWKZ-xLIeKkZ9YFS8g");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Mesa de Comedor 'Zenith'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Elegancia y funcionalidad para tus reuniones.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAlOh-ypZ_1FmsOTNbs5HY_4P1r-6busqaiuwFZtplSHP2kmRj8kMvTIDlKn-m2sc46Mw6FxkZq48RBb9tMgjxvbYJMHRBqIvmdE2NeLv7Nsi4TNB94JUPofN-kUGKkZmO4JrOSDwM57gccbQU08OQFRrYuNY8hnsOKAkdeg_TH3A78pGKIuwSo2rruCOE5026MfeM13ZlQtmyOZFDRHUNBscpyGBhj0G6LEtNwfB4iK9uaBLpo1mkAiaEuO3tZI0YKgU8V-sU2UwE");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Sillón 'Comodidad Suprema'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Relájate con estilo en este sillón de lujo.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Estantería 'Minimal'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Organización elegante y moderna.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Cama 'Serenity'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Descanso profundo y estilo contemporáneo.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Lámpara de Pie 'Glow'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Iluminación ambiental con diseño moderno.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Mesa de Centro 'Orbit'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Un toque de sofisticación para tu sala.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Silla de Oficina 'ErgoFlex'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Confort y soporte para largas jornadas.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Sillas Comedor 'Clasicas' (Set x4)</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Combinación perfecta de estilo y comodidad.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Escritorio 'Compacto'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Solución ideal para espacios reducidos.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Mueble TV 'Media'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Soporte funcional con diseño moderno.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Mesa de Noche 'Luna'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Practicidad y estilo junto a tu cama.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Alfombra 'Nórdica'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Calidez y textura para cualquier ambiente.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Biblioteca 'Modular'</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Espacio para tus libros con estilo adaptable.</p>
+</div>
+</div>
+<div class="flex h-full flex-1 flex-col gap-4 rounded-lg">
+<div class="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg flex flex-col" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDFccxUDcuu7aMsoEjRx6LPlMWcZ8HGtk4u9AKEGiVu8UhyHBEWa15wEXGi7SE6O2wqkk_R-oSSBj73An6Y4W6EhK0L2IOv0VuPe9O9WrhGz8XuCF80It4qktt7WE_TNDLc7Cf_necDzM6fg06w09Ys6wBASC-411JvcECX1UDxJPAlR-_idpsByJ31stpUS2aIvO79ggdqkyBe2e3eozcwiCfHU7RY6UkXx3g04ZmWh44a29mYsYH3zdkiY3WXRI1tDZ8JHtEx4ug");'></div>
+<div>
+<p class="text-[#111418] text-base font-medium leading-normal">Cojines Decorativos (Set x2)</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">Toque final de color y confort.</p>
+</div>
+</div>
+</div>
+<h2 class="text-[#111418] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Testimonios</h2>
+<div class="flex flex-col gap-8 overflow-x-hidden bg-white p-4">
+<div class="flex flex-col gap-3 bg-white">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDiLEXjEDvI8C180KFTgTclzbP2PdQwkSLgY_siU_eMXRvgqUlLbh_js_gvkXscxtUX-YnE9-R8NSiAocTTkfMbMCsrrCUgx9en7NTgpYPDfy6LcORn2VI7gTWoduh-mVvRofIo_RTMvmVM-IRqcvngNGjHJzQCjr3yN0zNQL1aUIioQ7ohPLSuM5HGvZoQera4kqhiIVfxFOjkscAT0JkXPOUnefG3gkB0Ulv2jl-BR7Le9qQclDMy7aSG51H6-d8MeosnUxE8WgM");'></div>
+<div class="flex-1">
+<p class="text-[#111418] text-base font-medium leading-normal">Sofía Martínez</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">15 de marzo de 2024</p>
+</div>
+</div>
+<div class="flex gap-0.5">
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+</div>
+<p class="text-[#111418] text-base font-normal leading-normal">
+                  "LandingChat ha transformado mi experiencia de compra. Encontré el sofá perfecto gracias a la ayuda personalizada del chat. ¡Recomendado!"
+                </p>
+<div class="flex gap-9 text-[#617289]">
+<button class="flex items-center gap-2">
+<div class="text-inherit" data-icon="ThumbsUp" data-size="20px" data-weight="regular">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234,80.12A24,24,0,0,0,216,72H160V56a40,40,0,0,0-40-40,8,8,0,0,0-7.16,4.42L75.06,96H32a16,16,0,0,0-16,16v88a16,16,0,0,0,16,16H204a24,24,0,0,0,23.82-21l12-96A24,24,0,0,0,234,80.12ZM32,112H72v88H32ZM223.94,97l-12,96a8,8,0,0,1-7.94,7H88V105.89l36.71-73.43A24,24,0,0,1,144,56V80a8,8,0,0,0,8,8h64a8,8,0,0,1,7.94,9Z"></path>
+</svg>
+</div>
+<p class="text-inherit">5</p>
+</button>
+<button class="flex items-center gap-2">
+<div class="text-inherit" data-icon="ThumbsDown" data-size="20px" data-weight="regular">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M239.82,157l-12-96A24,24,0,0,0,204,40H32A16,16,0,0,0,16,56v88a16,16,0,0,0,16,16H75.06l37.78,75.58A8,8,0,0,0,120,240a40,40,0,0,0,40-40V184h56a24,24,0,0,0,23.82-27ZM72,144H32V56H72Zm150,21.29a7.88,7.88,0,0,1-6,2.71H152a8,8,0,0,0-8,8v24a24,24,0,0,1-19.29,23.54L88,150.11V56H204a8,8,0,0,1,7.94,7l12,96A7.87,7.87,0,0,1,222,165.29Z"></path>
+</svg>
+</div>
+</button>
+</div>
+</div>
+<div class="flex flex-col gap-3 bg-white">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCWAKpB8CEa5O9d4SjqRV8RkurL4DlN5F3ZuH7rrJCfTtH7e2_kAd3q52qgc6xuvPiIcU1b4hbARofXcxs-XHpOYrLyCu48QTTeY6RjsAskx2hNT5vBJRa3ovayqOOfMNBijMxg1fotl7WI_6q6MON8qJdhzSRS-8qddy-OKLeL9TPW-cINrRrjY_-SHlG7Q10kzDtatUW5vsKOpxdALeIYgpa-Fbjk3KXg51r6obECl70c7AhQjpqniEkxlyck7d5TN-0foD5mvFk");'></div>
+<div class="flex-1">
+<p class="text-[#111418] text-base font-medium leading-normal">Carlos López</p>
+<p class="text-[#617289] text-sm font-normal leading-normal">20 de febrero de 2024</p>
+</div>
+</div>
+<div class="flex gap-0.5">
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#111418]" data-icon="Star" data-size="20px" data-weight="fill">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234.5,114.38l-45.1,39.36,13.51,58.6a16,16,0,0,1-23.84,17.34l-51.11-31-51,31a16,16,0,0,1-23.84-17.34L66.61,153.8,21.5,114.38a16,16,0,0,1,9.11-28.06l59.46-5.15,23.21-55.36a15.95,15.95,0,0,1,29.44,0h0L166,81.17l59.44,5.15a16,16,0,0,1,9.11,28.06Z"></path>
+</svg>
+</div>
+<div class="text-[#bac3ce]" data-icon="Star" data-size="20px" data-weight="regular">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M239.2,97.29a16,16,0,0,0-13.81-11L166,81.17,142.72,25.81h0a15.95,15.95,0,0,0-29.44,0L90.07,81.17,30.61,86.32a16,16,0,0,0-9.11,28.06L66.61,153.8,53.09,212.34a16,16,0,0,0,23.84,17.34l51-31,51.11,31a16,16,0,0,0,23.84-17.34l-13.51-58.6,45.1-39.36A16,16,0,0,0,239.2,97.29Zm-15.22,5-45.1,39.36a16,16,0,0,0-5.08,15.71L187.35,216v0l-51.07-31a15.9,15.9,0,0,0-16.54,0l-51,31h0L82.2,157.4a16,16,0,0,0-5.08-15.71L32,102.35a.37.37,0,0,1,0-.09l59.44-5.14a16,16,0,0,0,13.35-9.75L128,32.08l23.20,55.29a16,16,0,0,0,13.35,9.75L224,102.26S224,102.32,224,102.33Z"></path>
+</svg>
+</div>
+</div>
+<p class="text-[#111418] text-base font-normal leading-normal">
+                  "La mesa de comedor que compré es hermosa y de gran calidad. El servicio de atención al cliente fue muy útil para resolver mis dudas."
+                </p>
+<div class="flex gap-9 text-[#617289]">
+<button class="flex items-center gap-2">
+<div class="text-inherit" data-icon="ThumbsUp" data-size="20px" data-weight="regular">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M234,80.12A24,24,0,0,0,216,72H160V56a40,40,0,0,0-40-40,8,8,0,0,0-7.16,4.42L75.06,96H32a16,16,0,0,0-16,16v88a16,16,0,0,0,16,16H204a24,24,0,0,0,23.82-21l12-96A24,24,0,0,0,234,80.12ZM32,112H72v88H32ZM223.94,97l-12,96a8,8,0,0,1-7.94,7H88V105.89l36.71-73.43A24,24,0,0,1,144,56V80a8,8,0,0,0,8,8h64a8,8,0,0,1,7.94,9Z"></path>
+</svg>
+</div>
+<p class="text-inherit">3</p>
+</button>
+<button class="flex items-center gap-2">
+<div class="text-inherit" data-icon="ThumbsDown" data-size="20px" data-weight="regular">
+<svg fill="currentColor" height="20px" viewBox="0 0 256 256" width="20px" xmlns="http://www.w3.org/2000/svg">
+<path d="M239.82,157l-12-96A24,24,0,0,0,204,40H32A16,16,0,0,0,16,56v88a16,16,0,0,0,16,16H75.06l37.78,75.58A8,8,0,0,0,120,240a40,40,0,0,0,40-40V184h56a24,24,0,0,0,23.82-27ZM72,144H32V56H72Zm150,21.29a7.88,7.88,0,0,1-6,2.71H152a8,8,0,0,0-8,8v24a24,24,0,0,1-19.29,23.54L88,150.11V56H204a8,8,0,0,1,7.94,7l12,96A7.87,7.87,0,0,1,222,165.29Z"></path>
+</svg>
+</div>
+<p class="text-inherit">1</p>
+</button>
+</div>
+</div>
+</div>
+<div class="@container">
+<div class="flex flex-col justify-end gap-6 px-4 py-10 @[480px]:gap-8 @[480px]:px-10 @[480px]:py-20">
+<div class="flex flex-col gap-2 text-center">
+<h1 class="text-[#111418] tracking-light text-[32px] font-bold leading-tight @[480px]:text-4xl @[480px]:font-black @[480px]:leading-tight @[480px]:tracking-[-0.033em] max-w-[720px]">
+                    ¿Necesitas ayuda? Chatea con nosotros
+                  </h1>
+</div>
+<div class="flex flex-1 justify-center">
+<div class="flex justify-center">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 @[480px]:h-12 @[480px]:px-5 bg-[#2b7cee] text-white text-sm font-bold leading-normal tracking-[0.015em] @[480px]:text-base @[480px]:font-bold @[480px]:leading-normal @[480px]:tracking-[0.015em] grow">
+<span class="truncate">Iniciar Chat</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<footer class="flex justify-center">
+<div class="flex max-w-[960px] flex-1 flex-col">
+<footer class="flex flex-col gap-6 px-5 py-10 text-center @container">
+<div class="flex flex-wrap items-center justify-center gap-6 @[480px]:flex-row @[480px]:justify-around">
+<a class="text-[#617289] text-base font-normal leading-normal min-w-40" href="#">Política de Privacidad</a>
+<a class="text-[#617289] text-base font-normal leading-normal min-w-40" href="#">Términos de Servicio</a>
+<a class="text-[#617289] text-base font-normal leading-normal min-w-40" href="#">Contacto</a>
+</div>
+<div class="flex flex-wrap justify-center gap-4">
+<a href="#">
+<div class="text-[#617289]" data-icon="TwitterLogo" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewBox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M247.39,68.94A8,8,0,0,0,240,64H209.57A48.66,48.66,0,0,0,168.1,40a46.91,46.91,0,0,0-33.75,13.7A47.9,47.9,0,0,0,120,88v6.09C79.74,83.47,46.81,50.72,46.46,50.37a8,8,0,0,0-13.65,4.92c-4.31,47.79,9.57,79.77,22,98.18a110.93,110.93,0,0,0,21.88,24.2c-15.23,17.53-39.21,26.74-39.47,26.84a8,8,0,0,0-3.85,11.93c.75,1.12,3.75,5.05,11.08,8.72C53.51,229.7,65.48,232,80,232c70.67,0,129.72-54.42,135.75-124.44l29.91-29.9A8,8,0,0,0,247.39,68.94Zm-45,29.41a8,8,0,0,0-2.32,5.14C196,166.58,143.28,216,80,216c-10.56,0-18-1.4-23.22-3.08,11.51-6.25,27.56-17,37.88-32.48A8,8,0,0,0,92,169.08c-.47-.27-43.91-26.34-44-96,16,13,45.25,33.17,78.67,38.79A8,8,0,0,0,136,104V88a32,32,0,0,1,9.6-22.92A30.94,30.94,0,0,1,167.9,56c12.66.16,24.49,7.88,29.44,19.21A8,8,0,0,0,204.67,80h16Z"></path>
+</svg>
+</div>
+</a>
+<a href="#">
+<div class="text-[#617289]" data-icon="InstagramLogo" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewBox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160ZM176,24H80A56.06,56.06,0,0,0,24,80v96a56.06,56.06,0,0,0,56,56h96a56.06,56.06,0,0,0,56-56V80A56.06,56.06,0,0,0,176,24Zm40,152a40,40,0,0,1-40,40H80a40,40,0,0,1-40-40V80A40,40,0,0,1,80,40h96a40,40,0,0,1,40,40ZM192,76a12,12,0,1,1-12-12A12,12,0,0,1,192,76Z"></path>
+</svg>
+</div>
+</a>
+<a href="#">
+<div class="text-[#617289]" data-icon="FacebookLogo" data-size="24px" data-weight="regular">
+<svg fill="currentColor" height="24px" viewBox="0 0 256 256" width="24px" xmlns="http://www.w3.org/2000/svg">
+<path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm8,191.63V152h24a8,8,0,0,0,0-16H136V112a16,16,0,0,1,16-16h16a8,8,0,0,0,0-16H152a32,32,0,0,0-32,32v24H96a8,8,0,0,0,0,16h24v63.63a88,88,0,1,1,16,0Z"></path>
+</svg>
+</div>
+</a>
+</div>
+<p class="text-[#617289] text-base font-normal leading-normal">© 2024 LandingChat. Todos los derechos reservados.</p>
+</footer>
+</div>
+</footer>
+</div>
+</div>
+
+</body></html>

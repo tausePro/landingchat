@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #2b7cee;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #101822;
+  --color-card-light: #ffffff;
+  --color-card-dark: #1a2431;
+  --color-text-light-primary: #101822;
+  --color-text-dark-primary: #f6f7f8;
+  --color-text-light-secondary: #6a737d;
+  --color-text-dark-secondary: #9fa6b2;
+  --color-border-light: #e5e7eb;
+  --color-border-dark: #364150;
+  --color-success: #07883b;
+  --color-danger: #e73908;
+
+  --color-chat-user: #e9ecef;
+  --color-chat-assistant: #ffffff;
+  --color-text-primary: #212529;
+  --color-text-secondary: #6c757d;
+
+  --font-display: "Manrope", sans-serif;
+}
+
+/* Custom Utilities for semantic usage */
+@layer utilities {
+  .bg-background {
+    @apply bg-background-light dark:bg-background-dark;
+  }
+
+  .text-primary-text {
+    @apply text-text-light-primary dark:text-text-dark-primary;
+  }
+
+  .text-secondary-text {
+    @apply text-text-light-secondary dark:text-text-dark-secondary;
+  }
+}
+
+/* Base styles */
+body {
+  @apply bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary font-display;
+}

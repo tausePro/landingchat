@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LandingChat - Integra tus Productos</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b7cee",
+            "background-light": "#f6f7f8",
+            "background-dark": "#101822",
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "0.75rem",
+            "xl": "1rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24
+    }
+  </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="flex h-full min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex w-64 flex-col gap-y-6 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 p-4">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat company logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCQrH8lrFInq40O_nNaaj_xh_cdhalt2dgfTBkrqC3cHHvI3_Yr7SUyicnMefVCkhDpI9ujvv20ATT3kmket7kg1MrcGewwYqEU48eRKhT_o_QmjUgF9l4TAQxfJp3FHGWSVcRyDUCmMT02O-fiLP4IITkhNu3s8LM35g7NecVJEAjPIe4SL2Zn2CsZWCAXEk4jCRlJRUfobD9LxoSEFTaXMng48MyFLr2et0R5zuW78C9ByrwMLL-iVbGWeaEKMQVI12f0py42xpg");'></div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-slate-50 text-base font-bold leading-normal">LandingChat</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Tu Espacio de Trabajo</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">chat</span>
+<p class="text-sm font-medium leading-normal">Chats</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<p class="text-sm font-bold leading-normal">Productos</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<p class="text-sm font-medium leading-normal">Contactos</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-sm font-medium leading-normal">Ajustes</p>
+</a>
+</nav>
+</div>
+<div class="mt-auto flex flex-col gap-3 p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
+<p class="text-slate-900 dark:text-slate-50 text-base font-medium leading-normal">Progreso de Onboarding</p>
+<div class="flex flex-col gap-1">
+<span class="text-slate-500 dark:text-slate-400 text-xs font-medium">Paso 2 de 4</span>
+<div class="w-full rounded-full bg-slate-200 dark:bg-slate-700"><div class="h-1.5 rounded-full bg-primary" style="width: 50%;"></div></div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 px-4 py-8 md:p-10">
+<div class="mx-auto flex h-full max-w-4xl flex-col">
+<!-- PageHeading -->
+<div class="flex flex-wrap justify-between gap-4 py-4">
+<div class="flex flex-col gap-1">
+<p class="text-slate-900 dark:text-slate-50 text-3xl font-extrabold leading-tight tracking-tight">Integra tu catálogo de productos</p>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Elige el método que mejor se adapte a tu negocio para empezar a vender a través del chat.</p>
+</div>
+</div>
+<!-- ImageGrid as Cards -->
+<div class="grid grid-cols-1 gap-6 py-8 md:grid-cols-2 lg:grid-cols-3">
+<!-- Card 1: Carga Masiva -->
+<div class="flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm transition-shadow hover:shadow-lg">
+<div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+<span class="material-symbols-outlined text-3xl">upload_file</span>
+</div>
+<div class="flex flex-grow flex-col gap-2">
+<p class="text-slate-900 dark:text-slate-50 text-lg font-bold leading-normal">Carga masiva con un archivo</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Ideal para catálogos grandes. Sube rápidamente todos tus productos usando nuestra plantilla.</p>
+</div>
+<div class="flex flex-col items-start gap-3">
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-11 px-5 bg-primary text-slate-50 text-sm font-bold leading-normal tracking-[-0.015em] hover:bg-primary/90 transition-colors">
+<span class="truncate">Seleccionar archivo</span>
+</button>
+<a class="text-primary dark:text-primary/90 text-sm font-medium hover:underline" href="#">Descargar plantilla (CSV/Excel)</a>
+</div>
+</div>
+<!-- Card 2: Conexión con Plataformas -->
+<div class="flex flex-col gap-4 rounded-xl border border-primary dark:border-primary bg-primary/5 dark:bg-primary/10 p-6 shadow-sm ring-2 ring-primary/20 transition-shadow hover:shadow-lg">
+<div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+<span class="material-symbols-outlined text-3xl">hub</span>
+</div>
+<div class="flex flex-grow flex-col gap-2">
+<p class="text-slate-900 dark:text-slate-50 text-lg font-bold leading-normal">Conecta tu tienda e-commerce</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Sincronización automática de stock y productos. Ideal para usuarios de Shopify, WooCommerce, etc.</p>
+<div class="flex items-center gap-2 pt-2">
+<img class="h-6 w-6" data-alt="Shopify logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdAyZXIpbnA5cqQWVz1Gidh0KDXX7Nz9uvoG7DWDcaJHAxXXjbkFlIi9Mb-nW9zEF_BKyX0kPmQqEBh3Jhtsue0-lQ5A3HzWp8rWa2isbQP633LmlemxOFco5kryvgoHTKHQolnz6uXO-TKufudFyQLzyAIo3ISTm6b_iW4TWBE6MunIUii8AcQNF_9-yJ7VtBnnGzTXBsWfB2uuTYJH1QYQOyc3s70IOd31amUeRMO0HSuzWUccwBJHqUPdsARP0TYd73gTAsPao"/>
+<img class="h-6 w-6" data-alt="WooCommerce logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCevo-srIONss-GGGqpdgQS1etGu1EPfQN1ARQpQh9R1NhCcXs-2TOojqysgbYQWxU9uLLB9BaBB3SyGd7ciIJuyLOTzgCSyHWeBBARq55AKLZXNLLofz1-2MzB5RUgyv5tRfBGsYpO-_r3dFfBfUoD7KccQRul2LoRSUKIyqaLVXofI1T0qE2Y_pbuv5BZ7S_8J4C3d76HUaEFweK0h7MwuTsCkSxluHFdjrRmNeGWaVnukzth2moRfvcJiVgWS7RKGm8JB6i86xk"/>
+<img class="h-6 w-6" data-alt="PrestaShop logo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBbgrR2DWlgI1ZE-yVsi9rR_-H_upIlG7iEVmPpz1XFMAf68phZcKrsyaRAME7EutcOH5vFexEI5YV5Ujh4ZG6Q4kHbPPyNd7hLwqhQNNW7t7p__LETpO7o2RAceMm_x19NBCYmr3eluvMY3UifOjViOIyMHRSqkq_Ujk2eIRzOLeNVKadCl1Mi9nmz3UoytJl07xXjSTNkGLhZrBufTjBmMF7Lp2hqn90yKDw-C6vikKWoM7EVeI1V6-WrjReaHrTGx9vMFdzpc9c"/>
+</div>
+</div>
+<div class="mt-auto flex flex-col items-start">
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-11 px-5 bg-primary text-slate-50 text-sm font-bold leading-normal tracking-[-0.015em] hover:bg-primary/90 transition-colors">
+<span class="truncate">Conectar</span>
+</button>
+</div>
+</div>
+<!-- Card 3: Añadir Manualmente -->
+<div class="flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm transition-shadow hover:shadow-lg">
+<div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+<span class="material-symbols-outlined text-3xl">add_box</span>
+</div>
+<div class="flex flex-grow flex-col gap-2">
+<p class="text-slate-900 dark:text-slate-50 text-lg font-bold leading-normal">Añadir productos manualmente</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Perfecto para catálogos pequeños o para añadir productos específicos de forma rápida.</p>
+</div>
+<div class="mt-auto flex flex-col items-start">
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-11 px-5 bg-primary text-slate-50 text-sm font-bold leading-normal tracking-[-0.015em] hover:bg-primary/90 transition-colors">
+<span class="truncate">Añadir un producto</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Skip Button -->
+<div class="flex justify-center py-6 mt-auto">
+<button class="flex cursor-pointer items-center justify-center rounded-lg h-11 px-5 text-slate-500 dark:text-slate-400 text-sm font-bold leading-normal hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+<span class="truncate">Omitir por ahora</span>
+</button>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>
