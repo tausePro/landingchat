@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configuración de Mensajes Automáticos - LandingChat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+    .material-symbols-outlined.fill {
+      font-variation-settings: 'FILL' 1;
+    }
+  </style>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b7cee",
+            "background-light": "#f6f7f8",
+            "background-dark": "#101822",
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#333333] dark:text-gray-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col">
+<div class="flex h-full min-h-screen w-full">
+<!-- SideNavBar -->
+<aside class="flex w-64 flex-col border-r border-gray-200 dark:border-[#324867] bg-white dark:bg-[#111822] p-4">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat company logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAxBnTVX-v6UXSZ2zSiMgOb4bdiMQB7fQYj25vXtIoz_09JIyKlHMCAJrh9T6ttxXcilCrqc2h4wVLT0n05Nqs1nXNwxm2-2aLTdWUXKbRm6hgYddDBFVJNgbjoQ0EmBduDhcSaovOfml4Kqm4Mo-5ZJmVDZUS2ytS51zONqjzabfPAeSUXRVWDl260UwRDmHDOovtxVs50oiIVJ5ef19W0lp1Lh1o8PMHvRiMmTeVt7isq5HDzHYsUSAWmv7tnxe2rHo1Abwot17c");'></div>
+<div class="flex flex-col">
+<h1 class="text-gray-900 dark:text-white text-base font-bold leading-normal">LandingChat</h1>
+<p class="text-gray-500 dark:text-[#92a9c9] text-sm font-normal leading-normal">Configuración</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 dark:bg-[#233348]" href="#">
+<span class="material-symbols-outlined text-primary dark:text-white fill">chat</span>
+<p class="text-primary dark:text-white text-sm font-medium leading-normal">Mensaje de Bienvenida</p>
+<span class="ml-auto h-2 w-2 rounded-full bg-green-500"></span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/50" href="#">
+<span class="material-symbols-outlined text-gray-600 dark:text-white">schedule</span>
+<p class="text-gray-600 dark:text-white text-sm font-medium leading-normal">Mensaje Fuera de Horario</p>
+<span class="ml-auto h-2 w-2 rounded-full bg-gray-400"></span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/50" href="#">
+<span class="material-symbols-outlined text-gray-600 dark:text-white">playlist_add_check</span>
+<p class="text-gray-600 dark:text-white text-sm font-medium leading-normal">Mensaje de Espera en Cola</p>
+<span class="ml-auto h-2 w-2 rounded-full bg-gray-400"></span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto p-6 lg:p-10">
+<div class="mx-auto max-w-7xl">
+<!-- PageHeading -->
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex flex-col gap-2">
+<p class="text-gray-900 dark:text-white text-3xl md:text-4xl font-black leading-tight tracking-[-0.033em]">Configuración de Mensajes Automáticos</p>
+<p class="text-gray-500 dark:text-[#92a9c9] text-base font-normal leading-normal">Personaliza los mensajes que tus clientes ven al iniciar un chat.</p>
+</div>
+<button class="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">save</span>
+              Guardar Cambios
+            </button>
+</div>
+<div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
+<!-- Configuration Column -->
+<div class="flex flex-col gap-6 lg:col-span-2">
+<!-- ActionPanel -->
+<div class="@container rounded-xl border border-gray-200 dark:border-[#324867] bg-white dark:bg-[#111822]">
+<div class="flex flex-1 flex-col items-start justify-between gap-4 p-5 @[480px]:flex-row @[480px]:items-center">
+<div class="flex flex-col gap-1">
+<p class="text-gray-900 dark:text-white text-base font-bold leading-tight">Activar Mensaje de Bienvenida</p>
+<p class="text-gray-500 dark:text-[#92a9c9] text-sm font-normal leading-normal">Habilita este mensaje para que se envíe automáticamente a los usuarios.</p>
+</div>
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full border-none bg-gray-200 dark:bg-[#233348] p-0.5 has-[:checked]:bg-primary">
+<input checked="" class="invisible absolute" type="checkbox"/>
+<div class="h-full w-[27px] transform rounded-full bg-white shadow-md transition-transform duration-300 ease-in-out" style="box-shadow: rgba(0, 0, 0, 0.1) 0px 3px 8px, rgba(0, 0, 0, 0.04) 0px 3px 1px;"></div>
+</label>
+</div>
+</div>
+<!-- Message Editor Section -->
+<div class="rounded-xl border border-gray-200 dark:border-[#324867] bg-white dark:bg-[#111822]">
+<!-- SectionHeader -->
+<h3 class="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] border-b border-gray-200 dark:border-[#324867] px-5 py-4">Contenido del mensaje</h3>
+<div class="p-5">
+<!-- TextField -->
+<div class="flex flex-col gap-4">
+<label class="flex flex-col">
+<p class="text-gray-800 dark:text-white text-sm font-medium leading-normal pb-2">Editor de mensaje</p>
+<div class="relative">
+<div class="flex items-center gap-1 border border-b-0 border-gray-300 dark:border-[#324867] bg-gray-50 dark:bg-[#192433]/50 p-2 rounded-t-lg">
+<button class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700/60"><span class="material-symbols-outlined text-lg text-gray-600 dark:text-gray-300">format_bold</span></button>
+<button class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700/60"><span class="material-symbols-outlined text-lg text-gray-600 dark:text-gray-300">format_italic</span></button>
+<button class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700/60"><span class="material-symbols-outlined text-lg text-gray-600 dark:text-gray-300">format_list_bulleted</span></button>
+<button class="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700/60"><span class="material-symbols-outlined text-lg text-gray-600 dark:text-gray-300">link</span></button>
+</div>
+<textarea class="form-input flex w-full min-w-0 flex-1 resize-y overflow-hidden rounded-b-lg rounded-t-none text-gray-900 dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-[#324867] bg-background-light dark:bg-[#192433] focus:border-primary dark:focus:border-primary min-h-36 placeholder:text-gray-400 dark:placeholder:text-[#92a9c9] p-[15px] text-base font-normal leading-normal">¡Hola, {{nombre_cliente}}! 👋
+
+Bienvenido a {{nombre_tienda}}. ¿Cómo podemos ayudarte hoy?</textarea>
+</div>
+</label>
+</div>
+<!-- Variables Section -->
+<div class="mt-6">
+<div class="flex items-center gap-2">
+<h4 class="text-gray-800 dark:text-white text-sm font-medium leading-normal">Variables Disponibles</h4>
+<span class="material-symbols-outlined text-base text-gray-400 dark:text-gray-500 cursor-help" title="Haz clic para insertar una variable en tu mensaje.">help</span>
+</div>
+<div class="flex flex-wrap gap-2 pt-3">
+<button class="cursor-pointer rounded-full bg-primary/10 dark:bg-primary/20 px-3 py-1 text-xs font-medium text-primary dark:text-blue-300 transition-colors hover:bg-primary/20 dark:hover:bg-primary/30">{{nombre_cliente}}</button>
+<button class="cursor-pointer rounded-full bg-primary/10 dark:bg-primary/20 px-3 py-1 text-xs font-medium text-primary dark:text-blue-300 transition-colors hover:bg-primary/20 dark:hover:bg-primary/30">{{nombre_tienda}}</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Preview Column -->
+<div class="lg:col-span-1">
+<div class="sticky top-10 flex flex-col">
+<h3 class="text-gray-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] mb-4">Vista Previa</h3>
+<div class="flex h-[550px] w-full max-w-sm flex-col rounded-xl border border-gray-200 dark:border-[#324867] bg-white dark:bg-[#111822] shadow-lg">
+<div class="flex items-center gap-3 border-b border-gray-200 dark:border-[#324867] p-3">
+<div class="relative">
+<div class="h-10 w-10 rounded-full bg-cover bg-center" data-alt="Store avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDJbS8ceT4xBVwLDSFLY9xWX3rtLasuFHPels5d9Amy5WkQGFJYJayDn5_6twhAfXB0di08cyhcu0dSr_xNI_xmXKvU_20rTQ5Mfsq3X3A9CXVUh2oXbHJmLYCFg-LAaHZ45oAihosmhVxJF9Z2-iZV2qHTR8b8O0RUq7-ZIQ6GSsc2_D3gZD7v5JJF4zONCWjCiTbiLvv6YxUbZJrgTz0Cc4jLlz2GMsl2d_0ByGFVi7A1Q9xtvUAoEJ5twfVhT8tYclymbHXn054")'></div>
+<span class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-[#111822]"></span>
+</div>
+<div>
+<p class="font-bold text-gray-900 dark:text-white">{{nombre_tienda}}</p>
+<p class="text-xs text-gray-500 dark:text-gray-400">Normalmente responde al instante</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4 bg-gray-100/50 dark:bg-black/20" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBTE_eTXFY8A-NJd3lVnP6zaQJfnSzK_TVpDoOgKa-NPUcLaG1x2Kww8E6v-rdGpR3yrt27M11RFMLgi5QV4562Dwz_AyeSP8OFnkOtwf_NZRzwy8hCiJ9-4meGQjk76THmRLvtv_2kM2-LUu17p49ut-IyLqOicJ33yc0zU7EGhAgTZ6qDn2GLnsPwyPs9rfEZMjvs4MR5QDnfXn46mPCMg6UzsX-6BGLStne7dAe9q2obAwBvRGNWjS2CHvaKpiKRDqXwQBGKklY');">
+<div class="flex flex-col gap-3">
+<div class="flex justify-start">
+<div class="max-w-[80%] rounded-b-xl rounded-tr-xl bg-gray-200 dark:bg-[#233348] p-3">
+<p class="text-sm text-gray-800 dark:text-gray-200">
+<strong>¡Hola, Alex! 👋</strong>
+<br/>
+                            Bienvenido a The Shoe Store. ¿Cómo podemos ayudarte hoy?
+                          </p>
+</div>
+</div>
+<div class="flex justify-end">
+<div class="max-w-[80%] rounded-b-xl rounded-tl-xl bg-primary text-white p-3">
+<p class="text-sm">Hola, quisiera saber si tienen stock de las zapatillas modelo X en talle 42.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2 border-t border-gray-200 dark:border-[#324867] p-3">
+<span class="material-symbols-outlined text-gray-500">add_circle</span>
+<input class="flex-1 bg-transparent text-sm focus:outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-900 dark:text-white" placeholder="Escribe un mensaje..." type="text"/>
+<span class="material-symbols-outlined text-gray-500">mood</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

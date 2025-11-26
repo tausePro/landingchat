@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>¡Felicidades! Tu espacio de trabajo está listo.</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b7cee",
+            "background-light": "#f6f7f8",
+            "background-dark": "#101822",
+            "text-light": "#0d131b",
+            "text-dark": "#f6f7f8",
+            "subtext-light": "#4c6c9a",
+            "subtext-dark": "#94a3b8",
+            "card-light": "#ffffff",
+            "card-dark": "#1e293b",
+            "border-light": "#cfd9e7",
+            "border-dark": "#334155",
+            "button-secondary-light": "#e7ecf3",
+            "button-secondary-dark": "#334155",
+            "button-secondary-text-dark": "#f6f7f8"
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark group/design-root overflow-x-hidden text-text-light dark:text-text-dark">
+<div class="layout-container flex h-full grow flex-col">
+<div class="flex flex-1 justify-center py-10 px-4 sm:px-6 lg:px-8">
+<div class="layout-content-container flex flex-col w-full max-w-3xl flex-1 gap-8">
+<!-- Icono de Éxito -->
+<div class="flex justify-center">
+<div class="flex h-24 w-24 items-center justify-center rounded-full bg-primary/20 text-primary">
+<span class="material-symbols-outlined !text-6xl">check_circle</span>
+</div>
+</div>
+<!-- PageHeading -->
+<div class="flex flex-wrap justify-center gap-3 text-center">
+<div class="flex w-full flex-col items-center gap-3">
+<h1 class="text-text-light dark:text-text-dark text-4xl font-black leading-tight tracking-[-0.033em] sm:text-5xl">¡Felicidades! Tu espacio de trabajo está listo.</h1>
+<p class="text-subtext-light dark:text-subtext-dark text-base font-normal leading-normal max-w-2xl">Has configurado con éxito tu tienda y tu primer agente. Ahora estás listo para empezar a vender y conversar con tus clientes.</p>
+</div>
+</div>
+<!-- TextGrid - Próximos Pasos -->
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+<div class="flex flex-1 flex-col gap-3 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6 text-center items-center">
+<div class="text-primary">
+<span class="material-symbols-outlined !text-3xl">dashboard</span>
+</div>
+<div class="flex flex-col gap-1">
+<h2 class="text-text-light dark:text-text-dark text-lg font-bold leading-tight">Explora tu Dashboard</h2>
+<p class="text-subtext-light dark:text-subtext-dark text-sm font-normal leading-normal">Visualiza tus métricas y gestiona tu operación.</p>
+</div>
+</div>
+<div class="flex flex-1 flex-col gap-3 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6 text-center items-center">
+<div class="text-primary">
+<span class="material-symbols-outlined !text-3xl">smart_toy</span>
+</div>
+<div class="flex flex-col gap-1">
+<h2 class="text-text-light dark:text-text-dark text-lg font-bold leading-tight">Conoce a tu Agente</h2>
+<p class="text-subtext-light dark:text-subtext-dark text-sm font-normal leading-normal">Prueba las conversaciones y personaliza sus respuestas.</p>
+</div>
+</div>
+<div class="flex flex-1 flex-col gap-3 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6 text-center items-center">
+<div class="text-primary">
+<span class="material-symbols-outlined !text-3xl">add_shopping_cart</span>
+</div>
+<div class="flex flex-col gap-1">
+<h2 class="text-text-light dark:text-text-dark text-lg font-bold leading-tight">Añade más productos</h2>
+<p class="text-subtext-light dark:text-subtext-dark text-sm font-normal leading-normal">Amplía tu catálogo para ofrecer más a tus clientes.</p>
+</div>
+</div>
+</div>
+<!-- ButtonGroup - CTAs -->
+<div class="flex justify-center pt-4">
+<div class="flex w-full flex-col sm:flex-row flex-wrap gap-3 max-w-lg justify-center">
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] grow sm:grow-0 sm:w-auto">
+<span class="truncate">Ir al Dashboard</span>
+</button>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-button-secondary-light dark:bg-button-secondary-dark text-text-light dark:text-button-secondary-text-dark text-base font-bold leading-normal tracking-[0.015em] grow sm:grow-0 sm:w-auto">
+<span class="truncate">Gestionar Agentes</span>
+</button>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-5 bg-button-secondary-light dark:bg-button-secondary-dark text-text-light dark:text-button-secondary-text-dark text-base font-bold leading-normal tracking-[0.015em] grow sm:grow-0 sm:w-auto">
+<span class="truncate">Añadir Productos</span>
+</button>
+</div>
+</div>
+<!-- Skip Link -->
+<div class="flex justify-center pt-2">
+<a class="text-subtext-light dark:text-subtext-dark text-sm font-medium hover:text-primary dark:hover:text-primary" href="#">O saltar por ahora</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LandingChat - Roles &amp; Permissions</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24;
+            font-size: 24px;
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#3B82F6",
+              "background-light": "#f9fafb",
+              "background-dark": "#111822",
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.5rem", "lg": "0.75rem", "xl": "1rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col">
+<div class="flex h-full min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex h-screen min-h-[700px] w-64 flex-col justify-between border-r border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark p-4">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3 px-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat company logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAtlB1UW7FChAxcYS9Is3v2osHB-95TI8zv24RzPwIysYpAkawIKlL2X9b_gh5Z18BGDCjCiG5LBKeY2ebF-qIT7Rt1SrD_bi5_c4L8vsxU34ge1mi1AjnGtJeTG0TeZtg1cE4TpcNCx3yY4eRQAHynWRgE5DG0sPUbJJHsPfRt_Nab1LU-p3v_JLdja8XKpJoNzx7_nq0ss4UHMJp2B3JWia60ReLchTu2Q_s-gO6l4d3klIH2T5lVUrEZqIweCe1B0x58n8Ul2Lw");'></div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-white text-base font-bold leading-normal">LandingChat</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Growth Plan</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">inbox</span>
+<p class="text-sm font-medium leading-normal">Inbox</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<p class="text-sm font-medium leading-normal">Analytics</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">manage_accounts</span>
+<p class="text-sm font-bold leading-normal">Roles &amp; Permissions</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">toggle_on</span>
+<p class="text-sm font-medium leading-normal">Settings</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg" href="#">
+<span class="material-symbols-outlined">help</span>
+<p class="text-sm font-medium leading-normal">Help Center</p>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex-col overflow-y-auto">
+<!-- PageHeading -->
+<header class="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm p-6">
+<div class="flex flex-wrap items-center justify-between gap-4">
+<div class="flex flex-col gap-1">
+<h1 class="text-slate-900 dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em]">Roles &amp; Permissions</h1>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Manage what your team members can see and do within LandingChat.</p>
+</div>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+<!-- Left Column: Roles List -->
+<div class="lg:col-span-1 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<h2 class="text-lg font-bold text-slate-900 dark:text-white">Roles</h2>
+<button class="flex items-center justify-center gap-2 overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined !text-xl">add</span>
+<span class="truncate">Crear Nuevo Rol</span>
+</button>
+</div>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between items-center p-3 rounded-lg cursor-pointer bg-slate-100 dark:bg-slate-800 border border-primary/50">
+<span class="font-semibold text-slate-900 dark:text-white">Agente de Ventas</span>
+<span class="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-full">15 Usuarios</span>
+</div>
+<div class="flex justify-between items-center p-3 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">
+<span class="font-medium text-slate-700 dark:text-slate-300">Supervisor de Soporte</span>
+<span class="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-full">8 Usuarios</span>
+</div>
+<div class="flex justify-between items-center p-3 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800">
+<span class="font-medium text-slate-700 dark:text-slate-300">Administrador</span>
+<span class="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded-full">5 Usuarios</span>
+</div>
+</div>
+</div>
+<!-- Right Column: Role Details -->
+<div class="lg:col-span-2 flex flex-col gap-6">
+<!-- Role Details Header -->
+<div class="flex flex-col gap-4">
+<h2 class="text-slate-900 dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em]">Editando rol: Agente de Ventas</h2>
+<div class="flex flex-col gap-4">
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" for="role-name">Nombre del Rol</label>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-primary focus:border-primary" id="role-name" type="text" value="Agente de Ventas"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" for="role-description">Descripción</label>
+<textarea class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-primary focus:border-primary" id="role-description" rows="2">Acceso a chats asignados y métricas de ventas.</textarea>
+</div>
+</div>
+</div>
+<!-- SegmentedButtons for Permissions/Users -->
+<div class="flex w-full">
+<div class="flex h-10 w-full items-center justify-center rounded-lg bg-slate-200 dark:bg-slate-800 p-1">
+<label class="flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-lg px-2 has-[:checked]:bg-white dark:has-[:checked]:bg-slate-900 has-[:checked]:shadow-sm has-[:checked]:text-primary dark:has-[:checked]:text-primary text-slate-600 dark:text-slate-400 text-sm font-medium leading-normal">
+<span class="truncate">Permisos del Rol</span>
+<input checked="" class="invisible w-0" name="details-tab" type="radio" value="Permissions"/>
+</label>
+<label class="flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-lg px-2 has-[:checked]:bg-white dark:has-[:checked]:bg-slate-900 has-[:checked]:shadow-sm has-[:checked]:text-primary dark:has-[:checked]:text-primary text-slate-600 dark:text-slate-400 text-sm font-medium leading-normal">
+<span class="truncate">Usuarios Asignados</span>
+<input class="invisible w-0" name="details-tab" type="radio" value="Users"/>
+</label>
+</div>
+</div>
+<!-- Permissions List -->
+<div class="flex flex-col gap-6">
+<!-- Permission Group -->
+<div class="flex flex-col gap-4">
+<h3 class="font-bold text-slate-900 dark:text-white">Gestión de Conversaciones</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+<div>
+<p class="font-medium text-slate-800 dark:text-slate-200">Ver historial de chats asignados</p>
+<p class="text-sm text-slate-500 dark:text-slate-400">Puede ver todas las conversaciones que le han sido asignadas.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+<div>
+<p class="font-medium text-slate-800 dark:text-slate-200">Ver historial de chats de otros agentes</p>
+<p class="text-sm text-slate-500 dark:text-slate-400">Permite el acceso a conversaciones de otros miembros del equipo.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</div>
+<!-- Permission Group -->
+<div class="flex flex-col gap-4">
+<h3 class="font-bold text-slate-900 dark:text-white">Acceso a Reportes</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+<div>
+<p class="font-medium text-slate-800 dark:text-slate-200">Crear nuevos informes de ventas</p>
+<p class="text-sm text-slate-500 dark:text-slate-400">Permite generar y exportar reportes sobre el rendimiento de ventas.</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/50 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+<div>
+<p class="font-medium text-slate-400 dark:text-slate-500">Configurar agente IA (solo Administradores)</p>
+<p class="text-sm text-slate-400 dark:text-slate-500">Permiso restringido para modificar la configuración de los agentes IA.</p>
+</div>
+<label class="relative inline-flex items-center cursor-not-allowed">
+<input class="sr-only peer" disabled="" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 dark:after:bg-slate-600 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex justify-end items-center gap-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-transparent text-red-500 dark:text-red-500 text-sm font-bold leading-normal tracking-[0.015em] hover:bg-red-500/10 transition-colors">
+<span class="truncate">Eliminar Rol</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors">
+<span class="truncate">Guardar Cambios</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>
