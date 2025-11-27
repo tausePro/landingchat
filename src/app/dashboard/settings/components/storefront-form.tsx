@@ -6,6 +6,9 @@ import { TemplateSelector } from "./template-selector"
 import { LivePreview } from "./live-preview"
 import { HeaderEditor } from "./header-editor"
 import { FooterEditor } from "./footer-editor"
+import { ProductFeaturesEditor } from "./product-features-editor"
+import { ProductSectionEditor } from "./product-section-editor"
+import { ServicesSectionEditor } from "./services-section-editor"
 import { CompleteTemplateEditor } from "./complete-template-editor"
 import { ServicesTemplateEditor } from "./services-template-editor"
 import { SingleProductTemplateEditor } from "./single-product-template-editor"
@@ -34,13 +37,23 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
 
                 {/* Dynamic Template Configuration */}
                 {selectedTemplate === "complete" && (
-                    <CompleteTemplateEditor organization={organization} />
+                    <>
+                        <CompleteTemplateEditor organization={organization} />
+                        <ProductFeaturesEditor organization={organization} />
+                        <ProductSectionEditor organization={organization} />
+                    </>
                 )}
                 {selectedTemplate === "services" && (
-                    <ServicesTemplateEditor organization={organization} />
+                    <>
+                        <ServicesTemplateEditor organization={organization} />
+                        <ServicesSectionEditor organization={organization} />
+                    </>
                 )}
                 {selectedTemplate === "single-product" && (
-                    <SingleProductTemplateEditor organization={organization} />
+                    <>
+                        <SingleProductTemplateEditor organization={organization} />
+                        <ProductFeaturesEditor organization={organization} />
+                    </>
                 )}
 
                 <TypographySelector organization={organization} />
