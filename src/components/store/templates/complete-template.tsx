@@ -24,6 +24,13 @@ export function CompleteTemplate({
     const showChatButton = heroSettings.showChatButton ?? true
     const chatButtonText = heroSettings.chatButtonText || "Chatear para Comprar"
 
+    const templateConfig = organization.settings?.storefront?.templateConfig?.complete || {}
+    const steps = templateConfig.steps || [
+        { id: "1", title: "1. Chatea", description: "Cuéntale a nuestro asistente qué necesitas, como si hablaras con un amigo." },
+        { id: "2", title: "2. Elige", description: "Recibe recomendaciones personalizadas y selecciona tu favorita." },
+        { id: "3", title: "3. Recibe", description: "Coordina el envío y el pago directamente en el chat. ¡Listo!" }
+    ]
+
     return (
         <>
             {/* Hero Section - Complete */}
@@ -129,27 +136,20 @@ export function CompleteTemplate({
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-8">
-                        <div className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                            <div className="w-16 h-16 mx-auto bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600 mb-6">
-                                <MessageCircle className="w-8 h-8" />
+                        {steps.map((step: any, index: number) => (
+                            <div key={step.id || index} className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                                <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-6 ${index === 0 ? 'bg-blue-100 text-blue-600' :
+                                        index === 1 ? 'bg-purple-100 text-purple-600' :
+                                            'bg-green-100 text-green-600'
+                                    }`}>
+                                    {index === 0 ? <MessageCircle className="w-8 h-8" /> :
+                                        index === 1 ? <ShoppingBag className="w-8 h-8" /> :
+                                            <Truck className="w-8 h-8" />}
+                                </div>
+                                <h3 className="text-xl font-bold mb-3">{step.title}</h3>
+                                <p className="text-gray-600">{step.description}</p>
                             </div>
-                            <h3 className="text-xl font-bold mb-3">1. Chatea</h3>
-                            <p className="text-gray-600">Cuéntale a nuestro asistente qué necesitas, como si hablaras con un amigo.</p>
-                        </div>
-                        <div className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                            <div className="w-16 h-16 mx-auto bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600 mb-6">
-                                <ShoppingBag className="w-8 h-8" />
-                            </div>
-                            <h3 className="text-xl font-bold mb-3">2. Elige</h3>
-                            <p className="text-gray-600">Recibe recomendaciones personalizadas y selecciona tu favorita.</p>
-                        </div>
-                        <div className="text-center p-6 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                            <div className="w-16 h-16 mx-auto bg-green-100 rounded-2xl flex items-center justify-center text-green-600 mb-6">
-                                <Truck className="w-8 h-8" />
-                            </div>
-                            <h3 className="text-xl font-bold mb-3">3. Recibe</h3>
-                            <p className="text-gray-600">Coordina el envío y el pago directamente en el chat. ¡Listo!</p>
-                        </div>
+                        ))}
                     </div>
                 </div>
             </section>

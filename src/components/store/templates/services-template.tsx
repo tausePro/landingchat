@@ -23,6 +23,12 @@ export function ServicesTemplate({
     const showChatButton = heroSettings.showChatButton ?? true
     const chatButtonText = heroSettings.chatButtonText || "Agendar Consulta"
 
+    const templateConfig = organization.settings?.storefront?.templateConfig?.services || {}
+    const testimonials = templateConfig.testimonials || [
+        { id: "1", title: "Cliente Verificado", description: "El servicio superó todas mis expectativas. La atención al detalle y la profesionalidad del equipo son inigualables." },
+        { id: "2", title: "CEO, Tech Company", description: "Increíble experiencia de trabajo. Altamente recomendados para cualquier proyecto serio." }
+    ]
+
     return (
         <>
             {/* Hero Section - Services */}
@@ -144,17 +150,17 @@ export function ServicesTemplate({
                             </div>
                         </div>
                         <div className="grid gap-6">
-                            {[1, 2].map((i) => (
-                                <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            {testimonials.map((testimonial: any, index: number) => (
+                                <div key={testimonial.id || index} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                                     <div className="flex gap-1 text-yellow-400 mb-4">
                                         {[1, 2, 3, 4, 5].map((s) => <Star key={s} className="w-4 h-4 fill-current" />)}
                                     </div>
-                                    <p className="text-slate-700 mb-4 italic">"El servicio superó todas mis expectativas. La atención al detalle y la profesionalidad del equipo son inigualables."</p>
+                                    <p className="text-slate-700 mb-4 italic">"{testimonial.description}"</p>
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-slate-200" />
                                         <div>
-                                            <div className="font-bold text-sm text-slate-900">Cliente Verificado</div>
-                                            <div className="text-xs text-slate-500">CEO, Tech Company</div>
+                                            <div className="font-bold text-sm text-slate-900">{testimonial.title}</div>
+                                            <div className="text-xs text-slate-500">Cliente Verificado</div>
                                         </div>
                                     </div>
                                 </div>

@@ -32,6 +32,14 @@ export function SingleProductTemplate({
         image_url: null
     }
 
+    const templateConfig = organization.settings?.storefront?.templateConfig?.singleProduct || {}
+    const specs = templateConfig.specs || [
+        { id: "1", title: "Característica 1", description: "Descripción detallada de la característica 1" },
+        { id: "2", title: "Característica 2", description: "Descripción detallada de la característica 2" },
+        { id: "3", title: "Característica 3", description: "Descripción detallada de la característica 3" },
+        { id: "4", title: "Característica 4", description: "Descripción detallada de la característica 4" }
+    ]
+
     return (
         <>
             {/* Split Hero Section */}
@@ -154,10 +162,12 @@ export function SingleProductTemplate({
                             <div className="border-t border-gray-100 pt-8">
                                 <h4 className="font-bold mb-4">Características Principales</h4>
                                 <ul className="space-y-3">
-                                    {[1, 2, 3, 4].map((i) => (
-                                        <li key={i} className="flex items-start gap-3">
+                                    {specs.map((spec: any, index: number) => (
+                                        <li key={spec.id || index} className="flex items-start gap-3">
                                             <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                                            <span className="text-gray-600">Característica increíble número {i} que te encantará.</span>
+                                            <span className="text-gray-600">
+                                                <strong>{spec.title}: </strong> {spec.description}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
