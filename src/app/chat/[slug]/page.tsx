@@ -33,6 +33,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [input, setInput] = useState("")
     const [products, setProducts] = useState<any[]>([])
     const [agent, setAgent] = useState<any>(null)
+    const [organization, setOrganization] = useState<any>(null)
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const { addItem } = useCartStore()
@@ -61,12 +62,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         setCustomerId(storedCustomerId)
         setCustomerName(storedCustomerName)
 
-        // Cargar productos y agente (necesario para la UI)
+        // Cargar productos, agente y organización
         getStoreProducts(slug).then((data) => {
             if (data) {
                 setProducts(data.products)
-                // El agente se actualizará con la respuesta del init si es necesario, 
-                // pero cargamos uno por defecto por si acaso
+                setOrganization(data.organization)
                 if (!agent) setAgent(data.agent)
             }
         })
@@ -228,7 +228,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }).format(price)
     }
 
-    if (isInitializing) {
+    if (isInitializing || !organization) {
         return (
             <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
                 <div className="text-center">
@@ -239,17 +239,46 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         )
     }
 
+    const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
+    const showStoreName = organization.settings?.storefront?.header?.showStoreName ?? true
+
     return (
         <>
-            {/* Chat Header */}
-            <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-900">
-                <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-gray-200 dark:border-gray-700 relative"
-                    style={{ backgroundImage: `url("${agent?.avatar_url || 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o'}")` }}>
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-900 rounded-full"></span>
-                </div>
-                <div className="flex flex-col">
-                    <h1 className="text-base font-bold leading-normal text-slate-900 dark:text-white">{agent?.name || 'Asistente de Compras'}</h1>
-                    <p className="text-green-600 dark:text-green-400 text-xs font-medium leading-normal">En línea</p>
+            {/* Storefront-style Header */}
+            <div className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
+                <div className="container mx-auto flex h-16 items-center justify-between px-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => router.push(`/store/${slug}`)}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/store/${slug}`)}>
+                            {organization.logo_url ? (
+                                <img
+                                    src={organization.logo_url}
+                                    alt={organization.name}
+                                    className="h-10 w-auto object-contain max-w-[120px] md:max-w-[150px]"
+                                />
+                            ) : (
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg">
+                                    {organization.name.substring(0, 1)}
+                                </div>
+                            )}
+                            {showStoreName && (
+                                <span className="text-lg md:text-xl font-bold tracking-tight">{organization.name}</span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-full text-sm font-medium">
+                            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                            Chateando con {agent?.name || 'Asistente'}
+                        </div>
+                    </div>
                 </div>
             </div>
 

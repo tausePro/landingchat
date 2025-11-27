@@ -5,16 +5,16 @@ import { createClient } from "@/lib/supabase/server"
 export async function getStoreProducts(slug: string) {
     const supabase = await createClient()
 
-    // 1. Get Organization ID from Slug
+    // 1. Get Organization from Slug
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name")
+        .select("*")
         .eq("slug", slug)
         .single()
 
     if (orgError || !org) {
         console.error("Error fetching organization:", orgError)
-        return { products: [], agent: null }
+        return { products: [], agent: null, organization: null }
     }
 
     // 2. Get Products for that Organization
@@ -27,7 +27,7 @@ export async function getStoreProducts(slug: string) {
 
     if (prodError) {
         console.error("Error fetching products:", prodError)
-        return { products: [], agent: null }
+        return { products: [], agent: null, organization: org }
     }
 
     // 3. Get Active Agent
@@ -41,6 +41,7 @@ export async function getStoreProducts(slug: string) {
 
     return {
         products: products || [],
-        agent: agent || null
+        agent: agent || null,
+        organization: org
     }
 }

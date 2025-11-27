@@ -25,7 +25,9 @@ export function StoreLayoutClient({ slug, organization, products, children }: St
     const storefrontSettings = organization.settings?.storefront || {}
     const heroSettings = storefrontSettings.hero || {}
     const typographySettings = storefrontSettings.typography || {}
+    const headerSettings = storefrontSettings.header || {}
     const selectedTemplate = storefrontSettings.template || "minimal"
+    const showStoreName = headerSettings.showStoreName ?? true
 
     // Typography
     const fontFamily = typographySettings.fontFamily || "Inter"
@@ -70,15 +72,21 @@ export function StoreLayoutClient({ slug, organization, products, children }: St
             {/* --- Header --- */}
             <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push(`/store/${slug}`)}>
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/store/${slug}`)}>
                         {organization.logo_url ? (
-                            <img src={organization.logo_url} alt={organization.name} className="h-8 w-auto object-contain" />
+                            <img
+                                src={organization.logo_url}
+                                alt={organization.name}
+                                className="h-10 w-auto object-contain max-w-[120px] md:max-w-[150px]"
+                            />
                         ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg">
                                 {organization.name.substring(0, 1)}
                             </div>
                         )}
-                        <span className="text-lg font-bold tracking-tight">{organization.name}</span>
+                        {showStoreName && (
+                            <span className="text-lg md:text-xl font-bold tracking-tight">{organization.name}</span>
+                        )}
                     </div>
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
                         <a href={`/store/${slug}`} className="hover:text-primary transition-colors">Inicio</a>
@@ -88,7 +96,7 @@ export function StoreLayoutClient({ slug, organization, products, children }: St
                         <Button
                             onClick={() => handleStartChat()}
                             style={{ backgroundColor: primaryColor }}
-                            className="font-bold shadow-lg shadow-blue-500/20"
+                            className="font-bold shadow-lg shadow-blue-500/20 text-sm md:text-base px-4 md:px-6"
                         >
                             Iniciar Chat
                         </Button>

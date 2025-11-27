@@ -4,6 +4,7 @@ import { HeroEditor } from "./hero-editor"
 import { TypographySelector } from "./typography-selector"
 import { TemplateSelector } from "./template-selector"
 import { LivePreview } from "./live-preview"
+import { HeaderEditor } from "./header-editor"
 import { CompleteTemplateEditor } from "./complete-template-editor"
 import { ServicesTemplateEditor } from "./services-template-editor"
 import { SingleProductTemplateEditor } from "./single-product-template-editor"
@@ -25,6 +26,8 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
             {/* Left Column: Configuration (2/3) */}
             <div className="lg:col-span-2 space-y-8">
                 <TemplateSelector organization={organization} />
+
+                <HeaderEditor organization={organization} />
 
                 <HeroEditor organization={organization} />
 
