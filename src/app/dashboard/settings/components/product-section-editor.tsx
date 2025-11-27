@@ -75,10 +75,10 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Sección de Productos</CardTitle>
-                <CardDescription>
+        <Card className="bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-800">
+            <CardHeader className="pb-6">
+                <CardTitle className="text-xl font-bold text-[#1F2937] dark:text-white">Sección de Productos</CardTitle>
+                <CardDescription className="text-base text-[#6B7280] dark:text-gray-400">
                     Configura cómo se muestran los productos en el grid de tu tienda
                 </CardDescription>
             </CardHeader>
@@ -215,7 +215,11 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                     )}
                 </div>
 
-                <Button onClick={handleSave} disabled={loading} className="w-full mt-6">
+                <Button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="w-full h-12 bg-primary hover:bg-primary/90 text-white text-base font-bold mt-6"
+                >
                     {loading ? "Guardando..." : "Guardar Configuración"}
                 </Button>
             </CardContent>

@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -84,81 +83,98 @@ export function ProductFeaturesEditor({ organization }: ProductFeaturesEditorPro
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Características del Producto</CardTitle>
-                <CardDescription>
+        <Card className="bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-800">
+            <CardHeader className="pb-6">
+                <CardTitle className="text-xl font-bold text-[#1F2937] dark:text-white">Características del Producto</CardTitle>
+                <CardDescription className="text-base text-[#6B7280] dark:text-gray-400">
                     Configura los badges que aparecen debajo del botón "Iniciar chat"
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="space-y-4">
+            <CardContent className="space-y-6">
+                <div className="space-y-6">
                     {features.map((feature, index) => (
-                        <div key={index} className="flex items-start gap-4 p-4 border rounded-lg">
-                            <div className="flex-1 space-y-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-24">
-                                        <Label className="text-xs">Ícono</Label>
-                                        <Input
-                                            value={feature.icon}
-                                            onChange={(e) => handleIconChange(index, e.target.value)}
-                                            className="h-9 text-sm"
-                                            placeholder="check_circle"
-                                        />
-                                    </div>
-                                    <div className="flex-1">
-                                        <Label className="text-xs">Título</Label>
-                                        <Input
-                                            value={feature.title}
-                                            onChange={(e) => handleTitleChange(index, e.target.value)}
-                                            className="h-9"
-                                            placeholder="Ej: Envío Gratis"
-                                        />
-                                    </div>
-                                    <div className="flex flex-col items-center gap-1 pt-5">
-                                        <Switch
-                                            checked={feature.enabled}
-                                            onCheckedChange={() => handleToggle(index)}
-                                        />
-                                        <span className="text-xs text-muted-foreground">
-                                            {feature.enabled ? "Activo" : "Inactivo"}
-                                        </span>
-                                    </div>
+                        <div key={index} className="border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+                            {/* Input Row */}
+                            <div className="grid grid-cols-12 gap-4 items-start mb-4">
+                                <div className="col-span-3">
+                                    <label className="text-sm font-medium text-[#1F2937] dark:text-gray-300 block mb-2">
+                                        Ícono
+                                    </label>
+                                    <Input
+                                        value={feature.icon}
+                                        onChange={(e) => handleIconChange(index, e.target.value)}
+                                        className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700"
+                                        placeholder="local_shipping"
+                                    />
                                 </div>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <span className="material-symbols-outlined text-lg">{feature.icon}</span>
-                                    <span>{feature.title}</span>
+                                <div className="col-span-6">
+                                    <label className="text-sm font-medium text-[#1F2937] dark:text-gray-300 block mb-2">
+                                        Título
+                                    </label>
+                                    <Input
+                                        value={feature.title}
+                                        onChange={(e) => handleTitleChange(index, e.target.value)}
+                                        className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700"
+                                        placeholder="Ej: Envío Gratis"
+                                    />
+                                </div>
+                                <div className="col-span-2 flex flex-col items-center pt-7">
+                                    <Switch
+                                        checked={feature.enabled}
+                                        onCheckedChange={() => handleToggle(index)}
+                                    />
+                                    <span className="text-xs text-[#6B7280] dark:text-gray-400 mt-1">
+                                        Activo
+                                    </span>
+                                </div>
+                                <div className="col-span-1 flex justify-end pt-7">
+                                    <button
+                                        onClick={() => handleRemoveFeature(index)}
+                                        className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-xl">delete</span>
+                                    </button>
                                 </div>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveFeature(index)}
-                                className="text-red-500 hover:text-red-700"
-                            >
-                                <span className="material-symbols-outlined">delete</span>
-                            </Button>
+
+                            {/* Preview Row */}
+                            <div className="flex items-center gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                                <span className="material-symbols-outlined text-2xl text-[#1F2937] dark:text-gray-300">
+                                    {feature.icon}
+                                </span>
+                                <span className="text-base font-medium text-[#1F2937] dark:text-gray-200">
+                                    {feature.title}
+                                </span>
+                            </div>
                         </div>
                     ))}
                 </div>
 
-                <Button
-                    variant="outline"
+                <button
                     onClick={handleAddFeature}
-                    className="w-full"
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-gray-200 dark:border-gray-700 rounded-lg text-base font-medium text-[#1F2937] dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
                 >
-                    <span className="material-symbols-outlined mr-2">add</span>
+                    <span className="material-symbols-outlined text-xl">add</span>
                     Agregar Característica
-                </Button>
+                </button>
 
-                <Button onClick={handleSave} disabled={loading} className="w-full">
+                <Button
+                    onClick={handleSave}
+                    disabled={loading}
+                    className="w-full h-12 bg-primary hover:bg-primary/90 text-white text-base font-bold"
+                >
                     {loading ? "Guardando..." : "Guardar Configuración"}
                 </Button>
 
-                <div className="pt-4 border-t">
-                    <p className="text-xs text-muted-foreground">
-                        💡 <strong>Tip:</strong> Usa íconos de Material Symbols.
-                        <a href="https://fonts.google.com/icons" target="_blank" rel="noopener" className="text-primary hover:underline ml-1">
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                    <p className="text-sm text-[#6B7280] dark:text-gray-400">
+                        💡 <strong>Tip:</strong> Usa íconos de Material Symbols.{" "}
+                        <a
+                            href="https://fonts.google.com/icons"
+                            target="_blank"
+                            rel="noopener"
+                            className="text-primary hover:underline"
+                        >
                             Ver catálogo de íconos
                         </a>
                     </p>
