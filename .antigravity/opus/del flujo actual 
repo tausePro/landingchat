@@ -1,0 +1,311 @@
+Los dos journeys de LandingChat
+Journey 1: El comerciante (usuario de LandingChat)
+Este es tu cliente directo, quien paga por la plataforma.
+¿Quién es?
+Dueño de negocio pequeño/mediano en Colombia y Latam. Vende productos o servicios. No es técnico. Probablemente ya vende por WhatsApp de forma manual y quiere profesionalizar.
+Su problema:
+
+Responde mensajes todo el día manualmente
+No tiene tienda web o la que tiene no convierte
+Pierde ventas por no responder rápido
+No conoce a sus clientes (sin CRM)
+No puede escalar sin contratar más gente
+
+Su journey en LandingChat:
+DESCUBRIMIENTO → REGISTRO → ONBOARDING → CONFIGURACIÓN → OPERACIÓN → CRECIMIENTO
+
+1. Descubrimiento
+   - Ve un anuncio o referido
+   - Entra a landingchat.co
+   - Entiende la propuesta: "Vende por chat con IA"
+
+2. Registro
+   - Crea cuenta (email/Google)
+   - Trial gratuito o plan básico
+
+3. Onboarding (lo que ya tienen)
+   - Configura datos de tienda
+   - Crea/personaliza su agente de IA
+   - Sube productos (manual, CSV, o integración)
+   - Configura pagos y envíos
+
+4. Configuración de Storefront (el builder)
+   - Elige template
+   - Personaliza colores, textos, logo
+   - Publica su tienda: mitienda.landingchat.co
+
+5. Operación diaria
+   - Dashboard: ve conversaciones, ventas, métricas
+   - Interviene en chats cuando es necesario
+   - Agrega/edita productos
+   - Ve órdenes y gestiona envíos
+
+6. Crecimiento
+   - Configura automatizaciones (remarketing, recordatorios)
+   - Analiza métricas de conversión
+   - Agrega más agentes o canales (WhatsApp, Instagram)
+   - Escala a plan superior
+
+Journey 2: El comprador (cliente de cada tienda)
+Este es el cliente final que compra en las tiendas creadas con LandingChat.
+¿Quién es?
+Consumidor colombiano/latam. Acostumbrado a comprar por WhatsApp. Prefiere conversar antes de comprar. Desconfía de tiendas desconocidas.
+Su problema:
+
+Quiere comprar pero tiene dudas
+No quiere navegar catálogos enormes
+Quiere respuestas inmediatas
+Necesita confianza antes de pagar
+
+Su journey en una tienda LandingChat:
+LLEGADA → CONVERSACIÓN → IDENTIFICACIÓN → DESCUBRIMIENTO → CARRITO → CHECKOUT → POST-VENTA
+
+1. Llegada
+   - Entra por link (redes, anuncio, WhatsApp)
+   - Ve la landing de la tienda
+   - Click en "Iniciar Chat" o llega directo al chat
+
+2. Conversación inicial
+   - El agente IA saluda
+   - Pide nombre y contacto (identificación)
+   - Pregunta qué busca
+
+3. Identificación (CLAVE)
+   - Cliente da su nombre y WhatsApp/email
+   - Se crea en el CRM
+   - Si ya existía, el agente lo reconoce:
+     "¡Hola María! ¿Cómo te fue con las zapatillas?"
+
+4. Descubrimiento de productos
+   - Cliente describe lo que busca
+   - Agente recomienda productos relevantes
+   - Muestra cards con imagen, precio, botón
+   - Responde preguntas (tallas, envío, etc.)
+
+5. Carrito
+   - Cliente agrega productos desde el chat
+   - Puede modificar cantidades
+   - Ve resumen en cualquier momento
+
+6. Checkout
+   - Cliente decide comprar
+   - Proporciona dirección de envío
+   - Elige método de pago
+   - Confirma orden
+
+7. Post-venta
+   - Recibe confirmación por chat/email
+   - Puede consultar estado del pedido
+   - Recibe seguimiento proactivo:
+     "Tu pedido está en camino"
+   - Días después: "¿Qué tal te pareció?"
+
+8. Recompra (el ciclo virtuoso)
+   - Recibe recordatorios inteligentes
+   - Ofertas personalizadas
+   - Ya lo conocen, compra más fácil
+
+La ventaja competitiva de LandingChat
+Para el comerciante:
+ProblemaSolución tradicionalSolución LandingChatResponder mensajesContratar personaAgente IA 24/7Crear tienda webDesarrollador o Shopify ($$$)Builder simple incluidoConocer clientesExcel o nadaCRM automáticoRemarketingMailchimp + saber usarloAutomatizado desde el chatEscalar ventasMás personalMisma IA, infinitos chats
+Para el comprador:
+Experiencia tradicionalExperiencia LandingChatNavegar catálogo enorme"¿Qué buscas?" → recomendaciónEsperar respuesta de WhatsAppRespuesta instantáneaRepetir info cada vez"Hola María, te recuerdo"Checkout en otra páginaCompra sin salir del chatNo saber estado del pedidoConsulta en el mismo chat
+El diferenciador único:
+"La tienda ES la conversación"
+No es un chatbot pegado a un e-commerce. No es un widget de soporte. Es un modelo donde la conversación es el mecanismo principal de descubrimiento, venta y fidelización.
+
+Diagrama Mermaid: Vista completa del sistema
+mermaidflowchart TB
+    subgraph LANDINGCHAT["🏢 PLATAFORMA LANDINGCHAT"]
+        direction TB
+        
+        subgraph COMERCIANTE["👔 Journey del Comerciante"]
+            C1[Landing Page\nlandingchat.co] --> C2[Registro/Login]
+            C2 --> C3[Onboarding]
+            C3 --> C4[Dashboard]
+            
+            subgraph DASHBOARD["📊 Dashboard"]
+                D1[Conversaciones]
+                D2[Productos]
+                D3[Órdenes]
+                D4[Clientes/CRM]
+                D5[Store Builder]
+                D6[Agentes]
+                D7[Automatizaciones]
+                D8[Analytics]
+            end
+            
+            C4 --> DASHBOARD
+        end
+        
+        subgraph BUILDER["🎨 Store Builder"]
+            B1[Elegir Template] --> B2[Personalizar Marca]
+            B2 --> B3[Configurar Secciones]
+            B3 --> B4[Preview en Vivo]
+            B4 --> B5[Publicar]
+            B5 --> STORE
+        end
+        
+        subgraph AGENTES["🤖 Sistema de Agentes"]
+            A1[Agent Templates\nMarketplace]
+            A2[Configuración\nPersonalidad/Tono]
+            A3[Tools\n15 acciones]
+            A4[Claude API\nCerebro IA]
+        end
+    end
+    
+    subgraph STORE["🏪 STOREFRONT\nmitienda.landingchat.co"]
+        direction TB
+        S1[Landing Page\nHero + Productos] --> S2[Iniciar Chat]
+        S2 --> CHAT
+        
+        subgraph CHAT["💬 Chat Commerce"]
+            CH1[Saludo del Agente]
+            CH2[Identificación\nNombre + Contacto]
+            CH3[Búsqueda/Recomendación]
+            CH4[Mostrar Productos]
+            CH5[Agregar al Carrito]
+            CH6[Checkout]
+            CH7[Confirmación]
+        end
+    end
+    
+    subgraph COMPRADOR["🛒 Journey del Comprador"]
+        direction TB
+        U1[Descubre tienda\nRedes/Anuncio/Link] --> U2[Entra al Store]
+        U2 --> U3[Inicia Chat]
+        U3 --> U4[Se identifica]
+        U4 --> U5[Busca productos]
+        U5 --> U6[Agrega al carrito]
+        U6 --> U7[Paga]
+        U7 --> U8[Recibe pedido]
+        U8 --> U9[Recompra]
+        U9 --> U3
+    end
+    
+    subgraph DATA["💾 Base de Datos"]
+        DB1[(Organizations)]
+        DB2[(Products)]
+        DB3[(Customers)]
+        DB4[(Chats)]
+        DB5[(Messages)]
+        DB6[(Orders)]
+        DB7[(Carts)]
+        DB8[(Agents)]
+    end
+    
+    subgraph INTEGRACIONES["🔌 Integraciones Futuras"]
+        I1[WhatsApp API]
+        I2[Instagram DM]
+        I3[Pasarelas de Pago\nWompi/PSE]
+        I4[Envíos\nServiEntrega/etc]
+    end
+    
+    COMERCIANTE -->|Configura| STORE
+    AGENTES -->|Potencia| CHAT
+    COMPRADOR -->|Interactúa| STORE
+    CHAT -->|Guarda| DATA
+    DASHBOARD -->|Lee/Escribe| DATA
+    STORE -.->|Futuro| INTEGRACIONES
+
+Diagrama: Flujo de una venta completa
+mermaidsequenceDiagram
+    participant C as 🛒 Comprador
+    participant S as 🏪 Storefront
+    participant A as 🤖 Agente IA
+    participant CL as 🧠 Claude API
+    participant DB as 💾 Supabase
+    participant M as 👔 Comerciante
+
+    Note over C,M: FASE 1: Llegada e Identificación
+    C->>S: Entra a mitienda.landingchat.co
+    S->>C: Muestra Landing + Botón Chat
+    C->>S: Click "Iniciar Chat"
+    S->>DB: Crear chat session
+    S->>A: Iniciar conversación
+    A->>CL: Generar saludo
+    CL->>A: "¡Hola! Soy Ana..."
+    A->>C: Saludo + pide nombre/contacto
+    C->>A: "Soy María, mi cel es 300..."
+    A->>CL: Procesar identificación
+    CL->>A: Tool: identify_customer
+    A->>DB: Crear/Buscar customer
+    DB->>A: Customer data + historial
+    A->>C: "¡Hola María! ¿Qué buscas hoy?"
+
+    Note over C,M: FASE 2: Descubrimiento y Venta
+    C->>A: "Busco zapatillas para correr"
+    A->>CL: Procesar búsqueda
+    CL->>A: Tool: search_products
+    A->>DB: Query productos
+    DB->>A: Lista de zapatillas
+    A->>C: Muestra 3 opciones con cards
+    C->>A: "Me gusta la segunda, talla 38"
+    A->>CL: Verificar stock
+    CL->>A: Tool: get_product_availability
+    A->>DB: Check stock talla 38
+    DB->>A: Disponible: 5 unidades
+    A->>C: "¡Disponible! ¿La agrego al carrito?"
+    C->>A: "Sí"
+    A->>CL: Agregar al carrito
+    CL->>A: Tool: add_to_cart
+    A->>DB: Actualizar cart
+    A->>C: "Agregado ✓ ¿Algo más?"
+
+    Note over C,M: FASE 3: Checkout
+    C->>A: "No, quiero pagar"
+    A->>CL: Iniciar checkout
+    CL->>A: Tool: start_checkout
+    A->>C: "¿A dónde te lo envío?"
+    C->>A: "Calle 123, Bogotá"
+    A->>CL: Opciones de envío
+    CL->>A: Tool: get_shipping_options
+    A->>C: Opciones de envío + precios
+    C->>A: "Envío estándar"
+    A->>S: Abrir modal de pago
+    S->>C: Modal checkout
+    C->>S: Confirma pago
+    S->>DB: Crear orden
+    DB->>M: Notificación nueva orden
+    S->>C: "¡Orden confirmada!"
+
+    Note over C,M: FASE 4: Post-venta
+    A->>C: "Tu orden #123 está confirmada"
+    Note right of DB: 3 días después...
+    DB->>A: Trigger: orden enviada
+    A->>C: "¡Tu pedido está en camino!"
+    Note right of DB: 7 días después...
+    DB->>A: Trigger: seguimiento
+    A->>C: "¿Qué tal las zapatillas María?"
+
+Vistas necesarias del sistema
+Para el Comerciante (Dashboard)
+VistaDescripciónEstado/dashboardResumen: métricas, ventas recientes, chats activos✅ Existe/dashboard/chatsLista de conversaciones, filtros por estado✅ Existe/dashboard/chats/[id]Detalle de chat, intervención manual✅ Existe/dashboard/productsCRUD de productos✅ Existe/dashboard/ordersLista de órdenes, cambiar estados✅ Existe/dashboard/customersCRM: lista de clientes, historial🟡 Parcial/dashboard/agentsConfigurar agentes IA✅ Existe/dashboard/store-builderPersonalizar storefront🔴 Pendiente/dashboard/automationsConfigurar triggers y campañas🔴 Pendiente/dashboard/analyticsMétricas detalladas, conversión🔴 Pendiente/dashboard/settingsPagos, envíos, cuenta✅ Existe
+Para el Comprador (Storefront)
+VistaDescripciónEstado/store/[slug]Landing page de la tienda✅ Existe/store/[slug]/p/[id]Detalle de producto🟡 Parcial/chat/[slug]Chat commerce principal✅ Existe (arreglando)/chat/[slug]/order/[id]Confirmación de orden🔴 Pendiente
+Públicas (Marketing LandingChat)
+VistaDescripciónEstado/Landing page de LandingChat✅ Existe/authLogin/Registro✅ Existe/pricingPlanes y precios🔴 Pendiente/onboarding/*Flujo de onboarding✅ Existe
+
+Resumen de prioridades
+Basándome en los journeys, esto es lo que necesita funcionar primero:
+Prioridad 1: El chat que vende (AHORA)
+
+✅ Agente IA funcionando
+🔧 Arreglar error actual
+✅ Identificación de clientes
+✅ Búsqueda y recomendación
+✅ Carrito y checkout
+
+Prioridad 2: El comerciante puede operar (1-2 semanas)
+
+✅ Dashboard con métricas
+✅ Ver y gestionar órdenes
+🟡 CRM de clientes completo
+🔴 Store Builder
+
+Prioridad 3: Crecimiento (1 mes)
+
+🔴 Automatizaciones
+🔴 Analytics avanzado
+🔴 Integraciones (WhatsApp, pagos)
+

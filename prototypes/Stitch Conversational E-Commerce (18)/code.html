@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LandingChat - Live Preview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .dot-pattern {
+            background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1px, transparent 0);
+            background-size: 16px 16px;
+        }
+        .dark .dot-pattern {
+            background-image: radial-gradient(circle at 1px 1px, #334155 1px, transparent 0);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex h-screen w-full flex-col group/design-root overflow-hidden">
+<div class="flex h-full grow">
+<!-- This is a placeholder for the left settings panel (40%) -->
+<div class="w-2/5 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6">
+<h2 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Panel de Configuración</h2>
+<p class="text-sm text-slate-500 dark:text-slate-400 mt-2">Los controles para personalizar el storefront irían aquí.</p>
+</div>
+<!-- Live Preview Panel (60%) -->
+<main class="w-3/5 flex flex-col bg-slate-50 dark:bg-background-dark dot-pattern">
+<!-- Panel Header -->
+<header class="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm px-6">
+<div class="flex items-center gap-2">
+<div class="flex h-9 items-center justify-center rounded-lg bg-slate-200 dark:bg-slate-800 p-1">
+<label class="flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-md px-3 has-[:checked]:bg-white has-[:checked]:dark:bg-slate-900 has-[:checked]:shadow-sm has-[:checked]:text-slate-900 dark:has-[:checked]:text-slate-100 text-slate-500 dark:text-slate-400 text-sm font-medium leading-normal gap-2">
+<span class="material-symbols-outlined !text-xl">desktop_windows</span>
+<span>Desktop</span>
+<input checked="" class="invisible w-0" name="preview-toggle" type="radio" value="Desktop"/>
+</label>
+<label class="flex cursor-pointer h-full grow items-center justify-center overflow-hidden rounded-md px-3 has-[:checked]:bg-white has-[:checked]:dark:bg-slate-900 has-[:checked]:shadow-sm has-[:checked]:text-slate-900 dark:has-[:checked]:text-slate-100 text-slate-500 dark:text-slate-400 text-sm font-medium leading-normal gap-2">
+<span class="material-symbols-outlined !text-xl">smartphone</span>
+<span>Móvil</span>
+<input class="invisible w-0" name="preview-toggle" type="radio" value="Mobile"/>
+</label>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 font-medium">
+<div class="h-2 w-2 rounded-full bg-green-400"></div>
+<span>Vista previa en tiempo real</span>
+</div>
+<button class="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+<span class="material-symbols-outlined !text-2xl">refresh</span>
+</button>
+</div>
+</header>
+<!-- Preview Area -->
+<div class="flex-grow flex items-center justify-center p-8 overflow-hidden">
+<div class="w-full h-full max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 flex flex-col">
+<!-- Mockup Browser Header -->
+<div class="flex items-center h-10 px-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-red-400 rounded-full"></div>
+<div class="w-3 h-3 bg-yellow-400 rounded-full"></div>
+<div class="w-3 h-3 bg-green-400 rounded-full"></div>
+</div>
+</div>
+<!-- Storefront Content -->
+<div class="w-full grow bg-white dark:bg-slate-900 overflow-y-auto">
+<div class="aspect-[16/9] w-full bg-cover bg-center" data-alt="Hero image for an e-commerce storefront, showing a collection of modern products on a minimalist background." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCp6iKXeej5DpTQcOO4Rhh5sqv55PJWWI_c0fg3GgxZ0nfgwG-3mZganvGdeXy-lIgyRL38GjF8rmcZFXWCNJte7ZWJSvypCdxDDe6Q1DRvFjr_LyNkv_bBpMOZwjPJ8S81xYYjm7LOcI4Qx5NdgfJ4ex5BVURgzhS6d2FStDBcC2JB7F-d_KBxeO_2vhXbDD4fDjzY7B2g--HCX2sVUmvpc_IF2kR50RmfUKiMpGlrNd9zFv-C8aPW_-z6Rjv8vo60VqKhpAuDgV4');"></div>
+<div class="p-8">
+<h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100">Mi Tienda Increíble</h1>
+<p class="text-slate-600 dark:text-slate-400 mt-2">Descubre productos únicos y de alta calidad.</p>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+<div class="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+<div class="aspect-square w-full bg-cover bg-center" data-alt="A stylish ceramic mug on a wooden table." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAhHvX92YLHX3ZVd6EBZL9b0EdmutHueNG_kiIDn52_hT8ZGJKxeGE6JpqyURHVztSx4OjJlad8zNMR6bwv1y-RG7_HTGyfoGamMIrnoJyi7a36zLCAtsN0ijwRj4dVsCaTTQGN_9JdDKT2VzrAAlXXzrVrzeQHptOeVvdms1dxMO9nYhM9EkNR2eTvaOmob6BhqAroGDO13yua7GADRreCc-6KIO7PKhDdHf7TqCy0Mm6OQwa1pAzkSwg4Hvo95Dx8BUnWtO5ZxjU');"></div>
+<div class="p-4">
+<h3 class="font-semibold text-slate-700 dark:text-slate-200">Taza de Cerámica</h3>
+<p class="text-slate-500 dark:text-slate-400">$19.99</p>
+</div>
+</div>
+<div class="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+<div class="aspect-square w-full bg-cover bg-center" data-alt="A minimalist desk lamp with a warm glow." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB4UOiuHoNR46AT2A_mT0nm6XBJgKwsuMDBUDiCaJTF3j9yYi-q6wxy_Oedak76ORGR251LUDrY1sXOCG-SI6bukFqw4a5I5_PJGnQoTv86OaOpWzh5sVUw_4JgQkt2I5q7vr5YoAAcgxANrIzLO7nwSHcz6NhFqwKDGRmwZe8WGGo-EsOnlu3qUcCw65Ukgaia16BtY5Sp9k-nMYwZhSimwSe_VRT51YBg03kbWLbWVtsD1I7Iup4aXakfZ9DXru1uPk4QNWyWXiI');"></div>
+<div class="p-4">
+<h3 class="font-semibold text-slate-700 dark:text-slate-200">Lámpara de Escritorio</h3>
+<p class="text-slate-500 dark:text-slate-400">$45.00</p>
+</div>
+</div>
+<div class="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+<div class="aspect-square w-full bg-cover bg-center" data-alt="A set of handcrafted leather notebooks." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBsnvTmbqgkTCC0QAXOPGzN_K-51GSQYKDrZGqwWWs9izvOn96j53WEdbbilGiWZPlBpycmtJCevQTzGYDBb77izoX2L4VP78nKZE9-7IrBj9_xwuOAHN4R85vMwDyNvGGFcKpa4uKKVpVsIFNgyk35whvrdg6jifqXbup4yk-AHXAlV47JpMtm9s7N8eCJUVS2MtZDwiTaaPaiCxHe6raKE8fkx9XxTPQtQMWSdQ-puyXKAwNgSk-I_nQT350R_Zuib0-Apd8JSMM');"></div>
+<div class="p-4">
+<h3 class="font-semibold text-slate-700 dark:text-slate-200">Cuadernos de Cuero</h3>
+<p class="text-slate-500 dark:text-slate-400">$25.50</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Panel Footer -->
+<footer class="flex h-16 shrink-0 items-center justify-between border-t border-slate-200 dark:border-slate-800 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm px-6">
+<div class="flex items-center gap-4 bg-slate-100 dark:bg-slate-800/50 p-2 rounded-lg">
+<div class="text-slate-500 dark:text-slate-400 flex items-center justify-center shrink-0 size-7">
+<span class="material-symbols-outlined !text-xl">link</span>
+</div>
+<p class="text-slate-600 dark:text-slate-300 text-sm font-mono leading-normal flex-1 truncate">landingchat.co/store/mi-tienda</p>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-md h-8 px-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium leading-normal hover:bg-slate-300 dark:hover:bg-slate-600">
+<span class="truncate">Copiar</span>
+</button>
+</div>
+<div class="shrink-0">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-5 bg-primary text-white text-sm font-medium leading-normal hover:bg-primary/90 shadow-sm">
+<span class="truncate">Publicar Cambios</span>
+</button>
+</div>
+</footer>
+</main>
+</div>
+</div>
+</body></html>

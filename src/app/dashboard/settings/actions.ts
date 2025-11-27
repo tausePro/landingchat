@@ -16,6 +16,7 @@ export interface SettingsData {
         slug: string
         contact_email: string | null
         industry: string | null
+        logo_url: string | null
         settings: any
     }
 }
@@ -60,6 +61,7 @@ export async function getSettingsData(): Promise<SettingsData> {
             slug: organization.slug,
             contact_email: organization.contact_email,
             industry: organization.industry,
+            logo_url: organization.logo_url,
             settings: organization.settings || {}
         }
     }

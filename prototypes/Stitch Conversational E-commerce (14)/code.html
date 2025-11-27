@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configuración de Storefront - LandingChat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-[#1F2937] dark:text-gray-200">
+<div class="relative flex min-h-screen w-full">
+<!-- SideNavBar -->
+<aside class="flex w-64 flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-background-dark p-4">
+<div class="flex h-full flex-col justify-between">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3 px-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat logo placeholder" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCYa-RmSPkk1JkFAGoR8xlJZsnGagJvdjBraNrRf1IyqnlhxHUcSaKIodN5FjnmtDajFvJeBDrlIfVEJPDsjeZCKRnw2tEngBzisR2u-OavP7LjYSa3tOq2FM_GzQ37R0abR-DqCzbvQjVqkafjbDM4w8lgCsiMj2A6daBgeVhbS7zIQ5S0zPAAy0lvp1rhioEvADOrWPQQq7Kz5hHfT2r_zqX3BtTrYMLg3LNxE01wy0yh65w7FV00Ewc-5vDahGWey9bg48q7tPA");'></div>
+<div class="flex flex-col">
+<h1 class="text-base font-bold leading-normal text-[#1F2937] dark:text-white">LandingChat</h1>
+<p class="text-sm font-normal leading-normal text-[#6B7280] dark:text-gray-400">E-commerce</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-xl">chat</span>
+<p class="text-sm font-medium leading-normal">Chats</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">storefront</span>
+<p class="text-sm font-medium leading-normal">Storefront</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-xl">analytics</span>
+<p class="text-sm font-medium leading-normal">Analytics</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-xl">settings</span>
+<p class="text-sm font-medium leading-normal">Settings</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-xl">help</span>
+<p class="text-sm font-medium leading-normal">Help</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined text-xl">logout</span>
+<p class="text-sm font-medium leading-normal">Log Out</p>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-6 sm:p-8 lg:p-12">
+<div class="max-w-4xl mx-auto">
+<!-- PageHeading -->
+<header class="flex flex-wrap justify-between gap-4 mb-8">
+<div class="flex flex-col gap-2">
+<h1 class="text-3xl font-bold leading-tight tracking-tight text-[#1F2937] dark:text-white">Configuración de Storefront</h1>
+<p class="text-base font-normal leading-normal text-[#6B7280] dark:text-gray-400">Personaliza la apariencia y funcionalidad de tus secciones.</p>
+</div>
+</header>
+<div class="flex flex-col gap-8">
+<!-- Products Section Card -->
+<section class="bg-white dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-800">
+<!-- SectionHeader -->
+<h2 class="text-xl font-bold leading-tight tracking-tight text-[#1F2937] dark:text-white pb-6">Sección de Productos</h2>
+<div class="flex flex-col gap-6">
+<!-- ListItem with Toggle -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="text-[#1F2937] dark:text-gray-300 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 size-10">
+<span class="material-symbols-outlined text-2xl">visibility</span>
+</div>
+<p class="text-base font-medium leading-normal text-[#1F2937] dark:text-gray-200 flex-1 truncate">Mostrar sección de productos</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-8 w-14 cursor-pointer items-center rounded-full border-none bg-gray-200 dark:bg-gray-700 p-1 has-[:checked]:justify-end has-[:checked]:bg-primary">
+<div class="h-6 w-6 rounded-full bg-white transition-transform"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<hr class="border-gray-200 dark:border-gray-800"/>
+<!-- Controls for Products Section -->
+<div class="flex flex-col gap-6">
+<!-- TextField - Products to show -->
+<div class="flex items-center justify-between">
+<label class="flex flex-col gap-1.5 flex-1">
+<p class="text-sm font-medium leading-normal text-[#1F2937] dark:text-gray-300">Cantidad a mostrar</p>
+<p class="text-sm text-[#6B7280] dark:text-gray-400">Elige cuántos productos se verán por página.</p>
+</label>
+<select class="form-select max-w-xs w-full rounded-lg text-[#1F2937] dark:text-gray-200 focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-primary dark:focus:border-primary h-12 p-3 text-base font-normal leading-normal">
+<option value="4">4 productos</option>
+<option value="6">6 productos</option>
+<option selected="" value="8">8 productos</option>
+<option value="12">12 productos</option>
+</select>
+</div>
+<!-- TextField - Order by -->
+<div class="flex items-center justify-between">
+<label class="flex flex-col gap-1.5 flex-1">
+<p class="text-sm font-medium leading-normal text-[#1F2937] dark:text-gray-300">Ordenar por</p>
+<p class="text-sm text-[#6B7280] dark:text-gray-400">Define el orden de aparición de los productos.</p>
+</label>
+<select class="form-select max-w-xs w-full rounded-lg text-[#1F2937] dark:text-gray-200 focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:border-primary dark:focus:border-primary h-12 p-3 text-base font-normal leading-normal">
+<option selected="" value="recent">Más recientes</option>
+<option value="price_asc">Precio menor</option>
+<option value="price_desc">Precio mayor</option>
+<option value="best_selling">Más vendidos</option>
+</select>
+</div>
+<!-- More ListItems with Toggles -->
+<div class="flex items-center justify-between">
+<p class="text-base font-medium leading-normal text-[#1F2937] dark:text-gray-200">Mostrar precios</p>
+<label class="relative flex h-8 w-14 cursor-pointer items-center rounded-full bg-gray-200 dark:bg-gray-700 p-1 has-[:checked]:justify-end has-[:checked]:bg-primary">
+<div class="h-6 w-6 rounded-full bg-white"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-base font-medium leading-normal text-[#1F2937] dark:text-gray-200">Mostrar botón "Agregar al carrito"</p>
+<label class="relative flex h-8 w-14 cursor-pointer items-center rounded-full bg-gray-200 dark:bg-gray-700 p-1 has-[:checked]:justify-end has-[:checked]:bg-primary">
+<div class="h-6 w-6 rounded-full bg-white"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<p class="text-base font-medium leading-normal text-[#1F2937] dark:text-gray-200">Mostrar badge "Recomendado por IA"</p>
+<label class="relative flex h-8 w-14 cursor-pointer items-center rounded-full bg-gray-200 dark:bg-gray-700 p-1 has-[:checked]:justify-end has-[:checked]:bg-primary">
+<div class="h-6 w-6 rounded-full bg-white"></div>
+<input class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+</div>
+</section>
+<!-- Categories Section Card -->
+<section class="bg-white dark:bg-gray-900/50 p-6 rounded-xl border border-gray-200 dark:border-gray-800">
+<!-- SectionHeader -->
+<h2 class="text-xl font-bold leading-tight tracking-tight text-[#1F2937] dark:text-white pb-6">Navegación por Categorías</h2>
+<div class="flex flex-col gap-6">
+<!-- ListItem with Toggle -->
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="text-[#1F2937] dark:text-gray-300 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0 size-10">
+<span class="material-symbols-outlined text-2xl">category</span>
+</div>
+<p class="text-base font-medium leading-normal text-[#1F2937] dark:text-gray-200 flex-1 truncate">Mostrar navegación por categorías</p>
+</div>
+<div class="shrink-0">
+<label class="relative flex h-8 w-14 cursor-pointer items-center rounded-full border-none bg-gray-200 dark:bg-gray-700 p-1 has-[:checked]:justify-end has-[:checked]:bg-primary">
+<div class="h-6 w-6 rounded-full bg-white transition-transform"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</div>
+<hr class="border-gray-200 dark:border-gray-800"/>
+<!-- Category List -->
+<div class="flex flex-col gap-4">
+<p class="text-sm font-medium text-[#1F2937] dark:text-gray-300">Selecciona las categorías a mostrar:</p>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600" type="checkbox"/>
+<span class="text-sm text-[#1F2937] dark:text-gray-300">Ropa</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600" type="checkbox"/>
+<span class="text-sm text-[#1F2937] dark:text-gray-300">Calzado</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600" type="checkbox"/>
+<span class="text-sm text-[#1F2937] dark:text-gray-300">Accesorios</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer">
+<input class="form-checkbox h-5 w-5 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600" type="checkbox"/>
+<span class="text-sm text-[#1F2937] dark:text-gray-300">Tecnología</span>
+</label>
+<label class="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer">
+<input checked="" class="form-checkbox h-5 w-5 rounded text-primary focus:ring-primary focus:ring-offset-0 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600" type="checkbox"/>
+<span class="text-sm text-[#1F2937] dark:text-gray-300">Hogar</span>
+</label>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</body></html>

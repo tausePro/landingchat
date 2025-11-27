@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configuración del Encabezado - LandingChat</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "primary": "#3182CE",
+                    "background-light": "#F7F9FC",
+                    "background-dark": "#101822",
+                },
+                fontFamily: {
+                    "display": ["Manrope", "sans-serif"]
+                },
+                borderRadius: {
+                    "DEFAULT": "0.5rem",
+                    "lg": "1rem",
+                    "xl": "1.5rem",
+                    "full": "9999px"
+                },
+            },
+        },
+    }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+                'FILL' 0,
+                'wght' 400,
+                'GRAD' 0,
+                'opsz' 24
+        }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="flex flex-row min-h-screen">
+<!-- SideNavBar -->
+<aside class="flex h-screen min-h-full flex-col justify-between border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-4 w-64 sticky top-0">
+<div class="flex flex-col gap-4">
+<div class="flex gap-3 items-center px-3 py-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDrI5SGn4k8qfPrOcunoTBHAFzreoMi4PoYYDvHqVDlyuTidX0AtsIFHlSGkxwTocBYTlb9fhF2PT2hEHmocEIkI_KQa7dR3xwbF6aCsAhWw_TfOJnOIllpfpO-UPnKZDEGzqMYnc-e-WO_tIbwfJSdHArof9jd9lJL6IFgLePks2Su35Ph6xS2zqeNSz3XN-48mL_gt2GUelwZ951TDk3UhN4RSjB2-Cb7Qw96nbN04Nm4f0FiRGc7YGoW85h7HzAyQOkDWbTPxOA");'></div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-white text-base font-bold leading-normal">LandingChat</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Workspace</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">dashboard</span>
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined text-primary dark:text-primary-300" style="font-variation-settings: 'FILL' 1;">storefront</span>
+<p class="text-primary dark:text-primary-300 text-sm font-medium leading-normal">Storefront Builder</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">chat</span>
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Conversations</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">inventory_2</span>
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Products</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">pie_chart</span>
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Analytics</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">settings</span>
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Settings</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-slate-700 dark:text-slate-300">help</span>
+<p class="text-slate-700 dark:text-slate-300 text-sm font-medium leading-normal">Help Center</p>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-6 lg:p-10">
+<div class="mx-auto max-w-6xl">
+<!-- Page Heading -->
+<header class="mb-8">
+<div class="flex flex-wrap justify-between gap-3">
+<div class="flex flex-col gap-2">
+<h1 class="text-slate-900 dark:text-white text-3xl font-black tracking-tight">Encabezado / Hero</h1>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Personaliza la sección principal que verán tus clientes al llegar a tu tienda.</p>
+</div>
+</div>
+</header>
+<!-- Settings Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+<!-- Left Column: Form -->
+<div class="lg:col-span-2 flex flex-col gap-8">
+<div class="bg-white dark:bg-slate-900/70 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+<h2 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-6">Contenido de Texto</h2>
+<div class="flex flex-col gap-6">
+<!-- Main Title -->
+<div>
+<label class="flex flex-col min-w-40 flex-1">
+<p class="text-slate-800 dark:text-slate-200 text-base font-medium leading-normal pb-2">Título Principal</p>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 h-12 placeholder:text-slate-400 dark:placeholder-slate-500 p-3 text-base font-normal leading-normal" maxlength="60" value="Descubre nuestras ofertas exclusivas"/>
+</label>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal pt-2 px-1">El texto principal que verán tus clientes. (36/60)</p>
+</div>
+<!-- Subtitle -->
+<div>
+<label class="flex flex-col min-w-40 flex-1">
+<p class="text-slate-800 dark:text-slate-200 text-base font-medium leading-normal pb-2">Subtítulo</p>
+<textarea class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 min-h-28 placeholder:text-slate-400 dark:placeholder-slate-500 p-3 text-base font-normal leading-normal" maxlength="120">Productos seleccionados con un 20% de descuento solo esta semana.</textarea>
+</label>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal pt-2 px-1">Describe tu propuesta de valor en una frase corta. (71/120)</p>
+</div>
+</div>
+</div>
+<div class="bg-white dark:bg-slate-900/70 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+<h2 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-6">Imagen de Fondo</h2>
+<div class="flex items-center gap-6">
+<div class="w-32 h-20 rounded-lg bg-center bg-cover" data-alt="Miniatura de una imagen de fondo de un paisaje montañoso" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBFqpQmKfP6QCAVi-CRW4WUKgLLiLtQ9xEofH9hjQa3UzjgcBRJ7mxipjDHXc2JNAR4ofoQ2a1dM7gwPQzHyzF0RLNCwlVN-epPZbQr00cj3CC9O_PUs1gu1AsRYl3ZgfEbF-tha0kRCUzKjuOCo2cLqY7iGdm5RSbMhkNLkipI5moCjT0KZjIfmBMaKo16wqYqFYv3VtxR_LyRw-UNAR3OJS2HNRE7T01pedfpa9ousY-pc_OC114PL7JsYeOGuJE3riiynCWVPDs');"></div>
+<div class="flex-1">
+<div class="flex items-center justify-center w-full">
+<label class="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-lg cursor-pointer bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" for="dropzone-file">
+<div class="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+<span class="material-symbols-outlined text-primary mb-1">upload_file</span>
+<p class="text-sm text-slate-500 dark:text-slate-400"><span class="font-semibold">Arrastra una imagen</span> o haz clic para subir</p>
+</div>
+<input class="hidden" id="dropzone-file" type="file"/>
+</label>
+</div>
+</div>
+</div>
+<div class="flex gap-4 mt-4">
+<button class="flex-1 text-sm font-medium text-primary dark:text-primary-300 bg-primary/10 dark:bg-primary/20 hover:bg-primary/20 dark:hover:bg-primary/30 h-10 px-4 rounded-lg transition-colors">Seleccionar desde productos</button>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal pt-4">Resolución recomendada: 1920x1080px. Formatos: JPG, PNG.</p>
+</div>
+<div class="bg-white dark:bg-slate-900/70 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+<h2 class="text-lg font-bold text-slate-800 dark:text-slate-200 mb-6">Botón de Chat</h2>
+<div class="flex flex-col gap-6">
+<div class="flex items-center justify-between">
+<p class="text-slate-800 dark:text-slate-200 text-base font-medium">Mostrar botón de chat</p>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+</label>
+</div>
+<div class="border-t border-slate-200 dark:border-slate-700 -mx-6"></div>
+<div>
+<label class="flex flex-col min-w-40 flex-1">
+<p class="text-slate-800 dark:text-slate-200 text-base font-medium leading-normal pb-2">Texto del botón</p>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 h-12 placeholder:text-slate-400 dark:placeholder-slate-500 p-3 text-base font-normal leading-normal" value="Iniciar Chat"/>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Preview -->
+<div class="hidden lg:block lg:col-span-1">
+<div class="sticky top-10">
+<div class="w-full aspect-[9/16] bg-white dark:bg-slate-900/70 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-2">
+<div class="bg-slate-200 dark:bg-slate-800 rounded-lg w-full h-full bg-cover bg-center flex flex-col justify-end items-center p-8 text-center" data-alt="Previsualización de la sección Hero con una imagen de montañas" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQkX1OvYnukDPHumQ2w-P2qmnyXcY6NuVMEXZZ8lLaX6EZZixVfCvGPzGeHSKjlD7VS0YA_UyFgRV5UjZc2gnFOH7kA-uqmhu5ENEeKNSE4_peBW-QuBx3-TcruLvKhnRXndfz73MIvMO7dmvunkymFW1J5PWHm5_N4TzznRXUwiGmwJBafIJ-0A8_fEh_TkpdpRT1-yJVmGEVaTzt06Z9mjEdkx8W9sVrdZjLaVETasns8Cn3EiqUPowglEY49nIaEjIBybCMQps');">
+<div class="bg-black/30 backdrop-blur-sm p-6 rounded-xl">
+<h3 class="text-white text-3xl font-bold leading-tight">Descubre nuestras ofertas exclusivas</h3>
+<p class="text-slate-200 mt-2">Productos seleccionados con un 20% de descuento solo esta semana.</p>
+<button class="mt-6 bg-primary text-white font-semibold py-3 px-6 rounded-lg shadow-lg hover:bg-primary/90 transition-all">Iniciar Chat</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

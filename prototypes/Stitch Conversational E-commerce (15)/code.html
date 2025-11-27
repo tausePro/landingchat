@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Configuración de Storefront - LandingChat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col">
+<div class="flex h-full flex-1">
+<!-- SideNavBar -->
+<aside class="flex w-64 flex-col gap-4 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-4">
+<div class="flex gap-3 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat company logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAFJfyAFxF5l5jFDS5JG1HSHZYaJgqRmvQ9mFM-rQWXCkjL7rXGoKiRql36v0d5T675XtVXgYONqVUOYhw7ij50U2t0VRtKcAHjak1UkqJ2MUsEiHygu1y8DUuPRlgmqoVaKUNGW40h1cvxpZVoDuahtexZ4x93uBqY6MsZJJpo-Kuwdpu369ygdKMMPsjokMmSMFTk4Los4BBHPRyTvvw_SP7I3Fvt5lrsfc8WyfqK9kpaBYywIRB5TUNjuZ9A0CIlDEUlSpauQJU");'></div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-slate-50 text-base font-bold leading-normal">LandingChat</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Workspace</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4 flex-grow">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 text-primary dark:bg-primary/30" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">storefront</span>
+<p class="text-sm font-bold leading-normal">Storefront Builder</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">forum</span>
+<p class="text-sm font-medium leading-normal">Conversations</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<p class="text-sm font-medium leading-normal">Analytics</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-sm font-medium leading-normal">Settings</p>
+</a>
+</nav>
+<div class="flex flex-col gap-4">
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Upgrade Plan</span>
+</button>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+<p class="text-sm font-medium leading-normal">Help</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">logout</span>
+<p class="text-sm font-medium leading-normal">Log Out</p>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto">
+<div class="mx-auto max-w-5xl p-6 md:p-8">
+<!-- Page Heading -->
+<div class="flex flex-wrap justify-between gap-4 pb-8">
+<div class="flex min-w-72 flex-col gap-2">
+<h1 class="text-slate-900 dark:text-slate-50 text-4xl font-black leading-tight tracking-[-0.033em]">Storefront Configuration</h1>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Customize the content and appearance of your conversational storefront.</p>
+</div>
+<button class="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-5 text-white text-sm font-bold leading-normal">
+<span class="material-symbols-outlined">save</span>
+<span class="truncate">Guardar Cambios</span>
+</button>
+</div>
+<div class="flex flex-col gap-8">
+<!-- Testimonials Section -->
+<section class="flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+<h2 class="text-slate-900 dark:text-slate-50 text-[22px] font-bold leading-tight tracking-[-0.015em]">Testimonios de Clientes</h2>
+<!-- Action Panel -->
+<div class="flex flex-1 flex-col items-start justify-between gap-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark p-5 sm:flex-row sm:items-center">
+<div class="flex flex-col gap-1">
+<p class="text-slate-900 dark:text-slate-50 text-base font-bold leading-tight">Mostrar sección de testimonios</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Activa para mostrar testimonios de clientes en tu storefront.</p>
+</div>
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full bg-slate-200 dark:bg-slate-700 p-0.5 has-[:checked]:bg-primary">
+<div class="h-full w-[27px] transform rounded-full bg-white transition-transform duration-200 ease-in-out" style="box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 3px, rgba(0, 0, 0, 0.06) 0px 1px 2px;"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+<!-- List of Testimonials -->
+<div class="flex justify-end pt-2">
+<button class="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary/20 dark:bg-primary/30 px-4 text-primary text-sm font-bold leading-normal">
+<span class="material-symbols-outlined">add_circle_outline</span>
+<span class="truncate">+ Agregar Testimonio</span>
+</button>
+</div>
+<div class="flex flex-col divide-y divide-slate-200 dark:divide-slate-800 border-t border-slate-200 dark:border-slate-800">
+<div class="flex items-center gap-4 px-4 py-3 justify-between">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-12" data-alt="Profile picture of Maria Garcia" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuD1lHWzgnQmrdx6eoEBrNUTvg03T-73oyHYHsd3tGNHjtbVsgYqElC05f1Z3YID_jE5EsoHCiksyJ81gJKOcRUnqNzxnLmvb4BQr2rATf4bsL-HFEH1SYo3ilXWqbB1CFGhFveeyWivumM-OubL4CYQLYxMe2SL3_RGjxPHayqFvqW65dbD8eqoLd8YEbCchDgOuLZVpnDaD5yXEU0So_NWrs1XNbBTZFJzdFkn9PTMad9j2MjCLkSgCvYtpA4nQxJ4BAr35BGr2Qk");'></div>
+<div class="flex flex-col justify-center">
+<p class="text-slate-900 dark:text-slate-50 text-base font-medium leading-normal line-clamp-1">Maria Garcia</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal line-clamp-1">"Excellent service and amazing products. Highly recommended!"</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"><span class="material-symbols-outlined text-xl">edit</span></button>
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"><span class="material-symbols-outlined text-xl">delete</span></button>
+</div>
+</div>
+<div class="flex items-center gap-4 px-4 py-3 justify-between">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-12" data-alt="Profile picture of John Smith" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDR5UPoEiafEOcWImfihUzerucc8Hj62FSwRJ8CykaKfdsDLMYSZC1suud7KvX7c1c1kinXSchnK8AevQCJo52M_yCS3YZ8RmmFETyrzcWn2d9BE-8YvGhdoewVHFptKnDM7AxGZxPn-NM1KlzGEWBULlPqXXIcrEerNN3juGMUic5rJoftsQCbuVbpDiT-NKftJkviUgkWiiUb1Ld2Rs-JcftAgWeYd2aP2gVcBcYeQ_XxsauOzaI0Cv8ivYV0Eu7ekGW7kfEUNto");'></div>
+<div class="flex flex-col justify-center">
+<p class="text-slate-900 dark:text-slate-50 text-base font-medium leading-normal line-clamp-1">John Smith</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal line-clamp-1">"The platform is intuitive and helped us increase our sales."</p>
+</div>
+</div>
+<div class="flex items-center gap-2 shrink-0">
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"><span class="material-symbols-outlined text-xl">edit</span></button>
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10"><span class="material-symbols-outlined text-xl">delete</span></button>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+<h2 class="text-slate-900 dark:text-slate-50 text-[22px] font-bold leading-tight tracking-[-0.015em]">Llamada a la Acción Final (CTA)</h2>
+<div class="flex flex-1 flex-col items-start justify-between gap-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark p-5 sm:flex-row sm:items-center">
+<div class="flex flex-col gap-1">
+<p class="text-slate-900 dark:text-slate-50 text-base font-bold leading-tight">Mostrar CTA al final de la página</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Muestra una sección final para captar la atención del usuario.</p>
+</div>
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full bg-slate-200 dark:bg-slate-700 p-0.5 has-[:checked]:bg-primary">
+<div class="h-full w-[27px] transform rounded-full bg-white transition-transform duration-200 ease-in-out" style="box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 3px, rgba(0, 0, 0, 0.06) 0px 1px 2px;"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="cta-title">Título principal del CTA</label>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 focus:border-primary focus:ring-primary" id="cta-title" placeholder="Ej: ¿Listo para empezar?" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="cta-button">Texto del botón</label>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 focus:border-primary focus:ring-primary" id="cta-button" placeholder="Ej: Crear mi cuenta" type="text"/>
+</div>
+</div>
+</section>
+<!-- Social Media & Footer Section -->
+<section class="flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6">
+<h2 class="text-slate-900 dark:text-slate-50 text-[22px] font-bold leading-tight tracking-[-0.015em]">Redes Sociales y Pie de Página</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="relative">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="instagram">Instagram</label>
+<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 pt-7">
+<svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><rect height="20" rx="5" ry="5" width="20" x="2" y="2"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+</div>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 pl-10 focus:border-primary focus:ring-primary" id="instagram" placeholder="Tu usuario de Instagram" type="text"/>
+</div>
+<div class="relative">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="facebook">Facebook</label>
+<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 pt-7">
+<svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+</div>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 pl-10 focus:border-primary focus:ring-primary" id="facebook" placeholder="Tu usuario de Facebook" type="text"/>
+</div>
+<div class="relative">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="whatsapp">WhatsApp</label>
+<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 pt-7">
+<svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+</div>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 pl-10 focus:border-primary focus:ring-primary" id="whatsapp" placeholder="Número de WhatsApp" type="text"/>
+</div>
+<div class="relative">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5" for="tiktok">TikTok</label>
+<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 pt-7">
+<svg class="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24"><path d="M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"></path><path d="M12 2v10"></path><path d="M16 16a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"></path></svg>
+</div>
+<input class="w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-50 pl-10 focus:border-primary focus:ring-primary" id="tiktok" placeholder="Tu usuario de TikTok" type="text"/>
+</div>
+</div>
+<div class="flex flex-1 flex-col items-start justify-between gap-4 rounded-lg border border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark p-5 sm:flex-row sm:items-center mt-2">
+<div class="flex flex-col gap-1">
+<p class="text-slate-900 dark:text-slate-50 text-base font-bold leading-tight">Mostrar íconos de redes en el footer</p>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Muestra enlaces a tus redes sociales en el pie de página.</p>
+</div>
+<label class="relative flex h-[31px] w-[51px] cursor-pointer items-center rounded-full bg-slate-200 dark:bg-slate-700 p-0.5 has-[:checked]:bg-primary">
+<div class="h-full w-[27px] transform rounded-full bg-white transition-transform duration-200 ease-in-out" style="box-shadow: rgba(0, 0, 0, 0.1) 0px 1px 3px, rgba(0, 0, 0, 0.06) 0px 1px 2px;"></div>
+<input checked="" class="invisible absolute" type="checkbox"/>
+</label>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

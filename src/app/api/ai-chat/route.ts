@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     console.log("API /api/ai-chat called")
     try {
         const body = await request.json()
-        const { message, chatId, slug } = body
+        const { message, chatId, slug, currentProductId } = body
 
         if (!message || !slug) {
             return NextResponse.json(
@@ -100,7 +100,8 @@ export async function POST(request: NextRequest) {
             chatId: currentChatId,
             organizationId: organization.id,
             agentId: agentId,
-            customerId: customerId
+            customerId: customerId,
+            currentProductId: currentProductId // Pass the product ID from context
         })
 
         return NextResponse.json({

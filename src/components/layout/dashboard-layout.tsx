@@ -120,11 +120,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                                 notifications
                             </span>
                         </button>
-                        <button className="flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-background-light dark:bg-background-dark text-text-light-secondary dark:text-text-dark-secondary hover:text-primary">
+                        <Link href="/dashboard/settings" className="flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-background-light dark:bg-background-dark text-text-light-secondary dark:text-text-dark-secondary hover:text-primary">
                             <span className="material-symbols-outlined text-2xl">
                                 settings
                             </span>
-                        </button>
+                        </Link>
                     </div>
                 </header>
                 <div className="flex-1 overflow-y-auto p-8">{children}</div>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Panel de Configuración de Tienda</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#4F46E5",
+            "background-light": "#F9FAFB",
+            "background-dark": "#101822",
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+        },
+      },
+    }
+  </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<div class="flex flex-1 justify-center py-5 px-4 sm:px-8 md:px-12 lg:px-20">
+<div class="layout-content-container flex flex-col max-w-sm flex-1">
+<div class="flex h-full min-h-[700px] flex-col justify-between bg-white dark:bg-[#1F2937] p-4 rounded-xl shadow-sm">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Store logo placeholder" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuBS543DykfiOmSyCTScbR8O_UJ4AvhejIQc7A1oJzVMNHkHEccz2LZOkI4gzMXcgoTO6SIHw37gOgIXfi_FP_q5FRPRgh90XirTY8n7ZPqDQEo9j-2vOhHHvm-i0CZKUFaUPL9DPjp0WJ9q73ihUoOUYuYsnutsU0ptTik_LQCZou0Fx3lGxLmR5vyrDItX_AdGhgeVkp1zHkiJUKcLmGqh1AI-1Id5nDLnEtSU2YK9Ru8fDhKoRiSj5A_kWYM_x1EvmDTbs1Mbk-g');"></div>
+<div class="flex flex-col">
+<h1 class="text-[#1F2937] dark:text-white text-base font-bold leading-normal">Personaliza tu Tienda</h1>
+<div class="flex items-center gap-1.5">
+<p class="text-[#6B7281] dark:text-gray-400 text-sm font-normal leading-normal">Los cambios se guardan automáticamente</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-0 border-t border-[#E5E7EB] dark:border-gray-700">
+<details class="flex flex-col py-2 group">
+<summary class="flex cursor-pointer items-center justify-between gap-6 py-2 list-none">
+<p class="text-[#1F2937] dark:text-white text-sm font-medium leading-normal">Header</p>
+<span class="material-symbols-outlined text-[#1F2937] dark:text-white group-open:rotate-180 transition-transform duration-200">expand_more</span>
+</summary>
+<p class="text-[#6B7281] dark:text-gray-400 text-sm font-normal leading-normal pb-2">Aquí se mostrarían las opciones de configuración para el header de la tienda.</p>
+</details>
+<details class="flex flex-col border-t border-[#E5E7EB] dark:border-gray-700 py-2 group" open="">
+<summary class="flex cursor-pointer items-center justify-between gap-6 py-2 list-none">
+<p class="text-[#1F2937] dark:text-white text-sm font-medium leading-normal">Plantilla de la Tienda</p>
+<span class="material-symbols-outlined text-[#1F2937] dark:text-white group-open:rotate-180 transition-transform duration-200">expand_more</span>
+</summary>
+<div class="pt-4 grid grid-cols-2 gap-4">
+<div class="relative group cursor-pointer">
+<div class="absolute inset-0 rounded-lg ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-[#1F2937]"></div>
+<div class="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-primary text-white">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="bg-cover bg-center flex flex-col gap-3 rounded-lg justify-end p-3 aspect-video" data-alt="Minimalist template preview" style="background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%), url('https://lh3.googleusercontent.com/aida-public/AB6AXuAWOr7GyxMwJQ43HPknPsbkJ-hzT5OFvD3k-SYjC67wqR28Ep13jfgDKLAn828RB1YsVMdGB3huaE-2D10WLCrSr_Y81bvrVdPgCF2lm11oYMi5i3S9lGTn5IU42beT2xjGZINmOgX2BEwLS3mHsAwg5lOxu6n-dXZI_Tv0T2dJOglJAaFSCGdZU1ZmLRc_2a1XjRYv-_Eb4DcajJXOOE4mw11KyoUgVea24EoFE-_NgE3TzGzOx7VRldhrqUxTZ94SCSEZcgFUz4k');">
+<p class="text-white text-sm font-bold leading-tight line-clamp-2">Minimal</p>
+</div>
+</div>
+<div class="relative group cursor-pointer">
+<div class="absolute inset-0 rounded-lg ring-1 ring-transparent group-hover:ring-[#E5E7EB] dark:group-hover:ring-gray-600 transition-shadow"></div>
+<div class="bg-cover bg-center flex flex-col gap-3 rounded-lg justify-end p-3 aspect-video" data-alt="Full-featured template preview" style="background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%), url('https://lh3.googleusercontent.com/aida-public/AB6AXuDqz50C46Gt8VnkM5q7VkaSoElO2dwf-B0KofPKuK1Xia9zcgloI6jzztBVXB4adGIkoFxE-H77OBvX13dauB4P2zegLxVJxprGyD6MYOCXDZVdEeIn4_JF3rOvo-fyd5w2ON707NOGznTj637Q7I6KpbU_-1dvr4yyIflfjt8a8C109k74cK8lnheYFqu57ZCVjvbw1gFBLXWAO_0TQ3YYdpCUlnzyXvU7kicoX9f3N_ks9VDy8eDYSs4S6fJP7N1XXEFr5GEjdlk');">
+<p class="text-white text-sm font-bold leading-tight line-clamp-2">Completo</p>
+</div>
+</div>
+<div class="relative group cursor-pointer">
+<div class="absolute inset-0 rounded-lg ring-1 ring-transparent group-hover:ring-[#E5E7EB] dark:group-hover:ring-gray-600 transition-shadow"></div>
+<div class="bg-cover bg-center flex flex-col gap-3 rounded-lg justify-end p-3 aspect-video" data-alt="Single product template preview" style="background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%), url('https://lh3.googleusercontent.com/aida-public/AB6AXuCqIt4tyFRqnMRmR21qewOu0KhGmzXTIO1vo9Q2fTWKeo6bxYjFyDZ5qEI-8P2YtBOqeca3xRwiioSKMt12lI1tmBY7KZ0enqaiSvTpfajSwUjiCTZIa81R_5w0qw_Da3uI8dJDv-EVonlzjHpaGk3p2pZ5k1Ph4sPXdWfb1WJLn9kn8YTeHfyZ2GV6LXFrE_SEpeoWT9sjJenS7VUJEdzQYp7uLZh0_sT2fUEjrvGA2Bp65jQuu1-lo_VHbPZH3t9O17WQZlHdWsw');">
+<p class="text-white text-sm font-bold leading-tight line-clamp-2">Producto Único</p>
+</div>
+</div>
+<div class="relative group cursor-pointer">
+<div class="absolute inset-0 rounded-lg ring-1 ring-transparent group-hover:ring-[#E5E7EB] dark:group-hover:ring-gray-600 transition-shadow"></div>
+<div class="bg-cover bg-center flex flex-col gap-3 rounded-lg justify-end p-3 aspect-video" data-alt="Services template preview" style="background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 100%), url('https://lh3.googleusercontent.com/aida-public/AB6AXuCrrl-YYUr7FiPPvqfkP_Pcwoh2pAg_cNollWQVKPUR-vZvLGQ_jMzL2-fq6QVzYTlkFYo9vMA-6AbPEH3-CNIJc78y8DbdnAkArWP2Ek3qD0GT0a0MXvNV2Mgh71jPAoFNqPa91bonW5bChNz4zpLB6uQ1GZsmPWR4qVqykrt3nlo0djz133qVDfKZBYsp9If8WwuajHHvCeyuwA-WRPbvRw-wIbz5Nifb6URnKtAoJbbuDAbtA1mVHtXmv6BgXLU4bvKJR8PWilQ');">
+<p class="text-white text-sm font-bold leading-tight line-clamp-2">Servicios</p>
+</div>
+</div>
+</div>
+</details>
+<div class="border-t border-[#E5E7EB] dark:border-gray-700"></div>
+</div>
+</div>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] gap-2">
+<span class="truncate">Ver tienda en vivo</span>
+<span class="material-symbols-outlined text-base">open_in_new</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

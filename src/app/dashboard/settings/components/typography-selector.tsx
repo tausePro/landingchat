@@ -1,0 +1,126 @@
+"use client"
+
+import { useState } from "react"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { updateOrganization } from "../actions"
+import { useRouter } from "next/navigation"
+
+interface TypographySelectorProps {
+    organization: {
+        id: string
+        name: string
+        slug: string
+        settings: any
+    }
+}
+
+const FONT_OPTIONS = [
+    { value: "Inter", label: "Inter", className: "font-sans" },
+    { value: "Poppins", label: "Poppins", className: "font-sans" },
+    { value: "Roboto", label: "Roboto", className: "font-sans" },
+    { value: "Montserrat", label: "Montserrat", className: "font-sans" },
+    { value: "Playfair Display", label: "Playfair Display", className: "font-serif" },
+]
+
+export function TypographySelector({ organization }: TypographySelectorProps) {
+    const router = useRouter()
+    const typographySettings = organization.settings?.storefront?.typography || {}
+
+    const [fontFamily, setFontFamily] = useState(typographySettings.fontFamily || "Inter")
+    const [isSaving, setIsSaving] = useState(false)
+
+    const handleSave = async () => {
+        setIsSaving(true)
+        try {
+            const updatedSettings = {
+                ...organization.settings,
+                storefront: {
+                    ...organization.settings?.storefront,
+                    typography: {
+                        fontFamily
+                    }
+                }
+            }
+
+            await updateOrganization({
+                name: organization.name,
+                slug: organization.slug,
+                settings: updatedSettings
+            })
+
+            router.refresh()
+        } catch (error) {
+            console.error("Error saving typography settings:", error)
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shadow-sm">
+                <div className="p-6 border-b border-border-light dark:border-border-dark">
+                    <h2 className="text-lg font-semibold">Tipografía</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Selecciona la fuente principal para tu storefront
+                    </p>
+                </div>
+                <div className="p-6">
+                    <Label htmlFor="font-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Fuente Principal
+                    </Label>
+                    <div className="relative">
+                        <select
+                            id="font-select"
+                            value={fontFamily}
+                            onChange={(e) => setFontFamily(e.target.value)}
+                            className="appearance-none w-full h-12 pl-4 pr-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-gray-900 dark:text-white"
+                        >
+                            {FONT_OPTIONS.map((font) => (
+                                <option key={font.value} value={font.value} className={font.className}>
+                                    {font.label}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                            <span className="material-symbols-outlined">expand_more</span>
+                        </div>
+                    </div>
+
+                    {/* Preview */}
+                    <div className="mt-6 p-6 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Vista Previa</p>
+                        <div style={{ fontFamily: fontFamily }}>
+                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                Título de Ejemplo
+                            </h3>
+                            <p className="text-base text-gray-600 dark:text-gray-300">
+                                Este es un texto de ejemplo para que veas cómo se verá la tipografía en tu storefront.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Botones de Acción */}
+            <div className="flex justify-end gap-3 border-t border-border-light dark:border-border-dark pt-6">
+                <Button
+                    variant="outline"
+                    onClick={() => router.refresh()}
+                    disabled={isSaving}
+                    className="h-10 px-5 text-sm font-semibold"
+                >
+                    Cancelar
+                </Button>
+                <Button
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="h-10 px-5 text-sm font-semibold bg-primary hover:bg-primary/90"
+                >
+                    {isSaving ? "Guardando..." : "Guardar Cambios"}
+                </Button>
+            </div>
+        </div>
+    )
+}

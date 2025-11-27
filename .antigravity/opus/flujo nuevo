@@ -1,0 +1,279 @@
+hay que hacer un ajuste, pienso que para identificar al usuario y crearlo tenemos 2 opciones, el diseño de la landing tiene un boton(iniciar chat en el home o antes del footer) y si el usuario da clic ahí de priemro de una debemos activar un modal pidiendo el nombre y el whatsapp, e igual si da clic en chatear par comprar y no esta logueado/reigstrado, ahi ya tenemos 2 datos super importantes(verificamos su identidad enviando un código a whatsapp la primera vez? ) y ya con eso le creamos el perfil basico, que opinas ?
+
+Felipe, me encanta este ajuste. Es mucho más inteligente que pedirle los datos dentro del chat.
+
+Por qué es mejor tu enfoque
+El problema del enfoque anterior:
+
+El usuario entra al chat
+El agente saluda
+El agente pide nombre y WhatsApp
+El usuario tiene que escribir los datos
+Fricción innecesaria, se siente como interrogatorio
+Tu enfoque:
+
+El usuario hace click en "Iniciar Chat"
+Modal limpio: nombre + WhatsApp
+Verificación por código (confianza)
+Entra al chat YA identificado
+El agente saluda: "¡Hola María! ¿Qué buscas hoy?"
+Beneficios:
+
+Datos limpios. Input de formulario vs. el agente parseando "soy maría mi cel es trescientos..."
+WhatsApp verificado. Dato real, no inventado
+Canal de comunicación. Podés enviar notificaciones, remarketing, estado de pedido
+Menos tokens de IA. No gastás en el ida y vuelta de identificación
+Experiencia premium. Se siente como entrar a un lugar donde te conocen
+Flujo propuesto
+┌─────────────────────────────────────────────────────────────┐
+│                      STOREFRONT                              │
+│                                                              │
+│   [Hero: "Encuentra tu producto ideal"]                     │
+│                                                              │
+│              [🔵 Iniciar Chat]  ←── Click                   │
+│                      │                                       │
+└──────────────────────┼───────────────────────────────────────┘
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   MODAL DE REGISTRO                          │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                                                        │  │
+│  │   💬 Para chatear, necesitamos conocerte              │  │
+│  │                                                        │  │
+│  │   Nombre                                               │  │
+│  │   ┌──────────────────────────────────────────────┐    │  │
+│  │   │ María García                                  │    │  │
+│  │   └──────────────────────────────────────────────┘    │  │
+│  │                                                        │  │
+│  │   WhatsApp                                             │  │
+│  │   ┌────────┬─────────────────────────────────────┐    │  │
+│  │   │ +57 ▼  │ 300 123 4567                        │    │  │
+│  │   └────────┴─────────────────────────────────────┘    │  │
+│  │                                                        │  │
+│  │   ┌──────────────────────────────────────────────┐    │  │
+│  │   │         Continuar al Chat  →                 │    │  │
+│  │   └──────────────────────────────────────────────┘    │  │
+│  │                                                        │  │
+│  │   🔒 Tu info está segura. Solo la usamos para         │  │
+│  │      atenderte mejor.                                  │  │
+│  │                                                        │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                       │
+                       ▼ (Primera vez con este WhatsApp)
+┌─────────────────────────────────────────────────────────────┐
+│                 MODAL DE VERIFICACIÓN                        │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │                                                        │  │
+│  │   📱 Verificación por WhatsApp                        │  │
+│  │                                                        │  │
+│  │   Enviamos un código de 6 dígitos a                   │  │
+│  │   +57 300 123 4567                                     │  │
+│  │                                                        │  │
+│  │   ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐          │  │
+│  │   │  4 │ │  7 │ │  2 │ │  8 │ │    │ │    │          │  │
+│  │   └────┘ └────┘ └────┘ └────┘ └────┘ └────┘          │  │
+│  │                                                        │  │
+│  │   ¿No recibiste el código? Reenviar (30s)             │  │
+│  │                                                        │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+                       │
+                       ▼ (Código correcto)
+┌─────────────────────────────────────────────────────────────┐
+│                       CHAT                                   │
+│                                                              │
+│   🤖 Alejandra: ¡Hola María! Bienvenida a TiendaX.         │
+│      ¿Qué estás buscando hoy?                               │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+Sobre la verificación por WhatsApp
+¿Es necesaria? Depende del balance fricción vs. seguridad.
+
+Argumentos a favor:
+
+Dato verificado 100%
+Evita números falsos
+El usuario confía más (ve que es serio)
+Habilitás notificaciones por WhatsApp
+Argumentos en contra:
+
+Más fricción = menos conversiones
+Necesitás integrar WhatsApp Business API (costo)
+Complejidad técnica adicional
+Mi recomendación: Hacerlo opcional por tienda
+
+Dashboard > Configuración > Seguridad
+
+☐ Verificar WhatsApp de nuevos clientes
+  └─ Envía un código de 6 dígitos antes de iniciar el chat
+  └─ Recomendado para productos de alto valor
+Para el MVP: Yo haría sin verificación primero. Capturás el dato, creás el customer, y listo. La verificación la agregás después cuando integres WhatsApp Business API para notificaciones.
+
+Lógica de identificación
+Usuario hace click en "Iniciar Chat"
+        │
+        ▼
+¿Tiene cookie/localStorage con customer_id?
+        │
+    ┌───┴───┐
+    │       │
+   SÍ       NO
+    │       │
+    ▼       ▼
+Cargar   Mostrar modal
+customer de registro
+    │       │
+    │       ▼
+    │   Usuario ingresa
+    │   nombre + WhatsApp
+    │       │
+    │       ▼
+    │   ¿WhatsApp existe en DB
+    │    para esta tienda?
+    │       │
+    │   ┌───┴───┐
+    │   │       │
+    │  SÍ       NO
+    │   │       │
+    │   ▼       ▼
+    │ "¡Hola   Crear nuevo
+    │ María!   customer
+    │ Te       │
+    │ recuerdo"│
+    │   │       │
+    └───┴───────┘
+        │
+        ▼
+Guardar customer_id en cookie
+        │
+        ▼
+Crear chat con customer_id vinculado
+        │
+        ▼
+Abrir chat
+Agente saluda por nombre
+Cambios en el sistema
+1. Nuevo componente: Modal de identificación
+src/components/store/customer-gate-modal.tsx
+2. Modificar flujo del Store
+typescript
+// En /store/[slug]/page.tsx o /chat/[slug]/page.tsx
+
+const handleStartChat = () => {
+  const customerId = localStorage.getItem(`customer_${slug}`)
+  
+  if (customerId) {
+    // Ya identificado, ir al chat
+    router.push(`/chat/${slug}`)
+  } else {
+    // Mostrar modal de identificación
+    setShowGateModal(true)
+  }
+}
+
+const handleCustomerIdentified = (customer) => {
+  localStorage.setItem(`customer_${slug}`, customer.id)
+  setShowGateModal(false)
+  router.push(`/chat/${slug}`)
+}
+```
+
+### 3. Nueva API route
+```
+POST /api/store/[slug]/identify
+
+Body: { name, phone }
+
+Response: { customer, isNew, chat }
+4. Modificar el chat
+El chat ya no necesita el tool identify_customer al inicio. El customer_id llega desde el modal.
+
+typescript
+// En /chat/[slug]/page.tsx
+
+useEffect(() => {
+  const customerId = localStorage.getItem(`customer_${slug}`)
+  
+  if (!customerId) {
+    // Redirigir al store para identificarse
+    router.push(`/store/${slug}?action=chat`)
+    return
+  }
+  
+  // Iniciar chat con customer ya identificado
+  initChat(customerId)
+}, [])
+Diagrama actualizado del flujo
+mermaid
+flowchart TB
+    subgraph STORE["🏪 Storefront"]
+        S1[Landing Page]
+        S2[Botón: Iniciar Chat]
+        S3[Botón: Chatear para Comprar]
+    end
+    
+    subgraph GATE["🚪 Gate de Identificación"]
+        G1{¿Customer existe\nen localStorage?}
+        G2[Modal: Nombre + WhatsApp]
+        G3{¿WhatsApp existe\nen DB?}
+        G4[Crear Customer]
+        G5[Cargar Customer\nexistente]
+        G6[Guardar en localStorage]
+    end
+    
+    subgraph VERIFY["✅ Verificación (Opcional)"]
+        V1[Enviar código por WhatsApp]
+        V2[Modal: Ingresar código]
+        V3{¿Código correcto?}
+    end
+    
+    subgraph CHAT["💬 Chat"]
+        C1[Crear/Cargar Chat\ncon customer_id]
+        C2[Agente saluda por nombre]
+        C3[Conversación normal]
+    end
+    
+    S1 --> S2
+    S1 --> S3
+    S2 --> G1
+    S3 --> G1
+    
+    G1 -->|Sí| C1
+    G1 -->|No| G2
+    G2 --> G3
+    G3 -->|Sí| G5
+    G3 -->|No| G4
+    G4 --> G6
+    G5 --> G6
+    G6 --> C1
+    
+    G4 -.->|Si verificación activa| V1
+    V1 --> V2
+    V2 --> V3
+    V3 -->|Sí| G6
+    V3 -->|No| V2
+    
+    C1 --> C2
+    C2 --> C3
+Resumen de lo que hay que hacer
+Crear componente CustomerGateModal
+Input nombre
+Input WhatsApp con selector de país
+Botón continuar
+Texto de privacidad
+Crear API /api/store/[slug]/identify
+Recibe nombre + phone
+Busca o crea customer
+Retorna customer data
+Modificar Store page
+Interceptar clicks a chat
+Mostrar modal si no identificado
+Guardar en localStorage después
+Modificar Chat page
+Verificar que venga customer_id
+Si no, redirigir al store
+Pasar customer_id al crear chat
+Actualizar el agente
+Ya no necesita pedir datos al inicio
+Saluda directamente por nombre

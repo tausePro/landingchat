@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gestión de Dominio Personalizado</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#2b7cee",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101822",
+              "success": "#28a745",
+              "warning": "#ffc107",
+              "danger": "#dc3545",
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 24px;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex min-h-screen w-full">
+<!-- SideNavBar -->
+<aside class="flex h-screen min-h-full w-64 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-background-dark p-4 sticky top-0">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Company logo for Mi Tienda Inc." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAIMl72aBPTm2vsML2W7upQkAu2pa3NoHMPF3JEony0KPF5XMKKy_Ri30F5mC-KhRdZ9poxehQbqTn7vJOcOHZmrG5BWKnEI-SPETZN7uwrFpOq6UbVWhn5mX5EM4kDKil9CGyeTat8gAprk0UKRsMz4Z3eLjsA3RE-qlnz7lGQhKrDAu3MFBWPYlEMQWgg5g6-88kD6rjvD2GvhyMS9RscoOiLL4xwuflRvtC2OYW8u0DrzbjQ-HcEb8QO2USCuWcL2wHQnKCMYvg");'></div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-slate-50 text-base font-medium leading-normal">Mi Tienda Inc.</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Admin Account</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">chat</span>
+<p class="text-sm font-medium leading-normal">Chats</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">group</span>
+<p class="text-sm font-medium leading-normal">Contacts</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-sm font-medium leading-normal">Settings</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined fill">public</span>
+<p class="text-sm font-medium leading-normal">Domain</p>
+</a>
+</nav>
+</div>
+<div class="mt-auto">
+<button class="flex min-w-[84px] w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-slate-50 text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90">
+<span class="truncate">Upgrade Plan</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 p-6 sm:p-8 lg:p-10">
+<div class="mx-auto max-w-4xl">
+<!-- PageHeading -->
+<div class="flex flex-wrap justify-between gap-3 mb-8">
+<div class="flex min-w-72 flex-col gap-2">
+<p class="text-slate-900 dark:text-slate-50 text-3xl md:text-4xl font-black leading-tight tracking-[-0.033em]">Custom Domain</p>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Connect your own domain to give your landing page a professional, branded address.</p>
+</div>
+</div>
+<!-- Current Domain Card -->
+<div class="mb-8 p-4 @container bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
+<div class="flex flex-col items-stretch justify-start rounded-lg @xl:flex-row @xl:items-center">
+<div class="flex w-full min-w-72 grow flex-col items-stretch justify-center gap-1 py-2 @xl:px-4">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Your LandingChat Domain</p>
+<div class="flex items-center gap-3 justify-between">
+<p class="text-slate-900 dark:text-slate-50 text-lg font-bold leading-tight tracking-[-0.015em]">mitienda.landingchat.co</p>
+<button class="flex items-center gap-2 text-sm text-primary font-medium">
+<span class="material-symbols-outlined !text-base">content_copy</span>
+<span>Copy Link</span>
+</button>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal mt-1">This is your default address. You can share this link anytime.</p>
+</div>
+</div>
+</div>
+<!-- Custom Domain Section Card -->
+<div class="bg-white dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-800">
+<!-- SectionHeader -->
+<div class="border-b border-slate-200 dark:border-slate-800">
+<h2 class="text-slate-900 dark:text-slate-50 text-[22px] font-bold leading-tight tracking-[-0.015em] px-6 py-5">Connect your custom domain</h2>
+</div>
+<div class="p-6">
+<!-- TextField -->
+<div class="flex flex-col sm:flex-row max-w-full flex-wrap items-end gap-4">
+<label class="flex flex-col min-w-40 flex-1">
+<p class="text-slate-900 dark:text-slate-50 text-base font-medium leading-normal pb-2">Enter your custom domain</p>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-lg text-slate-900 dark:text-slate-50 focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-background-light dark:bg-slate-800 focus:border-primary dark:focus:border-primary h-14 placeholder:text-slate-400 dark:placeholder:text-slate-500 p-[15px] text-base font-normal leading-normal" placeholder="e.g., www.mitienda.com" value=""/>
+</label>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-14 px-6 bg-primary text-slate-50 text-base font-bold leading-normal tracking-[0.015em] w-full sm:w-auto hover:bg-primary/90">
+<span class="truncate">Verify &amp; Save Domain</span>
+</button>
+</div>
+<!-- Domain Status Section -->
+<div class="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-lg bg-slate-100 dark:bg-slate-800/50">
+<div class="flex items-center gap-3">
+<p class="text-slate-900 dark:text-slate-50 font-semibold">www.mitienda.com</p>
+<span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium bg-warning/20 text-yellow-800 dark:bg-warning/30 dark:text-yellow-200">
+<span class="size-1.5 rounded-full bg-warning"></span>
+                                    Pending
+                                </span>
+</div>
+<div class="flex items-center gap-4">
+<p class="text-sm text-slate-600 dark:text-slate-400">Activate domain</p>
+<label class="relative inline-flex cursor-pointer items-center">
+<input class="peer sr-only" disabled="" type="checkbox" value=""/>
+<div class="peer h-6 w-11 rounded-full bg-slate-300 dark:bg-slate-700 after:absolute after:start-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 dark:after:border-slate-600 after:bg-white after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white rtl:peer-checked:after:-translate-x-full"></div>
+</label>
+</div>
+</div>
+<!-- Instructions Accordion -->
+<div class="mt-6 border-t border-slate-200 dark:border-slate-800 pt-6">
+<details class="group">
+<summary class="flex cursor-pointer list-none items-center justify-between font-medium text-slate-900 dark:text-slate-50">
+                                    How to connect your domain
+                                    <span class="transition group-open:rotate-180">
+<span class="material-symbols-outlined">expand_more</span>
+</span>
+</summary>
+<div class="mt-4 text-slate-600 dark:text-slate-400">
+<p class="mb-4">To connect your domain, you need to create a CNAME record in your domain provider's DNS settings. This points your domain to LandingChat servers.</p>
+<div class="space-y-4">
+<div class="flex gap-4">
+<div class="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">1</div>
+<p>Log in to your domain provider's website (e.g., GoDaddy, Namecheap, Google Domains).</p>
+</div>
+<div class="flex gap-4">
+<div class="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">2</div>
+<p>Find the DNS management page and create the following record:</p>
+</div>
+</div>
+<!-- DNS Records Table -->
+<div class="mt-4 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+<table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+<thead class="bg-slate-50 dark:bg-slate-800">
+<tr>
+<th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" scope="col">Type</th>
+<th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" scope="col">Host / Name</th>
+<th class="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300" scope="col">Value / Points to</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900/50">
+<tr>
+<td class="whitespace-nowrap px-4 py-3 font-medium text-slate-800 dark:text-slate-200">CNAME</td>
+<td class="whitespace-nowrap px-4 py-3">www</td>
+<td class="whitespace-nowrap px-4 py-3">
+<div class="flex items-center justify-between gap-4">
+<span class="font-mono text-xs">domains.landingchat.co</span>
+<button class="flex items-center gap-1.5 text-xs text-primary font-medium">
+<span class="material-symbols-outlined !text-sm">content_copy</span>
+<span>Copy</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p class="mt-4 text-xs text-slate-500">DNS changes can take up to 48 hours to propagate. Once completed, click the "Verify &amp; Save" button again.</p>
+</div>
+</details>
+</div>
+</div>
+<!-- Card Footer -->
+<div class="flex justify-end gap-4 p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-xl">
+<a class="text-primary font-medium text-sm flex items-center gap-2" href="#">
+<span class="material-symbols-outlined !text-base">help_outline</span>
+<span>Need help? Contact support</span>
+</a>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

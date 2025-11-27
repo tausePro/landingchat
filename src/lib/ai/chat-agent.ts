@@ -11,6 +11,7 @@ interface ProcessMessageInput {
     organizationId: string
     agentId: string
     customerId?: string
+    currentProductId?: string
 }
 
 interface ProcessMessageOutput {
@@ -36,24 +37,19 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
     const actions: Array<{ type: string; data: any }> = []
 
     try {
-        console.log("[processMessage] Starting with input:", { chatId: input.chatId, agentId: input.agentId })
+        console.log("[processMessage] Starting with input:", { chatId: input.chatId, agentId: input.agentId, currentProductId: input.currentProductId })
         const supabase = await createClient()
 
         // 1. Load agent configuration
-        console.log("[processMessage] Loading agent configuration...")
         const { data: agent } = await supabase
             .from("agents")
             .select("*")
             .eq("id", input.agentId)
             .single()
 
-        if (!agent) {
-            throw new Error("Agent not found")
-        }
-        console.log("[processMessage] Agent loaded:", agent.name)
+        if (!agent) throw new Error("Agent not found")
 
         // 2. Load organization
-        console.log("[processMessage] Loading organization...")
         const { data: organization } = await supabase
             .from("organizations")
             .select("name")
@@ -61,17 +57,24 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 3. Load products catalog
-        console.log("[processMessage] Loading products...")
         const { data: products } = await supabase
             .from("products")
             .select("*")
             .eq("organization_id", input.organizationId)
             .eq("is_active", true)
 
-        console.log("[processMessage] Products loaded:", products?.length || 0)
+        // 3.1 Load current product context if available
+        let currentProduct = null
+        if (input.currentProductId) {
+            const { data: product } = await supabase
+                .from("products")
+                .select("*")
+                .eq("id", input.currentProductId)
+                .single()
+            currentProduct = product
+        }
 
-        // 4. Load conversation history (last 10 messages)
-        console.log("[processMessage] Loading conversation history...")
+        // 4. Load conversation history
         const { data: messages } = await supabase
             .from("messages")
             .select("sender_type, content")
@@ -87,7 +90,6 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         ) : []
 
         // 5. Load customer context if exists
-        console.log("[processMessage] Loading customer context...")
         let customer = null
         let customerOrders = null
         if (input.customerId) {
@@ -109,7 +111,6 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         }
 
         // 6. Load cart state
-        console.log("[processMessage] Loading cart...")
         const { data: cart } = await supabase
             .from("carts")
             .select("*")
@@ -118,99 +119,120 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 7. Build system prompt
-        console.log("[processMessage] Building system prompt...")
-        const systemPrompt = buildSystemPrompt(
+        let systemPrompt = buildSystemPrompt(
             agent,
             organization?.name || "la tienda",
-            products || []
+            products || [],
+            customer || undefined,
+            currentProduct || undefined
         )
+
+        // Add strict rules about inventory and variants
+        systemPrompt += `
+        
+REGLAS CRÍTICAS DE INVENTARIO:
+1. ANTES de confirmar cualquier compra o agregar al carrito, DEBES verificar si el producto tiene variantes (talla, color).
+2. Si el producto tiene variantes, PREGUNTA al cliente cuál desea.
+3. SOLO ofrece las variantes que existen en el catálogo. NO INVENTES tallas o colores.
+4. Si el cliente pide una variante que no existe, dile amablemente que no está disponible y ofrece las que sí hay.
+5. Verifica siempre el stock disponible antes de prometer un producto.
+`
 
         // Add customer and cart context to system prompt
         let fullSystemPrompt = systemPrompt
         if (customer) {
             fullSystemPrompt += "\n\n" + buildCustomerContext(customer, customerOrders || [])
+        } else {
+            fullSystemPrompt += "\n\n" + buildCustomerContext(undefined, undefined)
         }
+
         if (cart) {
             fullSystemPrompt += "\n\n" + buildCartContext(cart)
         }
 
-        // 8. Add user message to history
-        const currentHistory = [
+        // 8. Prepare message history
+        let currentMessages: Anthropic.MessageParam[] = [
             ...conversationHistory,
             { role: 'user' as const, content: input.message }
         ]
 
-        // 9. Call Claude with tools
-        console.log("[processMessage] Calling Claude API...")
-        let response = await createMessage({
-            model: "claude-3-5-sonnet-20240620",
-            max_tokens: 1024,
-            system: fullSystemPrompt,
-            messages: currentHistory,
-            tools: tools as any
-        })
+        let finalResponseText = ""
+        let loopCount = 0
+        const MAX_LOOPS = 5
 
-        console.log("[processMessage] Claude response received")
+        // 9. Main Loop
+        while (loopCount < MAX_LOOPS) {
+            loopCount++
+            console.log(`[processMessage] Loop ${loopCount}, calling Claude...`)
 
-        let finalResponse = ""
-        let continueLoop = true
+            const response = await createMessage({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 1024,
+                system: fullSystemPrompt,
+                messages: currentMessages,
+                tools: tools as any
+            })
 
-        // 10. Process tool calls (may require multiple iterations)
-        while (continueLoop) {
-            continueLoop = false
+            // Add assistant response to history
+            currentMessages.push({
+                role: "assistant",
+                content: response.content
+            })
 
-            for (const content of response.content) {
-                if (content.type === "text") {
-                    finalResponse += content.text
-                } else if (content.type === "tool_use") {
-                    toolsUsed.push(content.name)
+            // Check if we have tool calls
+            const toolUseBlocks = response.content.filter(block => block.type === "tool_use")
+            const textBlocks = response.content.filter(block => block.type === "text")
 
-                    // Execute the tool
-                    const toolResult = await executeTool(
-                        content.name,
-                        content.input,
-                        {
-                            chatId: input.chatId,
-                            organizationId: input.organizationId,
-                            customerId: input.customerId
-                        }
-                    )
-
-                    // Add action to response
-                    if (toolResult.success && toolResult.data) {
-                        actions.push({
-                            type: content.name,
-                            data: toolResult.data
-                        })
-                    }
-
-                    // If tool execution requires continuation, call Claude again
-                    if (response.stop_reason === "tool_use") {
-                        const toolResultMessage: Anthropic.MessageParam = {
-                            role: "user",
-                            content: [{
-                                type: "tool_result",
-                                tool_use_id: content.id,
-                                content: JSON.stringify(toolResult)
-                            }]
-                        }
-
-                        response = await createMessage({
-                            model: "claude-3-5-sonnet-20240620",
-                            max_tokens: 1024,
-                            system: fullSystemPrompt,
-                            messages: [...currentHistory, toolResultMessage],
-                            tools: tools as any
-                        })
-
-                        continueLoop = true
-                        break
-                    }
-                }
+            if (textBlocks.length > 0) {
+                finalResponseText += textBlocks.map(b => (b as any).text).join("\n")
             }
+
+            if (toolUseBlocks.length === 0) {
+                // No more tools, we are done
+                break
+            }
+
+            // Process tool calls
+            const toolResults: Anthropic.ToolResultBlockParam[] = []
+
+            for (const toolBlock of toolUseBlocks) {
+                const toolUse = toolBlock as Anthropic.ToolUseBlock
+                toolsUsed.push(toolUse.name)
+                console.log(`[processMessage] Executing tool: ${toolUse.name}`)
+
+                const toolResult = await executeTool(
+                    toolUse.name,
+                    toolUse.input,
+                    {
+                        chatId: input.chatId,
+                        organizationId: input.organizationId,
+                        customerId: input.customerId
+                    }
+                )
+
+                // Add to actions list for frontend
+                if (toolResult.success && toolResult.data) {
+                    actions.push({
+                        type: toolUse.name,
+                        data: toolResult.data
+                    })
+                }
+
+                toolResults.push({
+                    type: "tool_result",
+                    tool_use_id: toolUse.id,
+                    content: JSON.stringify(toolResult)
+                })
+            }
+
+            // Add tool results to history for next iteration
+            currentMessages.push({
+                role: "user",
+                content: toolResults
+            })
         }
 
-        // 11. Save user message to DB
+        // 10. Save user message to DB
         await supabase.from("messages").insert({
             chat_id: input.chatId,
             sender_type: "user",
@@ -218,48 +240,41 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             metadata: {}
         })
 
-        // 12. Save assistant response to DB
+        // 11. Save assistant response to DB
         await supabase.from("messages").insert({
             chat_id: input.chatId,
             sender_type: "bot",
-            content: finalResponse,
+            content: finalResponseText,
             metadata: {
-                model: "claude-3-5-sonnet-20240620",
-                tokens: {
-                    input: response.usage.input_tokens,
-                    output: response.usage.output_tokens
-                },
+                model: "claude-sonnet-4-20250514",
                 tools_used: toolsUsed,
                 latency_ms: Date.now() - startTime
             }
         })
 
-        // 13. Return response
         return {
-            response: finalResponse,
+            response: finalResponseText,
             actions,
             metadata: {
-                model: "claude-3-5-sonnet-20240620",
-                tokens_used: {
-                    input: response.usage.input_tokens,
-                    output: response.usage.output_tokens
-                },
+                model: "claude-sonnet-4-20250514",
                 latency_ms: Date.now() - startTime,
                 tools_used: toolsUsed
             }
         }
 
     } catch (error: any) {
-        console.error("[processMessage] ERROR:", error)
+        console.error("[processMessage] ========== ERROR DETAILS ==========")
+        console.error("[processMessage] Error name:", error.name)
+        console.error("[processMessage] Error message:", error.message)
         console.error("[processMessage] Error stack:", error.stack)
-        console.error("[processMessage] Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)))
+        console.error("[processMessage] Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+        console.error("[processMessage] =====================================")
 
-        // Return fallback response
         return {
             response: "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",
             actions: [],
             metadata: {
-                model: "claude-3-5-sonnet-20240620",
+                model: "claude-sonnet-4-20250514",
                 latency_ms: Date.now() - startTime,
                 tools_used: toolsUsed
             }

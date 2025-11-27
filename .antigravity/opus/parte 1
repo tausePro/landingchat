@@ -1,0 +1,2219 @@
+Paquete de Implementación: Cerebro de IA con Claude para LandingChat
+Resumen Ejecutivo
+Este paquete implementa el sistema de IA conversacional completo para LandingChat, incluyendo identificación de clientes, 15 tools para el MVP, y todas las correcciones necesarias para resolver el error actual.
+
+Parte 1: Migración de Base de Datos
+sql-- ============================================
+-- MIGRACIÓN: AI Agent Infrastructure
+-- Ejecutar en Supabase SQL Editor
+-- ============================================
+
+-- 1. Agregar customer_id a chats (CRÍTICO - resuelve el error actual)
+ALTER TABLE chats ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES customers(id);
+
+-- 2. Índices para performance
+CREATE INDEX IF NOT EXISTS idx_customers_org_email ON customers(organization_id, email);
+CREATE INDEX IF NOT EXISTS idx_customers_org_phone ON customers(organization_id, phone);
+CREATE INDEX IF NOT EXISTS idx_chats_customer ON chats(customer_id);
+CREATE INDEX IF NOT EXISTS idx_chats_org_status ON chats(organization_id, status);
+CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_products_org_active ON products(organization_id, is_active);
+
+-- 3. Tabla de descuentos/cupones
+CREATE TABLE IF NOT EXISTS discounts (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id uuid REFERENCES organizations(id) NOT NULL,
+    code text NOT NULL,
+    type text CHECK (type IN ('percentage', 'fixed')) NOT NULL,
+    value decimal(10,2) NOT NULL,
+    min_purchase decimal(10,2) DEFAULT 0,
+    max_uses integer,
+    used_count integer DEFAULT 0,
+    valid_from timestamp with time zone DEFAULT now(),
+    valid_until timestamp with time zone,
+    is_active boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    UNIQUE(organization_id, code)
+);
+
+ALTER TABLE discounts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Org admins can manage discounts" ON discounts 
+    FOR ALL USING (organization_id = get_my_org_id());
+
+CREATE POLICY "Public can view active discounts" ON discounts 
+    FOR SELECT USING (is_active = true);
+
+-- 4. Agregar campos útiles a customers si no existen
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_interaction_at timestamp with time zone;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS total_orders integer DEFAULT 0;
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS total_spent decimal(10,2) DEFAULT 0;
+
+-- 5. Función para actualizar stats del customer
+CREATE OR REPLACE FUNCTION update_customer_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'INSERT' AND NEW.status = 'paid' THEN
+        UPDATE customers SET 
+            total_orders = total_orders + 1,
+            total_spent = total_spent + NEW.total,
+            updated_at = now()
+        WHERE id = NEW.customer_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trigger_update_customer_stats ON orders;
+CREATE TRIGGER trigger_update_customer_stats
+    AFTER INSERT OR UPDATE ON orders
+    FOR EACH ROW EXECUTE FUNCTION update_customer_stats();
+
+Parte 2: Variables de Entorno
+Agregar a .env.local:
+env# Anthropic API
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+
+# Ya deberían existir:
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJxxx
+
+Parte 3: Archivos de Código
+3.1 Cliente Anthropic (Actualizar)
+Archivo: src/lib/ai/anthropic.ts
+typescriptimport Anthropic from "@anthropic-ai/sdk"
+
+if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("WARNING: ANTHROPIC_API_KEY is not set")
+}
+
+const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY || "",
+})
+
+export async function createMessage(
+    params: Anthropic.MessageCreateParams, 
+    retries = 3
+): Promise<Anthropic.Message> {
+    if (!process.env.ANTHROPIC_API_KEY) {
+        throw new Error("ANTHROPIC_API_KEY is not configured. Please add it to your .env.local file.")
+    }
+
+    let lastError: Error | null = null
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            console.log(`[Anthropic] Calling API (attempt ${i + 1}/${retries})...`)
+            const startTime = Date.now()
+            
+            const message = await anthropic.messages.create(params)
+            
+            console.log(`[Anthropic] Response received in ${Date.now() - startTime}ms`)
+            return message as Anthropic.Message
+        } catch (error: any) {
+            lastError = error
+            console.error(`[Anthropic] Error (attempt ${i + 1}/${retries}):`, error.message)
+
+            // Don't retry on auth errors
+            if (error.status === 401 || error.status === 403) {
+                throw new Error(`Anthropic authentication error: ${error.message}. Check your API key.`)
+            }
+
+            // Don't retry on invalid request
+            if (error.status === 400) {
+                throw new Error(`Anthropic invalid request: ${error.message}`)
+            }
+
+            // Exponential backoff for other errors
+            if (i < retries - 1) {
+                const delay = Math.pow(2, i) * 1000
+                console.log(`[Anthropic] Retrying in ${delay}ms...`)
+                await new Promise(resolve => setTimeout(resolve, delay))
+            }
+        }
+    }
+
+    throw new Error(`Failed after ${retries} attempts: ${lastError?.message}`)
+}
+
+export function estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4)
+}
+
+export { anthropic }
+
+3.2 Definición de Tools (15 tools MVP)
+Archivo: src/lib/ai/tools.ts
+typescriptimport Anthropic from "@anthropic-ai/sdk"
+
+export const tools: Anthropic.Tool[] = [
+    // ==================== IDENTIFICACIÓN ====================
+    {
+        name: "identify_customer",
+        description: "Identifica o crea un cliente con su información de contacto. USAR AL INICIO de cada conversación nueva cuando el cliente proporcione su nombre y contacto.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                name: { 
+                    type: "string", 
+                    description: "Nombre completo del cliente" 
+                },
+                email: { 
+                    type: "string", 
+                    description: "Email del cliente (opcional si tiene teléfono)" 
+                },
+                phone: { 
+                    type: "string", 
+                    description: "Teléfono o WhatsApp del cliente (opcional si tiene email)" 
+                }
+            },
+            required: ["name"]
+        }
+    },
+
+    // ==================== PRODUCTOS ====================
+    {
+        name: "search_products",
+        description: "Busca productos en el catálogo basándose en lo que el cliente describe. Usa esto cuando el cliente dice qué tipo de producto busca.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                query: { 
+                    type: "string", 
+                    description: "Descripción de lo que busca el cliente (ej: 'zapatillas para correr', 'algo económico para regalo')" 
+                },
+                category: { 
+                    type: "string", 
+                    description: "Categoría específica si se menciona" 
+                },
+                max_price: { 
+                    type: "number", 
+                    description: "Precio máximo si el cliente menciona presupuesto" 
+                },
+                limit: { 
+                    type: "number", 
+                    description: "Cantidad de resultados (default 5)" 
+                }
+            },
+            required: ["query"]
+        }
+    },
+    {
+        name: "show_product",
+        description: "Muestra los detalles completos de un producto específico. Usar cuando el cliente quiere ver más info de un producto.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                product_id: { 
+                    type: "string", 
+                    description: "ID del producto a mostrar" 
+                }
+            },
+            required: ["product_id"]
+        }
+    },
+    {
+        name: "get_product_availability",
+        description: "Verifica el stock disponible de un producto.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                product_id: { 
+                    type: "string", 
+                    description: "ID del producto" 
+                },
+                variant: { 
+                    type: "string", 
+                    description: "Variante específica (talla, color, etc.)" 
+                }
+            },
+            required: ["product_id"]
+        }
+    },
+
+    // ==================== CARRITO ====================
+    {
+        name: "add_to_cart",
+        description: "Agrega un producto al carrito del cliente. Usar cuando el cliente confirma que quiere agregar algo.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                product_id: { 
+                    type: "string", 
+                    description: "ID del producto a agregar" 
+                },
+                quantity: { 
+                    type: "number", 
+                    description: "Cantidad a agregar (default 1)" 
+                },
+                variant: { 
+                    type: "string", 
+                    description: "Variante si aplica (talla, color)" 
+                }
+            },
+            required: ["product_id"]
+        }
+    },
+    {
+        name: "get_cart",
+        description: "Obtiene el contenido actual del carrito. Usar cuando el cliente pregunta qué tiene en el carrito o quiere revisar antes de pagar.",
+        input_schema: {
+            type: "object" as const,
+            properties: {}
+        }
+    },
+    {
+        name: "remove_from_cart",
+        description: "Elimina un producto del carrito.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                product_id: { 
+                    type: "string", 
+                    description: "ID del producto a eliminar" 
+                }
+            },
+            required: ["product_id"]
+        }
+    },
+    {
+        name: "update_cart_quantity",
+        description: "Actualiza la cantidad de un producto en el carrito.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                product_id: { 
+                    type: "string", 
+                    description: "ID del producto" 
+                },
+                quantity: { 
+                    type: "number", 
+                    description: "Nueva cantidad" 
+                }
+            },
+            required: ["product_id", "quantity"]
+        }
+    },
+
+    // ==================== CHECKOUT ====================
+    {
+        name: "start_checkout",
+        description: "Inicia el proceso de pago. Usar cuando el cliente dice que quiere pagar o finalizar la compra.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                shipping_address: { 
+                    type: "string", 
+                    description: "Dirección de envío si ya la proporcionó" 
+                },
+                city: { 
+                    type: "string", 
+                    description: "Ciudad de envío" 
+                }
+            }
+        }
+    },
+    {
+        name: "get_shipping_options",
+        description: "Obtiene las opciones de envío disponibles y sus costos.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                city: { 
+                    type: "string", 
+                    description: "Ciudad de destino" 
+                },
+                address: { 
+                    type: "string", 
+                    description: "Dirección completa" 
+                }
+            }
+        }
+    },
+    {
+        name: "apply_discount",
+        description: "Aplica un código de descuento al carrito.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                code: { 
+                    type: "string", 
+                    description: "Código de descuento" 
+                }
+            },
+            required: ["code"]
+        }
+    },
+
+    // ==================== INFORMACIÓN ====================
+    {
+        name: "get_store_info",
+        description: "Obtiene información de la tienda como horarios, políticas de envío, devoluciones, etc.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                topic: { 
+                    type: "string", 
+                    description: "Tema específico: 'shipping', 'returns', 'hours', 'payment_methods', 'contact'" 
+                }
+            }
+        }
+    },
+    {
+        name: "get_order_status",
+        description: "Consulta el estado de una orden existente.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                order_id: { 
+                    type: "string", 
+                    description: "ID de la orden (si lo tiene)" 
+                },
+                email: { 
+                    type: "string", 
+                    description: "Email usado en la compra (alternativa al order_id)" 
+                }
+            }
+        }
+    },
+    {
+        name: "get_customer_history",
+        description: "Obtiene el historial de compras y preferencias del cliente actual. Usar para personalizar recomendaciones.",
+        input_schema: {
+            type: "object" as const,
+            properties: {}
+        }
+    },
+
+    // ==================== ESCALAMIENTO ====================
+    {
+        name: "escalate_to_human",
+        description: "Transfiere la conversación a un agente humano. Usar cuando: el cliente lo pide explícitamente, hay un problema que no puedes resolver, o detectas frustración.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                reason: { 
+                    type: "string", 
+                    description: "Motivo del escalamiento" 
+                },
+                priority: { 
+                    type: "string", 
+                    description: "'high', 'medium', 'low'" 
+                }
+            },
+            required: ["reason"]
+        }
+    }
+]
+
+3.3 Ejecutor de Tools
+Archivo: src/lib/ai/tool-executor.ts
+typescriptimport { createClient } from "@/lib/supabase/server"
+
+interface ToolContext {
+    chatId: string
+    organizationId: string
+    customerId?: string
+}
+
+interface ToolResult {
+    success: boolean
+    data?: any
+    error?: string
+}
+
+export async function executeTool(
+    toolName: string,
+    input: any,
+    context: ToolContext
+): Promise<ToolResult> {
+    console.log(`[Tool] Executing: ${toolName}`, input)
+
+    const supabase = await createClient()
+
+    try {
+        switch (toolName) {
+            case "identify_customer":
+                return await identifyCustomer(supabase, input, context)
+
+            case "search_products":
+                return await searchProducts(supabase, input, context)
+
+            case "show_product":
+                return await showProduct(supabase, input, context)
+
+            case "get_product_availability":
+                return await getProductAvailability(supabase, input, context)
+
+            case "add_to_cart":
+                return await addToCart(supabase, input, context)
+
+            case "get_cart":
+                return await getCart(supabase, context)
+
+            case "remove_from_cart":
+                return await removeFromCart(supabase, input, context)
+
+            case "update_cart_quantity":
+                return await updateCartQuantity(supabase, input, context)
+
+            case "start_checkout":
+                return await startCheckout(supabase, input, context)
+
+            case "get_shipping_options":
+                return await getShippingOptions(supabase, input, context)
+
+            case "apply_discount":
+                return await applyDiscount(supabase, input, context)
+
+            case "get_store_info":
+                return await getStoreInfo(supabase, input, context)
+
+            case "get_order_status":
+                return await getOrderStatus(supabase, input, context)
+
+            case "get_customer_history":
+                return await getCustomerHistory(supabase, context)
+
+            case "escalate_to_human":
+                return await escalateToHuman(supabase, input, context)
+
+            default:
+                return { success: false, error: `Unknown tool: ${toolName}` }
+        }
+    } catch (error: any) {
+        console.error(`[Tool] Error in ${toolName}:`, error)
+        return { success: false, error: error.message }
+    }
+}
+
+// ==================== TOOL IMPLEMENTATIONS ====================
+
+async function identifyCustomer(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { name, email, phone } = input
+
+    if (!email && !phone) {
+        return { 
+            success: false, 
+            error: "Se necesita al menos email o teléfono para identificar al cliente" 
+        }
+    }
+
+    // Buscar cliente existente
+    let query = supabase
+        .from("customers")
+        .select("*, orders(id, total, status, created_at)")
+        .eq("organization_id", context.organizationId)
+
+    if (email) {
+        query = query.eq("email", email)
+    } else if (phone) {
+        query = query.eq("phone", phone)
+    }
+
+    const { data: existingCustomer } = await query.single()
+
+    if (existingCustomer) {
+        // Actualizar chat con customer_id
+        await supabase
+            .from("chats")
+            .update({ customer_id: existingCustomer.id })
+            .eq("id", context.chatId)
+
+        // Actualizar última interacción
+        await supabase
+            .from("customers")
+            .update({ last_interaction_at: new Date().toISOString() })
+            .eq("id", existingCustomer.id)
+
+        const lastOrder = existingCustomer.orders?.[0]
+
+        return {
+            success: true,
+            data: {
+                isReturning: true,
+                customer: {
+                    id: existingCustomer.id,
+                    name: existingCustomer.full_name,
+                    email: existingCustomer.email,
+                    phone: existingCustomer.phone
+                },
+                stats: {
+                    totalOrders: existingCustomer.total_orders || 0,
+                    totalSpent: existingCustomer.total_spent || 0
+                },
+                lastOrder: lastOrder ? {
+                    date: lastOrder.created_at,
+                    total: lastOrder.total,
+                    status: lastOrder.status
+                } : null,
+                preferences: existingCustomer.metadata || {}
+            }
+        }
+    }
+
+    // Crear nuevo cliente
+    const { data: newCustomer, error } = await supabase
+        .from("customers")
+        .insert({
+            organization_id: context.organizationId,
+            full_name: name,
+            email: email || null,
+            phone: phone || null,
+            last_interaction_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+    if (error) {
+        return { success: false, error: `Error creando cliente: ${error.message}` }
+    }
+
+    // Vincular al chat
+    await supabase
+        .from("chats")
+        .update({ customer_id: newCustomer.id })
+        .eq("id", context.chatId)
+
+    return {
+        success: true,
+        data: {
+            isReturning: false,
+            customer: {
+                id: newCustomer.id,
+                name: newCustomer.full_name,
+                email: newCustomer.email,
+                phone: newCustomer.phone
+            }
+        }
+    }
+}
+
+async function searchProducts(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { query, category, max_price, limit = 5 } = input
+
+    let dbQuery = supabase
+        .from("products")
+        .select("id, name, description, price, image_url, images, stock, categories, variants")
+        .eq("organization_id", context.organizationId)
+        .eq("is_active", true)
+        .gt("stock", 0)
+
+    if (max_price) {
+        dbQuery = dbQuery.lte("price", max_price)
+    }
+
+    // Búsqueda por texto en nombre y descripción
+    if (query) {
+        dbQuery = dbQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+    }
+
+    if (category) {
+        dbQuery = dbQuery.contains("categories", [category])
+    }
+
+    const { data: products, error } = await dbQuery.limit(limit)
+
+    if (error) {
+        return { success: false, error: error.message }
+    }
+
+    return {
+        success: true,
+        data: {
+            products: products.map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                description: p.description,
+                price: p.price,
+                image_url: p.image_url || p.images?.[0],
+                stock: p.stock,
+                hasVariants: p.variants?.length > 0
+            })),
+            totalFound: products.length
+        }
+    }
+}
+
+async function showProduct(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { product_id } = input
+
+    const { data: product, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", product_id)
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    if (error || !product) {
+        return { success: false, error: "Producto no encontrado" }
+    }
+
+    return {
+        success: true,
+        data: {
+            product: {
+                id: product.id,
+                name: product.name,
+                description: product.description,
+                price: product.price,
+                image_url: product.image_url,
+                images: product.images || [],
+                stock: product.stock,
+                sku: product.sku,
+                categories: product.categories || [],
+                variants: product.variants || []
+            }
+        }
+    }
+}
+
+async function getProductAvailability(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { product_id } = input
+
+    const { data: product, error } = await supabase
+        .from("products")
+        .select("name, stock, variants")
+        .eq("id", product_id)
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    if (error || !product) {
+        return { success: false, error: "Producto no encontrado" }
+    }
+
+    return {
+        success: true,
+        data: {
+            available: product.stock > 0,
+            quantity: product.stock,
+            productName: product.name
+        }
+    }
+}
+
+async function addToCart(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { product_id, quantity = 1, variant } = input
+
+    // Obtener producto
+    const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("id, name, price, image_url, stock")
+        .eq("id", product_id)
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    if (productError || !product) {
+        return { success: false, error: "Producto no encontrado" }
+    }
+
+    if (product.stock < quantity) {
+        return { 
+            success: false, 
+            error: `Solo hay ${product.stock} unidades disponibles de ${product.name}` 
+        }
+    }
+
+    // Obtener o crear carrito
+    let { data: cart } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    if (!cart) {
+        const { data: newCart, error: cartError } = await supabase
+            .from("carts")
+            .insert({
+                organization_id: context.organizationId,
+                chat_id: context.chatId,
+                customer_id: context.customerId || null,
+                items: [],
+                status: "active"
+            })
+            .select()
+            .single()
+
+        if (cartError) {
+            return { success: false, error: "Error creando carrito" }
+        }
+        cart = newCart
+    }
+
+    // Actualizar items del carrito
+    const items = cart.items || []
+    const existingIndex = items.findIndex((i: any) => i.product_id === product_id)
+
+    if (existingIndex >= 0) {
+        items[existingIndex].quantity += quantity
+    } else {
+        items.push({
+            product_id: product.id,
+            name: product.name,
+            price: product.price,
+            image_url: product.image_url,
+            quantity,
+            variant: variant || null
+        })
+    }
+
+    const { error: updateError } = await supabase
+        .from("carts")
+        .update({ 
+            items, 
+            updated_at: new Date().toISOString() 
+        })
+        .eq("id", cart.id)
+
+    if (updateError) {
+        return { success: false, error: "Error actualizando carrito" }
+    }
+
+    const total = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+
+    return {
+        success: true,
+        data: {
+            added: {
+                name: product.name,
+                quantity,
+                price: product.price
+            },
+            cart: {
+                itemCount: items.length,
+                totalItems: items.reduce((sum: number, i: any) => sum + i.quantity, 0),
+                total
+            }
+        }
+    }
+}
+
+async function getCart(supabase: any, context: ToolContext): Promise<ToolResult> {
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    if (!cart || !cart.items?.length) {
+        return {
+            success: true,
+            data: {
+                isEmpty: true,
+                items: [],
+                total: 0
+            }
+        }
+    }
+
+    const total = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+
+    return {
+        success: true,
+        data: {
+            isEmpty: false,
+            items: cart.items,
+            itemCount: cart.items.length,
+            totalItems: cart.items.reduce((sum: number, i: any) => sum + i.quantity, 0),
+            total
+        }
+    }
+}
+
+async function removeFromCart(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { product_id } = input
+
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    if (!cart) {
+        return { success: false, error: "No hay carrito activo" }
+    }
+
+    const items = cart.items.filter((i: any) => i.product_id !== product_id)
+    const removedItem = cart.items.find((i: any) => i.product_id === product_id)
+
+    await supabase
+        .from("carts")
+        .update({ items, updated_at: new Date().toISOString() })
+        .eq("id", cart.id)
+
+    return {
+        success: true,
+        data: {
+            removed: removedItem?.name || "Producto",
+            remainingItems: items.length
+        }
+    }
+}
+
+async function updateCartQuantity(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { product_id, quantity } = input
+
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    if (!cart) {
+        return { success: false, error: "No hay carrito activo" }
+    }
+
+    const items = cart.items.map((i: any) => {
+        if (i.product_id === product_id) {
+            return { ...i, quantity }
+        }
+        return i
+    }).filter((i: any) => i.quantity > 0)
+
+    await supabase
+        .from("carts")
+        .update({ items, updated_at: new Date().toISOString() })
+        .eq("id", cart.id)
+
+    const total = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+
+    return {
+        success: true,
+        data: {
+            cart: { items, total }
+        }
+    }
+}
+
+async function startCheckout(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    if (!cart || !cart.items?.length) {
+        return { success: false, error: "El carrito está vacío" }
+    }
+
+    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+
+    return {
+        success: true,
+        data: {
+            readyForCheckout: true,
+            summary: {
+                items: cart.items,
+                subtotal,
+                shipping: "Por calcular",
+                total: subtotal
+            },
+            nextStep: "El cliente debe proporcionar dirección de envío y método de pago"
+        }
+    }
+}
+
+async function getShippingOptions(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { city } = input
+
+    // Por ahora, opciones fijas. Después se pueden configurar por organización
+    const options = [
+        { 
+            id: "standard", 
+            name: "Envío Estándar", 
+            price: 10000, 
+            days: "3-5 días hábiles" 
+        },
+        { 
+            id: "express", 
+            name: "Envío Express", 
+            price: 20000, 
+            days: "1-2 días hábiles" 
+        }
+    ]
+
+    if (city?.toLowerCase().includes("bogota") || city?.toLowerCase().includes("bogotá")) {
+        options.push({ 
+            id: "same_day", 
+            name: "Mismo Día", 
+            price: 15000, 
+            days: "Hoy" 
+        })
+    }
+
+    return {
+        success: true,
+        data: { options, city }
+    }
+}
+
+async function applyDiscount(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { code } = input
+
+    const { data: discount, error } = await supabase
+        .from("discounts")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .eq("code", code.toUpperCase())
+        .eq("is_active", true)
+        .single()
+
+    if (error || !discount) {
+        return { success: false, error: "Código de descuento inválido o expirado" }
+    }
+
+    // Verificar vigencia
+    const now = new Date()
+    if (discount.valid_until && new Date(discount.valid_until) < now) {
+        return { success: false, error: "Este código ha expirado" }
+    }
+
+    if (discount.max_uses && discount.used_count >= discount.max_uses) {
+        return { success: false, error: "Este código ya alcanzó su límite de usos" }
+    }
+
+    // Obtener carrito para calcular descuento
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("items")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    const subtotal = cart?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
+
+    if (discount.min_purchase && subtotal < discount.min_purchase) {
+        return { 
+            success: false, 
+            error: `Este código requiere una compra mínima de $${discount.min_purchase.toLocaleString()}` 
+        }
+    }
+
+    let discountAmount = 0
+    if (discount.type === "percentage") {
+        discountAmount = subtotal * (discount.value / 100)
+    } else {
+        discountAmount = discount.value
+    }
+
+    return {
+        success: true,
+        data: {
+            code: discount.code,
+            type: discount.type,
+            value: discount.value,
+            discountAmount,
+            newTotal: subtotal - discountAmount
+        }
+    }
+}
+
+async function getStoreInfo(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { topic } = input
+
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("name, settings, contact_email")
+        .eq("id", context.organizationId)
+        .single()
+
+    const settings = org?.settings || {}
+
+    const info: any = {
+        storeName: org?.name,
+        contactEmail: org?.contact_email
+    }
+
+    switch (topic) {
+        case "shipping":
+            info.shipping = settings.shipping || {
+                description: "Envíos a toda Colombia. Tiempo estimado: 3-5 días hábiles.",
+                freeShippingThreshold: 100000
+            }
+            break
+        case "returns":
+            info.returns = settings.returns || {
+                description: "30 días para devoluciones. Producto sin usar y con etiquetas originales."
+            }
+            break
+        case "payment_methods":
+            info.paymentMethods = settings.paymentMethods || [
+                "Tarjeta de crédito/débito",
+                "PSE",
+                "Efectivo contra entrega (algunas ciudades)"
+            ]
+            break
+        case "hours":
+            info.hours = settings.hours || {
+                description: "Atención por chat: Lunes a Viernes 8am-6pm, Sábados 9am-1pm"
+            }
+            break
+        default:
+            info.general = {
+                shipping: "Envíos a toda Colombia",
+                returns: "30 días para devoluciones",
+                paymentMethods: ["Tarjeta", "PSE", "Efectivo"]
+            }
+    }
+
+    return { success: true, data: info }
+}
+
+async function getOrderStatus(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { order_id, email } = input
+
+    let query = supabase
+        .from("orders")
+        .select("id, status, total, items, created_at, shipping_cost, payment_method")
+        .eq("organization_id", context.organizationId)
+
+    if (order_id) {
+        query = query.eq("id", order_id)
+    } else if (email) {
+        query = query.eq("customer_info->>email", email)
+    } else if (context.customerId) {
+        query = query.eq("customer_id", context.customerId).order("created_at", { ascending: false }).limit(1)
+    } else {
+        return { success: false, error: "Necesito el número de orden o el email usado en la compra" }
+    }
+
+    const { data: order, error } = await query.single()
+
+    if (error || !order) {
+        return { success: false, error: "No encontré esa orden. ¿Puedes verificar el número?" }
+    }
+
+    const statusMessages: Record<string, string> = {
+        pending: "Pendiente de pago",
+        paid: "Pago confirmado, preparando envío",
+        shipped: "En camino",
+        delivered: "Entregado",
+        cancelled: "Cancelada"
+    }
+
+    return {
+        success: true,
+        data: {
+            orderId: order.id,
+            status: order.status,
+            statusMessage: statusMessages[order.status] || order.status,
+            total: order.total,
+            itemCount: order.items?.length || 0,
+            createdAt: order.created_at
+        }
+    }
+}
+
+async function getCustomerHistory(supabase: any, context: ToolContext): Promise<ToolResult> {
+    if (!context.customerId) {
+        return {
+            success: true,
+            data: {
+                hasHistory: false,
+                message: "Cliente no identificado aún"
+            }
+        }
+    }
+
+    const { data: customer } = await supabase
+        .from("customers")
+        .select("full_name, metadata, total_orders, total_spent")
+        .eq("id", context.customerId)
+        .single()
+
+    const { data: orders } = await supabase
+        .from("orders")
+        .select("id, items, total, status, created_at")
+        .eq("customer_id", context.customerId)
+        .order("created_at", { ascending: false })
+        .limit(5)
+
+    // Extraer productos comprados para recomendaciones
+    const purchasedProducts = orders?.flatMap((o: any) => o.items?.map((i: any) => i.name)) || []
+    const categories = [...new Set(purchasedProducts)]
+
+    return {
+        success: true,
+        data: {
+            hasHistory: true,
+            customer: {
+                name: customer?.full_name,
+                totalOrders: customer?.total_orders || 0,
+                totalSpent: customer?.total_spent || 0
+            },
+            recentOrders: orders?.map((o: any) => ({
+                id: o.id,
+                date: o.created_at,
+                total: o.total,
+                status: o.status,
+                itemCount: o.items?.length || 0
+            })) || [],
+            preferences: customer?.metadata || {},
+            purchasedCategories: categories.slice(0, 5)
+        }
+    }
+}
+
+async function escalateToHuman(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { reason, priority = "medium" } = input
+
+    // Actualizar chat status
+    await supabase
+        .from("chats")
+        .update({ 
+            status: "pending",
+            // Podríamos agregar un campo para notas de escalamiento
+        })
+        .eq("id", context.chatId)
+
+    // Buscar agentes humanos disponibles
+    const { data: humanAgents } = await supabase
+        .from("agents")
+        .select("id, name")
+        .eq("organization_id", context.organizationId)
+        .eq("type", "human")
+        .eq("status", "available")
+        .limit(1)
+
+    const assignedAgent = humanAgents?.[0]
+
+    if (assignedAgent) {
+        await supabase
+            .from("chats")
+            .update({ assigned_agent_id: assignedAgent.id })
+            .eq("id", context.chatId)
+    }
+
+    return {
+        success: true,
+        data: {
+            escalated: true,
+            reason,
+            priority,
+            agentAssigned: assignedAgent?.name || null,
+            message: assignedAgent 
+                ? `Te estoy transfiriendo con ${assignedAgent.name}. Un momento por favor.`
+                : "He notificado a nuestro equipo. Te atenderán en breve."
+        }
+    }
+}
+
+3.4 Constructor de Contexto
+Archivo: src/lib/ai/context.ts
+typescriptimport Anthropic from "@anthropic-ai/sdk"
+
+interface Agent {
+    name: string
+    role: string
+    configuration: {
+        tone?: string
+        greeting?: string
+        system_prompt?: string
+        personality?: string
+    }
+}
+
+interface Product {
+    id: string
+    name: string
+    description: string
+    price: number
+    stock: number
+    categories?: string[]
+}
+
+interface Customer {
+    id: string
+    full_name: string
+    email?: string
+    total_orders?: number
+    total_spent?: number
+    metadata?: any
+}
+
+interface Message {
+    role: "user" | "assistant"
+    content: string
+}
+
+export function buildSystemPrompt(
+    agent: Agent,
+    organizationName: string,
+    hasCustomer: boolean,
+    customerContext?: string
+): string {
+    const basePrompt = agent.configuration?.system_prompt || getDefaultPrompt(agent.role)
+    
+    const tone = agent.configuration?.tone || "amigable y profesional"
+    const personality = agent.configuration?.personality || ""
+
+    return `${basePrompt}
+
+INFORMACIÓN DE CONTEXTO:
+- Tienda: ${organizationName}
+- Tu nombre: ${agent.name}
+- Tu rol: ${agent.role === "sales" ? "Asistente de Ventas" : "Soporte al Cliente"}
+- Tono: ${tone}
+${personality ? `- Personalidad: ${personality}` : ""}
+
+REGLAS DE IDENTIFICACIÓN:
+${!hasCustomer ? `
+- Este es un chat NUEVO sin cliente identificado.
+- Tu PRIMER mensaje debe ser un saludo amigable presentándote.
+- En tu SEGUNDO intercambio, pide amablemente el nombre y un dato de contacto (email o WhatsApp).
+- Ejemplo: "Para darte una atención más personalizada, ¿me compartes tu nombre y tu WhatsApp o email?"
+- Una vez que el cliente proporcione sus datos, USA INMEDIATAMENTE el tool "identify_customer".
+` : `
+- El cliente ya está identificado.
+- Puedes personalizar la conversación basándote en su historial si lo tienes.
+${customerContext || ""}
+`}
+
+REGLAS GENERALES:
+1. Sé conversacional y natural, no robótico.
+2. Haz preguntas para entender las necesidades antes de recomendar productos.
+3. Muestra máximo 3 productos por respuesta para no abrumar.
+4. Si el cliente pregunta algo que no sabes, ofrece transferir a un humano.
+5. NUNCA inventes información sobre productos, precios o políticas.
+6. Siempre usa los tools disponibles para obtener información real.
+7. Si el cliente muestra frustración o pide hablar con un humano, usa "escalate_to_human".
+
+FORMATO DE RESPUESTAS:
+- Usa un lenguaje natural y amigable.
+- Cuando muestres productos, describe brevemente por qué los recomiendas.
+- Confirma siempre antes de agregar al carrito: "¿Te lo agrego al carrito?"
+- Al final de recomendaciones, pregunta si necesita algo más.
+`
+}
+
+function getDefaultPrompt(role: string): string {
+    if (role === "sales") {
+        return `Eres un asistente de ventas experto. Tu objetivo es ayudar a los clientes a encontrar los productos perfectos para sus necesidades y guiarlos hacia la compra de forma natural y sin presión.
+
+Eres amable, conocedor de los productos, y siempre buscas entender qué necesita realmente el cliente antes de hacer recomendaciones.`
+    }
+
+    return `Eres un asistente de atención al cliente. Tu objetivo es ayudar a resolver dudas, dar información sobre pedidos, y asegurar que el cliente tenga una excelente experiencia.
+
+Eres paciente, empático, y siempre buscas la mejor solución para el cliente.`
+}
+
+export function buildProductContext(products: Product[]): string {
+    if (!products?.length) {
+        return "CATÁLOGO: No hay productos disponibles actualmente."
+    }
+
+    const productList = products.slice(0, 50).map(p => 
+        `- ${p.name} (ID: ${p.id}): $${p.price.toLocaleString()} - ${p.description?.slice(0, 100) || "Sin descripción"}${p.stock <= 5 ? " [¡Pocas unidades!]" : ""}`
+    ).join("\n")
+
+    return `CATÁLOGO DE PRODUCTOS (${products.length} disponibles):
+${productList}
+
+Usa el tool "search_products" para buscar productos específicos cuando el cliente describa lo que necesita.
+Usa el tool "show_product" para mostrar detalles de un producto específico.`
+}
+
+export function buildCustomerContext(customer: Customer, recentOrders?: any[]): string {
+    if (!customer) return ""
+
+    let context = `
+CLIENTE IDENTIFICADO:
+- Nombre: ${customer.full_name}
+- Email: ${customer.email || "No registrado"}
+- Compras anteriores: ${customer.total_orders || 0}
+- Total gastado: $${(customer.total_spent || 0).toLocaleString()}`
+
+    if (recentOrders?.length) {
+        context += `
+- Última compra: ${new Date(recentOrders[0].created_at).toLocaleDateString()}`
+    }
+
+    if (customer.metadata?.preferences) {
+        context += `
+- Preferencias conocidas: ${JSON.stringify(customer.metadata.preferences)}`
+    }
+
+    return context
+}
+
+export function buildConversationHistory(messages: Message[]): Anthropic.MessageParam[] {
+    return messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+    }))
+}
+
+export function buildCartContext(cart: any): string {
+    if (!cart?.items?.length) {
+        return "CARRITO: Vacío"
+    }
+
+    const items = cart.items.map((i: any) => 
+        `- ${i.name} x${i.quantity}: $${(i.price * i.quantity).toLocaleString()}`
+    ).join("\n")
+
+    const total = cart.items.reduce((sum: number, i: any) => sum + (i.price * i.quantity), 0)
+
+    return `CARRITO ACTUAL:
+${items}
+Total: $${total.toLocaleString()}`
+}
+
+3.5 Chat Agent Service (Actualizado)
+Archivo: src/lib/ai/chat-agent.ts
+typescriptimport Anthropic from "@anthropic-ai/sdk"
+import { createMessage } from "./anthropic"
+import { tools } from "./tools"
+import { 
+    buildSystemPrompt, 
+    buildProductContext, 
+    buildCustomerContext, 
+    buildConversationHistory,
+    buildCartContext 
+} from "./context"
+import { executeTool } from "./tool-executor"
+import { createClient } from "@/lib/supabase/server"
+
+interface ProcessMessageInput {
+    message: string
+    chatId: string
+    organizationId: string
+    agentId: string
+    customerId?: string
+}
+
+interface ProcessMessageOutput {
+    response: string
+    actions: Array<{
+        type: string
+        data: any
+    }>
+    metadata: {
+        model: string
+        tokens_used?: {
+            input: number
+            output: number
+        }
+        latency_ms: number
+        tools_used: string[]
+    }
+}
+
+export async function processMessage(input: ProcessMessageInput): Promise<ProcessMessageOutput> {
+    const startTime = Date.now()
+    const toolsUsed: string[] = []
+    const actions: Array<{ type: string; data: any }> = []
+
+    console.log("[ChatAgent] Starting processMessage:", { 
+        chatId: input.chatId, 
+        hasCustomer: !!input.customerId 
+    })
+
+    const supabase = await createClient()
+
+    try {
+        // 1. Load agent configuration
+        const { data: agent, error: agentError } = await supabase
+            .from("agents")
+            .select("*")
+            .eq("id", input.agentId)
+            .single()
+
+        if (agentError || !agent) {
+            throw new Error(`Agent not found: ${agentError?.message}`)
+        }
+
+        // 2. Load organization
+        const { data: organization } = await supabase
+            .from("organizations")
+            .select("name, settings")
+            .eq("id", input.organizationId)
+            .single()
+
+        // 3. Load products catalog
+        const { data: products } = await supabase
+            .from("products")
+            .select("id, name, description, price, stock, categories")
+            .eq("organization_id", input.organizationId)
+            .eq("is_active", true)
+            .gt("stock", 0)
+            .limit(50)
+
+        // 4. Load customer if exists
+        let customer = null
+        let customerContextStr = ""
+        if (input.customerId) {
+            const { data: customerData } = await supabase
+                .from("customers")
+                .select("*, orders(id, total, status, created_at)")
+                .eq("id", input.customerId)
+                .single()
+            
+            if (customerData) {
+                customer = customerData
+                customerContextStr = buildCustomerContext(customer, customer.orders)
+            }
+        }
+
+        // 5. Load conversation history
+        const { data: messages } = await supabase
+            .from("messages")
+            .select("sender_type, content")
+            .eq("chat_id", input.chatId)
+            .order("created_at", { ascending: true })
+            .limit(20)
+
+        const conversationHistory = messages ? buildConversationHistory(
+            messages.map(m => ({
+                role: m.sender_type === "user" ? "user" as const : "assistant" as const,
+                content: m.content
+            }))
+        ) : []
+
+        // 6. Load current cart
+        const { data: cart } = await supabase
+            .from("carts")
+            .select("*")
+            .eq("chat_id", input.chatId)
+            .eq("status", "active")
+            .single()
+
+        // 7. Build system prompt
+        const systemPrompt = buildSystemPrompt(
+            agent,
+            organization?.name || "Tienda",
+            !!input.customerId,
+            customerContextStr
+        )
+
+        const productContext = buildProductContext(products || [])
+        const cartContext = buildCartContext(cart)
+
+        const fullSystemPrompt = `${systemPrompt}
+
+${productContext}
+
+${cartContext}`
+
+        // 8. Add current message to history
+        const currentHistory: Anthropic.MessageParam[] = [
+            ...conversationHistory,
+            { role: "user", content: input.message }
+        ]
+
+        // 9. Call Claude
+        console.log("[ChatAgent] Calling Claude API...")
+        let response = await createMessage({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 1024,
+            system: fullSystemPrompt,
+            messages: currentHistory,
+            tools: tools
+        })
+
+        let finalResponse = ""
+        let continueLoop = true
+        let loopCount = 0
+        const maxLoops = 5
+
+        // 10. Process response and tool calls
+        while (continueLoop && loopCount < maxLoops) {
+            continueLoop = false
+            loopCount++
+
+            for (const content of response.content) {
+                if (content.type === "text") {
+                    finalResponse += content.text
+                } else if (content.type === "tool_use") {
+                    console.log(`[ChatAgent] Tool call: ${content.name}`)
+                    toolsUsed.push(content.name)
+
+                    // Update customerId if identify_customer was used
+                    let currentCustomerId = input.customerId
+                    
+                    const toolResult = await executeTool(
+                        content.name,
+                        content.input,
+                        {
+                            chatId: input.chatId,
+                            organizationId: input.organizationId,
+                            customerId: currentCustomerId
+                        }
+                    )
+
+                    // If customer was identified, update the customerId for subsequent tools
+                    if (content.name === "identify_customer" && toolResult.success && toolResult.data?.customer?.id) {
+                        currentCustomerId = toolResult.data.customer.id
+                    }
+
+                    // Add action to response
+                    if (toolResult.success && toolResult.data) {
+                        actions.push({
+                            type: content.name,
+                            data: toolResult.data
+                        })
+                    }
+
+                    // Continue conversation with tool result
+                    if (response.stop_reason === "tool_use") {
+                        const toolResultMessage: Anthropic.MessageParam = {
+                            role: "user",
+                            content: [{
+                                type: "tool_result",
+                                tool_use_id: content.id,
+                                content: JSON.stringify(toolResult)
+                            }]
+                        }
+
+                        response = await createMessage({
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 1024,
+                            system: fullSystemPrompt,
+                            messages: [...currentHistory, 
+                                { role: "assistant", content: response.content },
+                                toolResultMessage
+                            ],
+                            tools: tools
+                        })
+
+                        continueLoop = true
+                        break
+                    }
+                }
+            }
+        }
+
+        // 11. Save messages to DB
+        await supabase.from("messages").insert({
+            chat_id: input.chatId,
+            sender_type: "user",
+            content: input.message,
+            metadata: {}
+        })
+
+        await supabase.from("messages").insert({
+            chat_id: input.chatId,
+            sender_type: "bot",
+            sender_id: input.agentId,
+            content: finalResponse,
+            metadata: {
+                model: "claude-sonnet-4-20250514",
+                tools_used: toolsUsed,
+                actions: actions.map(a => a.type)
+            }
+        })
+
+        const latency = Date.now() - startTime
+        console.log(`[ChatAgent] Complete in ${latency}ms. Tools used: ${toolsUsed.join(", ") || "none"}`)
+
+        return {
+            response: finalResponse,
+            actions,
+            metadata: {
+                model: "claude-sonnet-4-20250514",
+                tokens_used: response.usage ? {
+                    input: response.usage.input_tokens,
+                    output: response.usage.output_tokens
+                } : undefined,
+                latency_ms: latency,
+                tools_used: toolsUsed
+            }
+        }
+
+    } catch (error: any) {
+        console.error("[ChatAgent] Error:", error)
+        
+        // Save error message
+        await supabase.from("messages").insert({
+            chat_id: input.chatId,
+            sender_type: "user",
+            content: input.message,
+            metadata: { error: true }
+        })
+
+        throw error
+    }
+}
+
+3.6 API Route (Actualizado)
+Archivo: src/app/api/ai-chat/route.ts
+typescriptimport { NextRequest, NextResponse } from "next/server"
+import { processMessage } from "@/lib/ai/chat-agent"
+import { createClient } from "@/lib/supabase/server"
+
+export async function POST(request: NextRequest) {
+    console.log("[API] POST /api/ai-chat")
+    
+    try {
+        const body = await request.json()
+        const { message, chatId, slug } = body
+
+        // Validate input
+        if (!message?.trim()) {
+            return NextResponse.json(
+                { error: "Message is required" },
+                { status: 400 }
+            )
+        }
+
+        if (!slug) {
+            return NextResponse.json(
+                { error: "Slug is required" },
+                { status: 400 }
+            )
+        }
+
+        const supabase = await createClient()
+
+        // Get organization
+        const { data: organization, error: orgError } = await supabase
+            .from("organizations")
+            .select("id, name")
+            .eq("slug", slug)
+            .single()
+
+        if (orgError || !organization) {
+            console.error("[API] Organization not found:", slug)
+            return NextResponse.json(
+                { error: "Organization not found" },
+                { status: 404 }
+            )
+        }
+
+        // Get or create chat
+        let currentChatId = chatId
+        let agentId: string | null = null
+        let customerId: string | null = null
+
+        if (!currentChatId) {
+            // Find available bot agent
+            const { data: agent, error: agentError } = await supabase
+                .from("agents")
+                .select("id, name")
+                .eq("organization_id", organization.id)
+                .eq("type", "bot")
+                .eq("status", "available")
+                .limit(1)
+                .single()
+
+            if (agentError || !agent) {
+                console.error("[API] No available agent:", agentError)
+                return NextResponse.json(
+                    { error: "No hay agente disponible en este momento" },
+                    { status: 503 }
+                )
+            }
+
+            // Create new chat
+            const { data: newChat, error: chatError } = await supabase
+                .from("chats")
+                .insert({
+                    organization_id: organization.id,
+                    assigned_agent_id: agent.id,
+                    status: "active"
+                })
+                .select("id")
+                .single()
+
+            if (chatError || !newChat) {
+                console.error("[API] Chat creation failed:", chatError)
+                return NextResponse.json(
+                    { error: "Error creating chat session" },
+                    { status: 500 }
+                )
+            }
+
+            currentChatId = newChat.id
+            agentId = agent.id
+            console.log(`[API] New chat created: ${currentChatId}`)
+
+        } else {
+            // Get existing chat
+            const { data: chat, error: chatError } = await supabase
+                .from("chats")
+                .select("assigned_agent_id, customer_id, status")
+                .eq("id", currentChatId)
+                .single()
+
+            if (chatError || !chat) {
+                console.error("[API] Chat not found:", currentChatId)
+                return NextResponse.json(
+                    { error: "Chat session not found" },
+                    { status: 404 }
+                )
+            }
+
+            agentId = chat.assigned_agent_id
+            customerId = chat.customer_id
+        }
+
+        if (!agentId) {
+            return NextResponse.json(
+                { error: "No agent assigned to this chat" },
+                { status: 500 }
+            )
+        }
+
+        // Process message with AI
+        const result = await processMessage({
+            message: message.trim(),
+            chatId: currentChatId,
+            organizationId: organization.id,
+            agentId,
+            customerId: customerId || undefined
+        })
+
+        return NextResponse.json({
+            message: result.response,
+            actions: result.actions,
+            chatId: currentChatId,
+            metadata: result.metadata
+        })
+
+    } catch (error: any) {
+        console.error("[API] Error:", error.message)
+        console.error("[API] Stack:", error.stack)
+        
+        // Check for specific error types
+        if (error.message?.includes("ANTHROPIC_API_KEY")) {
+            return NextResponse.json(
+                { error: "AI service not configured. Please contact support." },
+                { status: 503 }
+            )
+        }
+
+        return NextResponse.json(
+            { error: "Error processing message. Please try again." },
+            { status: 500 }
+        )
+    }
+}
+
+3.7 Actualizar Chat Page (Frontend)
+Archivo: src/app/chat/[slug]/page.tsx
+Actualizar la función handleSend y agregar manejo de acciones:
+typescript"use client"
+
+import { useState, useEffect, use, useRef } from "react"
+import { useCartStore } from "@/store/cart-store"
+import { getStoreProducts } from "./actions"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+
+interface Product {
+    id: string
+    name: string
+    price: number
+    image_url: string
+    description: string
+}
+
+interface Message {
+    id: string
+    role: "user" | "assistant"
+    content: string
+    product?: Product
+    products?: Product[]
+    isLoading?: boolean
+    timestamp: Date
+}
+
+export default function ChatPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = use(params)
+    const [isMounted, setIsMounted] = useState(false)
+    const [input, setInput] = useState("")
+    const [isLoading, setIsLoading] = useState(false)
+    const [products, setProducts] = useState<any[]>([])
+    const [agent, setAgent] = useState<any>(null)
+    const [messages, setMessages] = useState<Message[]>([])
+    const [chatId, setChatId] = useState<string | null>(null)
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+    const { addItem } = useCartStore()
+
+    // Scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, [messages])
+
+    useEffect(() => {
+        setIsMounted(true)
+        
+        // Restore chatId from localStorage
+        const storedChatId = localStorage.getItem(`chatId_${slug}`)
+        if (storedChatId) {
+            setChatId(storedChatId)
+        }
+
+        // Get product ID from URL if present
+        const urlParams = new URLSearchParams(window.location.search)
+        const productId = urlParams.get("product")
+
+        // Fetch products and agent
+        getStoreProducts(slug).then((data) => {
+            if (data) {
+                setProducts(data.products)
+                setAgent(data.agent)
+
+                // If product ID in URL, show that product
+                if (productId) {
+                    const foundProduct = data.products.find((p: any) => p.id === productId)
+                    if (foundProduct) {
+                        setMessages([
+                            {
+                                id: "1",
+                                role: "assistant",
+                                content: `¡Hola! Veo que estás interesado en el ${foundProduct.name}. ¿Te gustaría agregarlo al carrito o tienes alguna pregunta?`,
+                                product: {
+                                    id: foundProduct.id,
+                                    name: foundProduct.name,
+                                    price: foundProduct.price,
+                                    image_url: foundProduct.image_url || foundProduct.images?.[0] || "",
+                                    description: foundProduct.description || ""
+                                },
+                                timestamp: new Date()
+                            }
+                        ])
+                        return
+                    }
+                }
+
+                // Default greeting
+                setMessages([{
+                    id: "1",
+                    role: "assistant",
+                    content: data.agent?.configuration?.greeting || 
+                        `¡Hola! Soy ${data.agent?.name || "tu asistente"}. ¿En qué puedo ayudarte hoy?`,
+                    timestamp: new Date()
+                }])
+            }
+        })
+    }, [slug])
+
+    const handleSend = async () => {
+        if (!input.trim() || isLoading) return
+
+        const userMessage: Message = {
+            id: Date.now().toString(),
+            role: "user",
+            content: input.trim(),
+            timestamp: new Date()
+        }
+
+        setMessages(prev => [...prev, userMessage])
+        const currentInput = input
+        setInput("")
+        setIsLoading(true)
+
+        // Add loading message
+        const loadingId = (Date.now() + 1).toString()
+        setMessages(prev => [...prev, {
+            id: loadingId,
+            role: "assistant",
+            content: "",
+            isLoading: true,
+            timestamp: new Date()
+        }])
+
+        try {
+            const response = await fetch("/api/ai-chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    message: currentInput,
+                    chatId,
+                    slug
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || "Error al procesar mensaje")
+            }
+
+            // Save chatId
+            if (data.chatId && data.chatId !== chatId) {
+                setChatId(data.chatId)
+                localStorage.setItem(`chatId_${slug}`, data.chatId)
+            }
+
+            // Remove loading message and add real response
+            setMessages(prev => prev.filter(m => m.id !== loadingId))
+
+            // Process actions from AI
+            let responseProducts: Product[] = []
+            let singleProduct: Product | undefined
+
+            if (data.actions?.length) {
+                for (const action of data.actions) {
+                    switch (action.type) {
+                        case "show_product":
+                            if (action.data?.product) {
+                                singleProduct = action.data.product
+                            }
+                            break
+                        case "search_products":
+                            if (action.data?.products) {
+                                responseProducts = action.data.products
+                            }
+                            break
+                        case "add_to_cart":
+                            if (action.data?.added) {
+                                // Update local cart state
+                                const added = action.data.added
+                                addItem({
+                                    id: added.product_id || Date.now().toString(),
+                                    name: added.name,
+                                    price: added.price,
+                                    image_url: ""
+                                })
+                            }
+                            break
+                        case "identify_customer":
+                            // Customer identified - could update UI if needed
+                            console.log("Customer identified:", action.data)
+                            break
+                    }
+                }
+            }
+
+            // Add assistant message with products if any
+            const assistantMessage: Message = {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: data.message,
+                product: singleProduct,
+                products: responseProducts.length > 0 ? responseProducts : undefined,
+                timestamp: new Date()
+            }
+
+            setMessages(prev => [...prev, assistantMessage])
+
+        } catch (error: any) {
+            console.error("Chat error:", error)
+            
+            // Remove loading and show error
+            setMessages(prev => prev.filter(m => m.id !== loadingId))
+            setMessages(prev => [...prev, {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Lo siento, hubo un error procesando tu mensaje. ¿Podrías intentar de nuevo?",
+                timestamp: new Date()
+            }])
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault()
+            handleSend()
+        }
+    }
+
+    const handleAddToCart = (product: Product) => {
+        addItem({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            image_url: product.image_url
+        })
+    }
+
+    const formatPrice = (price: number) => {
+        return new Intl.NumberFormat("es-CO", {
+            style: "currency",
+            currency: "COP",
+            minimumFractionDigits: 0
+        }).format(price)
+    }
+
+    if (!isMounted) return null
+
+    return (
+        <>
+            {/* Chat Header */}
+            <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <div 
+                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-gray-200"
+                    style={{ backgroundImage: `url("${agent?.avatar_url || ""}")` }}
+                />
+                <div className="flex flex-col">
+                    <h1 className="text-base font-medium">{agent?.name || "Asistente"}</h1>
+                    <p className="text-green-500 text-sm">Online</p>
+                </div>
+            </div>
+
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {messages.map((msg) => (
+                    <div
+                        key={msg.id}
+                        className={`flex items-end gap-3 ${msg.role === "user" ? "justify-end" : ""}`}
+                    >
+                        {msg.role === "assistant" && (
+                            <div 
+                                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8 shrink-0"
+                                style={{ backgroundImage: `url("${agent?.avatar_url || ""}")` }}
+                            />
+                        )}
+                        
+                        <div className={`flex flex-col gap-2 max-w-[70%] ${msg.role === "user" ? "items-end" : ""}`}>
+                            {/* Loading indicator */}
+                            {msg.isLoading ? (
+                                <div className="bg-white dark:bg-gray-800 rounded-2xl px-4 py-3 shadow-sm">
+                                    <div className="flex gap-1">
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Text content */}
+                                    {msg.content && (
+                                        <div className={`rounded-2xl px-4 py-3 ${
+                                            msg.role === "user" 
+                                                ? "bg-primary text-white rounded-br-md" 
+                                                : "bg-white dark:bg-gray-800 shadow-sm rounded-bl-md"
+                                        }`}>
+                                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                        </div>
+                                    )}
+
+                                    {/* Single product card */}
+                                    {msg.product && (
+                                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden max-w-sm">
+                                            {msg.product.image_url && (
+                                                <img 
+                                                    src={msg.product.image_url} 
+                                                    alt={msg.product.name}
+                                                    className="w-full h-48 object-cover"
+                                                />
+                                            )}
+                                            <div className="p-4">
+                                                <h3 className="font-semibold">{msg.product.name}</h3>
+                                                <p className="text-sm text-gray-500 line-clamp-2">{msg.product.description}</p>
+                                                <p className="text-primary font-bold mt-2">{formatPrice(msg.product.price)}</p>
+                                                <Button 
+                                                    onClick={() => handleAddToCart(msg.product!)}
+                                                    className="w-full mt-3"
+                                                    size="sm"
+                                                >
+                                                    Agregar al carrito
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Multiple products */}
+                                    {msg.products && msg.products.length > 0 && (
+                                        <div className="flex gap-3 overflow-x-auto pb-2">
+                                            {msg.products.map((product) => (
+                                                <div 
+                                                    key={product.id}
+                                                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden min-w-[200px] max-w-[200px]"
+                                                >
+                                                    {product.image_url && (
+                                                        <img 
+                                                            src={product.image_url} 
+                                                            alt={product.name}
+                                                            className="w-full h-32 object-cover"
+                                                        />
+                                                    )}
+                                                    <div className="p-3">
+                                                        <h3 className="font-semibold text-sm line-clamp-1">{product.name}</h3>
+                                                        <p className="text-primary font-bold text-sm mt-1">{formatPrice(product.price)}</p>
+                                                        <Button 
+                                                            onClick={() => handleAddToCart(product)}
+                                                            className="w-full mt-2"
+                                                            size="sm"
+                                                            variant="outline"
+                                                        >
+                                                            Agregar
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        {msg.role === "user" && (
+                            <div className="size-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                                <span className="text-sm">👤</span>
+                            </div>
+                        )}
+                    </div>
+                ))}
+                <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Area */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex gap-3">
+                    <Input
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Escribe tu mensaje..."
+                        disabled={isLoading}
+                        className="flex-1"
+                    />
+                    <Button 
+                        onClick={handleSend} 
+                        disabled={isLoading || !input.trim()}
+                    >
+                        <span className="material-symbols-outlined">send</span>
+                    </Button>
+                </div>
+            </div>
+        </>
+    )
+}
+```
+
+---
+
+## Parte 4: Verificación
+
+### Checklist de implementación
+```
+□ 1. Ejecutar migración SQL en Supabase
+□ 2. Agregar ANTHROPIC_API_KEY a .env.local
+□ 3. Crear/actualizar archivos:
+    □ src/lib/ai/anthropic.ts
+    □ src/lib/ai/tools.ts
+    □ src/lib/ai/tool-executor.ts
+    □ src/lib/ai/context.ts
+    □ src/lib/ai/chat-agent.ts
+    □ src/app/api/ai-chat/route.ts
+    □ src/app/chat/[slug]/page.tsx
+□ 4. Reiniciar servidor de desarrollo
+□ 5. Probar flujo completo:
+    □ Abrir chat → saludo inicial
+    □ Dar nombre y contacto → identificación
+    □ Buscar producto → resultados
+    □ Agregar al carrito → confirmación
+    □ Preguntar por envío → info
+    □ Pedir hablar con humano → escalamiento
+Tests manuales sugeridos
+
+Chat nuevo: Verificar que pida nombre y contacto
+Identificación: Dar datos y ver que se guarde en customers
+Cliente que vuelve: Iniciar nuevo chat con mismo email, verificar reconocimiento
+Búsqueda de productos: "Quiero algo para correr"
+Agregar al carrito: "Agrégame ese"
+Código de descuento: Probar código válido e inválido
+Consultar orden: "¿Cómo va mi pedido?"
+Escalar a humano: "Quiero hablar con una persona"

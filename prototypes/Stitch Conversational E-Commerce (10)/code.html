@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Identificación de Cliente - LandingChat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2b7cee",
+            "background-light": "#f6f7f8",
+            "background-dark": "#101822",
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL'0, 'wght'400, 'GRAD'0, 'opsz'24;
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body class="font-display">
+<div class="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark group/design-root overflow-x-hidden" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAjeunk24nNx13F5CVZtA71yw6myBD-UnfJXwSgu1ugos6mLSm6Wr50_dtIsXyPHtEbizshbZ9o2waderFzCqVtqWblaURX-O1bOGZsxasxvfcniYJGjj4BewPA9yMF6eXBR09dqNBdXabDp2bXRocS97KkCkS4itvud4CHbzSqml7t91hFLt5GfTZIxbv2xbrKVel3dfPYcXo1PnIDNdi8xnsNjaBRxr-0v8vro-19nteP6x5E00yJStfPphq1G1b6_rxitmHfUfc'); background-size: cover; background-position: center;">
+<!-- Modal Backdrop -->
+<div class="fixed inset-0 z-40 bg-gray-900/60 backdrop-blur-sm"></div>
+<!-- Modal Container -->
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+<div class="relative flex w-full max-w-md flex-col overflow-hidden rounded-xl bg-white dark:bg-[#1C2532] shadow-2xl">
+<!-- Close Button -->
+<button class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+<div class="flex flex-col items-center justify-center p-8 sm:p-10">
+<!-- Header Section -->
+<div class="flex flex-col items-center text-center w-full">
+<h1 class="text-[#0d131b] dark:text-white tracking-tight text-[28px] font-bold leading-tight">¡Hola de nuevo, Juan! 👋</h1>
+<p class="text-gray-600 dark:text-gray-400 text-base font-normal leading-normal pt-2">Te recordamos de tu última visita.</p>
+</div>
+<!-- User Info Section -->
+<div class="flex flex-col items-center py-8 w-full">
+<div class="flex items-center justify-center">
+<div class="bg-primary/10 text-primary rounded-full flex items-center justify-center size-20 text-3xl font-bold" data-alt="Avatar with the initial 'J'">
+                J
+              </div>
+</div>
+<div class="flex flex-col items-center pt-4">
+<h1 class="text-[#0d131b] dark:text-white text-xl font-bold leading-tight tracking-[-0.015em]">Juan Pérez González</h1>
+<p class="text-[#4c6c9a] dark:text-gray-400 text-sm font-normal leading-normal pt-1">+57 300 *** 4567</p>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="flex flex-col w-full space-y-3">
+<button class="flex items-center justify-center whitespace-nowrap h-11 px-6 text-base font-semibold rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors w-full">
+              Continuar como Juan
+            </button>
+<button class="flex items-center justify-center whitespace-nowrap h-11 px-6 text-base font-semibold rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors w-full">
+              No soy Juan
+            </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

@@ -3,6 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getSettingsData } from "./actions"
 import { ProfileForm } from "./components/profile-form"
 import { OrganizationForm } from "./components/organization-form"
+import { IdentificationForm } from "./components/identification-form"
+import { StorefrontForm } from "./components/storefront-form"
 
 export const dynamic = 'force-dynamic'
 
@@ -26,12 +28,20 @@ export default async function SettingsPage() {
                         <TabsList>
                             <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
                             <TabsTrigger value="organization">Organización</TabsTrigger>
+                            <TabsTrigger value="identification">Identificación</TabsTrigger>
+                            <TabsTrigger value="storefront">Storefront</TabsTrigger>
                         </TabsList>
                         <TabsContent value="profile">
                             <ProfileForm profile={data.profile} />
                         </TabsContent>
                         <TabsContent value="organization">
                             <OrganizationForm organization={data.organization} />
+                        </TabsContent>
+                        <TabsContent value="identification">
+                            <IdentificationForm organization={data.organization} />
+                        </TabsContent>
+                        <TabsContent value="storefront">
+                            <StorefrontForm organization={data.organization} />
                         </TabsContent>
                     </Tabs>
                 </div>

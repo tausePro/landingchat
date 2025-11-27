@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Marca y Colores - LandingChat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;family=Poppins:wght@400;500;600&amp;family=Roboto:wght@400;500;700&amp;family=Montserrat:wght@400;500;600&amp;family=Playfair+Display:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#3c83f6",
+              "background-light": "#f5f7f8",
+              "background-dark": "#101722",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"],
+              "inter": ["Inter", "sans-serif"],
+              "poppins": ["Poppins", "sans-serif"],
+              "roboto": ["Roboto", "sans-serif"],
+              "montserrat": ["Montserrat", "sans-serif"],
+              "playfair": ["Playfair Display", "serif"],
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-gray-800 dark:text-gray-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<div class="flex flex-1 justify-center py-5 sm:px-6 lg:px-8 xl:px-40">
+<div class="layout-content-container flex flex-col max-w-[960px] flex-1">
+<div class="flex flex-wrap justify-between gap-4 p-4 items-center">
+<div class="flex min-w-72 flex-col gap-2">
+<p class="text-[#0d131c] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Marca y Colores</p>
+<p class="text-[#49699c] dark:text-gray-400 text-base font-normal leading-normal">Personaliza la apariencia de tu storefront.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-sm font-bold leading-normal tracking-[0.015em] border border-gray-300 dark:border-gray-700">
+<span class="truncate">Restablecer</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Guardar Cambios</span>
+</button>
+</div>
+</div>
+<div class="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl mt-6">
+<h2 class="text-[#0d131c] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-6 pb-3 pt-5 border-b border-gray-200 dark:border-gray-800">Logo de la Marca</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+<div class="flex flex-col md:col-span-2">
+<div class="flex flex-col items-center gap-6 rounded-lg border-2 border-dashed border-[#ced8e8] dark:border-gray-700 px-6 py-14">
+<div class="flex max-w-[480px] flex-col items-center gap-2">
+<p class="text-[#0d131c] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] max-w-[480px] text-center">Arrastra una imagen o haz click para subir</p>
+<p class="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal max-w-[480px] text-center">JPG, PNG. Máximo 2MB.</p>
+</div>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-[#e7ecf4] dark:bg-primary/20 text-[#0d131c] dark:text-white text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="truncate">Subir imagen</span>
+</button>
+</div>
+</div>
+<div class="flex flex-col items-center justify-center gap-4">
+<p class="text-sm font-medium text-gray-500 dark:text-gray-400">Vista Previa</p>
+<div class="overflow-visible w-24 h-24">
+<div class="bg-center bg-no-repeat aspect-square bg-cover border-white dark:border-gray-900 bg-[#e7ecf4] dark:bg-gray-700 text-[#49699c] dark:text-gray-400 rounded-full flex items-center justify-center size-24 border-4" data-alt="Placeholder logo with abstract shapes">
+<span class="material-symbols-outlined text-4xl">image</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl mt-8">
+<h2 class="text-[#0d131c] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-6 pb-3 pt-5 border-b border-gray-200 dark:border-gray-800">Paleta de Colores</h2>
+<div class="p-6 space-y-6">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="flex flex-col gap-2">
+<label class="text-sm font-medium text-gray-700 dark:text-gray-300">Color Primario</label>
+<div class="relative flex items-center">
+<div class="w-10 h-10 rounded-l-lg" style="background-color: #3B82F6;"></div>
+<input class="w-full h-10 pl-4 pr-12 rounded-r-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-primary focus:border-primary" type="text" value="#3B82F6"/>
+<span class="material-symbols-outlined absolute right-3 text-gray-400">palette</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-sm font-medium text-gray-700 dark:text-gray-300">Color de Fondo</label>
+<div class="relative flex items-center">
+<div class="w-10 h-10 rounded-l-lg bg-gray-50 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700"></div>
+<input class="w-full h-10 pl-4 pr-12 rounded-r-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-primary focus:border-primary" type="text" value="#F9FAFB"/>
+<span class="material-symbols-outlined absolute right-3 text-gray-400">palette</span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-sm font-medium text-gray-700 dark:text-gray-300">Color de Texto</label>
+<div class="relative flex items-center">
+<div class="w-10 h-10 rounded-l-lg" style="background-color: #1F2937;"></div>
+<input class="w-full h-10 pl-4 pr-12 rounded-r-lg border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 focus:ring-primary focus:border-primary" type="text" value="#1F2937"/>
+<span class="material-symbols-outlined absolute right-3 text-gray-400">palette</span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+<span class="text-sm font-medium text-gray-700 dark:text-gray-300">Modo de fondo</span>
+<div class="flex items-center gap-4">
+<span class="text-sm text-gray-500 dark:text-gray-400">Claro</span>
+<button aria-checked="false" class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 dark:bg-gray-700 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-gray-900" role="switch" type="button">
+<span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-0"></span>
+</button>
+<span class="text-sm text-gray-500 dark:text-gray-400">Oscuro</span>
+</div>
+</div>
+</div>
+</div>
+<div class="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl mt-8">
+<h2 class="text-[#0d131c] dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] px-6 pb-3 pt-5 border-b border-gray-200 dark:border-gray-800">Tipografía</h2>
+<div class="p-6">
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2" for="font-select">Fuente Principal</label>
+<div class="relative">
+<select class="appearance-none w-full h-10 pl-4 pr-10 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-primary focus:border-primary" id="font-select">
+<option class="font-inter">Inter</option>
+<option class="font-poppins">Poppins</option>
+<option class="font-roboto">Roboto</option>
+<option class="font-montserrat">Montserrat</option>
+<option class="font-playfair">Playfair Display</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+<span class="material-symbols-outlined">expand_more</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>
