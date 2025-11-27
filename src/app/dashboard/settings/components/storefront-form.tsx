@@ -5,6 +5,7 @@ import { TypographySelector } from "./typography-selector"
 import { TemplateSelector } from "./template-selector"
 import { LivePreview } from "./live-preview"
 import { HeaderEditor } from "./header-editor"
+import { FooterEditor } from "./footer-editor"
 import { CompleteTemplateEditor } from "./complete-template-editor"
 import { ServicesTemplateEditor } from "./services-template-editor"
 import { SingleProductTemplateEditor } from "./single-product-template-editor"
@@ -43,6 +44,8 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
                 )}
 
                 <TypographySelector organization={organization} />
+
+                <FooterEditor organization={organization} />
             </div>
 
             {/* Right Column: Live Preview (1/3) */}

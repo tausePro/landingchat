@@ -64,11 +64,6 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         },
         branding: {
             primaryColor: formData.settings?.branding?.primaryColor ?? "#2b7cee"
-        },
-        social: {
-            instagram: formData.settings?.social?.instagram ?? "",
-            tiktok: formData.settings?.social?.tiktok ?? "",
-            facebook: formData.settings?.social?.facebook ?? ""
         }
     }
 
@@ -190,51 +185,6 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         value={formData.industry}
                                         onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                                     />
-                                </div>
-                            </div>
-
-                            <div className="pt-4 border-t">
-                                <h3 className="text-lg font-medium mb-4">Redes Sociales</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="instagram">Instagram</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400">@</span>
-                                            <Input
-                                                id="instagram"
-                                                className="pl-8"
-                                                placeholder="usuario"
-                                                value={safeSettings.social?.instagram || ""}
-                                                onChange={(e) => updateSettings('social', 'instagram', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="tiktok">TikTok</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400">@</span>
-                                            <Input
-                                                id="tiktok"
-                                                className="pl-8"
-                                                placeholder="usuario"
-                                                value={safeSettings.social?.tiktok || ""}
-                                                onChange={(e) => updateSettings('social', 'tiktok', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="facebook">Facebook</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400">/</span>
-                                            <Input
-                                                id="facebook"
-                                                className="pl-8"
-                                                placeholder="pagina"
-                                                value={safeSettings.social?.facebook || ""}
-                                                onChange={(e) => updateSettings('social', 'facebook', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                         </TabsContent>
