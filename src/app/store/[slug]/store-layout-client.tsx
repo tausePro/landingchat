@@ -10,9 +10,10 @@ interface StoreLayoutClientProps {
     slug: string
     organization: any
     products: any[]
+    children?: React.ReactNode
 }
 
-export function StoreLayoutClient({ slug, organization, products }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, children }: StoreLayoutClientProps) {
     const router = useRouter()
     const [showGateModal, setShowGateModal] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
@@ -69,7 +70,7 @@ export function StoreLayoutClient({ slug, organization, products }: StoreLayoutC
             {/* --- Header --- */}
             <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push(`/store/${slug}`)}>
                         {organization.logo_url ? (
                             <img src={organization.logo_url} alt={organization.name} className="h-8 w-auto object-contain" />
                         ) : (
@@ -80,7 +81,8 @@ export function StoreLayoutClient({ slug, organization, products }: StoreLayoutC
                         <span className="text-lg font-bold tracking-tight">{organization.name}</span>
                     </div>
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-                        <a href="#products" className="hover:text-primary transition-colors">Productos</a>
+                        <a href={`/store/${slug}`} className="hover:text-primary transition-colors">Inicio</a>
+                        <a href={`/store/${slug}/products`} className="hover:text-primary transition-colors">Productos</a>
                     </nav>
                     <div className="flex items-center gap-4">
                         <Button
@@ -95,15 +97,16 @@ export function StoreLayoutClient({ slug, organization, products }: StoreLayoutC
             </header>
 
             <main>
-                {/* Render Template Dinámicamente */}
-                <TemplateRenderer
-                    template={selectedTemplate}
-                    organization={organization}
-                    products={products}
-                    primaryColor={primaryColor}
-                    heroSettings={heroSettings}
-                    onStartChat={handleStartChat}
-                />
+                {children ? children : (
+                    <TemplateRenderer
+                        template={selectedTemplate}
+                        organization={organization}
+                        products={products}
+                        primaryColor={primaryColor}
+                        heroSettings={heroSettings}
+                        onStartChat={handleStartChat}
+                    />
+                )}
             </main>
 
             {/* Customer Gate Modal */}
@@ -111,9 +114,9 @@ export function StoreLayoutClient({ slug, organization, products }: StoreLayoutC
                 isOpen={showGateModal}
                 onClose={() => setShowGateModal(false)}
                 slug={slug}
-                organizationId={organization.id}
                 organizationSettings={organization.settings}
-                onCustomerIdentified={handleCustomerIdentified}
+                organizationName={organization.name}
+                onIdentified={handleCustomerIdentified}
             />
         </div>
     )
