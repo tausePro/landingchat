@@ -127,7 +127,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                         <SelectTrigger className="max-w-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
                             <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[9999] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                             <SelectItem value="4">4 productos</SelectItem>
                             <SelectItem value="6">6 productos</SelectItem>
                             <SelectItem value="8">8 productos</SelectItem>
@@ -149,7 +149,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                         <SelectTrigger className="max-w-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
                             <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[9999] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                             <SelectItem value="recent">Más recientes</SelectItem>
                             <SelectItem value="price_asc">Precio menor</SelectItem>
                             <SelectItem value="price_desc">Precio mayor</SelectItem>

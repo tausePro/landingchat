@@ -90,8 +90,31 @@ export function MinimalTemplate({
             </section>
 
             {/* Simple Footer */}
+            {/* Simple Footer */}
             <footer className="bg-gray-900 text-white py-12">
                 <div className="container mx-auto px-4 text-center">
+                    <div className="flex justify-center gap-6 mb-8">
+                        {organization.settings?.storefront?.footer?.social?.instagram && (
+                            <a href={organization.settings.storefront.footer.social.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                                Instagram
+                            </a>
+                        )}
+                        {organization.settings?.storefront?.footer?.social?.facebook && (
+                            <a href={organization.settings.storefront.footer.social.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                                Facebook
+                            </a>
+                        )}
+                        {organization.settings?.storefront?.footer?.social?.tiktok && (
+                            <a href={organization.settings.storefront.footer.social.tiktok} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                                TikTok
+                            </a>
+                        )}
+                        {organization.settings?.storefront?.footer?.social?.whatsapp && (
+                            <a href={`https://wa.me/${organization.settings.storefront.footer.social.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                                WhatsApp
+                            </a>
+                        )}
+                    </div>
                     <p className="text-gray-400">© 2024 {organization.name}. Todos los derechos reservados.</p>
                 </div>
             </footer>

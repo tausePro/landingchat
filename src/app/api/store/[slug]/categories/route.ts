@@ -23,18 +23,30 @@ export async function GET(
         // Get unique categories from products
         const { data: products, error: prodError } = await supabase
             .from('products')
-            .select('category')
+            .select('categories')
             .eq('organization_id', org.id)
-            .not('category', 'is', null)
+
+        const debugInfo = {
+            orgId: org.id,
+            productsFound: products?.length,
+            error: prodError
+        }
 
         if (prodError) {
-            return NextResponse.json({ categories: [] })
+            return NextResponse.json({ categories: [], debug: debugInfo })
         }
 
         // Extract unique categories
-        const categories = [...new Set(products.map(p => p.category).filter(Boolean))]
+        // Handle both array (Postgres array/JSONB) and string cases
+        const allCategories = products.flatMap(p => {
+            if (Array.isArray(p.categories)) return p.categories
+            if (typeof p.categories === 'string') return [p.categories]
+            return []
+        })
 
-        return NextResponse.json({ categories })
+        const categories = [...new Set(allCategories.filter(Boolean))]
+
+        return NextResponse.json({ categories, debug: debugInfo })
     } catch (error) {
         console.error('Error fetching categories:', error)
         return NextResponse.json({ categories: [] })
