@@ -15,7 +15,11 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
         return (
             <DashboardLayout>
-                <ProductForm initialData={product} isEditing />
+                <ProductForm
+                    organizationId={product.organization_id}
+                    initialData={product}
+                    isEditing
+                />
             </DashboardLayout>
         )
     } catch (error) {
