@@ -249,10 +249,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
     return (
         <>
-            {/* Storefront Header */}
+            {/* Storefront-style Header */}
             <div className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    {/* Left: Back button + Store Logo/Name */}
                     <div className="flex items-center gap-3">
                         <button
                             onClick={() => router.push(`/store/${slug}`)}
@@ -279,30 +278,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             )}
                         </div>
                     </div>
-
-                    {/* Right: Cart + Notifications + Agent Info */}
                     <div className="flex items-center gap-3">
-                        {/* Cart Button */}
-                        <button
-                            onClick={toggleCart}
-                            className="relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-gray-100 hover:bg-gray-200 transition-colors"
-                        >
-                            <span className="material-symbols-outlined text-xl">shopping_cart</span>
-                            {items.length > 0 && (
-                                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                                    {items.length}
-                                </span>
-                            )}
-                        </button>
-
-                        {/* Agent Info Badge */}
                         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-full text-sm font-medium">
-                            <div
-                                className="w-6 h-6 rounded-full bg-cover bg-center border border-green-200"
-                                style={{ backgroundImage: `url("${agentAvatar}")` }}
-                            />
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            <span>Chateando con {agentName}</span>
+                            Chateando con {agentName}
                         </div>
                     </div>
                 </div>
