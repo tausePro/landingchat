@@ -16,16 +16,29 @@ export default function DashboardPage() {
         const fetchStats = async () => {
             const supabase = createClient()
 
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("organization_id")
+                .eq("id", user.id)
+                .single()
+
+            if (!profile?.organization_id) return
+
             // Fetch Active Chats
             const { count: chatsCount } = await supabase
                 .from("chats")
                 .select("*", { count: "exact", head: true })
+                .eq("organization_id", profile.organization_id)
                 .eq("status", "active")
 
             // Fetch Active Agents
             const { count: agentsCount } = await supabase
                 .from("agents")
                 .select("*", { count: "exact", head: true })
+                .eq("organization_id", profile.organization_id)
                 .eq("status", "available")
 
             setStats({
