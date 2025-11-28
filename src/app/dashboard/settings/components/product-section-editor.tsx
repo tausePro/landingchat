@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -17,10 +17,9 @@ interface ProductSectionEditorProps {
     }
 }
 
-const DEFAULT_CATEGORIES = ["ropa", "calzado", "accesorios", "tecnologia", "hogar"]
-
 export function ProductSectionEditor({ organization }: ProductSectionEditorProps) {
     const [loading, setLoading] = useState(false)
+    const [categories, setCategories] = useState<string[]>([])
     const defaultConfig = {
         showSection: true,
         itemsToShow: 8,
@@ -30,13 +29,29 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
         showAIRecommended: false,
         categories: {
             enabled: true,
-            selected: ["ropa", "calzado", "accesorios", "hogar"]
+            selected: []
         }
     }
 
     const [config, setConfig] = useState(
         organization.settings?.storefront?.products || defaultConfig
     )
+
+    // Load categories from products
+    useEffect(() => {
+        const loadCategories = async () => {
+            try {
+                const response = await fetch(`/api/store/${organization.slug}/categories`)
+                const data = await response.json()
+                if (data.categories) {
+                    setCategories(data.categories)
+                }
+            } catch (error) {
+                console.error("Error loading categories:", error)
+            }
+        }
+        loadCategories()
+    }, [organization.slug])
 
     const handleSave = async () => {
         setLoading(true)
@@ -84,12 +99,12 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* Show Section Toggle */}
-                <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-800 rounded-xl">
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100">
-                            <span className="material-symbols-outlined text-2xl">visibility</span>
+                        <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100 dark:bg-gray-800">
+                            <span className="material-symbols-outlined text-2xl text-[#1F2937] dark:text-gray-300">visibility</span>
                         </div>
-                        <p className="font-medium">Mostrar sección de productos</p>
+                        <p className="font-medium text-base text-[#1F2937] dark:text-gray-200">Mostrar sección de productos</p>
                     </div>
                     <Switch
                         checked={config.showSection}
@@ -97,19 +112,23 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                     />
                 </div>
 
-                <div className="h-px bg-gray-200" />
+                <div className="h-px bg-gray-200 dark:border-gray-800" />
 
                 {/* Items to Show */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                        <Label className="text-sm font-medium">Cantidad a mostrar</Label>
-                        <p className="text-sm text-muted-foreground">Elige cuántos productos se verán por página.</p>
+                        <Label className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Cantidad a mostrar</Label>
+                        <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-1">Elige cuántos productos se verán por página.</p>
                     </div>
                     <Select
                         value={config.itemsToShow.toString()}
-                        onValueChange={(value) => setConfig({ ...config, itemsToShow: parseInt(value) })}
+                        onValueChange={(value) => setConfig({
+                            ...config, items
+
+ToShow: parseInt(value)
+                        })}
                     >
-                        <SelectTrigger className="max-w-xs w-32">
+                        <SelectTrigger className="max-w-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -122,16 +141,16 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                 </div>
 
                 {/* Order By */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                        <Label className="text-sm font-medium">Ordenar por</Label>
-                        <p className="text-sm text-muted-foreground">Define el orden de aparición de los productos.</p>
+                        <Label className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Ordenar por</Label>
+                        <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-1">Define el orden de aparición de los productos.</p>
                     </div>
                     <Select
                         value={config.orderBy}
                         onValueChange={(value) => setConfig({ ...config, orderBy: value })}
                     >
-                        <SelectTrigger className="max-w-xs w-40">
+                        <SelectTrigger className="max-w-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -145,7 +164,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
 
                 {/* Show Prices */}
                 <div className="flex items-center justify-between">
-                    <p className="font-medium">Mostrar precios</p>
+                    <p className="font-medium text-base text-[#1F2937] dark:text-gray-200">Mostrar precios</p>
                     <Switch
                         checked={config.showPrices}
                         onCheckedChange={(checked) => setConfig({ ...config, showPrices: checked })}
@@ -154,7 +173,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
 
                 {/* Show Add to Cart */}
                 <div className="flex items-center justify-between">
-                    <p className="font-medium">Mostrar botón "Agregar al carrito"</p>
+                    <p className="font-medium text-base text-[#1F2937] dark:text-gray-200">Mostrar botón "Agregar al carrito"</p>
                     <Switch
                         checked={config.showAddToCart}
                         onCheckedChange={(checked) => setConfig({ ...config, showAddToCart: checked })}
@@ -163,23 +182,23 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
 
                 {/* Show AI Recommended */}
                 <div className="flex items-center justify-between">
-                    <p className="font-medium">Mostrar badge "Recomendado por IA"</p>
+                    <p className="font-medium text-base text-[#1F2937] dark:text-gray-200">Mostrar badge "Recomendado por IA"</p>
                     <Switch
                         checked={config.showAIRecommended}
                         onCheckedChange={(checked) => setConfig({ ...config, showAIRecommended: checked })}
                     />
                 </div>
 
-                <div className="h-px bg-gray-200 my-6" />
+                <div className="h-px bg-gray-200 dark:border-gray-800 my-6" />
 
                 {/* Categories Navigation */}
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-800 rounded-xl">
                         <div className="flex items-center gap-4">
-                            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100">
-                                <span className="material-symbols-outlined text-2xl">category</span>
+                            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-100 dark:bg-gray-800">
+                                <span className="material-symbols-outlined text-2xl text-[#1F2937] dark:text-gray-300">category</span>
                             </div>
-                            <p className="font-medium">Mostrar navegación por categorías</p>
+                            <p className="font-medium text-base text-[#1F2937] dark:text-gray-200">Mostrar navegación por categorías</p>
                         </div>
                         <Switch
                             checked={config.categories.enabled}
@@ -190,27 +209,33 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                         />
                     </div>
 
-                    {config.categories.enabled && (
-                        <div className="pl-14 space-y-3">
-                            <p className="text-sm font-medium">Selecciona las categorías a mostrar:</p>
+                    {config.categories.enabled && categories.length > 0 && (
+                        <div className="pl-0 space-y-3">
+                            <p className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Selecciona las categorías a mostrar:</p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {DEFAULT_CATEGORIES.map((category) => (
+                                {categories.map((category) => (
                                     <label
                                         key={category}
-                                        className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition-colors"
+                                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                                     >
                                         <input
                                             type="checkbox"
-                                            className="form-checkbox h-5 w-5 rounded text-primary"
+                                            className="form-checkbox h-5 w-5 rounded text-primary border-gray-300 dark:border-gray-600 focus:ring-primary"
                                             checked={(config.categories.selected || []).includes(category)}
                                             onChange={() => toggleCategory(category)}
                                         />
-                                        <span className="text-sm capitalize">
-                                            {category === "tecnologia" ? "Tecnología" : category}
+                                        <span className="text-sm capitalize text-[#1F2937] dark:text-gray-300">
+                                            {category}
                                         </span>
                                     </label>
                                 ))}
                             </div>
+                        </div>
+                    )}
+
+                    {config.categories.enabled && categories.length === 0 && (
+                        <div className="pl-0 py-4 text-center text-sm text-[#6B7280] dark:text-gray-400">
+                            No hay categorías disponibles. Agrega categorías a tus productos.
                         </div>
                     )}
                 </div>
