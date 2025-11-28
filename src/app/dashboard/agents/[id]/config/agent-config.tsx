@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge } from "./actions"
+import { ImageUploader } from "@/components/shared/image-uploader"
 
 interface AgentConfigProps {
     agent: any
@@ -294,27 +295,21 @@ export function AgentConfig({ agent }: AgentConfigProps) {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="flex flex-col items-center gap-4">
-                                <div className="relative group">
-                                    <div className="size-24 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-4xl border-2 border-border-light dark:border-border-dark overflow-hidden">
-                                        {avatarUrl ? (
-                                            <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <span>🤖</span>
-                                        )}
-                                    </div>
-                                    <button className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-white shadow-sm hover:bg-primary/90 transition-colors">
-                                        <span className="material-symbols-outlined text-sm">edit</span>
-                                    </button>
-                                </div>
-                                <div className="w-full space-y-2">
-                                    <Label>URL del Avatar</Label>
-                                    <Input
-                                        value={avatarUrl}
-                                        onChange={(e) => setAvatarUrl(e.target.value)}
-                                        placeholder="https://..."
-                                        className="text-xs"
-                                    />
-                                </div>
+                                <ImageUploader
+                                    organizationId={agent.organization_id}
+                                    bucketName="organization-logos" // Using existing bucket
+                                    folderPath={`${agent.organization_id}/agents/${agent.id}`}
+                                    label=""
+                                    currentImageUrl={avatarUrl}
+                                    onUploadComplete={(url) => {
+                                        setAvatarUrl(url)
+                                    }}
+                                />
+                                <p className="text-xs text-center text-muted-foreground">
+                                    Sube una imagen para el avatar de tu agente.
+                                    <br />
+                                    Recuerda guardar los cambios en la pestaña "General".
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
