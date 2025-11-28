@@ -151,8 +151,12 @@ export function AgentList({ agents, templates }: AgentListProps) {
                     <Card key={agent.id} className="flex flex-col">
                         <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                             <div className="flex items-center gap-3">
-                                <div className="size-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xl">
-                                    {agent.avatar_url || '🤖'}
+                                <div className="size-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xl overflow-hidden">
+                                    {agent.avatar_url && agent.avatar_url.startsWith('http') ? (
+                                        <img src={agent.avatar_url} alt={agent.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        agent.avatar_url || '🤖'
+                                    )}
                                 </div>
                                 <div>
                                     <CardTitle className="text-base">{agent.name}</CardTitle>
