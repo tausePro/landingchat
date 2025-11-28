@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { updateOrganization } from "../actions"
 import { LogoUploader } from "@/components/onboarding/logo-uploader"
+import { ImageUploader } from "@/components/shared/image-uploader"
 
 interface OrganizationFormProps {
     organization: {
@@ -42,6 +43,11 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
             },
             branding: {
                 primaryColor: "#2b7cee"
+            },
+            agent: {
+                name: "",
+                role: "",
+                avatar: ""
             }
         }
     })
@@ -121,11 +127,12 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
             <CardContent>
                 <form onSubmit={handleSubmit}>
                     <Tabs defaultValue="general" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-5">
                             <TabsTrigger value="general">General</TabsTrigger>
                             <TabsTrigger value="payments">Pagos</TabsTrigger>
                             <TabsTrigger value="shipping">Envíos</TabsTrigger>
                             <TabsTrigger value="branding">Apariencia</TabsTrigger>
+                            <TabsTrigger value="agent">Agente IA</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="general" className="space-y-4">
@@ -293,6 +300,46 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                                 />
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="agent" className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>Nombre del Agente</Label>
+                                        <Input
+                                            value={formData.settings?.agent?.name || ""}
+                                            onChange={(e) => updateSettings('agent', 'name', e.target.value)}
+                                            placeholder="Ej: Ana, Soporte, Asistente..."
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Este es el nombre que verán tus clientes en el chat.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Rol o Descripción Corta</Label>
+                                        <Input
+                                            value={formData.settings?.agent?.role || ""}
+                                            onChange={(e) => updateSettings('agent', 'role', e.target.value)}
+                                            placeholder="Ej: Asistente de Ventas"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                                        <ImageUploader
+                                            organizationId={organization.id}
+                                            bucketName="organization-logos" // Reusing bucket for now or create 'agent-avatars'
+                                            folderPath={`${organization.id}/avatars`}
+                                            label="Avatar del Agente"
+                                            currentImageUrl={formData.settings?.agent?.avatar}
+                                            onUploadComplete={(url) => updateSettings('agent', 'avatar', url)}
+                                        />
                                     </div>
                                 </div>
                             </div>

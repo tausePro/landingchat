@@ -242,6 +242,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
     const showStoreName = organization.settings?.storefront?.header?.showStoreName ?? true
 
+    // Agent Settings
+    const agentSettings = organization.settings?.agent || {}
+    const agentName = agentSettings.name || agent?.name || 'Asistente'
+    const agentAvatar = agentSettings.avatar || agent?.avatar_url || 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o'
+
     return (
         <>
             {/* Storefront-style Header */}
@@ -276,7 +281,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     <div className="flex items-center gap-3">
                         <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 rounded-full text-sm font-medium">
                             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                            Chateando con {agent?.name || 'Asistente'}
+                            Chateando con {agentName}
                         </div>
                     </div>
                 </div>
@@ -291,7 +296,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     >
                         {msg.role === 'assistant' && (
                             <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-8 h-8 shrink-0 border border-gray-200 dark:border-gray-700"
-                                style={{ backgroundImage: `url("${agent?.avatar_url || 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o'}")` }}></div>
+                                style={{ backgroundImage: `url("${agentAvatar}")` }}></div>
                         )}
 
                         <div className={`flex flex-1 flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -329,6 +334,22 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         </div>
                     </div>
                 ))}
+
+                {/* Typing Indicator */}
+                {isLoading && (
+                    <div className="flex items-end gap-3">
+                        <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-8 h-8 shrink-0 border border-gray-200 dark:border-gray-700"
+                            style={{ backgroundImage: `url("${agentAvatar}")` }}></div>
+                        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl rounded-tl-sm px-4 py-4 shadow-sm">
+                            <div className="flex gap-1.5">
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div ref={messagesEndRef} />
             </div>
 
