@@ -122,11 +122,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                     </div>
                     <Select
                         value={config.itemsToShow.toString()}
-                        onValueChange={(value) => setConfig({
-                            ...config, items
-
-ToShow: parseInt(value)
-                        })}
+                        onValueChange={(value) => setConfig({ ...config, itemsToShow: parseInt(value) })}
                     >
                         <SelectTrigger className="max-w-[200px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
                             <SelectValue />
