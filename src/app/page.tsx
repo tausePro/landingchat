@@ -1,7 +1,40 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/server"
 
-export default function LandingPage() {
+export default async function LandingPage() {
+    const supabase = await createClient()
+
+    // Check maintenance mode
+    const { data: maintenanceSetting } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", "maintenance_mode")
+        .single()
+
+    const maintenanceMode = maintenanceSetting?.value as { isActive: boolean, message: string } | undefined
+
+    if (maintenanceMode?.isActive) {
+        return (
+            <div className="flex min-h-screen flex-col items-center justify-center bg-background-light dark:bg-background-dark p-4 text-center">
+                <div className="mb-8 flex size-20 items-center justify-center rounded-full bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400">
+                    <svg className="size-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                </div>
+                <h1 className="mb-4 text-3xl font-bold text-slate-900 dark:text-white">Mantenimiento Programado</h1>
+                <p className="mb-8 max-w-md text-slate-600 dark:text-slate-400">
+                    {maintenanceMode.message || "Estamos realizando mejoras en nuestra plataforma. Volveremos en breve."}
+                </p>
+                <div className="flex gap-4">
+                    <Link href="/auth">
+                        <Button variant="outline">Acceso Admin</Button>
+                    </Link>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="relative flex w-full flex-col group/design-root overflow-x-hidden">
             <div className="layout-container flex h-full grow flex-col">

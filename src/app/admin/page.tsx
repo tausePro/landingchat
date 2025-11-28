@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { MaintenanceToggle } from "./components/maintenance-toggle"
 
 export default async function AdminDashboardPage() {
     const supabase = await createClient()
@@ -157,6 +158,9 @@ export default async function AdminDashboardPage() {
                                 </div>
                                 <span className="text-sm text-green-600 dark:text-green-400">Operativo</span>
                             </div>
+
+                            {/* Maintenance Mode Toggle */}
+                            <MaintenanceToggle />
                         </div>
                     </div>
                 </div>
