@@ -2,9 +2,106 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-    let supabaseResponse = NextResponse.next({
-        request,
-    })
+    const hostname = request.headers.get('host') || ''
+    const pathname = request.nextUrl.pathname
+
+    // ============================================
+    // RUTAS QUE NUNCA SE REESCRIBEN
+    // ============================================
+    if (
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/api') ||
+        pathname.startsWith('/dashboard') ||
+        pathname.startsWith('/admin') ||
+        pathname.startsWith('/auth') ||
+        pathname.startsWith('/onboarding') ||
+        pathname.includes('.') // archivos estáticos
+    ) {
+        return handleAuth(request)
+    }
+
+    // ============================================
+    // DETECTAR SLUG DE LA TIENDA
+    // ============================================
+    let slug: string | null = null
+
+    // === DESARROLLO ===
+    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+        // Opción 1: Query param → localhost:3000?store=demo-store
+        slug = request.nextUrl.searchParams.get('store')
+
+        // Opción 2: Subdominio local → demo-store.localhost:3000
+        if (!slug) {
+            const hostPart = hostname.split(':')[0] // quitar puerto
+            const parts = hostPart.split('.')
+            if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
+                slug = parts[0]
+            }
+        }
+
+        // Opción 3: Path tradicional → localhost:3000/store/demo-store
+        if (!slug && (pathname.startsWith('/store/') || pathname.startsWith('/chat/'))) {
+            return handleAuth(request)
+        }
+    }
+    // === PRODUCCIÓN ===
+    else {
+        const parts = hostname.split('.')
+
+        // tienda.landingchat.co → ['tienda', 'landingchat', 'co']
+        if (parts.length >= 3) {
+            const subdomain = parts[0]
+
+            // Ignorar subdominios reservados
+            const reserved = ['www', 'app', 'api', 'dashboard', 'admin', 'wa']
+            if (!reserved.includes(subdomain)) {
+                slug = subdomain
+            }
+        }
+    }
+
+    // Si no hay slug, continuar normal (landing page principal)
+    if (!slug) {
+        return handleAuth(request)
+    }
+
+    // ============================================
+    // REESCRIBIR RUTAS PARA LA TIENDA
+    // ============================================
+
+    // tienda.landingchat.co/ → /store/tienda
+    if (pathname === '/' || pathname === '') {
+        const url = new URL(`/store/${slug}`, request.url)
+        // Preservar query params
+        request.nextUrl.searchParams.forEach((value, key) => {
+            if (key !== 'store') url.searchParams.set(key, value)
+        })
+        return NextResponse.rewrite(url)
+    }
+
+    // tienda.landingchat.co/chat → /chat/tienda
+    if (pathname === '/chat' || pathname === '/chat/') {
+        const url = new URL(`/chat/${slug}`, request.url)
+        request.nextUrl.searchParams.forEach((value, key) => {
+            if (key !== 'store') url.searchParams.set(key, value)
+        })
+        return NextResponse.rewrite(url)
+    }
+
+    // tienda.landingchat.co/p/123 → /store/tienda/p/123
+    if (pathname.startsWith('/p/')) {
+        return NextResponse.rewrite(new URL(`/store/${slug}${pathname}`, request.url))
+    }
+
+    // Cualquier otra ruta bajo el subdominio
+    return NextResponse.rewrite(new URL(`/store/${slug}${pathname}`, request.url))
+}
+
+// ============================================
+// FUNCIÓN DE AUTENTICACIÓN (existente)
+// ============================================
+async function handleAuth(request: NextRequest) {
+    let supabaseResponse = NextResponse.next({ request })
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,10 +112,8 @@ export async function middleware(request: NextRequest) {
                     return request.cookies.getAll()
                 },
                 setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-                    supabaseResponse = NextResponse.next({
-                        request,
-                    })
+                    cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+                    supabaseResponse = NextResponse.next({ request })
                     cookiesToSet.forEach(({ name, value, options }) =>
                         supabaseResponse.cookies.set(name, value, options)
                     )
@@ -27,115 +122,25 @@ export async function middleware(request: NextRequest) {
         }
     )
 
-    // Get user session
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
-    console.log("Middleware - Path:", request.nextUrl.pathname)
-    console.log("Middleware - User:", user?.email)
+    // Rutas públicas
+    const publicRoutes = ['/', '/store', '/chat', '/api', '/auth']
+    const isPublicRoute = publicRoutes.some(route =>
+        request.nextUrl.pathname === route ||
+        request.nextUrl.pathname.startsWith(route + '/')
+    )
 
-    // Public routes that don't require auth
-    const publicRoutes = ['/', '/chat', '/api', '/store']
-    const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname.startsWith(route))
-
-    // If user is not logged in and trying to access protected route
+    // Redirigir si no hay usuario y es ruta protegida
     if (!user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/onboarding')) {
-        console.log("Middleware - Redirecting to / (No User)")
-        const redirectUrl = request.nextUrl.clone()
-        redirectUrl.pathname = '/'
-        return NextResponse.redirect(redirectUrl)
-    }
-
-    // If user is logged in, check onboarding status
-    if (user && !request.nextUrl.pathname.startsWith('/onboarding')) {
-        // Get user's organization and onboarding status
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('organization_id, is_superadmin')
-            .eq('id', user.id)
-            .single()
-
-        console.log("Middleware - Profile:", profile)
-
-        // Allow superadmins to bypass onboarding
-        if (profile?.is_superadmin) {
-            console.log("Middleware - Superadmin bypass")
-            return supabaseResponse
-        }
-
-        if (profile?.organization_id) {
-            const { data: organization } = await supabase
-                .from('organizations')
-                .select('onboarding_completed')
-                .eq('id', profile.organization_id)
-                .single()
-
-            // If onboarding not completed, redirect to onboarding
-            if (organization && !organization.onboarding_completed) {
-                const redirectUrl = request.nextUrl.clone()
-                redirectUrl.pathname = '/onboarding/welcome'
-                return NextResponse.redirect(redirectUrl)
-            }
-        }
-    }
-
-    // If user completed onboarding and tries to access onboarding routes, redirect to dashboard
-    if (user && request.nextUrl.pathname.startsWith('/onboarding')) {
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('organization_id')
-            .eq('id', user.id)
-            .single()
-
-        if (profile?.organization_id) {
-            const { data: organization } = await supabase
-                .from('organizations')
-                .select('onboarding_completed')
-                .eq('id', profile.organization_id)
-                .single()
-
-            if (organization?.onboarding_completed) {
-                const redirectUrl = request.nextUrl.clone()
-                redirectUrl.pathname = '/dashboard'
-                return NextResponse.redirect(redirectUrl)
-            }
-        }
-    }
-
-    // Protect Admin Routes
-    if (request.nextUrl.pathname.startsWith('/admin')) {
-        if (!user) {
-            const redirectUrl = request.nextUrl.clone()
-            redirectUrl.pathname = '/auth'
-            return NextResponse.redirect(redirectUrl)
-        }
-
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('is_superadmin')
-            .eq('id', user.id)
-            .single()
-
-        if (!profile?.is_superadmin) {
-            const redirectUrl = request.nextUrl.clone()
-            redirectUrl.pathname = '/dashboard'
-            return NextResponse.redirect(redirectUrl)
-        }
+        const url = request.nextUrl.clone()
+        url.pathname = '/auth'
+        return NextResponse.redirect(url)
     }
 
     return supabaseResponse
 }
 
 export const config = {
-    matcher: [
-        /*
-         * Match all request paths except:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - public files (public folder)
-         */
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-    ],
+    matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 }

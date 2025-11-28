@@ -122,7 +122,6 @@ export function StoreLayoutClient({ slug, organization, products, children }: St
                 isOpen={showGateModal}
                 onClose={() => setShowGateModal(false)}
                 slug={slug}
-                organizationSettings={organization.settings}
                 organizationName={organization.name}
                 onIdentified={handleCustomerIdentified}
             />

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient } from "@supabase/supabase-js"
 
 export async function POST(
     request: NextRequest,
@@ -11,25 +11,26 @@ export async function POST(
         const body = await request.json()
         const { name, phone } = body
 
-        // Validación
         if (!name?.trim()) {
-            return NextResponse.json(
-                { error: "El nombre es requerido" },
-                { status: 400 }
-            )
+            return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 })
         }
 
         if (!phone?.trim()) {
-            return NextResponse.json(
-                { error: "El WhatsApp es requerido" },
-                { status: 400 }
-            )
+            return NextResponse.json({ error: "El WhatsApp es requerido" }, { status: 400 })
         }
 
-        // Limpiar teléfono (solo números y +)
         const cleanPhone = phone.replace(/[^\d+]/g, "")
 
-        const supabase = await createClient()
+        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            console.error("SUPABASE_SERVICE_ROLE_KEY is missing")
+            return NextResponse.json({ error: "Falta configuración del servidor" }, { status: 500 })
+        }
+
+        // Use service role key to bypass RLS
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY
+        )
 
         // Obtener organización
         const { data: organization, error: orgError } = await supabase
@@ -39,29 +40,21 @@ export async function POST(
             .single()
 
         if (orgError || !organization) {
-            return NextResponse.json(
-                { error: "Tienda no encontrada" },
-                { status: 404 }
-            )
+            return NextResponse.json({ error: "Tienda no encontrada" }, { status: 404 })
         }
 
-        // Buscar cliente existente por teléfono
+        // Buscar cliente existente
         const { data: existingCustomer } = await supabase
             .from("customers")
-            .select("id, full_name, phone, email, metadata, total_orders, total_spent")
+            .select("id, full_name, phone, email, total_orders, total_spent")
             .eq("organization_id", organization.id)
             .eq("phone", cleanPhone)
             .single()
 
         if (existingCustomer) {
-            // Cliente existente - actualizar última interacción
             await supabase
                 .from("customers")
-                .update({
-                    updated_at: new Date().toISOString(),
-                    // Opcionalmente actualizar el nombre si es diferente
-                    // full_name: name.trim()
-                })
+                .update({ updated_at: new Date().toISOString() })
                 .eq("id", existingCustomer.id)
 
             return NextResponse.json({
@@ -94,11 +87,8 @@ export async function POST(
             .single()
 
         if (createError) {
-            console.error("Error creating customer:", createError)
-            return NextResponse.json(
-                { error: "Error al registrar. Intenta de nuevo." },
-                { status: 500 }
-            )
+            console.error("Error creating customer - Full Error:", JSON.stringify(createError, null, 2))
+            return NextResponse.json({ error: "Error al registrar: " + createError.message }, { status: 500 })
         }
 
         return NextResponse.json({
@@ -116,9 +106,6 @@ export async function POST(
 
     } catch (error: any) {
         console.error("Error in identify:", error)
-        return NextResponse.json(
-            { error: "Error interno del servidor" },
-            { status: 500 }
-        )
+        return NextResponse.json({ error: "Error interno" }, { status: 500 })
     }
 }
