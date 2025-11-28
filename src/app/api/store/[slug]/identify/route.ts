@@ -46,7 +46,7 @@ export async function POST(
         // Buscar cliente existente
         const { data: existingCustomer } = await supabase
             .from("customers")
-            .select("id, full_name, phone, email, total_orders, total_spent")
+            .select("id, full_name, phone, email")
             .eq("organization_id", organization.id)
             .eq("phone", cleanPhone)
             .single()
@@ -63,8 +63,8 @@ export async function POST(
                     full_name: existingCustomer.full_name,
                     phone: existingCustomer.phone,
                     email: existingCustomer.email,
-                    totalOrders: existingCustomer.total_orders || 0,
-                    totalSpent: existingCustomer.total_spent || 0
+                    totalOrders: 0,
+                    totalSpent: 0
                 },
                 isNew: false,
                 isReturning: true

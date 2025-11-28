@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 
+export const dynamic = 'force-dynamic'
+
 export default function AuthPage() {
     const router = useRouter()
     const [isLogin, setIsLogin] = useState(true)
@@ -46,24 +48,66 @@ export default function AuthPage() {
 
                 // Create organization and profile
                 if (data.user) {
-                    // Create organization
-                    const { data: org, error: orgError } = await supabase
-                        .from("organizations")
-                        .insert({
-                            name: `${fullName}'s Organization`,
-                            slug: `org-${data.user.id.substring(0, 8)}`,
-                        })
-                        .select()
+                    // 1. Check if profile already exists
+                    const { data: existingProfile } = await supabase
+                        .from("profiles")
+                        .select("id")
+                        .eq("id", data.user.id)
                         .single()
 
-                    if (orgError) throw orgError
+                    if (existingProfile) {
+                        // Profile exists, just redirect
+                        router.push("/dashboard")
+                        return
+                    }
 
-                    // Create profile
+                    // 2. Check if organization already exists (by slug)
+                    const slug = `org-${data.user.id.substring(0, 8)}`
+                    let orgId
+
+                    const { data: existingOrg } = await supabase
+                        .from("organizations")
+                        .select("id")
+                        .eq("slug", slug)
+                        .single()
+
+                    if (existingOrg) {
+                        orgId = existingOrg.id
+                    } else {
+                        // Create organization
+                        const { data: org, error: orgError } = await supabase
+                            .from("organizations")
+                            .insert({
+                                name: `${fullName}'s Organization`,
+                                slug: slug,
+                            })
+                            .select()
+                            .single()
+
+                        if (orgError) {
+                            // If error is duplicate key (race condition), try to fetch again
+                            if (orgError.code === '23505') {
+                                const { data: retryOrg } = await supabase
+                                    .from("organizations")
+                                    .select("id")
+                                    .eq("slug", slug)
+                                    .single()
+                                if (retryOrg) orgId = retryOrg.id
+                                else throw orgError
+                            } else {
+                                throw orgError
+                            }
+                        } else {
+                            orgId = org.id
+                        }
+                    }
+
+                    // 3. Create profile
                     const { error: profileError } = await supabase
                         .from("profiles")
                         .insert({
                             id: data.user.id,
-                            organization_id: org.id,
+                            organization_id: orgId,
                             full_name: fullName,
                             role: "admin",
                         })
