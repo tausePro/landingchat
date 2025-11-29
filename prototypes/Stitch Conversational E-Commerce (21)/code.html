@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Página Detalles Producto (Móvil)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+  </style>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#3c83f6",
+            "background-light": "#f5f7f8",
+            "background-dark": "#101722",
+          },
+          fontFamily: {
+            "display": ["Manrope", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative flex min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<div class="flex flex-1 justify-center">
+<div class="layout-content-container flex flex-col max-w-[480px] flex-1">
+<!-- ToolBar at the top -->
+<header class="flex justify-between items-center gap-2 px-4 py-3 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm sticky top-0 z-10">
+<button class="p-2 text-[#0d131c] dark:text-white">
+<span class="material-symbols-outlined text-2xl">arrow_back</span>
+</button>
+<div class="flex gap-2">
+<button class="p-2 text-[#0d131c] dark:text-white">
+<span class="material-symbols-outlined text-2xl">share</span>
+</button>
+<button class="p-2 text-[#0d131c] dark:text-white">
+<span class="material-symbols-outlined text-2xl">favorite_border</span>
+</button>
+</div>
+</header>
+<main class="pb-28">
+<!-- HeaderImage (Image Gallery) -->
+<div class="@container">
+<div class="bg-cover bg-center flex flex-col justify-end overflow-hidden min-h-80" data-alt="Close-up of a stylish modern backpack with blue accents" style='background-image: linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0) 25%), url("https://lh3.googleusercontent.com/aida-public/AB6AXuCmmW-L0KFilUal8x4UDszaGnnDw5N5d1jN1cytj6tShmIRyZ3bLArMGJlmAKVnN0caTu-EdnXs7WZdmtESgp1POaTAhD4okhpm6nJWzVWILygbg4oIoD3kIY2ArAfMALOPeJGUUd_6txPhCohxV3IpAxsIudBQ03gIihhfqVRiAYCi5mePO04LMNWz88sZhIVti4fpYwkiYJ2isgPyPnYBAtT7XE0xoN2_oVe1jw8cJi3RP3kAVApaTyA-oeR2bmS2vNHckM4BbgI");'>
+<div class="flex justify-center gap-2 p-5">
+<div class="size-2 rounded-full bg-white"></div>
+<div class="size-2 rounded-full bg-white opacity-50"></div>
+<div class="size-2 rounded-full bg-white opacity-50"></div>
+<div class="size-2 rounded-full bg-white opacity-50"></div>
+</div>
+</div>
+</div>
+<!-- Product Information -->
+<div class="flex flex-col gap-1 pt-4">
+<h1 class="text-[#0d131c] dark:text-white tracking-tight text-[28px] font-bold leading-tight px-4 text-left">Mochila Urbana Tech Pro</h1>
+<h2 class="text-primary text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 text-left">$79.99</h2>
+<p class="text-[#0d131c]/80 dark:text-white/80 text-base font-normal leading-normal pt-1 px-4">
+                Diseñada para el profesional moderno. Esta mochila combina un estilo minimalista con una funcionalidad excepcional. Cuenta con compartimentos acolchados para portátiles de hasta 15", múltiples bolsillos organizadores y un puerto de carga USB integrado. <a class="text-primary font-semibold" href="#">Leer más</a>
+</p>
+</div>
+<!-- Variant Selectors -->
+<div class="px-4 pt-6 space-y-4">
+<!-- Color Selector -->
+<div>
+<h3 class="text-base font-semibold text-[#0d131c] dark:text-white mb-2">Color: <span class="font-normal text-[#0d131c]/70 dark:text-white/70">Azul Marino</span></h3>
+<div class="flex items-center gap-3">
+<button class="size-8 rounded-full bg-[#1e3a8a] ring-2 ring-offset-2 ring-primary ring-offset-background-light dark:ring-offset-background-dark"></button>
+<button class="size-8 rounded-full bg-gray-800"></button>
+<button class="size-8 rounded-full bg-slate-400"></button>
+</div>
+</div>
+<!-- Size Selector -->
+<div>
+<h3 class="text-base font-semibold text-[#0d131c] dark:text-white mb-2">Tamaño</h3>
+<div class="flex flex-wrap gap-3">
+<button class="px-4 py-2 text-sm font-semibold border border-gray-300 dark:border-gray-700 rounded-lg text-[#0d131c] dark:text-white">Pequeño</button>
+<button class="px-4 py-2 text-sm font-semibold border border-transparent rounded-lg text-white bg-primary">Mediano</button>
+<button class="px-4 py-2 text-sm font-semibold border border-gray-300 dark:border-gray-700 rounded-lg text-[#0d131c] dark:text-white">Grande</button>
+</div>
+</div>
+</div>
+<!-- Accordion for more info -->
+<div class="px-4 pt-8 space-y-2">
+<details class="group border-b border-gray-200 dark:border-gray-800 pb-3">
+<summary class="flex justify-between items-center cursor-pointer list-none">
+<span class="text-lg font-semibold text-[#0d131c] dark:text-white">Reseñas de Clientes</span>
+<span class="text-[#0d131c] dark:text-white transform transition-transform duration-200 group-open:rotate-180">
+<span class="material-symbols-outlined">expand_more</span>
+</span>
+</summary>
+<div class="mt-4 text-[#0d131c]/80 dark:text-white/80">
+<div class="flex items-center gap-2 mb-2">
+<div class="flex text-yellow-400">
+<span class="material-symbols-outlined !text-lg">star</span>
+<span class="material-symbols-outlined !text-lg">star</span>
+<span class="material-symbols-outlined !text-lg">star</span>
+<span class="material-symbols-outlined !text-lg">star</span>
+<span class="material-symbols-outlined !text-lg">star_half</span>
+</div>
+<span class="text-sm font-medium">4.5 de 5 (128 reseñas)</span>
+</div>
+<p class="text-sm">"¡La mejor mochila que he tenido! Súper cómoda y con mucho espacio. El puerto USB es un salvavidas." - Alex R.</p>
+</div>
+</details>
+<details class="group border-b border-gray-200 dark:border-gray-800 pb-3">
+<summary class="flex justify-between items-center cursor-pointer list-none">
+<span class="text-lg font-semibold text-[#0d131c] dark:text-white">Especificaciones</span>
+<span class="text-[#0d131c] dark:text-white transform transition-transform duration-200 group-open:rotate-180">
+<span class="material-symbols-outlined">expand_more</span>
+</span>
+</summary>
+<p class="mt-4 text-sm text-[#0d131c]/80 dark:text-white/80">Material: Nylon balístico resistente al agua. Dimensiones: 45cm x 30cm x 15cm. Peso: 0.8 kg. Compatibilidad: Laptops de hasta 15.6 pulgadas.</p>
+</details>
+</div>
+</main>
+<!-- Sticky CTA Button -->
+<div class="fixed bottom-0 left-0 right-0 w-full bg-background-light dark:bg-background-dark border-t border-gray-200 dark:border-gray-800 p-4 z-10">
+<div class="max-w-[480px] mx-auto">
+<button class="w-full flex items-center justify-center gap-2 bg-primary text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined">chat_bubble</span>
+<span>Chatear para Comprar</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>
