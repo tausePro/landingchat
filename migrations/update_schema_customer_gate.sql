@@ -1,5 +1,5 @@
 -- =============================================
--- MIGRACIÓN: MVP LandingChat - Customer Gate & Subdomains
+-- MIGRACIÓN: MVP LandingChat - Customer Gate
 -- =============================================
 
 -- 1. Agregar customer_id a chats (si no existe)

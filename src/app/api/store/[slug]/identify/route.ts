@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(
     request: NextRequest,
@@ -20,17 +20,7 @@ export async function POST(
         }
 
         const cleanPhone = phone.replace(/[^\d+]/g, "")
-
-        if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-            console.error("SUPABASE_SERVICE_ROLE_KEY is missing")
-            return NextResponse.json({ error: "Falta configuración del servidor" }, { status: 500 })
-        }
-
-        // Use service role key to bypass RLS
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        )
+        const supabase = await createClient()
 
         // Obtener organización
         const { data: organization, error: orgError } = await supabase
@@ -46,7 +36,7 @@ export async function POST(
         // Buscar cliente existente
         const { data: existingCustomer } = await supabase
             .from("customers")
-            .select("id, full_name, phone, email")
+            .select("id, full_name, phone, email, total_orders, total_spent")
             .eq("organization_id", organization.id)
             .eq("phone", cleanPhone)
             .single()
@@ -63,8 +53,8 @@ export async function POST(
                     full_name: existingCustomer.full_name,
                     phone: existingCustomer.phone,
                     email: existingCustomer.email,
-                    totalOrders: 0,
-                    totalSpent: 0
+                    totalOrders: existingCustomer.total_orders || 0,
+                    totalSpent: existingCustomer.total_spent || 0
                 },
                 isNew: false,
                 isReturning: true
@@ -87,8 +77,8 @@ export async function POST(
             .single()
 
         if (createError) {
-            console.error("Error creating customer - Full Error:", JSON.stringify(createError, null, 2))
-            return NextResponse.json({ error: "Error al registrar: " + createError.message }, { status: 500 })
+            console.error("Error creating customer:", createError)
+            return NextResponse.json({ error: "Error al registrar" }, { status: 500 })
         }
 
         return NextResponse.json({
