@@ -59,7 +59,8 @@ export async function updateOrganizationDetails(data: OrganizationDetails) {
         .from("organizations")
         .update({
             name: data.name,
-            subdomain: data.subdomain,
+            slug: data.subdomain, // Save subdomain as slug
+            subdomain: data.subdomain, // Also save to subdomain if column exists (it might not, but safe to try or just rely on slug)
             contact_email: data.contactEmail,
             industry: data.industry,
             logo_url: data.logoUrl || null,

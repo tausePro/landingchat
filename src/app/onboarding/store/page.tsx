@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProgressBar } from "@/components/onboarding/progress-bar"
 import { LogoUploader } from "@/components/onboarding/logo-uploader"
 import { updateOrganizationDetails } from "../actions"
+
 
 export default function StoreConfigPage() {
     const router = useRouter()
@@ -19,8 +20,57 @@ export default function StoreConfigPage() {
         logoUrl: ""
     })
 
+    // Subdomain validation state
+    const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "unavailable" | "invalid">("idle")
+    const [subdomainError, setSubdomainError] = useState<string | null>(null)
+
+    // Debounce subdomain check
+    useEffect(() => {
+        const checkSubdomain = async () => {
+            if (!formData.subdomain) {
+                setSubdomainStatus("idle")
+                setSubdomainError(null)
+                return
+            }
+
+            // Basic format validation
+            const validRegex = /^[a-z0-9-]+$/
+            if (!validRegex.test(formData.subdomain)) {
+                setSubdomainStatus("invalid")
+                setSubdomainError("Solo letras minúsculas, números y guiones.")
+                return
+            }
+
+            setSubdomainStatus("checking")
+            setSubdomainError(null)
+
+            try {
+                const res = await fetch(`/api/check-subdomain?subdomain=${formData.subdomain}`)
+                const data = await res.json()
+
+                if (data.available) {
+                    setSubdomainStatus("available")
+                } else {
+                    setSubdomainStatus("unavailable")
+                    setSubdomainError("Este subdominio ya está en uso.")
+                }
+            } catch (error) {
+                console.error("Error checking subdomain:", error)
+                setSubdomainStatus("idle") // Reset on error to allow retry or submit attempt
+            }
+        }
+
+        const timeoutId = setTimeout(checkSubdomain, 500)
+        return () => clearTimeout(timeoutId)
+    }, [formData.subdomain])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+
+        if (subdomainStatus === "unavailable" || subdomainStatus === "invalid") {
+            return // Prevent submit if invalid
+        }
+
         setLoading(true)
 
         try {
@@ -69,18 +119,32 @@ export default function StoreConfigPage() {
                         <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
                             Elige tu URL
                         </p>
-                        <div className="flex items-center rounded-lg border border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 dark:border-slate-600 dark:bg-slate-800">
+                        <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-primary/20 dark:bg-slate-800 ${subdomainStatus === "unavailable" || subdomainStatus === "invalid"
+                            ? "border-red-500 focus-within:border-red-500"
+                            : subdomainStatus === "available"
+                                ? "border-green-500 focus-within:border-green-500"
+                                : "border-slate-300 dark:border-slate-600 focus-within:border-primary"
+                            }`}>
                             <input
                                 className="form-input h-12 w-full flex-1 rounded-l-lg border-0 bg-transparent px-3 py-2 text-base font-normal text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0 dark:text-white"
                                 placeholder="tu-tienda"
                                 value={formData.subdomain}
-                                onChange={(e) => setFormData({ ...formData, subdomain: e.target.value })}
+                                onChange={(e) => setFormData({ ...formData, subdomain: e.target.value.toLowerCase() })}
                                 required
                             />
-                            <span className="whitespace-nowrap pr-3 text-sm text-slate-500 dark:text-slate-400">
-                                .landingchat.co
-                            </span>
+                            <div className="flex items-center pr-3">
+                                {subdomainStatus === "checking" && <span className="mr-2 size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600"></span>}
+                                <span className="whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                                    .landingchat.co
+                                </span>
+                            </div>
                         </div>
+                        {subdomainError && (
+                            <p className="text-xs text-red-500">{subdomainError}</p>
+                        )}
+                        {subdomainStatus === "available" && (
+                            <p className="text-xs text-green-600">¡Disponible!</p>
+                        )}
                     </label>
                 </div>
 
@@ -126,7 +190,7 @@ export default function StoreConfigPage() {
 
                 {/* Action Buttons */}
                 <div className="flex flex-col items-center gap-4 border-t border-slate-200 pt-6 dark:border-slate-700 sm:flex-row-reverse">
-                    <Button type="submit" disabled={loading} className="w-full sm:w-auto h-12 px-6">
+                    <Button type="submit" disabled={loading || subdomainStatus === "checking" || subdomainStatus === "unavailable" || subdomainStatus === "invalid"} className="w-full sm:w-auto h-12 px-6">
                         {loading ? "Guardando..." : "Guardar y Continuar"}
                     </Button>
                     <Button
