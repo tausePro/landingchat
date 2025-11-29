@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { StoreLayoutClient } from "../../store-layout-client"
+import { ProductCTAButton } from "./product-cta-button"
 
 interface ProductDetailPageProps {
     params: Promise<{ slug: string; id: string }>
@@ -107,8 +108,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                                             <button
                                                 key={vIdx}
                                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${vIdx === 0
-                                                        ? 'text-white shadow-lg shadow-primary/30'
-                                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-700 dark:text-slate-300'
+                                                    ? 'text-white shadow-lg shadow-primary/30'
+                                                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-700 dark:text-slate-300'
                                                     }`}
                                                 style={vIdx === 0 ? { backgroundColor: primaryColor } : {}}
                                             >
@@ -137,18 +138,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 </div>
 
                 {/* Sticky Footer CTA */}
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50">
-                    <div className="max-w-md mx-auto">
-                        <Link
-                            href={`/chat/${slug}?product=${id}`}
-                            className="flex w-full items-center justify-center gap-2 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:opacity-90 transition-opacity"
-                            style={{ backgroundColor: primaryColor }}
-                        >
-                            <span className="material-symbols-outlined">chat_bubble</span>
-                            <span>Chatear para Comprar</span>
-                        </Link>
-                    </div>
-                </div>
+                <ProductCTAButton slug={slug} productId={id} primaryColor={primaryColor} />
             </div>
         </StoreLayoutClient>
     )
