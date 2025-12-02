@@ -26,6 +26,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [sku, setSku] = useState(initialData?.sku || "")
     const [stock, setStock] = useState(initialData?.stock?.toString() || "0")
     const [price, setPrice] = useState(initialData?.price?.toString() || "")
+    const [salePrice, setSalePrice] = useState(initialData?.sale_price?.toString() || "")
     const [images, setImages] = useState<string[]>(initialData?.images || [])
     const [categories, setCategories] = useState<string[]>(initialData?.categories || [])
     const [variants, setVariants] = useState<Array<{ type: string; values: string[] }>>(initialData?.variants || [])
@@ -58,6 +59,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 name: name.trim(),
                 description: description.trim() || undefined,
                 price: parseFloat(price),
+                sale_price: salePrice ? parseFloat(salePrice) : undefined,
                 stock: parseInt(stock) || 0,
                 sku: sku.trim() || undefined,
                 images,
@@ -190,6 +192,22 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                         required
                                     />
                                 </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-sale-price">Precio de Oferta (COP)</label>
+                                <div className="relative mt-2">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
+                                    <input
+                                        className="form-input w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-7"
+                                        id="product-sale-price"
+                                        placeholder="24990"
+                                        type="number"
+                                        step="100"
+                                        value={salePrice}
+                                        onChange={e => setSalePrice(e.target.value)}
+                                    />
+                                </div>
+                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Opcional. Se mostrará tachado el precio original.</p>
                             </div>
                         </div>
                     </div>

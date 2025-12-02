@@ -31,6 +31,7 @@ export interface ProductData {
     name: string
     description?: string
     price: number
+    sale_price?: number
     image_url?: string
     stock: number
     sku?: string
@@ -50,6 +51,7 @@ export interface CreateProductData {
     name: string
     description?: string
     price: number
+    sale_price?: number
     image_url?: string
     stock?: number
     sku?: string
@@ -141,7 +143,8 @@ export async function createProduct(productData: CreateProductData) {
             is_subscription: productData.is_subscription ?? false,
             is_configurable: productData.is_configurable ?? false,
             subscription_config: productData.subscription_config ?? null,
-            configurable_options: productData.configurable_options ?? null
+            configurable_options: productData.configurable_options ?? null,
+            sale_price: productData.sale_price ?? null
         })
         .select()
         .single()
