@@ -11,6 +11,7 @@ export interface AgentData {
     status: string
     avatar_url?: string
     configuration?: any
+    personalization_config?: any
     created_at: string
 }
 
@@ -25,6 +26,10 @@ export interface AgentTemplateData {
         system_prompt: string
         default_config: any
     }
+}
+
+export async function getAgents() {
+    return getUserAgents()
 }
 
 export async function getUserAgents() {
@@ -160,15 +165,28 @@ export async function createAgentFromTemplate(templateId: string, name: string) 
     return { success: true, agent: newAgent }
 }
 
+export async function updateAgent(id: string, agentData: Partial<AgentData>) {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+        .from("agents")
+        .update(agentData)
+        .eq("id", id)
+
+    if (error) {
+        console.error("Error updating agent:", error)
+        throw new Error(`Failed to update agent: ${error.message}`)
+    }
+
+    revalidatePath("/dashboard/agents")
+    return { success: true }
+}
+
 export async function deleteAgent(id: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) throw new Error("Unauthorized")
-
-    // Verify ownership via RLS (implicit) but good to be safe if needed
-    // RLS policy "Users can delete agents in own organization" should be there?
-    // Checking schema... we only added insert policy. We need delete policy.
 
     const { error } = await supabase
         .from("agents")

@@ -55,10 +55,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             updated_at,
             status,
             total,
-            notes,
             items,
-            shipping_address,
-            billing_address,
             customer:customers(id, full_name, email, phone)
         `)
         .eq("id", orderId)
@@ -81,11 +78,11 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
         subtotal: order.total || 0, // Use total as subtotal since we don't have separate column
         tax: 0, // Not available in schema
         shipping_cost: 0, // Not available in schema
-        notes: order.notes,
+        notes: null, // Not available in schema
         customer: Array.isArray(order.customer) ? order.customer[0] : order.customer,
         items: Array.isArray(order.items) ? order.items : [],
-        shipping_address: order.shipping_address,
-        billing_address: order.billing_address
+        shipping_address: null, // Not available in schema
+        billing_address: null // Not available in schema
     }
 }
 

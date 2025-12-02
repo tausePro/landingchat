@@ -28,7 +28,17 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [images, setImages] = useState<string[]>(initialData?.images || [])
     const [categories, setCategories] = useState<string[]>(initialData?.categories || [])
     const [variants, setVariants] = useState<Array<{ type: string; values: string[] }>>(initialData?.variants || [])
+    const [isSubscription, setIsSubscription] = useState(initialData?.is_subscription ?? false)
+    const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable ?? false)
     const [isActive, setIsActive] = useState(initialData?.is_active ?? true)
+
+    // Subscription configuration state
+    const [subscriptionEnabled, setSubscriptionEnabled] = useState(initialData?.subscription_config?.enabled ?? false)
+    const [subscriptionPrice, setSubscriptionPrice] = useState(initialData?.subscription_config?.price?.toString() || "")
+    const [subscriptionInterval, setSubscriptionInterval] = useState<'day' | 'week' | 'month' | 'year'>(initialData?.subscription_config?.interval || 'month')
+    const [subscriptionIntervalCount, setSubscriptionIntervalCount] = useState(initialData?.subscription_config?.interval_count?.toString() || "1")
+    const [subscriptionTrialDays, setSubscriptionTrialDays] = useState(initialData?.subscription_config?.trial_days?.toString() || "")
+    const [subscriptionDiscount, setSubscriptionDiscount] = useState(initialData?.subscription_config?.discount_percentage?.toString() || "")
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -50,7 +60,17 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 image_url: images[0], // Primary image
                 categories,
                 variants: variants.filter(v => v.type && v.values.length > 0),
-                is_active: isActive
+                is_active: isActive,
+                is_subscription: subscriptionEnabled, // Use subscriptionEnabled instead
+                is_configurable: isConfigurable,
+                subscription_config: subscriptionEnabled ? {
+                    enabled: true,
+                    price: parseFloat(subscriptionPrice),
+                    interval: subscriptionInterval,
+                    interval_count: parseInt(subscriptionIntervalCount) || 1,
+                    trial_days: subscriptionTrialDays ? parseInt(subscriptionTrialDays) : undefined,
+                    discount_percentage: subscriptionDiscount ? parseFloat(subscriptionDiscount) : undefined
+                } : undefined
             }
 
             if (isEditing && initialData?.id) {
@@ -82,8 +102,8 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     <Link href="/dashboard/products" className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-4 text-sm font-medium text-text-light-primary dark:text-text-dark-primary hover:bg-background-light dark:hover:bg-background-dark">
                         <span className="truncate">Cancelar</span>
                     </Link>
-                    <button 
-                        type="submit" 
+                    <button
+                        type="submit"
                         disabled={loading}
                         className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 text-white text-sm font-bold shadow-sm hover:bg-primary/90 disabled:opacity-50"
                     >
@@ -101,10 +121,10 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         <div className="mt-6 grid grid-cols-1 gap-6">
                             <div>
                                 <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-name">Nombre del Producto</label>
-                                <input 
-                                    className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary" 
-                                    id="product-name" 
-                                    placeholder="Ej: Camiseta Conversacional Pro" 
+                                <input
+                                    className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                    id="product-name"
+                                    placeholder="Ej: Camiseta Conversacional Pro"
                                     type="text"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
@@ -130,10 +150,10 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-sku">SKU</label>
-                                <input 
-                                    className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary" 
-                                    id="product-sku" 
-                                    placeholder="LC-TS-001" 
+                                <input
+                                    className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                    id="product-sku"
+                                    placeholder="LC-TS-001"
                                     type="text"
                                     value={sku}
                                     onChange={e => setSku(e.target.value)}
@@ -141,10 +161,10 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                             </div>
                             <div>
                                 <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-stock">Stock</label>
-                                <input 
-                                    className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary" 
-                                    id="product-stock" 
-                                    placeholder="100" 
+                                <input
+                                    className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                    id="product-stock"
+                                    placeholder="100"
                                     type="number"
                                     value={stock}
                                     onChange={e => setStock(e.target.value)}
@@ -154,17 +174,134 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                 <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-price">Precio (COP)</label>
                                 <div className="relative mt-2">
                                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
-                                    <input 
-                                        className="form-input w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-7" 
-                                        id="product-price" 
-                                        placeholder="29990" 
-                                        type="number" 
+                                    <input
+                                        className="form-input w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-7"
+                                        id="product-price"
+                                        placeholder="29990"
+                                        type="number"
                                         step="100"
                                         value={price}
                                         onChange={e => setPrice(e.target.value)}
                                         required
                                     />
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Advanced Options */}
+                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                        <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Opciones Avanzadas</h2>
+                        <div className="mt-6 flex flex-col gap-4">
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Vender por Suscripción</h3>
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">Permite a los clientes suscribirse a este producto.</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={subscriptionEnabled}
+                                            onChange={e => setSubscriptionEnabled(e.target.checked)}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                    </label>
+                                </div>
+
+                                {/* Subscription Configuration Fields */}
+                                {subscriptionEnabled && (
+                                    <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-border-light dark:border-border-dark space-y-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Precio de Suscripción (COP)</label>
+                                                <div className="relative mt-2">
+                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
+                                                    <input
+                                                        className="form-input w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-7"
+                                                        placeholder="45000"
+                                                        type="number"
+                                                        step="100"
+                                                        value={subscriptionPrice}
+                                                        onChange={e => setSubscriptionPrice(e.target.value)}
+                                                        required={subscriptionEnabled}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Periodicidad</label>
+                                                <select
+                                                    className="form-select mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark h-10"
+                                                    value={subscriptionInterval}
+                                                    onChange={e => setSubscriptionInterval(e.target.value as any)}
+                                                >
+                                                    <option value="day">Diario</option>
+                                                    <option value="week">Semanal</option>
+                                                    <option value="month">Mensual</option>
+                                                    <option value="year">Anual</option>
+                                                </select>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Cada cuántos</label>
+                                                <input
+                                                    className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                                    placeholder="1"
+                                                    type="number"
+                                                    min="1"
+                                                    value={subscriptionIntervalCount}
+                                                    onChange={e => setSubscriptionIntervalCount(e.target.value)}
+                                                />
+                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Ej: "2" para cada 2 meses</p>
+                                            </div>
+
+                                            <div>
+                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Días de prueba gratis (opcional)</label>
+                                                <input
+                                                    className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                                    placeholder="7"
+                                                    type="number"
+                                                    min="0"
+                                                    value={subscriptionTrialDays}
+                                                    onChange={e => setSubscriptionTrialDays(e.target.value)}
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Descuento vs Precio Único (%, opcional)</label>
+                                                <input
+                                                    className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                                    placeholder="10"
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.1"
+                                                    value={subscriptionDiscount}
+                                                    onChange={e => setSubscriptionDiscount(e.target.value)}
+                                                />
+                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Se mostrará como "Ahorra X%" en el storefront</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="border-t border-border-light dark:border-border-dark"></div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Producto Configurable</h3>
+                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">Permite personalizar el producto a través del Agente.</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={isConfigurable}
+                                        onChange={e => setIsConfigurable(e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -209,8 +346,8 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                 <div className="flex items-center justify-between mt-2">
                                     <p className="text-text-light-secondary dark:text-text-dark-secondary">Producto Activo</p>
                                     <label className="relative inline-flex items-center cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
+                                        <input
+                                            type="checkbox"
                                             className="sr-only peer"
                                             checked={isActive}
                                             onChange={e => setIsActive(e.target.checked)}

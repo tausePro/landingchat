@@ -4,6 +4,7 @@ import { useState, useEffect, use, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cart-store"
 import { getStoreProducts } from "./actions"
+import { StoreHeader } from "@/components/store/store-header"
 
 interface Product {
     id: string
@@ -34,6 +35,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [products, setProducts] = useState<any[]>([])
     const [agent, setAgent] = useState<any>(null)
     const [organization, setOrganization] = useState<any>(null)
+    const [badges, setBadges] = useState<any[]>([])
+    const [promotions, setPromotions] = useState<any[]>([])
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const { addItem } = useCartStore()
@@ -67,15 +70,20 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             if (data) {
                 setProducts(data.products)
                 setOrganization(data.organization)
+                setBadges(data.badges)
+                setPromotions(data.promotions)
                 if (!agent) setAgent(data.agent)
+
+                // Inicializar chat con los productos cargados
+                initializeChat(storedCustomerId, storedChatId, data.products)
+            } else {
+                // Fallback si falla la carga de productos
+                initializeChat(storedCustomerId, storedChatId, [])
             }
         })
-
-        // Inicializar chat
-        initializeChat(storedCustomerId, storedChatId)
     }, [slug, router])
 
-    const initializeChat = async (custId: string, existingChatId: string | null) => {
+    const initializeChat = async (custId: string, existingChatId: string | null, loadedProducts: any[]) => {
         try {
             const response = await fetch(`/api/store/${slug}/chat/init`, {
                 method: "POST",
@@ -99,9 +107,24 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 // Si hay un producto en la URL, el usuario quería preguntar por él
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
+                const context = urlParams.get('context')
 
-                if (productId) {
-                    // Aquí podríamos enviar un mensaje automático o sugerencia
+                if (productId && context) {
+                    // User came from customization flow
+                    const product = loadedProducts.find(p => p.id === productId)
+                    const productName = product ? product.name : "este producto"
+                    const customerName = localStorage.getItem(`customer_name_${slug}`)
+
+                    // Add initial message from agent with context
+                    // Only add if it's a new conversation or the last message wasn't this one (simple check)
+                    // For now, just add it locally. 
+                    const contextMsg: Message = {
+                        id: "context-init-" + Date.now(),
+                        role: 'assistant',
+                        content: `Hola ${customerName || ''}, veo que estás interesado en **${productName}** con las siguientes opciones: **${decodeURIComponent(context)}**. ¿Te gustaría proceder con la compra o tienes alguna duda?`,
+                        timestamp: new Date()
+                    }
+                    setMessages(prev => [...prev, contextMsg])
                 }
             }
 
@@ -154,7 +177,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     chatId,
                     slug,
                     customerId, // Enviar customerId explícitamente
-                    currentProductId: new URLSearchParams(window.location.search).get('product')
+                    currentProductId: new URLSearchParams(window.location.search).get('product'),
+                    context: new URLSearchParams(window.location.search).get('context')
                 })
             })
 
@@ -248,9 +272,23 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const agentAvatar = agentSettings.avatar || agent?.avatar_url || 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o'
 
     return (
-        <>
-            {/* Header - Prototype Style */}
-            <div className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
+        <div className="flex flex-col h-screen bg-white dark:bg-gray-900">
+            {/* Desktop Header */}
+            <div className="hidden md:block">
+                {organization && (
+                    <StoreHeader
+                        slug={slug}
+                        organization={organization}
+                        onStartChat={() => { }}
+                        primaryColor={primaryColor}
+                        showStoreName={showStoreName}
+                        hideChatButton={true}
+                    />
+                )}
+            </div>
+
+            {/* Mobile Header - Prototype Style */}
+            <div className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md md:hidden">
                 <div className="container mx-auto flex h-14 items-center justify-between px-4">
                     <div className="flex items-center gap-3">
                         <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -283,126 +321,179 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-gray-950">
-                {messages.map((msg) => (
-                    <div
-                        key={msg.id}
-                        className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'justify-end' : ''}`}
-                    >
-                        {msg.role === 'assistant' && (
-                            <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center shadow-sm"
-                                style={{ backgroundImage: `url("${agentAvatar}")` }}></div>
-                        )}
-
-                        <div className={`flex flex-1 flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+            {/* Main Chat Container */}
+            <div className="flex-1 flex flex-col overflow-hidden md:max-w-4xl md:mx-auto md:w-full md:border-x md:border-gray-200 md:dark:border-gray-800 md:shadow-sm md:bg-white md:dark:bg-gray-950">
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-gray-950 md:bg-white md:dark:bg-gray-950">
+                    {messages.map((msg) => (
+                        <div
+                            key={msg.id}
+                            className={`flex items-end gap-2.5 ${msg.role === 'user' ? 'justify-end' : ''}`}
+                        >
                             {msg.role === 'assistant' && (
-                                <p className="text-xs font-normal leading-normal text-gray-500 dark:text-gray-400 ml-1">{agentName}</p>
+                                <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center shadow-sm"
+                                    style={{ backgroundImage: `url("${agentAvatar}")` }}></div>
                             )}
 
-                            <div className="space-y-2 max-w-[85%]">
-                                {msg.content && (
-                                    <div className={`text-sm font-normal leading-normal px-3.5 py-2.5 shadow-sm ${msg.role === 'user'
-                                        ? 'rounded-2xl rounded-br-sm bg-primary text-white'
-                                        : 'rounded-2xl rounded-bl-sm bg-white dark:bg-gray-800 text-slate-800 dark:text-gray-200 border border-slate-200 dark:border-gray-700'
-                                        }`}>
-                                        {msg.content}
-                                    </div>
+                            <div className={`flex flex-1 flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                {msg.role === 'assistant' && (
+                                    <p className="text-xs font-normal leading-normal text-gray-500 dark:text-gray-400 ml-1">{agentName}</p>
                                 )}
 
-                                {msg.product && (
-                                    <div className="ml-2 max-w-xs rounded-lg rounded-bl-sm border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-800/50 shadow-sm">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex flex-col gap-2 flex-1 min-w-0">
-                                                <div className="flex flex-col">
-                                                    <p className="text-sm font-bold leading-tight text-gray-900 dark:text-white line-clamp-2">{msg.product.name}</p>
-                                                    <p className="text-sm font-normal leading-normal text-gray-500 dark:text-gray-400 mt-0.5">{formatPrice(msg.product.price)}</p>
+                                <div className="space-y-2 max-w-[85%]">
+                                    {msg.content && (
+                                        <div className={`text-sm font-normal leading-normal px-3.5 py-2.5 shadow-sm ${msg.role === 'user'
+                                            ? 'rounded-2xl rounded-br-sm bg-primary text-white'
+                                            : 'rounded-2xl rounded-bl-sm bg-white dark:bg-gray-800 text-slate-800 dark:text-gray-200 border border-slate-200 dark:border-gray-700'
+                                            }`}>
+                                            {msg.content}
+                                        </div>
+                                    )}
+
+                                    {msg.product && (
+                                        <>
+                                            {/* Mobile: Compact Horizontal Layout */}
+                                            <div className="md:hidden ml-2 max-w-xs rounded-lg rounded-bl-sm border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-800/50 shadow-sm">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex flex-col gap-2 flex-1 min-w-0">
+                                                        <div className="flex flex-col">
+                                                            <p className="text-sm font-bold leading-tight text-gray-900 dark:text-white line-clamp-2">{msg.product.name}</p>
+                                                            <p className="text-sm font-normal leading-normal text-gray-500 dark:text-gray-400 mt-0.5">{formatPrice(msg.product.price)}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => addItem(msg.product!)}
+                                                            className="flex h-8 w-fit cursor-pointer items-center justify-center overflow-hidden rounded-md bg-gray-100 px-3 text-xs font-medium leading-normal text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors"
+                                                        >
+                                                            <span>Añadir al carrito</span>
+                                                        </button>
+                                                    </div>
+                                                    <div className="aspect-square w-20 flex-shrink-0 rounded-lg bg-cover bg-center border border-gray-100 dark:border-gray-700"
+                                                        style={{ backgroundImage: `url("${msg.product.image_url}")` }}></div>
+                                                </div>
+                                            </div>
+
+                                            {/* Desktop: Vertical Card Layout */}
+                                            <div className="hidden md:flex flex-col gap-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 w-64 shadow-md relative overflow-hidden">
+                                                <div className="bg-center bg-no-repeat aspect-[4/3] bg-cover rounded-lg w-full relative" style={{ backgroundImage: `url("${msg.product.image_url}")` }}>
+                                                    {/* Badges */}
+                                                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                                                        {badges.filter(b => b.type === 'manual').map(b => (
+                                                            <span key={b.id} className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: b.background_color, color: b.text_color }}>
+                                                                {b.display_text}
+                                                            </span>
+                                                        ))}
+                                                        {promotions.some(p => p.applies_to === 'all' || (p.applies_to === 'products' && p.target_ids?.includes(msg.product?.id))) && (
+                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500 text-white animate-pulse">
+                                                                OFERTA
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1 px-1">
+                                                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">{msg.product.name}</h3>
+                                                    <p className="text-xs text-slate-500 dark:text-gray-400 line-clamp-2">{msg.product.description}</p>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <p className="text-lg font-bold text-slate-900 dark:text-white mt-1">
+                                                            {(() => {
+                                                                let price = msg.product.price
+                                                                const promo = promotions.find(p => p.applies_to === 'all' || (p.applies_to === 'products' && p.target_ids?.includes(msg.product?.id)))
+                                                                if (promo) {
+                                                                    if (promo.type === 'percentage') price = price * (1 - promo.value / 100)
+                                                                    else if (promo.type === 'fixed') price = Math.max(0, price - promo.value)
+                                                                }
+                                                                return formatPrice(price)
+                                                            })()}
+                                                        </p>
+                                                        {promotions.some(p => p.applies_to === 'all' || (p.applies_to === 'products' && p.target_ids?.includes(msg.product?.id))) && (
+                                                            <span className="text-xs text-gray-400 line-through">{formatPrice(msg.product.price)}</span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <button
                                                     onClick={() => addItem(msg.product!)}
-                                                    className="flex h-8 w-fit cursor-pointer items-center justify-center overflow-hidden rounded-md bg-gray-100 px-3 text-xs font-medium leading-normal text-gray-800 dark:bg-gray-700 dark:text-gray-200 hover:bg-gray-200 transition-colors"
+                                                    className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-primary text-white gap-2 text-sm font-bold hover:bg-blue-600 transition-colors shadow-sm"
                                                 >
-                                                    <span>Añadir al carrito</span>
+                                                    <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
+                                                    <span>Agregar</span>
                                                 </button>
                                             </div>
-                                            <div className="aspect-square w-20 flex-shrink-0 rounded-lg bg-cover bg-center border border-gray-100 dark:border-gray-700"
-                                                style={{ backgroundImage: `url("${msg.product.image_url}")` }}></div>
-                                        </div>
-                                    </div>
-                                )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {msg.role === 'user' && (
+                                <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-bold">
+                                    {customerName ? customerName.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+
+                    {/* Typing Indicator */}
+                    {isLoading && (
+                        <div className="flex items-end gap-2.5">
+                            <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center shadow-sm"
+                                style={{ backgroundImage: `url("${agentAvatar}")` }}></div>
+                            <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
+                                <div className="flex gap-1.5">
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                                </div>
                             </div>
                         </div>
+                    )}
 
-                        {msg.role === 'user' && (
-                            <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-bold">
-                                {customerName ? customerName.charAt(0).toUpperCase() : 'U'}
-                            </div>
-                        )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area - Prototype Style */}
+                <div className="w-full shrink-0 border-t border-solid border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
+                    {/* Quick Action Buttons */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+                        <button
+                            onClick={() => router.push(`/store/${slug}/products`)}
+                            className="flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-50 transition-colors"
+                        >
+                            Ver más productos
+                        </button>
+                        <button
+                            onClick={() => setInput("Quiero hablar con un humano")}
+                            className="flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-50 transition-colors"
+                        >
+                            Hablar con un agente
+                        </button>
                     </div>
-                ))}
 
-                {/* Typing Indicator */}
-                {isLoading && (
-                    <div className="flex items-end gap-2.5">
-                        <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center shadow-sm"
-                            style={{ backgroundImage: `url("${agentAvatar}")` }}></div>
-                        <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                            <div className="flex gap-1.5">
-                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
-                            </div>
+                    {/* Text Input */}
+                    <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                            <input
+                                className="h-12 w-full rounded-lg border-none bg-gray-100 pl-4 pr-10 text-sm text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-400"
+                                placeholder="Escribe tu mensaje..."
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                disabled={isLoading}
+                            />
                         </div>
+                        <button
+                            onClick={handleSend}
+                            disabled={!input.trim() || isLoading}
+                            className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-primary text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? (
+                                <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <span className="material-symbols-outlined">send</span>
+                            )}
+                        </button>
                     </div>
-                )}
-
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area - Prototype Style */}
-            <div className="w-full shrink-0 border-t border-solid border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-                {/* Quick Action Buttons */}
-                <div className="mb-3 flex flex-wrap items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-                    <button
-                        onClick={() => router.push(`/store/${slug}/products`)}
-                        className="flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-50 transition-colors"
-                    >
-                        Ver más productos
-                    </button>
-                    <button
-                        onClick={() => setInput("Quiero hablar con un humano")}
-                        className="flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-50 transition-colors"
-                    >
-                        Hablar con un agente
-                    </button>
-                </div>
-
-                {/* Text Input */}
-                <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                        <input
-                            className="h-12 w-full rounded-lg border-none bg-gray-100 pl-4 pr-10 text-sm text-gray-800 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-opacity-50 dark:bg-gray-800 dark:text-gray-200 dark:placeholder:text-gray-400"
-                            placeholder="Escribe tu mensaje..."
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            disabled={isLoading}
-                        />
-                    </div>
-                    <button
-                        onClick={handleSend}
-                        disabled={!input.trim() || isLoading}
-                        className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-primary text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? (
-                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        ) : (
-                            <span className="material-symbols-outlined">send</span>
-                        )}
-                    </button>
                 </div>
             </div>
-        </>
+        </div>
     )
+
 }

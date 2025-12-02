@@ -3,6 +3,15 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
+export interface SubscriptionConfig {
+    enabled: boolean
+    price: number
+    interval: 'day' | 'week' | 'month' | 'year'
+    interval_count: number
+    trial_days?: number
+    discount_percentage?: number
+}
+
 export interface ProductData {
     id: string
     organization_id: string
@@ -14,8 +23,12 @@ export interface ProductData {
     sku?: string
     categories?: string[]
     images?: string[]
-    variants?: Array<{ type: string; values: string[] }>
+    variants?: Array<{ type: string; values: string[]; priceAdjustment?: number }>
+    options?: Array<{ name: string; values: string[] }>
     is_active?: boolean
+    is_subscription?: boolean
+    is_configurable?: boolean
+    subscription_config?: SubscriptionConfig
     created_at: string
 }
 
@@ -28,8 +41,12 @@ export interface CreateProductData {
     sku?: string
     categories?: string[]
     images?: string[]
-    variants?: Array<{ type: string; values: string[] }>
+    variants?: Array<{ type: string; values: string[]; priceAdjustment?: number }>
+    options?: Array<{ name: string; values: string[] }>
     is_active?: boolean
+    is_subscription?: boolean
+    is_configurable?: boolean
+    subscription_config?: SubscriptionConfig
 }
 
 export async function getProducts() {
@@ -62,17 +79,6 @@ export async function getProducts() {
 
 export async function getProductById(id: string) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
-
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
-
-    if (!profile?.organization_id) throw new Error("No organization found")
 
     const { data, error } = await supabase
         .from("products")
@@ -82,11 +88,7 @@ export async function getProductById(id: string) {
 
     if (error) {
         console.error("Error fetching product:", error)
-        throw new Error(`Product not found: ${error.message}`)
-    }
-
-    if (data.organization_id !== profile.organization_id) {
-        throw new Error("You don't have permission to access this product")
+        return null
     }
 
     return data as ProductData
@@ -119,7 +121,11 @@ export async function createProduct(productData: CreateProductData) {
             categories: productData.categories ?? [],
             images: productData.images ?? [],
             variants: productData.variants ?? [],
-            is_active: productData.is_active ?? true
+            options: productData.options ?? [],
+            is_active: productData.is_active ?? true,
+            is_subscription: productData.is_subscription ?? false,
+            is_configurable: productData.is_configurable ?? false,
+            subscription_config: productData.subscription_config ?? null
         })
         .select()
         .single()

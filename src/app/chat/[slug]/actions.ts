@@ -14,7 +14,7 @@ export async function getStoreProducts(slug: string) {
 
     if (orgError || !org) {
         console.error("Error fetching organization:", orgError)
-        return { products: [], agent: null, organization: null }
+        return { products: [], agent: null, organization: null, badges: [], promotions: [] }
     }
 
     // 2. Get Products for that Organization
@@ -27,7 +27,7 @@ export async function getStoreProducts(slug: string) {
 
     if (prodError) {
         console.error("Error fetching products:", prodError)
-        return { products: [], agent: null, organization: org }
+        return { products: [], agent: null, organization: org, badges: [], promotions: [] }
     }
 
     // 3. Get Active Agent
@@ -39,9 +39,27 @@ export async function getStoreProducts(slug: string) {
         .limit(1)
         .single()
 
+    // 4. Get Active Badges
+    const { data: badges } = await supabase
+        .from("badges")
+        .select("*")
+        .eq("organization_id", org.id)
+
+    // 5. Get Active Promotions
+    const now = new Date().toISOString()
+    const { data: promotions } = await supabase
+        .from("promotions")
+        .select("*")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .or(`start_date.is.null,start_date.lte.${now}`)
+        .or(`end_date.is.null,end_date.gte.${now}`)
+
     return {
         products: products || [],
         agent: agent || null,
-        organization: org
+        organization: org,
+        badges: badges || [],
+        promotions: promotions || []
     }
 }
