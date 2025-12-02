@@ -12,6 +12,19 @@ export interface SubscriptionConfig {
     discount_percentage?: number
 }
 
+export interface ConfigOption {
+    name: string
+    type: 'text' | 'select' | 'number' | 'color'
+    required: boolean
+    placeholder?: string
+    max_length?: number
+    choices?: string[]
+    min?: number
+    max?: number
+    default?: any
+    affects_preview?: boolean
+}
+
 export interface ProductData {
     id: string
     organization_id: string
@@ -29,6 +42,7 @@ export interface ProductData {
     is_subscription?: boolean
     is_configurable?: boolean
     subscription_config?: SubscriptionConfig
+    configurable_options?: ConfigOption[]
     created_at: string
 }
 
@@ -47,6 +61,7 @@ export interface CreateProductData {
     is_subscription?: boolean
     is_configurable?: boolean
     subscription_config?: SubscriptionConfig
+    configurable_options?: ConfigOption[]
 }
 
 export async function getProducts() {
@@ -125,7 +140,8 @@ export async function createProduct(productData: CreateProductData) {
             is_active: productData.is_active ?? true,
             is_subscription: productData.is_subscription ?? false,
             is_configurable: productData.is_configurable ?? false,
-            subscription_config: productData.subscription_config ?? null
+            subscription_config: productData.subscription_config ?? null,
+            configurable_options: productData.configurable_options ?? null
         })
         .select()
         .single()

@@ -13,6 +13,10 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     try {
         const product = await getProductById(id)
 
+        if (!product) {
+            notFound()
+        }
+
         return (
             <DashboardLayout>
                 <ProductForm

@@ -3,11 +3,12 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ProductData, CreateProductData, createProduct, updateProduct } from "../actions"
+import { ProductData, CreateProductData, createProduct, updateProduct, ConfigOption } from "../actions"
 import { RichTextEditor } from "./rich-text-editor"
 import { ImageUpload } from "./image-upload"
 import { VariantsEditor } from "./variants-editor"
 import { CategoriesInput } from "./categories-input"
+import { ConfigurableOptionsEditor } from "./configurable-options-editor"
 
 interface ProductFormProps {
     organizationId: string
@@ -40,6 +41,9 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [subscriptionTrialDays, setSubscriptionTrialDays] = useState(initialData?.subscription_config?.trial_days?.toString() || "")
     const [subscriptionDiscount, setSubscriptionDiscount] = useState(initialData?.subscription_config?.discount_percentage?.toString() || "")
 
+    // Configurable product state
+    const [configurableOptions, setConfigurableOptions] = useState<ConfigOption[]>(initialData?.configurable_options || [])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -63,6 +67,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 is_active: isActive,
                 is_subscription: subscriptionEnabled, // Use subscriptionEnabled instead
                 is_configurable: isConfigurable,
+                configurable_options: isConfigurable ? configurableOptions : undefined,
                 subscription_config: subscriptionEnabled ? {
                     enabled: true,
                     price: parseFloat(subscriptionPrice),
@@ -303,6 +308,16 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
                                 </label>
                             </div>
+
+                            {/* Configurable Options Editor */}
+                            {isConfigurable && (
+                                <div className="mt-6 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-border-light dark:border-border-dark">
+                                    <ConfigurableOptionsEditor
+                                        options={configurableOptions}
+                                        onChange={setConfigurableOptions}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
