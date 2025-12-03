@@ -1,3 +1,5 @@
+"use client"
+
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
 

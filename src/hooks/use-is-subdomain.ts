@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react"
 
+/**
+ * Hook para detectar si estamos en un subdominio (client-side)
+ */
 export function useIsSubdomain(): boolean {
     const [isSubdomain, setIsSubdomain] = useState(false)
 
