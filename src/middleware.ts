@@ -78,6 +78,13 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
     }
 
+    // Si estamos en subdominio y alguien accede con /store/[slug]/*, redirigir a la ruta sin prefijo
+    // Ejemplo: qp.landingchat.co/store/qp/producto/123 -> qp.landingchat.co/producto/123
+    if (isProductionSubdomain && pathname.startsWith(`/store/${slug}/`)) {
+        const cleanPath = pathname.replace(`/store/${slug}`, '')
+        return NextResponse.redirect(new URL(cleanPath, request.url))
+    }
+
     // ============================================
     // REESCRIBIR RUTAS PARA LA TIENDA
     // ============================================
