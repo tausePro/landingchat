@@ -27,7 +27,7 @@ export default async function LandingPage() {
                     {maintenanceMode.message || "Estamos realizando mejoras en nuestra plataforma. Volveremos en breve."}
                 </p>
                 <div className="flex gap-4">
-                    <Link href="/auth">
+                    <Link href="/login">
                         <Button variant="outline">Acceso Admin</Button>
                     </Link>
                 </div>
@@ -54,7 +54,7 @@ export default async function LandingPage() {
                                 <Link className="text-sm font-medium leading-normal text-slate-700 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">Precios</Link>
                                 <Link className="text-sm font-medium leading-normal text-slate-700 dark:text-slate-300 hover:text-primary dark:hover:text-primary" href="#">Sobre nosotros</Link>
                             </nav>
-                            <Link href="/auth">
+                            <Link href="/registro">
                                 <Button className="h-10 px-4 text-sm font-bold">
                                     <span className="truncate">Iniciar Sesión / Registrarse</span>
                                 </Button>
@@ -75,7 +75,7 @@ export default async function LandingPage() {
                                         Diseña y lanza tu propia experiencia de comercio conversacional, potenciando tus ventas directamente desde el chat.
                                     </p>
                                     <div className="flex flex-wrap gap-3 mt-4">
-                                        <Link href="/auth">
+                                        <Link href="/registro">
                                             <Button className="h-12 px-5 text-base font-bold">
                                                 <span className="truncate">Crea Tu ChatCommerce Gratis</span>
                                             </Button>

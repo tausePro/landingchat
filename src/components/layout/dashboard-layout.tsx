@@ -141,7 +141,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                             onClick={async () => {
                                 const supabase = createClient()
                                 await supabase.auth.signOut()
-                                window.location.href = "/auth"
+                                window.location.href = "/login"
                             }}
                             className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 transition-colors pl-1"
                         >

@@ -49,7 +49,7 @@ export default async function SettingsPage() {
         )
     } catch (error: any) {
         if (error.message === "Unauthorized") {
-            redirect("/auth")
+            redirect("/login")
         }
 
         return (

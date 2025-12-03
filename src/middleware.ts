@@ -125,7 +125,7 @@ async function handleAuth(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Rutas públicas
-    const publicRoutes = ['/', '/store', '/chat', '/api', '/auth']
+    const publicRoutes = ['/', '/store', '/chat', '/api', '/auth', '/login', '/registro', '/recuperar']
     const isPublicRoute = publicRoutes.some(route =>
         request.nextUrl.pathname === route ||
         request.nextUrl.pathname.startsWith(route + '/')
@@ -134,7 +134,7 @@ async function handleAuth(request: NextRequest) {
     // Redirigir si no hay usuario y es ruta protegida
     if (!user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/onboarding')) {
         const url = request.nextUrl.clone()
-        url.pathname = '/auth'
+        url.pathname = '/login'
         return NextResponse.redirect(url)
     }
 
