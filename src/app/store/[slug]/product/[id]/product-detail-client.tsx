@@ -110,24 +110,20 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         }
     }
 
-    // Filter Badges
+    // Filter visible badges
     const visibleBadges = badges.filter(badge => {
-        if (badge.type === 'manual') return true // Assuming manual assignment logic isn't fully linked yet, or we show all org badges? No, usually linked to product.
-        // For now, let's show all manual badges as "Available" or check if we have a product-badge link table.
-        // We didn't create a product_badges table. 
-        // The requirement said "Management of product badges". 
-        // If there's no link table, maybe they are global or rule based?
-        // "manual" usually implies manual assignment. 
-        // Let's assume for this MVP we show badges if they match a rule or if they are just "there" for the demo?
-        // Wait, the migration `create_badges_table.sql` has `rules`.
-        // If type is manual, maybe we need a `product_badges` table? 
-        // Or maybe we just show them if they are "automatic" and match?
-        // Let's implement automatic rules:
+        // Show manually assigned badge
+        if (badge.type === 'manual' && product.badge_id === badge.id) {
+            return true
+        }
+
+        // Show automatic badges based on rules
         if (badge.type === 'automatic') {
             if (badge.rules?.stock_status === 'low' && product.stock < 5 && product.stock > 0) return true
             if (badge.rules?.stock_status === 'out' && product.stock === 0) return true
             if (badge.rules?.discount_greater_than && activePromotion && activePromotion.value >= badge.rules.discount_greater_than) return true
         }
+
         return false
     })
 
@@ -221,8 +217,8 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 <button
                                     onClick={() => setPurchaseType('one-time')}
                                     className={`p-3 rounded-lg border-2 transition-all ${purchaseType === 'one-time'
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                                         }`}
                                 >
                                     <div className="text-left">
@@ -237,8 +233,8 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 <button
                                     onClick={() => setPurchaseType('subscription')}
                                     className={`p-3 rounded-lg border-2 transition-all relative ${purchaseType === 'subscription'
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                                        ? 'border-primary bg-primary/10'
+                                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
                                         }`}
                                 >
                                     {product.subscription_config.discount_percentage && (
