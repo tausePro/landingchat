@@ -133,6 +133,8 @@ export async function getProductById(id: string) {
     return data as ProductData
 }
 
+import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug"
+
 export async function createProduct(productData: CreateProductData) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -147,11 +149,25 @@ export async function createProduct(productData: CreateProductData) {
 
     if (!profile?.organization_id) throw new Error("No organization found")
 
+    // Generate slug
+    const baseSlug = generateSlug(productData.name)
+
+    // Check for existing slugs in this organization
+    const { data: existingSlugs } = await supabase
+        .from("products")
+        .select("slug")
+        .eq("organization_id", profile.organization_id)
+        .ilike("slug", `${baseSlug}%`)
+
+    const slugs = existingSlugs?.map(p => p.slug) || []
+    const slug = generateUniqueSlug(baseSlug, slugs)
+
     const { data, error } = await supabase
         .from("products")
         .insert({
             organization_id: profile.organization_id,
             name: productData.name,
+            slug: slug,
             description: productData.description,
             price: productData.price,
             image_url: productData.image_url,
@@ -183,6 +199,32 @@ export async function createProduct(productData: CreateProductData) {
 
 export async function updateProduct(id: string, productData: Partial<CreateProductData>) {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    // If name is updated, we might want to update slug, but usually slugs should be stable for SEO.
+    // For now, we'll keep the slug stable unless explicitly requested or if it's missing.
+    // If we wanted to update slug on name change:
+    /*
+    let updateData: any = { ...productData }
+    
+    if (productData.name) {
+        const { data: product } = await supabase.from("products").select("organization_id").eq("id", id).single()
+        if (product) {
+            const baseSlug = generateSlug(productData.name)
+            const { data: existingSlugs } = await supabase
+                .from("products")
+                .select("slug")
+                .eq("organization_id", product.organization_id)
+                .neq("id", id) // Exclude current product
+                .ilike("slug", `${baseSlug}%`)
+            
+            const slugs = existingSlugs?.map(p => p.slug) || []
+            updateData.slug = generateUniqueSlug(baseSlug, slugs)
+        }
+    }
+    */
 
     const { error } = await supabase
         .from("products")

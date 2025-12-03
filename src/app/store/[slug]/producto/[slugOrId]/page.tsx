@@ -4,13 +4,13 @@ import { getProductDetails } from "../../actions"
 import { ProductDetailClient } from "./product-detail-client"
 
 interface ProductDetailPageProps {
-    params: Promise<{ slug: string; id: string }>
+    params: Promise<{ slug: string; slugOrId: string }>
 }
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
-    const { slug, id } = await params
+    const { slug, slugOrId } = await params
 
-    const data = await getProductDetails(slug, id)
+    const data = await getProductDetails(slug, slugOrId)
 
     if (!data) notFound()
 
