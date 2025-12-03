@@ -391,7 +391,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                     <option value="">Sin badge</option>
                                     {badges.map(badge => (
                                         <option key={badge.id} value={badge.id}>
-                                            {badge.text}
+                                            {badge.display_text}
                                         </option>
                                     ))}
                                 </select>
