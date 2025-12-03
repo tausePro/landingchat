@@ -44,6 +44,17 @@ export interface ProductData {
     is_configurable?: boolean
     subscription_config?: SubscriptionConfig
     configurable_options?: ConfigOption[]
+    // Marketing fields
+    badge_id?: string
+    free_shipping_enabled?: boolean
+    free_shipping_min_amount?: number
+    free_shipping_conditions?: string
+    meta_title?: string
+    meta_description?: string
+    keywords?: string[]
+    tags?: string[]
+    is_featured?: boolean
+    max_quantity_per_customer?: number
     created_at: string
 }
 
@@ -64,6 +75,17 @@ export interface CreateProductData {
     is_configurable?: boolean
     subscription_config?: SubscriptionConfig
     configurable_options?: ConfigOption[]
+    // Marketing fields
+    badge_id?: string
+    free_shipping_enabled?: boolean
+    free_shipping_min_amount?: number
+    free_shipping_conditions?: string
+    meta_title?: string
+    meta_description?: string
+    keywords?: string[]
+    tags?: string[]
+    is_featured?: boolean
+    max_quantity_per_customer?: number
 }
 
 export async function getProducts() {
@@ -144,7 +166,8 @@ export async function createProduct(productData: CreateProductData) {
             is_configurable: productData.is_configurable ?? false,
             subscription_config: productData.subscription_config ?? null,
             configurable_options: productData.configurable_options ?? null,
-            sale_price: productData.sale_price ?? null
+            sale_price: productData.sale_price ?? null,
+            badge_id: productData.badge_id ?? null
         })
         .select()
         .single()

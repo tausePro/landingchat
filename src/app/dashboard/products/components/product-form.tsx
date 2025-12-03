@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ProductData, CreateProductData, createProduct, updateProduct, ConfigOption } from "../actions"
+import { getBadges } from "../../badges/actions"
 import { RichTextEditor } from "./rich-text-editor"
 import { ImageUpload } from "./image-upload"
 import { VariantsEditor } from "./variants-editor"
@@ -45,6 +46,19 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     // Configurable product state
     const [configurableOptions, setConfigurableOptions] = useState<ConfigOption[]>(initialData?.configurable_options || [])
 
+    // Marketing state
+    const [badgeId, setBadgeId] = useState(initialData?.badge_id || "")
+    const [badges, setBadges] = useState<any[]>([])
+
+    // Load badges
+    useEffect(() => {
+        async function loadBadges() {
+            const badgesList = await getBadges()
+            setBadges(badgesList)
+        }
+        loadBadges()
+    }, [])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -77,7 +91,8 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     interval_count: parseInt(subscriptionIntervalCount) || 1,
                     trial_days: subscriptionTrialDays ? parseInt(subscriptionTrialDays) : undefined,
                     discount_percentage: subscriptionDiscount ? parseFloat(subscriptionDiscount) : undefined
-                } : undefined
+                } : undefined,
+                badge_id: badgeId || undefined
             }
 
             if (isEditing && initialData?.id) {
@@ -365,6 +380,25 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Organización</h2>
                         <div className="mt-6 flex flex-col gap-6">
+                            <div>
+                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-badge">Badge</label>
+                                <select
+                                    className="form-select mt-2 block w-full rounded-lg bg-background-light dark:bg-background-dark border-transparent focus:border-primary focus:ring-primary text-text-light-primary dark:text-text-dark-primary"
+                                    id="product-badge"
+                                    value={badgeId}
+                                    onChange={e => setBadgeId(e.target.value)}
+                                >
+                                    <option value="">Sin badge</option>
+                                    {badges.map(badge => (
+                                        <option key={badge.id} value={badge.id}>
+                                            {badge.text} ({badge.type})
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                    Badge que se mostrará en el producto
+                                </p>
+                            </div>
                             <div>
                                 <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Categorías</label>
                                 <div className="mt-2">
