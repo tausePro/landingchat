@@ -7,9 +7,11 @@ export const dynamic = 'force-dynamic'
 
 // Helper function for currency formatting (assuming it's needed for the new code)
 const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat('es-CO', {
         style: 'currency',
-        currency: 'EUR',
+        currency: 'COP',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
     }).format(amount);
 };
 
@@ -87,8 +89,8 @@ export default async function ProductsPage() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full ${product.is_active
-                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
                                                     }`}>
                                                     {product.is_active ? 'Activo' : 'Inactivo'}
                                                 </span>

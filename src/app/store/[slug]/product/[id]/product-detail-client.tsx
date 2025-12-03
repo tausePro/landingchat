@@ -43,7 +43,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         // Determine base price based on purchase type
         let price = purchaseType === 'subscription' && product.subscription_config?.enabled
             ? product.subscription_config.price
-            : product.price
+            : (product.sale_price || product.price) // Use sale_price if available
 
         // 1. Add Variant Adjustments
         if (product.variants) {
@@ -136,6 +136,17 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                     <Link href={`/store/${slug}`} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
                         <span className="material-symbols-outlined text-2xl">arrow_back</span>
                     </Link>
+                    {organization.logo_url && (
+                        <div className="absolute left-1/2 -translate-x-1/2">
+                            <Image
+                                src={organization.logo_url}
+                                alt={organization.name}
+                                width={32}
+                                height={32}
+                                className="rounded-full"
+                            />
+                        </div>
+                    )}
                     <div className="flex gap-2">
                         <button className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
                             <span className="material-symbols-outlined text-2xl">share</span>
@@ -201,7 +212,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         <h2 className="text-2xl font-bold md:text-3xl md:mt-2" style={{ color: primaryColor }}>
                             {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(currentPrice)}
                         </h2>
-                        {activePromotion && (
+                        {(activePromotion || product.sale_price) && (
                             <span className="text-lg text-slate-400 line-through">
                                 {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
                             </span>
