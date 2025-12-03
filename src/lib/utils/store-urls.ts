@@ -27,7 +27,10 @@ export function getProductUrl(productSlug: string, isSubdomain: boolean, storeSl
  * Genera URL del chat
  */
 export function getChatUrl(isSubdomain: boolean, storeSlug: string): string {
-    return getStoreLink('/chat', isSubdomain, storeSlug)
+    if (isSubdomain) {
+        return '/chat'
+    }
+    return `/chat/${storeSlug}`
 }
 
 /**
