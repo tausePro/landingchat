@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useIsSubdomain } from "@/hooks/use-is-subdomain"
+import { getStoreLink } from "@/lib/utils/store-urls"
 
 interface ProductDetailClientProps {
     product: any
@@ -15,6 +17,7 @@ interface ProductDetailClientProps {
 
 export function ProductDetailClient({ product, organization, badges, promotions, slug }: ProductDetailClientProps) {
     const router = useRouter()
+    const isSubdomain = useIsSubdomain()
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
     const images = product.images || []
     const mainImage = images[0] || product.image_url || "/placeholder-product.png"
