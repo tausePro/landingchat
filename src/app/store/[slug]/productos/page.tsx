@@ -16,7 +16,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
 
     // Detectar si estamos en subdominio (server-side)
-    const headersList = headers()
+    const headersList = await headers()
     const hostname = headersList.get('host') || ''
     const isSub = isSubdomain(hostname)
 
