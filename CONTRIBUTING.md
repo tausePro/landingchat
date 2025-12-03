@@ -117,6 +117,21 @@ git commit -m "docs: actualizar README con instrucciones de deploy"
 - Archivos de componentes: `kebab-case.tsx` (ej: `customer-list.tsx`)
 - Constantes: `UPPER_SNAKE_CASE` (ej: `MAX_RETRIES`)
 
+## Configuración de Repositorio
+
+### Protección de Ramas (GitHub)
+
+Para mantener la integridad del código, configuramos las siguientes reglas en GitHub (Settings → Branches):
+
+**Rama `main`:**
+- [x] Require a pull request before merging
+- [x] Require status checks to pass before merging
+- [x] Require linear history (opcional)
+
+**Rama `develop`:**
+- [x] Require a pull request before merging
+- [x] Require status checks to pass before merging
+
 ## Preguntas
 
 Si tienes dudas sobre el flujo de trabajo o necesitas ayuda, abre un issue o contacta al equipo.
