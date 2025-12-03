@@ -12,6 +12,7 @@ interface CustomersPageProps {
         search?: string
         category?: string
         channel?: string
+        zone?: string
     }
 }
 
@@ -20,13 +21,15 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
     const search = searchParams.search
     const category = searchParams.category
     const channel = searchParams.channel
+    const zone = searchParams.zone
 
     const { customers, total, totalPages } = await getCustomers({
         page,
         limit: 25,
         search,
         category,
-        channel
+        channel,
+        zone
     })
 
     return (
