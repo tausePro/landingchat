@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { CustomerGateModal } from "@/components/store/customer-gate-modal"
 import { TemplateRenderer } from "@/components/store/templates/template-renderer"
@@ -18,8 +18,10 @@ interface StoreLayoutClientProps {
 
 export function StoreLayoutClient({ slug, organization, products, children, hideNavigation = false, hideHeaderOnMobile = false }: StoreLayoutClientProps) {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [showGateModal, setShowGateModal] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
+    const [pendingContext, setPendingContext] = useState<string | null>(null)
 
     // Branding settings
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
@@ -34,6 +36,34 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
     // Typography
     const fontFamily = typographySettings.fontFamily || "Inter"
+
+    // Detectar action=chat en la URL
+    useEffect(() => {
+        const action = searchParams.get('action')
+        const productId = searchParams.get('product')
+        const context = searchParams.get('context')
+
+        if (action === 'chat') {
+            // Verificar si ya está identificado
+            const customerId = localStorage.getItem(`customer_${slug}`)
+
+            if (customerId) {
+                // Ya identificado, ir directamente al chat
+                let chatUrl = `/chat/${slug}`
+                const params = new URLSearchParams()
+                if (productId) params.set('product', productId)
+                if (context) params.set('context', context)
+                if (params.toString()) chatUrl += `?${params.toString()}`
+
+                router.push(chatUrl)
+            } else {
+                // No identificado, guardar contexto y mostrar modal
+                if (productId) setPendingProductId(productId)
+                if (context) setPendingContext(context)
+                setShowGateModal(true)
+            }
+        }
+    }, [searchParams, slug, router])
 
     const handleStartChat = (productId?: string) => {
         // Verificar si ya está identificado
@@ -63,9 +93,12 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
         // Cerrar modal e ir al chat
         setShowGateModal(false)
 
-        const chatUrl = pendingProductId
-            ? `/chat/${slug}?product=${pendingProductId}`
-            : `/chat/${slug}`
+        // Construir URL del chat con producto y contexto si existen
+        let chatUrl = `/chat/${slug}`
+        const params = new URLSearchParams()
+        if (pendingProductId) params.set('product', pendingProductId)
+        if (pendingContext) params.set('context', pendingContext)
+        if (params.toString()) chatUrl += `?${params.toString()}`
 
         router.push(chatUrl)
     }
