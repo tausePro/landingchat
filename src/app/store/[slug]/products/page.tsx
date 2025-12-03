@@ -34,7 +34,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {products.map((product) => (
                             <div key={product.id} className="group relative bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col">
-                                <Link href={`/store/${slug}/product/${product.id}`} className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-4">
+                                <Link href={`/store/${slug}/producto/${product.slug || product.id}`} className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-4">
                                     {product.image_url ? (
                                         <img
                                             src={product.image_url}
@@ -51,7 +51,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
                                 </Link>
 
                                 <div className="flex-1 flex flex-col">
-                                    <Link href={`/store/${slug}/product/${product.id}`}>
+                                    <Link href={`/store/${slug}/producto/${product.slug || product.id}`}>
                                         <h3 className="font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors line-clamp-1">
                                             {product.name}
                                         </h3>
@@ -65,7 +65,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
                                             {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
                                         </span>
                                         <Link
-                                            href={`/store/${slug}/product/${product.id}`}
+                                            href={`/store/${slug}/producto/${product.slug || product.id}`}
                                             className="p-2 rounded-full hover:bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors"
                                         >
                                             <ArrowRight className="w-5 h-5" />
