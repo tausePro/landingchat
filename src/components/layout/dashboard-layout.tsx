@@ -65,7 +65,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         { icon: "chat", label: "Chats", href: "/dashboard/chats" },
         { icon: "inventory_2", label: "Productos", href: "/dashboard/products" },
         { icon: "receipt_long", label: "Pedidos", href: "/dashboard/orders" },
-        { icon: "group", label: "Usuarios", href: "/dashboard/users" },
+        { icon: "group", label: "Clientes", href: "/dashboard/customers" },
         { icon: "campaign", label: "Marketing", href: "/dashboard/marketing" },
         { icon: "smart_toy", label: "Agentes", href: "/dashboard/agents" },
     ]

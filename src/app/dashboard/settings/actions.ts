@@ -17,6 +17,11 @@ export interface SettingsData {
         contact_email: string | null
         industry: string | null
         logo_url: string | null
+        favicon_url: string | null
+        seo_title: string | null
+        seo_description: string | null
+        seo_keywords: string | null
+        tracking_config: any
         settings: any
     }
 }
@@ -62,6 +67,11 @@ export async function getSettingsData(): Promise<SettingsData> {
             contact_email: organization.contact_email,
             industry: organization.industry,
             logo_url: organization.logo_url,
+            favicon_url: organization.favicon_url,
+            seo_title: organization.seo_title,
+            seo_description: organization.seo_description,
+            seo_keywords: organization.seo_keywords,
+            tracking_config: organization.tracking_config || {},
             settings: organization.settings || {}
         }
     }
@@ -92,6 +102,11 @@ export async function updateOrganization(data: {
     contact_email?: string
     industry?: string
     logo_url?: string
+    favicon_url?: string
+    seo_title?: string
+    seo_description?: string
+    seo_keywords?: string
+    tracking_config?: any
     settings?: any
 }) {
     const supabase = await createClient()
@@ -117,6 +132,11 @@ export async function updateOrganization(data: {
             contact_email: data.contact_email,
             industry: data.industry,
             logo_url: data.logo_url,
+            favicon_url: data.favicon_url,
+            seo_title: data.seo_title,
+            seo_description: data.seo_description,
+            seo_keywords: data.seo_keywords,
+            tracking_config: data.tracking_config,
             settings: data.settings
         })
         .eq("id", profile.organization_id)

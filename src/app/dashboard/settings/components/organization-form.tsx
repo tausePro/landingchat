@@ -19,6 +19,11 @@ interface OrganizationFormProps {
         contact_email: string | null
         industry: string | null
         logo_url: string | null
+        favicon_url: string | null
+        seo_title: string | null
+        seo_description: string | null
+        seo_keywords: string | null
+        tracking_config: any
         settings?: any
     }
 }
@@ -31,6 +36,15 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         contact_email: organization.contact_email || "",
         industry: organization.industry || "",
         logo_url: organization.logo_url || "",
+        favicon_url: organization.favicon_url || "",
+        seo_title: organization.seo_title || "",
+        seo_description: organization.seo_description || "",
+        seo_keywords: organization.seo_keywords || "",
+        tracking_config: organization.tracking_config || {
+            meta_pixel_id: "",
+            google_analytics_id: "",
+            tiktok_pixel_id: ""
+        },
         settings: organization.settings || {
             payments: {
                 wompi: { enabled: false, publicKey: "" },
@@ -110,22 +124,33 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         }))
     }
 
+    const updateTrackingConfig = (key: string, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            tracking_config: {
+                ...prev.tracking_config,
+                [key]: value
+            }
+        }))
+    }
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Configuración de la Organización</CardTitle>
                 <CardDescription>
-                    Gestiona los detalles de tu negocio, métodos de pago y apariencia.
+                    Gestiona los detalles de tu negocio, métodos de pago, apariencia y SEO.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit}>
                     <Tabs defaultValue="general" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-5">
                             <TabsTrigger value="general">General</TabsTrigger>
                             <TabsTrigger value="payments">Pagos</TabsTrigger>
                             <TabsTrigger value="shipping">Envíos</TabsTrigger>
                             <TabsTrigger value="branding">Apariencia</TabsTrigger>
+                            <TabsTrigger value="seo">SEO & Tracking</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="general" className="space-y-4">
@@ -293,6 +318,92 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                                 />
                                             </div>
                                         )}
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <Label>Favicon de la Tienda</Label>
+                                    <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50">
+                                        <LogoUploader
+                                            organizationId={organization.id}
+                                            onUploadComplete={(url) => setFormData(prev => ({ ...prev, favicon_url: url }))}
+                                        />
+                                        {formData.favicon_url && (
+                                            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                <p className="text-xs text-muted-foreground mb-2">Favicon actual:</p>
+                                                <img
+                                                    src={formData.favicon_url}
+                                                    alt="Favicon actual"
+                                                    className="h-8 w-8 object-contain"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="seo" className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="seoTitle">Título SEO</Label>
+                                    <Input
+                                        id="seoTitle"
+                                        value={formData.seo_title}
+                                        onChange={(e) => setFormData({ ...formData, seo_title: e.target.value })}
+                                        placeholder="Ej: Zapatería Juan | Las mejores zapatillas en Bogotá"
+                                    />
+                                    <p className="text-xs text-muted-foreground">El título que aparecerá en Google y en la pestaña del navegador.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="seoDescription">Descripción SEO</Label>
+                                    <Textarea
+                                        id="seoDescription"
+                                        value={formData.seo_description}
+                                        onChange={(e) => setFormData({ ...formData, seo_description: e.target.value })}
+                                        placeholder="Ej: Encuentra zapatillas deportivas, casuales y formales..."
+                                    />
+                                    <p className="text-xs text-muted-foreground">Breve descripción para los resultados de búsqueda.</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="seoKeywords">Palabras Clave (Keywords)</Label>
+                                    <Input
+                                        id="seoKeywords"
+                                        value={formData.seo_keywords}
+                                        onChange={(e) => setFormData({ ...formData, seo_keywords: e.target.value })}
+                                        placeholder="Ej: zapatillas, bogotá, moda, deporte"
+                                    />
+                                </div>
+
+                                <div className="pt-4 border-t">
+                                    <h3 className="text-lg font-semibold mb-4">Tracking & Analítica</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="metaPixel">Meta Pixel ID (Facebook)</Label>
+                                            <Input
+                                                id="metaPixel"
+                                                value={formData.tracking_config.meta_pixel_id}
+                                                onChange={(e) => updateTrackingConfig('meta_pixel_id', e.target.value)}
+                                                placeholder="Ej: 123456789012345"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="ga4">Google Analytics 4 ID</Label>
+                                            <Input
+                                                id="ga4"
+                                                value={formData.tracking_config.google_analytics_id}
+                                                onChange={(e) => updateTrackingConfig('google_analytics_id', e.target.value)}
+                                                placeholder="Ej: G-XXXXXXXXXX"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="tiktokPixel">TikTok Pixel ID</Label>
+                                            <Input
+                                                id="tiktokPixel"
+                                                value={formData.tracking_config.tiktok_pixel_id}
+                                                onChange={(e) => updateTrackingConfig('tiktok_pixel_id', e.target.value)}
+                                                placeholder="Ej: CXXXXXXXXXX"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
