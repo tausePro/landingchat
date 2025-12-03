@@ -4,8 +4,6 @@ import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useIsSubdomain } from "@/hooks/use-is-subdomain"
-import { getStoreLink } from "@/lib/utils/store-urls"
 
 interface ProductDetailClientProps {
     product: any
@@ -17,7 +15,6 @@ interface ProductDetailClientProps {
 
 export function ProductDetailClient({ product, organization, badges, promotions, slug }: ProductDetailClientProps) {
     const router = useRouter()
-    const isSubdomain = useIsSubdomain()
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
     const images = product.images || []
     const mainImage = images[0] || product.image_url || "/placeholder-product.png"
@@ -107,10 +104,13 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         const customerId = localStorage.getItem(`customer_${slug}`)
 
         if (customerId) {
-            router.push(`/chat/${slug}?${params.toString()}`)
+            // User is identified, go directly to chat
+            const chatUrl = `/chat/${slug}?${params.toString()}`
+            router.push(chatUrl)
         } else {
-            const link = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, slug)
-            router.push(link)
+            // User needs to identify first, go to store home with chat action
+            const homeUrl = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, slug)
+            router.push(homeUrl)
         }
     }
 
@@ -137,7 +137,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
             <div className="md:container md:mx-auto md:px-4 md:grid md:grid-cols-2 md:gap-12 lg:gap-16">
                 {/* Custom Sticky Header (Mobile Only) */}
                 <header className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center px-4 py-3 bg-white/10 backdrop-blur-md md:hidden">
-                    <Link href={getStoreLink('/', isSubdomain, slug)} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
+                    <Link href={`/store/${slug}`} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
                         <span className="material-symbols-outlined text-2xl">arrow_back</span>
                     </Link>
                     {organization.logo_url && (
