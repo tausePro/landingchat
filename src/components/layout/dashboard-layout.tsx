@@ -16,6 +16,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const router = useRouter()
 
     const [isChecking, setIsChecking] = React.useState(true)
+    const [userEmail, setUserEmail] = React.useState<string>("")
+    const [userAvatar, setUserAvatar] = React.useState<string>("")
+    const [userName, setUserName] = React.useState<string>("Admin")
 
     React.useEffect(() => {
         const checkOnboarding = async () => {
@@ -23,6 +26,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 const supabase = createClient()
                 const { data: { user } } = await supabase.auth.getUser()
                 if (!user) return
+
+                // Set user data from auth
+                setUserEmail(user.email || "")
+                setUserAvatar(user.user_metadata?.avatar_url || "")
+                setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || "Admin")
 
                 const { data: profile } = await supabase
                     .from("profiles")
@@ -108,19 +116,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
                     <div className="flex flex-col gap-4">
                         <div className="flex gap-3 items-center">
-                            <div
-                                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10"
-                                style={{
-                                    backgroundImage:
-                                        'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCIdasyWEybUov-G42CqjZih8JWmc3SZxRkV-9J8hP8KJGolWzrIMbRojur8GHg7NbVorAoXQxF6f2wBHN9t-wQQKKMZLlVmijUW-sia9Jx_M0Z0nW0CpuLPKySBu2FVwsYYG_h4dZdSUWdBgO3vzeB8avQDF5mGnyEVg6fPdTyEr69p9HKWEkIIKOS281zWcwoGbNWuPh2gctLUP3HineXXUkFuA0pmRzszLUeMymbCeBOfvdWo-5Fr32oixdk8Ld_tz_WVBw9x-E")',
-                                }}
-                            ></div>
+                            {userAvatar ? (
+                                <div
+                                    className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10"
+                                    style={{ backgroundImage: `url("${userAvatar}")` }}
+                                ></div>
+                            ) : (
+                                <div className="bg-primary/20 rounded-full size-10 flex items-center justify-center">
+                                    <span className="text-primary font-bold text-lg">
+                                        {userName.charAt(0).toUpperCase()}
+                                    </span>
+                                </div>
+                            )}
                             <div className="flex flex-col">
                                 <h1 className="text-text-light-primary dark:text-text-dark-primary text-base font-medium leading-normal">
-                                    Admin
+                                    {userName}
                                 </h1>
                                 <p className="text-text-light-secondary dark:text-text-dark-secondary text-sm font-normal leading-normal">
-                                    manager@landingchat.co
+                                    {userEmail}
                                 </p>
                             </div>
                         </div>
