@@ -9,6 +9,7 @@ interface ProductDetailPageProps {
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
     const { slug, slugOrId } = await params
+    console.log('ProductDetailPage Server Debug:', { slug, slugOrId })
 
     const data = await getProductDetails(slug, slugOrId)
 
