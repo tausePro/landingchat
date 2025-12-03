@@ -104,9 +104,13 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         const customerId = localStorage.getItem(`customer_${slug}`)
 
         if (customerId) {
-            router.push(`/chat/${slug}?${params.toString()}`)
+            // User is identified, go directly to chat
+            const chatUrl = `/chat/${slug}?${params.toString()}`
+            router.push(chatUrl)
         } else {
-            router.push(`/store/${slug}?action=chat&${params.toString()}`)
+            // User needs to identify first, go to store home with chat action
+            const homeUrl = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, slug)
+            router.push(homeUrl)
         }
     }
 
