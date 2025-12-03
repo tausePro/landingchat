@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         // Process message with AI agent
         const result = await processMessage({
             message,
-            chatId: currentChatId,
+            chatId: currentChatId!,
             organizationId: organization.id,
             agentId: agentId,
             customerId: customerId,
