@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ProductData, CreateProductData, createProduct, updateProduct, ConfigOption } from "../actions"
