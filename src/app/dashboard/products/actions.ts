@@ -190,7 +190,7 @@ export async function createProduct(productData: CreateProductData) {
 
     if (error) {
         console.error("Error creating product:", error)
-        throw new Error(`Failed to create product: ${error.message}`)
+        return { success: false, error: error.message }
     }
 
     revalidatePath("/dashboard/products")

@@ -95,14 +95,20 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 badge_id: badgeId || undefined
             }
 
+            let result
             if (isEditing && initialData?.id) {
-                await updateProduct(initialData.id, productData)
+                result = await updateProduct(initialData.id, productData)
             } else {
-                await createProduct(productData)
+                result = await createProduct(productData)
+            }
+
+            if (result && !result.success) {
+                throw new Error(result.error || "Error desconocido")
             }
 
             router.push("/dashboard/products")
         } catch (error: any) {
+            console.error("Form submit error:", error)
             alert(`Error: ${error.message}`)
         } finally {
             setLoading(false)
