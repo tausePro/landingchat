@@ -18,6 +18,9 @@ interface ProductDetailClientProps {
 export function ProductDetailClient({ product, organization, badges, promotions, slug }: ProductDetailClientProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
+
+    console.log('ProductDetailClient Debug:', { slug, isSubdomain, hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR' })
+
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
     const images = product.images || []
     const mainImage = images[0] || product.image_url || "/placeholder-product.png"
