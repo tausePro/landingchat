@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { z } from "zod"
+
+const identifySchema = z.object({
+    name: z.string().min(1, "El nombre es requerido").max(100, "Nombre muy largo"),
+    phone: z.string().min(1, "El WhatsApp es requerido").max(20, "Teléfono muy largo")
+})
 
 export async function POST(
     request: NextRequest,
@@ -9,15 +15,17 @@ export async function POST(
 
     try {
         const body = await request.json()
-        const { name, phone } = body
 
-        if (!name?.trim()) {
-            return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 })
+        // Validate request body with Zod
+        const validation = identifySchema.safeParse(body)
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: validation.error.issues[0].message },
+                { status: 400 }
+            )
         }
 
-        if (!phone?.trim()) {
-            return NextResponse.json({ error: "El WhatsApp es requerido" }, { status: 400 })
-        }
+        const { name, phone } = validation.data
 
         const cleanPhone = phone.replace(/[^\d+]/g, "")
 

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { z } from "zod"
+
+const chatInitSchema = z.object({
+    customerId: z.string().uuid("Customer ID inválido")
+})
 
 export async function POST(
     request: NextRequest,
@@ -9,11 +14,17 @@ export async function POST(
 
     try {
         const body = await request.json()
-        const { customerId } = body
 
-        if (!customerId) {
-            return NextResponse.json({ error: "Customer ID requerido" }, { status: 400 })
+        // Validate request body with Zod
+        const validation = chatInitSchema.safeParse(body)
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: validation.error.issues[0].message },
+                { status: 400 }
+            )
         }
+
+        const { customerId } = validation.data
 
         // Use service role key to bypass RLS
         const supabase = createClient(

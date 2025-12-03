@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from "next/server"
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createClient } from "@/lib/supabase/server"
+import { z } from "zod"
+
+const aiChatSchema = z.object({
+    message: z.string().min(1, "Message is required").max(2000, "Message too long"),
+    chatId: z.string().uuid().optional(),
+    slug: z.string().min(1, "Slug is required"),
+    currentProductId: z.string().uuid().optional()
+})
 
 export async function POST(request: NextRequest) {
     console.log("API /api/ai-chat called")
     try {
         const body = await request.json()
-        const { message, chatId, slug, currentProductId } = body
 
-        if (!message || !slug) {
+        // Validate request body with Zod
+        const validation = aiChatSchema.safeParse(body)
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "Missing required fields: message, slug" },
+                { error: validation.error.issues[0].message },
                 { status: 400 }
             )
         }
+
+        const { message, chatId, slug, currentProductId } = validation.data
 
         const supabase = await createClient()
 
