@@ -20,6 +20,12 @@ export async function middleware(request: NextRequest) {
         return handleAuth(request)
     }
 
+    // Redirección de migración /products -> /productos (excluyendo dashboard ya filtrado arriba)
+    if (pathname.endsWith('/products')) {
+        const newPath = pathname.replace('/products', '/productos')
+        return NextResponse.redirect(new URL(newPath, request.url))
+    }
+
     // ============================================
     // DETECTAR SLUG DE LA TIENDA
     // ============================================

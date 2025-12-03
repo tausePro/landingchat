@@ -1,4 +1,5 @@
-"use client"
+import { useIsSubdomain } from "@/hooks/use-is-subdomain"
+import { getStoreLink } from "@/lib/utils/store-urls"
 
 import { useState, useEffect, use, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -22,8 +23,9 @@ interface Message {
     timestamp: Date
 }
 
-export default function ChatPage({ params }: { params: Promise<{ slug: string }> }) {
-    const { slug } = use(params)
+export default function ChatPage({ params }: { params: { slug: string } }) {
+    const { slug } = params
+    const isSubdomain = useIsSubdomain()
     const router = useRouter()
 
     const [customerId, setCustomerId] = useState<string | null>(null)
@@ -453,7 +455,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     {/* Quick Action Buttons */}
                     <div className="mb-3 flex flex-wrap items-center gap-2 overflow-x-auto no-scrollbar pb-1">
                         <button
-                            onClick={() => router.push(`/store/${slug}/products`)}
+                            onClick={() => {
+                                const link = getStoreLink('/productos', isSubdomain, slug)
+                                router.push(link)
+                            }}
                             className="flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-50 transition-colors"
                         >
                             Ver más productos

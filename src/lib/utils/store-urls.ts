@@ -29,3 +29,11 @@ export function isSubdomain(hostname: string): boolean {
 
     return false
 }
+
+export function getProductUrl(productSlug: string, isSubdomain: boolean, storeSlug: string): string {
+    return getStoreLink(`/producto/${productSlug}`, isSubdomain, storeSlug)
+}
+
+export function getChatUrl(isSubdomain: boolean, storeSlug: string): string {
+    return getStoreLink('/chat', isSubdomain, storeSlug)
+}
