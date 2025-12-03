@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { CustomerGateModal } from "@/components/store/customer-gate-modal"
 import { TemplateRenderer } from "@/components/store/templates/template-renderer"
 import { StoreHeader } from "@/components/store/store-header"
+import { useIsSubdomain } from "@/hooks/use-is-subdomain"
+import { getChatUrl } from "@/lib/utils/store-urls"
 
 interface StoreLayoutClientProps {
     slug: string
@@ -19,6 +21,7 @@ interface StoreLayoutClientProps {
 export function StoreLayoutClient({ slug, organization, products, children, hideNavigation = false, hideHeaderOnMobile = false }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const isSubdomain = useIsSubdomain()
     const [showGateModal, setShowGateModal] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
@@ -49,7 +52,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
             if (customerId) {
                 // Ya identificado, ir directamente al chat
-                let chatUrl = `/chat/${slug}`
+                let chatUrl = getChatUrl(isSubdomain, slug)
                 const params = new URLSearchParams()
                 if (productId) params.set('product', productId)
                 if (context) params.set('context', context)
@@ -63,7 +66,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 setShowGateModal(true)
             }
         }
-    }, [searchParams, slug, router])
+    }, [searchParams, slug, router, isSubdomain])
 
     const handleStartChat = (productId?: string) => {
         // Verificar si ya está identificado
@@ -71,9 +74,8 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
         if (customerId) {
             // Ya identificado, ir al chat
-            const chatUrl = productId
-                ? `/chat/${slug}?product=${productId}`
-                : `/chat/${slug}`
+            let chatUrl = getChatUrl(isSubdomain, slug)
+            if (productId) chatUrl += `?product=${productId}`
             router.push(chatUrl)
         } else {
             // Guardar producto pendiente si existe
@@ -94,7 +96,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
         setShowGateModal(false)
 
         // Construir URL del chat con producto y contexto si existen
-        let chatUrl = `/chat/${slug}`
+        let chatUrl = getChatUrl(isSubdomain, slug)
         const params = new URLSearchParams()
         if (pendingProductId) params.set('product', pendingProductId)
         if (pendingContext) params.set('context', pendingContext)
