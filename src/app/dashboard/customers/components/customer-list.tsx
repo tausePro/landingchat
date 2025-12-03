@@ -83,7 +83,7 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                                 <td className="p-4 align-middle">
                                     <div className="flex flex-col gap-1">
                                         {customer.phone && (
-                                            <div className="flex items-center gap-1 text-xs cursor-pointer hover:underline" onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, '')}`, '_blank')}>
+                                            <div className="flex items-center gap-1 text-xs cursor-pointer hover:underline" onClick={() => window.open(`https://wa.me/${customer.phone?.replace(/\D/g, '') || ''}`, '_blank')}>
                                                 <span className="material-symbols-outlined text-[14px] text-green-600">call</span>
                                                 {customer.phone}
                                             </div>
