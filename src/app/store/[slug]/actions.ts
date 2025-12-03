@@ -40,7 +40,7 @@ export async function getStoreData(slug: string, limit: number = 6) {
     }
 }
 
-export async function getProductDetails(slug: string, productId: string) {
+export async function getProductDetails(slug: string, slugOrId: string) {
     const supabase = await createClient()
 
     // 1. Fetch Organization
@@ -52,13 +52,23 @@ export async function getProductDetails(slug: string, productId: string) {
 
     if (orgError || !org) return null
 
-    // 2. Fetch Product
-    const { data: product, error: productError } = await supabase
+    // 2. Fetch Product - support both UUID and slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId)
+
+    let productQuery = supabase
         .from("products")
         .select("*")
-        .eq("id", productId)
         .eq("organization_id", org.id)
-        .single()
+
+    if (isUUID) {
+        // Legacy support: lookup by UUID
+        productQuery = productQuery.eq("id", slugOrId)
+    } else {
+        // New: lookup by slug
+        productQuery = productQuery.eq("slug", slugOrId)
+    }
+
+    const { data: product, error: productError } = await productQuery.single()
 
     if (productError || !product) return null
 
