@@ -65,6 +65,13 @@ export async function middleware(request: NextRequest) {
         return handleAuth(request)
     }
 
+    // Si estamos en subdominio y la ruta es /dashboard, redirigir al dominio principal
+    // Evitar redirigir en localhost si estamos probando con ?store=...
+    const isProductionSubdomain = !hostname.includes('localhost') && !hostname.includes('127.0.0.1') && slug
+    if (isProductionSubdomain && pathname.startsWith('/dashboard')) {
+        return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
+    }
+
     // ============================================
     // REESCRIBIR RUTAS PARA LA TIENDA
     // ============================================

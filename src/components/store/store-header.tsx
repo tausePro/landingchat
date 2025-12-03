@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { useIsSubdomain } from "@/hooks/use-is-subdomain"
+import { getStoreLink } from "@/lib/utils/store-urls"
 
 interface StoreHeaderProps {
     slug: string
@@ -25,11 +27,15 @@ export function StoreHeader({
     hideChatButton = false
 }: StoreHeaderProps) {
     const router = useRouter()
+    const isSubdomain = useIsSubdomain()
+
+    const homeLink = getStoreLink('/', isSubdomain, slug)
+    const productsLink = getStoreLink('/productos', isSubdomain, slug)
 
     return (
         <header className={`sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md ${hideOnMobile ? 'hidden md:block' : ''} ${className}`}>
             <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/store/${slug}`)}>
+                <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(homeLink)}>
                     {organization.logo_url ? (
                         <img
                             src={organization.logo_url}
@@ -46,8 +52,8 @@ export function StoreHeader({
                     )}
                 </div>
                 <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-                    <a href={`/store/${slug}`} className="hover:text-primary transition-colors">Inicio</a>
-                    <a href={`/store/${slug}/products`} className="hover:text-primary transition-colors">Productos</a>
+                    <a href={homeLink} className="hover:text-primary transition-colors">Inicio</a>
+                    <a href={productsLink} className="hover:text-primary transition-colors">Productos</a>
                 </nav>
                 <div className="flex items-center gap-4">
                     {!hideChatButton && (
