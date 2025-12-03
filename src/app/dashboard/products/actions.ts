@@ -233,7 +233,7 @@ export async function updateProduct(id: string, productData: Partial<CreateProdu
 
     if (error) {
         console.error("Error updating product:", error)
-        throw new Error(`Failed to update product: ${error.message}`)
+        return { success: false, error: error.message }
     }
 
     revalidatePath("/dashboard/products")
@@ -251,7 +251,7 @@ export async function deleteProduct(id: string) {
 
     if (error) {
         console.error("Error deleting product:", error)
-        throw new Error(`Failed to delete product: ${error.message}`)
+        return { success: false, error: error.message }
     }
 
     revalidatePath("/dashboard/products")
