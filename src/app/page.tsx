@@ -205,7 +205,7 @@ export default async function LandingPage() {
                             </div>
                         </div>
                         <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
-                            <p>© 2024 LandingChat. Todos los derechos reservados.</p>
+                            <p>© {new Date().getFullYear()} LandingChat. Todos los derechos reservados.</p>
                         </div>
                     </div>
                 </footer>

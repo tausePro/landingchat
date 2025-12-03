@@ -115,7 +115,7 @@ export function MinimalTemplate({
                             </a>
                         )}
                     </div>
-                    <p className="text-gray-400">© 2024 {organization.name}. Todos los derechos reservados.</p>
+                    <p className="text-gray-400">© {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.</p>
                 </div>
             </footer>
         </>

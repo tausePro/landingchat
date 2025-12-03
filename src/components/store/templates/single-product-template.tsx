@@ -183,7 +183,7 @@ export function SingleProductTemplate({
                     <div className="flex items-center justify-center gap-2 mb-4">
                         <span className="text-xl font-bold">{organization.name}</span>
                     </div>
-                    <p className="text-gray-400 text-sm">© 2024 {organization.name}. Todos los derechos reservados.</p>
+                    <p className="text-gray-400 text-sm">© {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.</p>
                 </div>
             </footer>
         </>

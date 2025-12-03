@@ -208,7 +208,7 @@ export function ServicesTemplate({
                             <a href="#" className="hover:text-slate-900">Nosotros</a>
                             <a href="#" className="hover:text-slate-900">Contacto</a>
                         </div>
-                        <p className="text-slate-500 text-sm">© 2024 {organization.name}</p>
+                        <p className="text-slate-500 text-sm">© {new Date().getFullYear()} {organization.name}</p>
                     </div>
                 </div>
             </footer>

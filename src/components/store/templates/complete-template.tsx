@@ -401,7 +401,7 @@ export function CompleteTemplate({
                         </div>
                     </div>
                     <div className="border-t border-gray-100 pt-8 text-center text-gray-400 text-sm">
-                        <p>© 2024 {organization.name}. Powered by LandingChat.</p>
+                        <p>© {new Date().getFullYear()} {organization.name}. Powered by LandingChat.</p>
                     </div>
                 </div>
             </footer>
