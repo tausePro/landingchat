@@ -25,7 +25,14 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     const { organization, product, badges, promotions } = data
 
     return (
-        <StoreLayoutClient slug={organization.slug} organization={organization} products={[]} hideNavigation={false} hideHeaderOnMobile={true}>
+        <StoreLayoutClient
+            slug={organization.slug}
+            organization={organization}
+            products={[]}
+            hideNavigation={false}
+            hideHeaderOnMobile={true}
+            initialIsSubdomain={initialIsSubdomain}
+        >
             <ProductDetailClient
                 product={product}
                 organization={organization}

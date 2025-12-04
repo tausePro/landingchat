@@ -16,12 +16,14 @@ interface StoreLayoutClientProps {
     children?: React.ReactNode
     hideNavigation?: boolean
     hideHeaderOnMobile?: boolean
+    initialIsSubdomain?: boolean
 }
 
-export function StoreLayoutClient({ slug, organization, products, children, hideNavigation = false, hideHeaderOnMobile = false }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const isSubdomain = useIsSubdomain()
+    const clientIsSubdomain = useIsSubdomain()
+    const isSubdomain = initialIsSubdomain || clientIsSubdomain
     const [showGateModal, setShowGateModal] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)

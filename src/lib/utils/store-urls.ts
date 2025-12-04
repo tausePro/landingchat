@@ -12,6 +12,9 @@ export function getStoreBasePath(isSubdomain: boolean, slug: string): string {
  * Genera un link completo para el storefront
  */
 export function getStoreLink(path: string, isSubdomain: boolean, slug: string): string {
+    if (!slug || slug === 'undefined') {
+        console.error('getStoreLink called with invalid slug:', { path, isSubdomain, slug })
+    }
     const base = getStoreBasePath(isSubdomain, slug)
     const normalizedPath = path.startsWith('/') ? path : `/${path}`
     return `${base}${normalizedPath}`
