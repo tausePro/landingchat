@@ -20,6 +20,11 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const isSubdomain = useIsSubdomain()
 
     console.log('ProductDetailClient Debug:', { slug, isSubdomain, hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR' })
+    console.log('ProductDetailClient received slug:', slug)
+
+    if (!slug) {
+        console.error('ERROR: slug is undefined in ProductDetailClient!')
+    }
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
     const images = product.images || []
@@ -93,6 +98,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     }
 
     const handleChat = (productId?: string) => {
+        console.log('DEBUG handleChat:', { slug, isSubdomain, productId })
         // Build context string
         const contextParts: string[] = []
         Object.entries(selectedVariants).forEach(([type, value]) => {

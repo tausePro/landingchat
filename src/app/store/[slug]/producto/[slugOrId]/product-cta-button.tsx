@@ -15,6 +15,8 @@ export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mob
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
 
+    console.log('ProductCTAButton received slug:', slug)
+
     const handleClick = () => {
         // Check if customer is already identified
         const customerId = localStorage.getItem(`customer_${slug}`)
