@@ -4,22 +4,6 @@ import { useState } from "react"
 import { type Plan } from "@/types"
 import { togglePlanStatus, deletePlan } from "../actions"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Pencil, Power, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface PlanListProps {
@@ -65,99 +49,129 @@ export function PlanList({ plans, onEdit }: PlanListProps) {
     }
 
     return (
-        <div className="rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Precio</TableHead>
-                        <TableHead>Límites</TableHead>
-                        <TableHead>Features</TableHead>
-                        <TableHead>Estado</TableHead>
-                        <TableHead className="w-[70px]"></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+            <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-slate-800/50">
+                    <tr>
+                        <th className="px-6 py-4 text-left text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            <button className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white">
+                                Nombre del Plan
+                                <span className="material-symbols-outlined text-base">swap_vert</span>
+                            </button>
+                        </th>
+                        <th className="px-6 py-4 text-left text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            <button className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white">
+                                Precio
+                                <span className="material-symbols-outlined text-base">swap_vert</span>
+                            </button>
+                        </th>
+                        <th className="px-6 py-4 text-left text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            Límites
+                        </th>
+                        <th className="px-6 py-4 text-left text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            Características
+                        </th>
+                        <th className="px-6 py-4 text-left text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            <button className="flex items-center gap-2 hover:text-slate-900 dark:hover:text-white">
+                                Estado
+                                <span className="material-symbols-outlined text-base">swap_vert</span>
+                            </button>
+                        </th>
+                        <th className="px-6 py-4 text-left text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                            Acciones
+                        </th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {plans.map((plan) => (
-                        <TableRow key={plan.id}>
-                            <TableCell>
-                                <div>
-                                    <p className="font-medium">{plan.name}</p>
-                                    <p className="text-sm text-muted-foreground">{plan.slug}</p>
+                        <tr key={plan.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-slate-900 dark:text-white text-sm font-semibold">{plan.name}</div>
+                                <div className="text-slate-500 dark:text-slate-400 text-xs">{plan.slug}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex flex-col">
+                                    <div className="text-slate-900 dark:text-white text-sm font-medium">
+                                        {formatPrice(plan.price, plan.currency)}/{plan.billing_period === 'monthly' ? 'mes' : 'año'}
+                                    </div>
                                 </div>
-                            </TableCell>
-                            <TableCell>
-                                <div>
-                                    <p className="font-medium">{formatPrice(plan.price, plan.currency)}</p>
-                                    <p className="text-sm text-muted-foreground">/{plan.billing_period === 'monthly' ? 'mes' : 'año'}</p>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <div className="text-sm space-y-1">
-                                    <p>{plan.max_products} productos</p>
-                                    <p>{plan.max_agents} agentes</p>
-                                    <p>{plan.max_monthly_conversations.toLocaleString()} conv/mes</p>
-                                </div>
-                            </TableCell>
-                            <TableCell>
-                                <div className="flex flex-wrap gap-1">
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-slate-500 dark:text-slate-400 text-sm">{plan.max_products} Productos</div>
+                                <div className="text-slate-500 dark:text-slate-400 text-sm">{plan.max_agents} Agentes</div>
+                                <div className="text-slate-500 dark:text-slate-400 text-sm">{plan.max_monthly_conversations.toLocaleString()} Conv/mes</div>
+                            </td>
+                            <td className="px-6 py-4">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     {Object.entries(plan.features).map(([key, value]) => (
-                                        <Badge
+                                        <span
                                             key={key}
-                                            variant={value ? "default" : "secondary"}
-                                            className="text-xs"
+                                            className="material-symbols-outlined text-xl"
+                                            style={{ fontVariationSettings: value ? "'FILL' 1" : "'FILL' 0" }}
+                                            title={key}
                                         >
-                                            {key}
-                                        </Badge>
+                                            {value ? "check_circle" : "cancel"}
+                                        </span>
                                     ))}
+                                    {Object.keys(plan.features).length === 0 && (
+                                        <span className="text-slate-400 text-sm">Sin features</span>
+                                    )}
                                 </div>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={plan.is_active ? "default" : "secondary"}>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    plan.is_active
+                                        ? "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300"
+                                        : "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300"
+                                }`}>
                                     {plan.is_active ? "Activo" : "Inactivo"}
-                                </Badge>
-                            </TableCell>
-                            <TableCell>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            disabled={loading === plan.id}
-                                        >
-                                            <MoreHorizontal className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => onEdit(plan)}>
-                                            <Pencil className="mr-2 h-4 w-4" />
-                                            Editar
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => handleToggleStatus(plan.id)}>
-                                            <Power className="mr-2 h-4 w-4" />
-                                            {plan.is_active ? "Desactivar" : "Activar"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={() => handleDelete(plan.id, plan.name)}
-                                            className="text-destructive"
-                                        >
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Eliminar
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                        </TableRow>
+                                </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => onEdit(plan)}
+                                        className="text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                        title="Editar Plan"
+                                        disabled={loading === plan.id}
+                                    >
+                                        <span className="material-symbols-outlined">edit</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleToggleStatus(plan.id)}
+                                        className={`transition-colors ${
+                                            plan.is_active
+                                                ? "text-green-600 hover:text-red-600 dark:text-green-400 dark:hover:text-red-400"
+                                                : "text-slate-400 hover:text-green-600 dark:hover:text-green-400"
+                                        }`}
+                                        title={plan.is_active ? "Desactivar Plan" : "Activar Plan"}
+                                        disabled={loading === plan.id}
+                                    >
+                                        <span className="material-symbols-outlined">
+                                            {plan.is_active ? "toggle_on" : "toggle_off"}
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(plan.id, plan.name)}
+                                        className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                        title="Eliminar Plan"
+                                        disabled={loading === plan.id}
+                                    >
+                                        <span className="material-symbols-outlined">delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
                     ))}
                     {plans.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <tr>
+                            <td colSpan={6} className="px-6 py-12 text-center text-slate-500 dark:text-slate-400">
                                 No hay planes configurados
-                            </TableCell>
-                        </TableRow>
+                            </td>
+                        </tr>
                     )}
-                </TableBody>
-            </Table>
+                </tbody>
+            </table>
         </div>
     )
 }

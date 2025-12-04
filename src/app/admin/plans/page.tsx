@@ -6,7 +6,6 @@ import { getPlans } from "./actions"
 import { PlanList } from "./components/plan-list"
 import { PlanForm } from "./components/plan-form"
 import { Button } from "@/components/ui/button"
-import { Plus, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
 export default function PlansPage() {
@@ -39,7 +38,7 @@ export default function PlansPage() {
     const handleCloseForm = () => {
         setFormOpen(false)
         setEditingPlan(null)
-        loadPlans() // Recargar lista después de cerrar
+        loadPlans()
     }
 
     const handleNewPlan = () => {
@@ -48,33 +47,41 @@ export default function PlansPage() {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Planes de Suscripción</h2>
-                    <p className="text-muted-foreground">
-                        Gestiona los planes disponibles para las organizaciones.
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex flex-wrap justify-between items-center gap-4">
+                <div className="flex flex-col gap-2">
+                    <h1 className="text-slate-900 dark:text-white text-3xl md:text-4xl font-black leading-tight tracking-tight">
+                        Gestión de Planes de Suscripción
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">
+                        Crea, edita y gestiona los planes de suscripción globales.
                     </p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="icon" onClick={loadPlans} disabled={loading}>
-                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    </Button>
-                    <Button onClick={handleNewPlan}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Nuevo Plan
-                    </Button>
-                </div>
+                <Button
+                    onClick={handleNewPlan}
+                    className="flex items-center justify-center gap-2 min-w-[84px] cursor-pointer rounded-lg h-10 px-4 bg-blue-600 text-white text-sm font-bold leading-normal tracking-wide shadow-sm hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                >
+                    <span className="material-symbols-outlined text-xl">add</span>
+                    <span className="truncate">Crear Nuevo Plan</span>
+                </Button>
             </div>
 
-            {loading ? (
-                <div className="flex items-center justify-center py-12">
-                    <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            ) : (
-                <PlanList plans={plans} onEdit={handleEdit} />
-            )}
+            {/* Content */}
+            <div className="py-3">
+                {loading ? (
+                    <div className="flex items-center justify-center py-12">
+                        <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400">
+                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                            <span>Cargando planes...</span>
+                        </div>
+                    </div>
+                ) : (
+                    <PlanList plans={plans} onEdit={handleEdit} />
+                )}
+            </div>
 
+            {/* Form Modal */}
             <PlanForm
                 plan={editingPlan}
                 open={formOpen}

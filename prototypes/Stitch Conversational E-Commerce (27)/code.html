@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Superadmin: Gestión Planes (Rediseñado) - LandingChat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#2b7cee",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex min-h-screen w-full flex-col group/design-root">
+<div class="flex flex-1">
+<aside class="flex flex-col w-64 bg-white dark:bg-background-dark dark:border-r dark:border-gray-800 p-4 shrink-0">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCBml3hyZckSK6hm7Av67NeAgrywfgsBcupQzVMvZ7g2knuPGnvXnvWcau7YEIN86QUxPL3pGa6gQ9ZXbK8K6z6Pf5tigpNXE2EoDqLmQqhDs4ZX77TldC_eKzXoABxg71i5F4qdrhdxqeYvx4NS4PqrAbpECrbPJZ6eT9LMOgWWKkKGVeFv3sMuaqq7irnAXapJb9dKr0S9obBGFaRmlKP4A0u4n8D6kpGKrI91rdssmE7MBVGfhMQjXOFJ9tWfYDCnLh12lijprA");'></div>
+<div class="flex flex-col">
+<h1 class="text-[#111418] dark:text-white text-base font-medium leading-normal">Super Admin</h1>
+<p class="text-[#617289] dark:text-gray-400 text-sm font-normal leading-normal">admin@landingchat.com</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<p class="text-sm font-medium leading-normal">Analytics</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined">group</span>
+<p class="text-sm font-medium leading-normal">Clients</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 text-primary" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">credit_card</span>
+<p class="text-sm font-medium leading-normal">Plan Management</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-sm font-medium leading-normal">Settings</p>
+</a>
+</nav>
+</div>
+<div class="mt-auto flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined">support_agent</span>
+<p class="text-sm font-medium leading-normal">Support</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" href="#">
+<span class="material-symbols-outlined">logout</span>
+<p class="text-sm font-medium leading-normal">Log Out</p>
+</a>
+</div>
+</aside>
+<main class="flex-1 p-8">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-wrap justify-between items-center gap-4 mb-8">
+<div class="flex flex-col gap-2">
+<h1 class="text-[#111418] dark:text-white text-3xl md:text-4xl font-black leading-tight tracking-[-0.033em]">Gestión de Planes de Suscripción</h1>
+<p class="text-[#617289] dark:text-gray-400 text-base font-normal leading-normal">Crea, edita y gestiona los planes de suscripción globales.</p>
+</div>
+<button class="flex items-center justify-center gap-2 min-w-[84px] cursor-pointer rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] shadow-sm hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+<span class="material-symbols-outlined">add</span>
+<span class="truncate">Crear Nuevo Plan</span>
+</button>
+</div>
+<div class="px-0 py-3 @container">
+<div class="overflow-hidden rounded-xl border border-[#dbe0e6] dark:border-gray-700 bg-white dark:bg-background-dark">
+<table class="w-full">
+<thead class="bg-gray-50 dark:bg-gray-800/50">
+<tr>
+<th class="px-6 py-4 text-left text-[#617289] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
+<button class="flex items-center gap-2 hover:text-gray-900 dark:hover:text-white">
+                                        Nombre del Plan
+                                        <span class="material-symbols-outlined text-base">swap_vert</span>
+</button>
+</th>
+<th class="px-6 py-4 text-left text-[#617289] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
+<button class="flex items-center gap-2 hover:text-gray-900 dark:hover:text-white">
+                                        Precio
+                                        <span class="material-symbols-outlined text-base">swap_vert</span>
+</button>
+</th>
+<th class="px-6 py-4 text-left text-[#617289] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                                    Límites
+                                </th>
+<th class="px-6 py-4 text-left text-[#617289] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
+                                    Características Destacadas
+                                </th>
+<th class="px-6 py-4 text-left text-[#617289] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">
+<button class="flex items-center gap-2 hover:text-gray-900 dark:hover:text-white">
+                                        Estado
+                                        <span class="material-symbols-outlined text-base">swap_vert</span>
+</button>
+</th>
+<th class="px-6 py-4 text-left text-[#617289] dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#dbe0e6] dark:divide-gray-700">
+<tr>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-[#111418] dark:text-white text-sm font-semibold">Plan Básico</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex flex-col">
+<div class="text-[#111418] dark:text-white text-sm font-medium">$49/mes</div>
+<div class="text-[#617289] dark:text-gray-400 text-xs">$499/año</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-[#617289] dark:text-gray-400 text-sm">5 Agentes</div>
+<div class="text-[#617289] dark:text-gray-400 text-sm">10k Conversaciones</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="material-symbols-outlined text-gray-400 text-xl">cancel</span>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Activo</span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+<div class="flex items-center gap-4">
+<button class="text-[#617289] dark:text-gray-400 hover:text-primary dark:hover:text-primary" title="Editar Plan"><span class="material-symbols-outlined">edit</span></button>
+<button class="text-[#617289] dark:text-gray-400 hover:text-primary dark:hover:text-primary" title="Duplicar Plan"><span class="material-symbols-outlined">content_copy</span></button>
+<button class="text-[#617289] dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500" title="Activar/Desactivar Plan"><span class="material-symbols-outlined">toggle_on</span></button>
+</div>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-[#111418] dark:text-white text-sm font-semibold">Plan Profesional</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex flex-col">
+<div class="text-[#111418] dark:text-white text-sm font-medium">$99/mes</div>
+<div class="text-[#617289] dark:text-gray-400 text-xs">$999/año</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-[#617289] dark:text-gray-400 text-sm">15 Agentes</div>
+<div class="text-[#617289] dark:text-gray-400 text-sm">50k Conversaciones</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300">Activo</span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+<div class="flex items-center gap-4">
+<button class="text-[#617289] dark:text-gray-400 hover:text-primary dark:hover:text-primary" title="Editar Plan"><span class="material-symbols-outlined">edit</span></button>
+<button class="text-[#617289] dark:text-gray-400 hover:text-primary dark:hover:text-primary" title="Duplicar Plan"><span class="material-symbols-outlined">content_copy</span></button>
+<button class="text-[#617289] dark:text-gray-400 hover:text-green-600 dark:hover:text-green-500" title="Activar/Desactivar Plan"><span class="material-symbols-outlined">toggle_on</span></button>
+</div>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-[#111418] dark:text-white text-sm font-semibold">Plan Enterprise</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="flex flex-col">
+<div class="text-[#111418] dark:text-white text-sm font-medium">$249/mes</div>
+<div class="text-[#617289] dark:text-gray-400 text-xs">$2499/año</div>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<div class="text-[#617289] dark:text-gray-400 text-sm">Agentes ilimitados</div>
+<div class="text-[#617289] dark:text-gray-400 text-sm">Conversaciones ilimitadas</div>
+</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="material-symbols-outlined text-green-600 text-xl" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</td>
+<td class="px-6 py-4 whitespace-nowrap">
+<span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">Inactivo</span>
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+<div class="flex items-center gap-4">
+<button class="text-[#617289] dark:text-gray-400 hover:text-primary dark:hover:text-primary" title="Editar Plan"><span class="material-symbols-outlined">edit</span></button>
+<button class="text-[#617289] dark:text-gray-400 hover:text-primary dark:hover:text-primary" title="Duplicar Plan"><span class="material-symbols-outlined">content_copy</span></button>
+<button class="text-[#617289] dark:text-gray-400 hover:text-red-600 dark:hover:text-red-500" title="Activar/Desactivar Plan"><span class="material-symbols-outlined">toggle_off</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>
