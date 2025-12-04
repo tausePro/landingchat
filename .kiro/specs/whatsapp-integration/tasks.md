@@ -1,20 +1,20 @@
 # Plan de Implementación - Integración WhatsApp con Evolution API
 
-- [ ] 1. Configurar infraestructura de base de datos y tipos
-  - [ ] 1.1 Crear migración SQL para tabla whatsapp_instances
+- [x] 1. Configurar infraestructura de base de datos y tipos
+  - [x] 1.1 Crear migración SQL para tabla whatsapp_instances
     - Crear tabla con campos: id, organization_id, instance_name, instance_type, status, phone_number, etc.
     - Agregar columnas channel y whatsapp_chat_id a tabla chats
     - Agregar índices y políticas RLS
     - _Requirements: 2.1, 3.2, 3.3_
-  - [ ] 1.2 Crear tipos y schemas Zod en `src/types/whatsapp.ts`
+  - [x] 1.2 Crear tipos y schemas Zod en `src/types/whatsapp.ts`
     - Definir WhatsAppInstanceSchema, EvolutionWebhookSchema, WhatsAppMessageSchema
     - Exportar tipos TypeScript inferidos
     - _Requirements: 3.1, 4.1_
-  - [ ] 1.3 Agregar campo max_whatsapp_conversations a tabla plans
+  - [x] 1.3 Agregar campo max_whatsapp_conversations a tabla plans
     - Migración para agregar límite de conversaciones WhatsApp por plan
     - _Requirements: 7.1, 7.4_
 
-- [ ] 2. Checkpoint - Verificar migración y tipos
+- [x] 2. Checkpoint - Verificar migración y tipos
 
 - [ ] 3. Implementar cliente Evolution API
   - [ ] 3.1 Crear cliente base en `src/lib/evolution/client.ts`
