@@ -5,10 +5,10 @@ import { ProfileForm } from "./components/profile-form"
 import { OrganizationForm } from "./components/organization-form"
 import { IdentificationForm } from "./components/identification-form"
 import { StorefrontForm } from "./components/storefront-form"
+import Link from "next/link"
+import { redirect } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
-
-import { redirect } from "next/navigation"
 
 export default async function SettingsPage() {
     try {
@@ -30,6 +30,8 @@ export default async function SettingsPage() {
                             <TabsTrigger value="organization">Organización</TabsTrigger>
                             <TabsTrigger value="identification">Identificación</TabsTrigger>
                             <TabsTrigger value="storefront">Storefront</TabsTrigger>
+                            <TabsTrigger value="payments">Pagos</TabsTrigger>
+                            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
                         </TabsList>
                         <TabsContent value="profile">
                             <ProfileForm profile={data.profile} />
@@ -42,6 +44,38 @@ export default async function SettingsPage() {
                         </TabsContent>
                         <TabsContent value="storefront">
                             <StorefrontForm organization={data.organization} />
+                        </TabsContent>
+                        <TabsContent value="payments">
+                            <div className="text-sm text-muted-foreground">
+                                <p>Configura tus pasarelas de pago para recibir pagos de tus clientes.</p>
+                                <div className="mt-4">
+                                    <Link 
+                                        href="/dashboard/settings/payments"
+                                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                                    >
+                                        Ir a Configuración de Pagos
+                                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </Link>
+                                </div>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="whatsapp">
+                            <div className="text-sm text-muted-foreground">
+                                <p>Conecta WhatsApp para atender clientes y recibir notificaciones.</p>
+                                <div className="mt-4">
+                                    <Link 
+                                        href="/dashboard/settings/whatsapp"
+                                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                                    >
+                                        Ir a Configuración de WhatsApp
+                                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </Link>
+                                </div>
+                            </div>
                         </TabsContent>
                     </Tabs>
                 </div>
