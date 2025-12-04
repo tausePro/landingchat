@@ -48,8 +48,20 @@ export function ImageUpload({ organizationId, images, onImagesChange }: ImageUpl
             const uploadPromises = Array.from(files).map(file =>
                 uploadProductImage(file, organizationId)
             )
-            const urls = await Promise.all(uploadPromises)
-            onImagesChange([...images, ...urls])
+            const results = await Promise.all(uploadPromises)
+            const successfulUrls = results
+                .filter(result => result.success)
+                .map(result => result.success ? result.data.url : "")
+                .filter(url => url !== "")
+            
+            if (successfulUrls.length > 0) {
+                onImagesChange([...images, ...successfulUrls])
+            }
+            
+            const failedCount = results.filter(r => !r.success).length
+            if (failedCount > 0) {
+                alert(`${failedCount} imagen(es) no se pudieron subir`)
+            }
         } catch (error: any) {
             alert(`Error al subir imagen: ${error.message}`)
         } finally {

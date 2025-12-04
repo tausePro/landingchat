@@ -81,8 +81,9 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 image_url: images[0], // Primary image
                 categories,
                 variants: variants.filter(v => v.type && v.values.length > 0),
+                options: [], // Required by schema
                 is_active: isActive,
-                is_subscription: subscriptionEnabled, // Use subscriptionEnabled instead
+                is_subscription: subscriptionEnabled,
                 is_configurable: isConfigurable,
                 configurable_options: isConfigurable ? configurableOptions : undefined,
                 subscription_config: subscriptionEnabled ? {

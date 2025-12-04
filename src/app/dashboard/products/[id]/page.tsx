@@ -10,23 +10,21 @@ interface EditProductPageProps {
 export default async function EditProductPage({ params }: EditProductPageProps) {
     const { id } = await params
 
-    try {
-        const product = await getProductById(id)
+    const result = await getProductById(id)
 
-        if (!product) {
-            notFound()
-        }
-
-        return (
-            <DashboardLayout>
-                <ProductForm
-                    organizationId={product.organization_id}
-                    initialData={product}
-                    isEditing
-                />
-            </DashboardLayout>
-        )
-    } catch (error) {
+    if (!result.success || !result.data) {
         notFound()
     }
+
+    const product = result.data
+
+    return (
+        <DashboardLayout>
+            <ProductForm
+                organizationId={product.organization_id}
+                initialData={product}
+                isEditing
+            />
+        </DashboardLayout>
+    )
 }

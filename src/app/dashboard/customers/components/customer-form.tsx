@@ -19,27 +19,47 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { createCustomer } from "../actions"
+import { createCustomer, type CreateCustomerInput } from "../actions"
 
 interface CustomerFormProps {
     open: boolean
     onOpenChange: (open: boolean) => void
 }
 
+type CustomerCategory = "nuevo" | "recurrente" | "vip" | "inactivo"
+type AcquisitionChannel = "web" | "chat" | "referido" | "importado" | "manual"
+
+interface FormData {
+    full_name: string
+    email: string
+    phone: string
+    category: CustomerCategory
+    acquisition_channel: AcquisitionChannel
+    tags: string[]
+    address: {
+        city: string
+        neighborhood: string
+        zone: string
+    }
+}
+
+const initialFormData: FormData = {
+    full_name: "",
+    email: "",
+    phone: "",
+    category: "nuevo",
+    acquisition_channel: "web",
+    tags: [],
+    address: {
+        city: "Bogotá",
+        neighborhood: "",
+        zone: ""
+    }
+}
+
 export function CustomerForm({ open, onOpenChange }: CustomerFormProps) {
     const [loading, setLoading] = useState(false)
-    const [formData, setFormData] = useState({
-        full_name: "",
-        email: "",
-        phone: "",
-        category: "nuevo",
-        acquisition_channel: "web",
-        address: {
-            city: "Bogotá",
-            neighborhood: "",
-            zone: ""
-        }
-    })
+    const [formData, setFormData] = useState<FormData>(initialFormData)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -49,18 +69,7 @@ export function CustomerForm({ open, onOpenChange }: CustomerFormProps) {
         
         if (result.success) {
             onOpenChange(false)
-            setFormData({
-                full_name: "",
-                email: "",
-                phone: "",
-                category: "nuevo",
-                acquisition_channel: "web",
-                address: {
-                    city: "Bogotá",
-                    neighborhood: "",
-                    zone: ""
-                }
-            })
+            setFormData(initialFormData)
             alert("Cliente creado exitosamente")
         } else {
             const errorMsg = result.fieldErrors 
@@ -128,7 +137,7 @@ export function CustomerForm({ open, onOpenChange }: CustomerFormProps) {
                                 <Label htmlFor="category">Categoría</Label>
                                 <Select
                                     value={formData.category}
-                                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                                    onValueChange={(value) => setFormData({ ...formData, category: value as CustomerCategory })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Selecciona" />
@@ -147,7 +156,7 @@ export function CustomerForm({ open, onOpenChange }: CustomerFormProps) {
                                 <Label htmlFor="channel">Canal</Label>
                                 <Select
                                     value={formData.acquisition_channel}
-                                    onValueChange={(value) => setFormData({ ...formData, acquisition_channel: value })}
+                                    onValueChange={(value) => setFormData({ ...formData, acquisition_channel: value as AcquisitionChannel })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Selecciona" />

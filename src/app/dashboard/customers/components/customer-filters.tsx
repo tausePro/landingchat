@@ -14,7 +14,7 @@ import { useDebouncedCallback } from "use-debounce"
 
 import { useState, useRef } from "react"
 import { CustomerForm } from "./customer-form"
-import { importCustomers } from "../actions"
+import { importCustomers, type ImportCustomerRow } from "../actions"
 import Papa from "papaparse"
 
 export function CustomerFilters() {
@@ -59,7 +59,7 @@ export function CustomerFilters() {
         Papa.parse(file, {
             header: true,
             complete: async (results) => {
-                const importResult = await importCustomers(results.data)
+                const importResult = await importCustomers(results.data as ImportCustomerRow[])
                 
                 if (importResult.success) {
                     alert(`Se importaron ${importResult.data.imported} clientes correctamente`)

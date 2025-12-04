@@ -13,7 +13,7 @@ import {
 } from "@/types/customer"
 
 // Re-export types for backward compatibility
-export type { Customer, GetCustomersParams }
+export type { Customer, GetCustomersParams, CreateCustomerInput }
 
 // ============================================================================
 // Query Actions
