@@ -110,6 +110,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 await fetchHistory(data.chatId)
 
                 // Si hay un producto en la URL, el usuario quería preguntar por él
+                // IMPORTANTE: Agregar DESPUÉS de cargar historial para que no se sobrescriba
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
                 const context = urlParams.get('context')
@@ -117,20 +118,19 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 if (productId && context) {
                     // User came from customization flow
                     const product = loadedProducts.find(p => p.id === productId)
-                    const productName = product ? product.name : "este producto"
-                    const customerName = localStorage.getItem(`customer_name_${slug}`)
+                    if (product) {
+                        const customerName = localStorage.getItem(`customer_name_${slug}`)
 
-                    // Add initial message from agent with context
-                    // Only add if it's a new conversation or the last message wasn't this one (simple check)
-                    // For now, just add it locally. 
-                    const contextMsg: Message = {
-                        id: "context-init-" + Date.now(),
-                        role: 'assistant',
-                        content: `Hola ${customerName || ''}, veo que estás interesado en **${productName}** con las siguientes opciones: **${decodeURIComponent(context)}**. ¿Te gustaría proceder con la compra o tienes alguna duda?`,
-                        product: product, // Attach product to show the card
-                        timestamp: new Date()
+                        // Add initial message from agent with context
+                        const contextMsg: Message = {
+                            id: "context-init-" + Date.now(),
+                            role: 'assistant',
+                            content: `Hola ${customerName || ''}, veo que estás interesado en **${product.name}** con las siguientes opciones: **${decodeURIComponent(context)}**. ¿Te gustaría proceder con la compra o tienes alguna duda?`,
+                            product: product, // Attach product to show the card
+                            timestamp: new Date()
+                        }
+                        setMessages(prev => [...prev, contextMsg])
                     }
-                    setMessages(prev => [...prev, contextMsg])
                 }
             }
 

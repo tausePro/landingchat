@@ -7,6 +7,7 @@ const aiChatSchema = z.object({
     message: z.string().min(1, "Message is required").max(2000, "Message too long"),
     chatId: z.string().uuid().optional(),
     slug: z.string().min(1, "Slug is required"),
+    customerId: z.string().uuid().optional(),
     currentProductId: z.string().uuid().optional()
 })
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { message, chatId, slug, currentProductId } = validation.data
+        const { message, chatId, slug, customerId, currentProductId } = validation.data
 
         const supabase = await createClient()
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
         // Get or create chat
         let currentChatId = chatId
         let agentId: string
-        let customerId: string | undefined
+        let effectiveCustomerId: string | undefined = customerId
 
         if (!currentChatId) {
             // Create new chat
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
                 .insert({
                     organization_id: organization.id,
                     assigned_agent_id: agent.id,
+                    customer_id: customerId || null,
                     status: "active"
                 })
                 .select()
@@ -84,7 +86,6 @@ export async function POST(request: NextRequest) {
 
             currentChatId = newChat.id
             agentId = agent.id
-            customerId = undefined
         } else {
             // Get agent ID from existing chat
             const { data: chat, error: chatQueryError } = await supabase
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
             }
 
             agentId = chat.assigned_agent_id
-            customerId = chat.customer_id
+            effectiveCustomerId = customerId || chat.customer_id
         }
 
         // Process message with AI agent
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
             chatId: currentChatId!,
             organizationId: organization.id,
             agentId: agentId,
-            customerId: customerId,
+            customerId: effectiveCustomerId,
             currentProductId: currentProductId // Pass the product ID from context
         })
 
