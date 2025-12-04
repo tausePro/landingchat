@@ -25,8 +25,8 @@ interface Message {
     timestamp: Date
 }
 
-export default function ChatPage({ params }: { params: { slug: string } }) {
-    const { slug } = params
+export default function ChatPage({ params }: { params: Promise<{ slug: string }> }) {
+    const { slug } = use(params)
     const isSubdomain = useIsSubdomain()
     const router = useRouter()
 
