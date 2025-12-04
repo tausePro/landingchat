@@ -2,6 +2,7 @@
  * Genera la base path para URLs del store
  * Si estamos en subdominio (qp.landingchat.co), la base es ""
  * Si estamos en path (landingchat.co/store/qp), la base es "/store/[slug]"
+ * (Force rebuild)
  */
 export function getStoreBasePath(isSubdomain: boolean, slug: string): string {
     return isSubdomain ? '' : `/store/${slug}`
