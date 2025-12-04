@@ -96,20 +96,33 @@ export function serializePlanForDb(plan: CreatePlanInput): Record<string, unknow
 
 // Función helper para deserializar plan desde base de datos
 export function deserializePlanFromDb(dbRow: Record<string, unknown>): Plan {
+  // La DB puede tener 'interval' o 'billing_period'
+  const billingPeriod = (dbRow.billing_period || dbRow.interval || 'monthly') as string
+  
   return PlanSchema.parse({
     id: dbRow.id,
     name: dbRow.name,
-    slug: dbRow.slug,
+    slug: dbRow.slug || generateSlugFromName(dbRow.name as string),
     description: dbRow.description,
-    price: Number(dbRow.price),
-    currency: dbRow.currency,
-    billing_period: dbRow.billing_period,
-    max_products: dbRow.max_products,
-    max_agents: dbRow.max_agents,
-    max_monthly_conversations: dbRow.max_monthly_conversations,
+    price: Number(dbRow.price || 0),
+    currency: dbRow.currency || 'COP',
+    billing_period: billingPeriod === 'yearly' ? 'yearly' : 'monthly',
+    max_products: dbRow.max_products || 100,
+    max_agents: dbRow.max_agents || 1,
+    max_monthly_conversations: dbRow.max_monthly_conversations || 500,
     features: dbRow.features ?? {},
-    is_active: dbRow.is_active,
-    created_at: dbRow.created_at,
-    updated_at: dbRow.updated_at,
+    is_active: dbRow.is_active ?? dbRow.is_public ?? true,
+    created_at: dbRow.created_at || new Date().toISOString(),
+    updated_at: dbRow.updated_at || new Date().toISOString(),
   })
+}
+
+// Helper para generar slug desde nombre
+function generateSlugFromName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
 }
