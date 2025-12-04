@@ -127,7 +127,6 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         id: "context-init-" + Date.now(),
                         role: 'assistant',
                         content: `Hola ${customerName || ''}, veo que estás interesado en **${productName}** con las siguientes opciones: **${decodeURIComponent(context)}**. ¿Te gustaría proceder con la compra o tienes alguna duda?`,
-                        product: product, // Attach product to show the card
                         timestamp: new Date()
                     }
                     setMessages(prev => [...prev, contextMsg])
@@ -328,7 +327,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             </div>
 
             {/* Main Chat Container */}
-            <div className="flex-1 flex flex-col overflow-hidden w-full bg-white dark:bg-gray-950">
+            <div className="flex-1 flex flex-col overflow-hidden md:max-w-4xl md:mx-auto md:w-full md:border-x md:border-gray-200 md:dark:border-gray-800 md:shadow-sm md:bg-white md:dark:bg-gray-950">
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50 dark:bg-gray-950 md:bg-white md:dark:bg-gray-950">
                     {messages.map((msg) => (
