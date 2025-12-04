@@ -32,22 +32,22 @@
 
 - [x] 4. Checkpoint - Verificar cliente Evolution
 
-- [ ] 5. Implementar configuración admin de Evolution API
-  - [ ] 5.1 Crear server actions en `src/app/admin/settings/evolution/actions.ts`
+- [x] 5. Implementar configuración admin de Evolution API
+  - [x] 5.1 Crear server actions en `src/app/admin/settings/evolution/actions.ts`
     - Implementar getEvolutionConfig, saveEvolutionConfig, testConnection
     - Encriptar API Key antes de guardar
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
-  - [ ] 5.2 Crear página `src/app/admin/settings/evolution/page.tsx`
+  - [x] 5.2 Crear página `src/app/admin/settings/evolution/page.tsx`
     - Formulario para URL y API Key
     - Botón para probar conexión
     - _Requirements: 1.1_
-  - [ ] 5.3 Crear página de gestión de instancias `src/app/admin/whatsapp/page.tsx`
+  - [x] 5.3 Crear página de gestión de instancias `src/app/admin/whatsapp/page.tsx`
     - Lista de todas las instancias con estado
     - Filtros por organización y estado
     - Acciones de desconectar/eliminar
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 6. Checkpoint - Verificar configuración admin
+- [x] 6. Checkpoint - Verificar configuración admin
 
 - [ ] 7. Implementar conexión WhatsApp en dashboard
   - [ ] 7.1 Crear server actions en `src/app/dashboard/settings/whatsapp/actions.ts`
