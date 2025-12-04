@@ -117,3 +117,27 @@ export {
   type SubscriptionStatus,
   type PaymentStatus,
 } from "./subscription"
+
+// Payment gateway domain types
+export {
+  PaymentProviderSchema,
+  TransactionStatusSchema,
+  PaymentStatusSchema as StorePaymentStatusSchema,
+  PaymentMethodSchema,
+  PaymentGatewayConfigSchema,
+  PaymentGatewayConfigInputSchema,
+  StoreTransactionSchema,
+  CreateTransactionInputSchema,
+  deserializePaymentGatewayConfig,
+  deserializeStoreTransaction,
+  type PaymentProvider,
+  type TransactionStatus,
+  type PaymentStatus as StorePaymentStatus,
+  type PaymentMethod,
+  type PaymentGatewayConfig,
+  type PaymentGatewayConfigInput,
+  type StoreTransaction,
+  type CreateTransactionInput,
+  type TransactionResult,
+  type Bank,
+} from "./payment"
