@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { processMessage } from "@/lib/ai/chat-agent"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
 const aiChatSchema = z.object({
@@ -8,7 +8,8 @@ const aiChatSchema = z.object({
     chatId: z.string().uuid().optional(),
     slug: z.string().min(1, "Slug is required"),
     customerId: z.string().uuid().optional(),
-    currentProductId: z.string().uuid().optional()
+    currentProductId: z.string().uuid().optional(),
+    context: z.string().optional()
 })
 
 export async function POST(request: NextRequest) {
@@ -25,9 +26,9 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { message, chatId, slug, customerId, currentProductId } = validation.data
+        const { message, chatId, slug, customerId: bodyCustomerId, currentProductId } = validation.data
 
-        const supabase = await createClient()
+        const supabase = createServiceClient()
 
         // Get organization from slug
         const { data: organization, error: orgError } = await supabase
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
         // Get or create chat
         let currentChatId = chatId
         let agentId: string
-        let effectiveCustomerId: string | undefined = customerId
+        let customerId: string | undefined
 
         if (!currentChatId) {
             // Create new chat
@@ -70,7 +71,6 @@ export async function POST(request: NextRequest) {
                 .insert({
                     organization_id: organization.id,
                     assigned_agent_id: agent.id,
-                    customer_id: customerId || null,
                     status: "active"
                 })
                 .select()
@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
 
             currentChatId = newChat.id
             agentId = agent.id
+            customerId = undefined
         } else {
             // Get agent ID from existing chat
             const { data: chat, error: chatQueryError } = await supabase
@@ -103,7 +104,8 @@ export async function POST(request: NextRequest) {
             }
 
             agentId = chat.assigned_agent_id
-            effectiveCustomerId = customerId || chat.customer_id
+            // Usar customerId del body si existe, sino del chat
+            customerId = bodyCustomerId || chat.customer_id
         }
 
         // Process message with AI agent
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest) {
             chatId: currentChatId!,
             organizationId: organization.id,
             agentId: agentId,
-            customerId: effectiveCustomerId,
+            customerId: customerId,
             currentProductId: currentProductId // Pass the product ID from context
         })
 

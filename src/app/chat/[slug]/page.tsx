@@ -109,27 +109,57 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 // Cargar historial de mensajes
                 await fetchHistory(data.chatId)
 
-                // Si hay un producto en la URL, el usuario quería preguntar por él
-                // IMPORTANTE: Agregar DESPUÉS de cargar historial para que no se sobrescriba
+                // Si hay un producto en la URL, hacer llamada inicial al AI con contexto del producto
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
                 const context = urlParams.get('context')
 
-                if (productId && context) {
-                    // User came from customization flow
-                    const product = loadedProducts.find(p => p.id === productId)
-                    if (product) {
-                        const customerName = localStorage.getItem(`customer_name_${slug}`)
-
-                        // Add initial message from agent with context
-                        const contextMsg: Message = {
-                            id: "context-init-" + Date.now(),
-                            role: 'assistant',
-                            content: `Hola ${customerName || ''}, veo que estás interesado en **${product.name}** con las siguientes opciones: **${decodeURIComponent(context)}**. ¿Te gustaría proceder con la compra o tienes alguna duda?`,
-                            product: product, // Attach product to show the card
-                            timestamp: new Date()
+                if (productId) {
+                    // Llamar al AI con el contexto del producto para obtener respuesta con tarjeta
+                    try {
+                        const aiResponse = await fetch('/api/ai-chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: context ? `Hola, me interesa este producto con: ${decodeURIComponent(context)}` : 'Hola, me interesa este producto',
+                                chatId: data.chatId,
+                                slug,
+                                customerId: custId,
+                                currentProductId: productId,
+                                context: context ? decodeURIComponent(context) : undefined
+                            })
+                        })
+                        
+                        if (aiResponse.ok) {
+                            const aiData = await aiResponse.json()
+                            
+                            // Procesar acciones (show_product)
+                            if (aiData.actions && aiData.actions.length > 0) {
+                                for (const action of aiData.actions) {
+                                    if (action.type === 'show_product' && action.data.product) {
+                                        const productMsg: Message = {
+                                            id: "product-" + Date.now(),
+                                            role: 'assistant',
+                                            content: aiData.message,
+                                            product: action.data.product,
+                                            timestamp: new Date()
+                                        }
+                                        setMessages(prev => [...prev, productMsg])
+                                    }
+                                }
+                            } else {
+                                // Si no hay acciones, solo mostrar el mensaje
+                                const aiMsg: Message = {
+                                    id: "ai-init-" + Date.now(),
+                                    role: 'assistant',
+                                    content: aiData.message,
+                                    timestamp: new Date()
+                                }
+                                setMessages(prev => [...prev, aiMsg])
+                            }
                         }
-                        setMessages(prev => [...prev, contextMsg])
+                    } catch (err) {
+                        console.error("Error calling AI with product context:", err)
                     }
                 }
             }
@@ -195,39 +225,42 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             const data = await response.json()
 
             // Process actions from AI
+            let hasProductAction = false
             if (data.actions && data.actions.length > 0) {
                 for (const action of data.actions) {
                     if (action.type === 'show_product' && action.data.product) {
+                        hasProductAction = true
                         const productMsg: Message = {
                             id: (Date.now() + Math.random()).toString(),
                             role: 'assistant',
-                            content: action.data.message || '',
+                            content: data.message, // Usar el mensaje principal
                             product: action.data.product,
                             timestamp: new Date()
                         }
                         setMessages(prev => [...prev, productMsg])
-                    } else if (action.type === 'add_to_cart' && action.data.product_id) {
-                        const product = products.find(p => p.id === action.data.product_id)
-                        if (product) {
-                            addItem({
-                                id: product.id,
-                                name: product.name,
-                                price: product.price,
-                                image_url: product.image_url || product.images?.[0]
-                            }, action.data.quantity || 1)
-                        }
+                    } else if (action.type === 'add_to_cart' && action.data.added) {
+                        // Producto agregado al carrito
+                        const addedProduct = action.data.added
+                        addItem({
+                            id: action.data.added.product_id || products.find(p => p.name === addedProduct.name)?.id,
+                            name: addedProduct.name,
+                            price: addedProduct.price,
+                            image_url: products.find(p => p.name === addedProduct.name)?.image_url
+                        }, addedProduct.quantity || 1)
                     }
                 }
             }
 
-            // Add AI response message
-            const aiMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: data.message,
-                timestamp: new Date()
+            // Solo agregar mensaje de texto si NO hubo acción de producto (para evitar duplicados)
+            if (!hasProductAction) {
+                const aiMsg: Message = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'assistant',
+                    content: data.message,
+                    timestamp: new Date()
+                }
+                setMessages(prev => [...prev, aiMsg])
             }
-            setMessages(prev => [...prev, aiMsg])
 
         } catch (error: any) {
             console.error('Error calling AI agent:', error)

@@ -3,7 +3,7 @@ import { createMessage } from "./anthropic"
 import { tools } from "./tools"
 import { buildSystemPrompt, buildProductContext, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
 import { executeTool } from "./tool-executor"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 interface ProcessMessageInput {
     message: string
@@ -38,7 +38,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
 
     try {
         console.log("[processMessage] Starting with input:", { chatId: input.chatId, agentId: input.agentId, currentProductId: input.currentProductId })
-        const supabase = await createClient()
+        const supabase = createServiceClient()
 
         // 1. Load agent configuration
         const { data: agent } = await supabase
@@ -66,12 +66,22 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         // 3.1 Load current product context if available
         let currentProduct = null
         if (input.currentProductId) {
-            const { data: product } = await supabase
+            console.log("[processMessage] Loading current product:", input.currentProductId, "for org:", input.organizationId)
+            const { data: product, error: productError } = await supabase
                 .from("products")
                 .select("*")
                 .eq("id", input.currentProductId)
+                .eq("organization_id", input.organizationId)
                 .single()
-            currentProduct = product
+            
+            if (productError) {
+                console.error("[processMessage] Error loading current product:", productError)
+            } else {
+                console.log("[processMessage] Current product loaded:", product?.name, "| Price:", product?.price)
+                currentProduct = product
+            }
+        } else {
+            console.log("[processMessage] No currentProductId provided")
         }
 
         // 4. Load conversation history
@@ -119,6 +129,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 7. Build system prompt
+        console.log("[processMessage] Building system prompt with currentProduct:", currentProduct?.name || "NONE")
         let systemPrompt = buildSystemPrompt(
             agent,
             organization?.name || "la tienda",
@@ -126,6 +137,11 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             customer || undefined,
             currentProduct || undefined
         )
+        
+        // Log para verificar si el contexto del producto está en el prompt
+        if (currentProduct) {
+            console.log("[processMessage] System prompt includes product context:", systemPrompt.includes(currentProduct.name))
+        }
 
         // Add strict rules about inventory and variants
         systemPrompt += `
@@ -251,6 +267,24 @@ REGLAS CRÍTICAS DE INVENTARIO:
                 latency_ms: Date.now() - startTime
             }
         })
+
+        // Si hay un producto en contexto y es el primer mensaje, agregar acción show_product
+        if (currentProduct && !actions.some(a => a.type === 'show_product')) {
+            actions.unshift({
+                type: 'show_product',
+                data: {
+                    product: {
+                        id: currentProduct.id,
+                        name: currentProduct.name,
+                        description: currentProduct.description,
+                        price: currentProduct.price,
+                        image_url: currentProduct.image_url || currentProduct.images?.[0],
+                        stock: currentProduct.stock,
+                        variants: currentProduct.variants
+                    }
+                }
+            })
+        }
 
         return {
             response: finalResponseText,

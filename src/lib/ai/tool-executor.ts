@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import {
     IdentifyCustomerSchema,
     SearchProductsSchema,
@@ -36,7 +36,7 @@ export async function executeTool(
 ): Promise<ToolResult> {
     console.log(`[Tool] Executing: ${toolName}`, input)
 
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     try {
         switch (toolName) {

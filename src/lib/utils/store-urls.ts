@@ -46,10 +46,18 @@ export function getChatUrl(isSubdomain: boolean, storeSlug: string): string {
 export function isSubdomain(hostname: string): boolean {
     if (!hostname) return false
 
-    // Ignorar localhost simple
-    if (hostname === 'localhost' || hostname.includes('127.0.0.1')) return false
+    // Quitar puerto si existe (ej: qp.localhost:3000 -> qp.localhost)
+    const hostWithoutPort = hostname.split(':')[0]
 
-    const parts = hostname.split('.')
+    // Localhost simple sin subdominio
+    if (hostWithoutPort === 'localhost' || hostWithoutPort === '127.0.0.1') return false
+
+    // Subdominio local: qp.localhost -> ['qp', 'localhost'] = 2 partes
+    const parts = hostWithoutPort.split('.')
+    if (parts.length === 2 && parts[1] === 'localhost') {
+        return true // Es un subdominio local como qp.localhost
+    }
+
     // En producción: tienda.landingchat.co (3 partes)
     // Lógica: si tiene más de 2 partes y no es www
     if (parts.length >= 3 && parts[0] !== 'www') return true
