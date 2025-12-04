@@ -127,6 +127,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         id: "context-init-" + Date.now(),
                         role: 'assistant',
                         content: `Hola ${customerName || ''}, veo que estás interesado en **${productName}** con las siguientes opciones: **${decodeURIComponent(context)}**. ¿Te gustaría proceder con la compra o tienes alguna duda?`,
+                        product: product, // Attach product to show the card
                         timestamp: new Date()
                     }
                     setMessages(prev => [...prev, contextMsg])
