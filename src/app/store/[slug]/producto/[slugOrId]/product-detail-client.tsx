@@ -350,7 +350,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                     {/* Desktop Actions */}
                     <div className="hidden md:flex flex-col gap-4 mt-8">
                         <button
-                            onClick={handleChat}
+                            onClick={() => handleChat()}
                             className="flex w-full items-center justify-center gap-2 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:opacity-90 transition-opacity"
                             style={{ backgroundColor: primaryColor }}
                         >
