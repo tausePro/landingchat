@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/client"
+import { PlanUsageCard } from "./components/plan-usage-card"
 
 export default function DashboardPage() {
     const [stats, setStats] = useState({
@@ -142,18 +143,21 @@ export default function DashboardPage() {
                             </div>
                         </CardContent>
                     </Card>
-                    <Card className="col-span-3">
-                        <CardHeader>
-                            <CardTitle>Chats Recientes</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                                    Implementando lista de chats...
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="col-span-3 space-y-4">
+                        <PlanUsageCard />
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Chats Recientes</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                                        Implementando lista de chats...
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </div>
         </DashboardLayout>

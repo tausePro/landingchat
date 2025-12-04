@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { MaintenanceToggle } from "./components/maintenance-toggle"
+import { getSubscriptionMetrics } from "./subscriptions/actions"
 
 export default async function AdminDashboardPage() {
     const supabase = await createClient()
@@ -8,6 +9,21 @@ export default async function AdminDashboardPage() {
     const { count: orgCount } = await supabase.from("organizations").select("*", { count: "exact", head: true })
     const { count: userCount } = await supabase.from("profiles").select("*", { count: "exact", head: true })
     const { count: chatCount } = await supabase.from("chats").select("*", { count: "exact", head: true })
+
+    // Fetch subscription metrics
+    const metricsResult = await getSubscriptionMetrics()
+    const mrr = metricsResult.success ? metricsResult.data.mrr : 0
+    const mrrCurrency = metricsResult.success ? metricsResult.data.mrr_currency : "COP"
+    const activeSubscriptions = metricsResult.success ? metricsResult.data.active_subscriptions : 0
+
+    // Format MRR
+    const formatPrice = (price: number, currency: string) => {
+        return new Intl.NumberFormat("es-CO", {
+            style: "currency",
+            currency,
+            minimumFractionDigits: 0,
+        }).format(price)
+    }
 
     // Fetch recent organizations
     const { data: recentOrgs } = await supabase
@@ -80,8 +96,8 @@ export default async function AdminDashboardPage() {
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">MRR Estimado</p>
-                            <h3 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">$0</h3>
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">MRR</p>
+                            <h3 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">{formatPrice(mrr, mrrCurrency)}</h3>
                         </div>
                         <div className="rounded-full bg-green-50 p-3 dark:bg-green-900/20">
                             <svg className="size-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -90,7 +106,7 @@ export default async function AdminDashboardPage() {
                         </div>
                     </div>
                     <div className="mt-4 flex items-center text-sm text-slate-500">
-                        <span className="font-medium">Basado en planes activos</span>
+                        <span className="font-medium">{activeSubscriptions} suscripciones activas</span>
                     </div>
                 </div>
             </div>

@@ -1,0 +1,125 @@
+# Plan de Implementación
+
+- [x] 1. Configurar infraestructura de tipos y migración de base de datos
+  - [x] 1.1 Crear migración SQL para tablas plans y payment_transactions
+    - Crear tabla `plans` con campos: id, name, slug, description, price, currency, billing_period, max_products, max_agents, max_monthly_conversations, features, is_active, timestamps
+    - Crear tabla `payment_transactions` con campos: id, subscription_id, amount, currency, status, provider, provider_transaction_id, provider_response, timestamps
+    - Agregar índices y políticas RLS
+    - _Requirements: 1.1, 3.2_
+  - [x] 1.2 Crear tipos y schemas Zod en `src/types/plan.ts`
+    - Definir PlanSchema, CreatePlanInputSchema, UpdatePlanInputSchema
+    - Exportar tipos TypeScript inferidos
+    - _Requirements: 5.1, 5.4, 5.5_
+  - [ ]* 1.3 Write property test for Plan schema validation
+    - **Property 1: Validación de schema de Plan**
+    - **Validates: Requirements 1.1, 1.5, 2.2**
+  - [ ]* 1.4 Write property test for Plan serialization round-trip
+    - **Property 2: Round-trip de serialización de Plan**
+    - **Validates: Requirements 5.4, 5.5**
+  - [x] 1.5 Crear tipos y schemas Zod en `src/types/subscription.ts`
+    - Definir SubscriptionSchema con refinement para fechas
+    - Definir PaymentTransactionSchema
+    - Exportar tipos TypeScript inferidos
+    - _Requirements: 5.2, 5.3_
+  - [ ]* 1.6 Write property test for date coherence validation
+    - **Property 4: Coherencia de fechas de período**
+    - **Validates: Requirements 5.3**
+
+- [x] 2. Checkpoint - Asegurar que todos los tests pasan
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 3. Implementar gestión de planes en admin
+  - [x] 3.1 Crear server actions en `src/app/admin/plans/actions.ts`
+    - Implementar getPlans, getPlanById, createPlan, updatePlan, togglePlanStatus
+    - Usar validación Zod y retornar ActionResult<T>
+    - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - [ ]* 3.2 Write property test for price and currency validation
+    - **Property 3: Precio positivo y moneda válida**
+    - **Validates: Requirements 5.1**
+  - [ ]* 3.3 Write property test for plan deactivation
+    - **Property 8: Desactivación de plan**
+    - **Validates: Requirements 1.4**
+  - [x] 3.4 Crear componente `src/app/admin/plans/components/plan-list.tsx`
+    - Mostrar tabla con nombre, precio, límites, estado
+    - Incluir acciones de editar y activar/desactivar
+    - _Requirements: 1.1, 1.5_
+  - [x] 3.5 Crear componente `src/app/admin/plans/components/plan-form.tsx`
+    - Formulario para crear/editar planes
+    - Validación client-side con Zod
+    - _Requirements: 1.2, 1.3_
+  - [x] 3.6 Crear página `src/app/admin/plans/page.tsx`
+    - Integrar plan-list y plan-form
+    - _Requirements: 1.1_
+
+- [x] 4. Checkpoint - Asegurar que todos los tests pasan
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Implementar visualización de suscripciones
+  - [x] 5.1 Crear server actions en `src/app/admin/subscriptions/actions.ts`
+    - Implementar getSubscriptions con filtros, getSubscriptionMetrics
+    - Calcular MRR sumando precios de suscripciones activas
+    - _Requirements: 2.1, 2.2, 2.4_
+  - [ ]* 5.2 Write property test for subscription status filter
+    - **Property 5: Filtro de suscripciones por estado**
+    - **Validates: Requirements 2.4**
+  - [ ]* 5.3 Write property test for timestamp update
+    - **Property 9: Actualización de timestamp**
+    - **Validates: Requirements 2.3**
+  - [x] 5.4 Crear componente `src/app/admin/subscriptions/components/subscription-list.tsx`
+    - Mostrar tabla con organización, plan, estado, fechas
+    - Incluir filtros por estado
+    - _Requirements: 2.2, 2.4_
+  - [x] 5.5 Crear página `src/app/admin/subscriptions/page.tsx`
+    - Integrar métricas y lista de suscripciones
+    - _Requirements: 2.1, 2.2_
+  - [x] 5.6 Actualizar dashboard admin con métricas de MRR
+    - Modificar `src/app/admin/page.tsx` para mostrar MRR real
+    - _Requirements: 2.1_
+
+- [x] 6. Checkpoint - Asegurar que todos los tests pasan
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 7. Implementar funciones de uso y límites para organizaciones
+  - [x] 7.1 Crear utilidades en `src/lib/utils/subscription.ts`
+    - Función calculateUsagePercentage(usage, limit)
+    - Función checkResourceLimit(usage, limit)
+    - Función getOrganizationUsage(orgId)
+    - _Requirements: 4.2, 4.3, 4.4_
+  - [ ]* 7.2 Write property test for usage percentage calculation
+    - **Property 6: Cálculo de porcentaje de uso**
+    - **Validates: Requirements 4.2, 4.3**
+  - [ ]* 7.3 Write property test for limit blocking
+    - **Property 7: Bloqueo por exceso de límite**
+    - **Validates: Requirements 4.4**
+  - [x] 7.4 Agregar indicador de uso en dashboard de organización
+    - Modificar `src/app/dashboard/page.tsx` para mostrar uso vs límites
+    - Mostrar alertas cuando uso > 80%
+    - _Requirements: 4.1, 4.2, 4.3_
+
+- [x] 8. Checkpoint - Asegurar que todos los tests pasan
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 9. Implementar integración con Wompi
+  - [x] 9.1 Crear cliente Wompi en `src/lib/wompi/client.ts`
+    - Configurar cliente HTTP con credenciales
+    - Implementar createTransaction, getTransaction
+    - _Requirements: 3.1, 3.2_
+  - [x] 9.2 Crear tipos Wompi en `src/lib/wompi/types.ts`
+    - Definir WompiTransactionRequest, WompiTransactionResponse
+    - Función formatTransactionForWompi
+    - _Requirements: 3.5_
+  - [ ]* 9.3 Write property test for Wompi transaction format
+    - **Property 10: Formato de transacción Wompi**
+    - **Validates: Requirements 3.5**
+  - [x] 9.4 Crear página de configuración Wompi `src/app/admin/settings/wompi/page.tsx`
+    - Formulario para ingresar llaves públicas y privadas
+    - Botón para probar conexión
+    - _Requirements: 3.1_
+  - [x] 9.5 Crear webhook handler `src/app/api/webhooks/wompi/route.ts`
+    - Validar firma del webhook
+    - Actualizar estado de suscripción según resultado
+    - Registrar transacción en payment_transactions
+    - _Requirements: 3.3, 3.4_
+
+- [x] 10. Final Checkpoint - Asegurar que todos los tests pasan
+  - Ensure all tests pass, ask the user if questions arise.
