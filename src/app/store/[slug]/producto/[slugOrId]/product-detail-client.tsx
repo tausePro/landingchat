@@ -92,26 +92,24 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
     }
 
-    const handleChat = () => {
-        // Construct query params with selected options
+    const handleChat = (productId?: string) => {
+        // Build context string
+        const contextParts: string[] = []
+        Object.entries(selectedVariants).forEach(([type, value]) => {
+            contextParts.push(`${type}: ${value}`)
+        })
+
         const params = new URLSearchParams()
-        params.set('product', product.id)
-
-        // Add variants to context
-        const variantContext = Object.entries(selectedVariants)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(', ')
-
-        if (variantContext) {
-            params.set('context', variantContext)
-        }
+        if (productId) params.set('product', productId)
+        if (contextParts.length > 0) params.set('context', contextParts.join(', '))
 
         // Check if customer is already identified
         const customerId = localStorage.getItem(`customer_${slug}`)
 
         if (customerId) {
             // User is identified, go directly to chat
-            const chatUrl = `/chat/${slug}?${params.toString()}`
+            let chatUrl = getChatUrl(isSubdomain, slug)
+            if (params.toString()) chatUrl += `?${params.toString()}`
             router.push(chatUrl)
         } else {
             // User needs to identify first, go to store home with chat action
@@ -143,7 +141,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
             <div className="md:container md:mx-auto md:px-4 md:grid md:grid-cols-2 md:gap-12 lg:gap-16">
                 {/* Custom Sticky Header (Mobile Only) */}
                 <header className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center px-4 py-3 bg-white/10 backdrop-blur-md md:hidden">
-                    <Link href={`/store/${slug}`} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
+                    <Link href={getStoreLink('/', isSubdomain, slug)} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
                         <span className="material-symbols-outlined text-2xl">arrow_back</span>
                     </Link>
                     {organization.logo_url && (
@@ -387,7 +385,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 md:hidden">
                 <div className="max-w-md mx-auto">
                     <button
-                        onClick={handleChat}
+                        onClick={() => handleChat()}
                         className="flex w-full items-center justify-center gap-2 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:opacity-90 transition-opacity"
                         style={{ backgroundColor: primaryColor }}
                     >

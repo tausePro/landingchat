@@ -1,6 +1,8 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useIsSubdomain } from "@/hooks/use-is-subdomain"
+import { getChatUrl, getStoreLink } from "@/lib/utils/store-urls"
 
 interface ProductCTAButtonProps {
     slug: string
@@ -11,6 +13,7 @@ interface ProductCTAButtonProps {
 
 export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mobile' }: ProductCTAButtonProps) {
     const router = useRouter()
+    const isSubdomain = useIsSubdomain()
 
     const handleClick = () => {
         // Check if customer is already identified
@@ -18,10 +21,12 @@ export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mob
 
         if (customerId) {
             // Navigate directly to chat with product
-            router.push(`/chat/${slug}?product=${productId}`)
+            const chatUrl = `${getChatUrl(isSubdomain, slug)}?product=${productId}`
+            router.push(chatUrl)
         } else {
             // Navigate to store with action=chat to trigger the gate modal
-            router.push(`/store/${slug}?action=chat&product=${productId}`)
+            const storeUrl = getStoreLink(`/?action=chat&product=${productId}`, isSubdomain, slug)
+            router.push(storeUrl)
         }
     }
 

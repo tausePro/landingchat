@@ -62,7 +62,8 @@ export default function ChatPage({ params }: { params: { slug: string } }) {
 
         if (!storedCustomerId) {
             // No identificado, redirigir al store
-            router.push(`/store/${slug}?action=chat`)
+            const storeUrl = getStoreLink('/?action=chat', isSubdomain, slug)
+            router.push(storeUrl)
             return
         }
 
@@ -310,13 +311,13 @@ export default function ChatPage({ params }: { params: { slug: string } }) {
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => router.push(`/store/${slug}`)}
+                            onClick={() => router.push(getStoreLink('/', isSubdomain, slug))}
                             className="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 transition-colors"
                         >
                             <span className="material-symbols-outlined text-lg">shopping_cart</span>
                         </button>
                         <button
-                            onClick={() => router.push(`/store/${slug}`)}
+                            onClick={() => router.push(getStoreLink('/', isSubdomain, slug))}
                             className="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 transition-colors"
                         >
                             <span className="material-symbols-outlined text-lg">close</span>
