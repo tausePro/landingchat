@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
-import { getStoreLink } from "@/lib/utils/store-urls"
+import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 
 interface ProductDetailClientProps {
     product: any
