@@ -13,11 +13,14 @@ interface ProductDetailClientProps {
     badges: any[]
     promotions: any[]
     slug: string
+    initialIsSubdomain?: boolean
 }
 
-export function ProductDetailClient({ product, organization, badges, promotions, slug }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, organization, badges, promotions, slug, initialIsSubdomain = false }: ProductDetailClientProps) {
     const router = useRouter()
-    const isSubdomain = useIsSubdomain()
+    // Use initial value from server if available, otherwise default to hook behavior
+    const clientIsSubdomain = useIsSubdomain()
+    const isSubdomain = initialIsSubdomain || clientIsSubdomain
 
     console.log('ProductDetailClient Debug:', { slug, isSubdomain, hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR' })
     console.log('ProductDetailClient received slug:', slug)

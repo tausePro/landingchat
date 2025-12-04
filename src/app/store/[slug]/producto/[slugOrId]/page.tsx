@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 import { StoreLayoutClient } from "../../store-layout-client"
 import { getProductDetails } from "../../actions"
 import { ProductDetailClient } from "./product-detail-client"
+import { headers } from "next/headers"
+import { isSubdomain } from "@/lib/utils/store-urls"
 
 interface ProductDetailPageProps {
     params: Promise<{ slug: string; slugOrId: string }>
@@ -10,6 +12,11 @@ interface ProductDetailPageProps {
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
     const { slug, slugOrId } = await params
     console.log('ProductDetailPage Server Debug:', { slug, slugOrId })
+
+    const headersList = await headers()
+    const host = headersList.get("host") || ""
+    const initialIsSubdomain = isSubdomain(host)
+    console.log('ProductDetailPage Server Subdomain Debug:', { host, initialIsSubdomain })
 
     const data = await getProductDetails(slug, slugOrId)
 
@@ -25,6 +32,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 badges={badges}
                 promotions={promotions}
                 slug={organization.slug}
+                initialIsSubdomain={initialIsSubdomain}
             />
         </StoreLayoutClient>
     )
