@@ -16,21 +16,21 @@
 
 - [x] 2. Checkpoint - Verificar migración y tipos
 
-- [ ] 3. Implementar cliente Evolution API
-  - [ ] 3.1 Crear cliente base en `src/lib/evolution/client.ts`
+- [x] 3. Implementar cliente Evolution API
+  - [x] 3.1 Crear cliente base en `src/lib/evolution/client.ts`
     - Implementar createInstance, deleteInstance, getInstance
     - Implementar getQRCode, getConnectionStatus, logout
     - Manejar autenticación con API Key
     - _Requirements: 2.2, 2.3_
-  - [ ] 3.2 Implementar métodos de mensajería en `src/lib/evolution/client.ts`
+  - [x] 3.2 Implementar métodos de mensajería en `src/lib/evolution/client.ts`
     - Implementar sendTextMessage, sendMediaMessage, sendButtonMessage
     - Manejar reintentos con backoff exponencial
     - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  - [ ] 3.3 Crear tipos Evolution en `src/lib/evolution/types.ts`
+  - [x] 3.3 Crear tipos Evolution en `src/lib/evolution/types.ts`
     - Definir interfaces para requests y responses de Evolution API
     - _Requirements: 3.1_
 
-- [ ] 4. Checkpoint - Verificar cliente Evolution
+- [x] 4. Checkpoint - Verificar cliente Evolution
 
 - [ ] 5. Implementar configuración admin de Evolution API
   - [ ] 5.1 Crear server actions en `src/app/admin/settings/evolution/actions.ts`
