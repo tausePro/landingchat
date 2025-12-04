@@ -302,7 +302,7 @@ export class EvolutionClient {
  * Crea una instancia del cliente Evolution con configuración del sistema
  */
 export async function createEvolutionClient(
-    supabase: { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => { single: () => Promise<{ data: { value: { url: string; apiKey: string } } | null; error: Error | null }> } } } }
+    supabase: any
 ): Promise<EvolutionClient | null> {
     const { data: settings, error } = await supabase
         .from("system_settings")

@@ -49,32 +49,32 @@
 
 - [x] 6. Checkpoint - Verificar configuración admin
 
-- [ ] 7. Implementar conexión WhatsApp en dashboard
-  - [ ] 7.1 Crear server actions en `src/app/dashboard/settings/whatsapp/actions.ts`
+- [x] 7. Implementar conexión WhatsApp en dashboard
+  - [x] 7.1 Crear server actions en `src/app/dashboard/settings/whatsapp/actions.ts`
     - Implementar getWhatsAppStatus, connectWhatsApp, disconnectWhatsApp
     - Implementar getQRCode, updateNotificationSettings
     - Verificar límites del plan antes de conectar
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-  - [ ] 7.2 Crear componente `src/app/dashboard/settings/whatsapp/components/corporate-card.tsx`
+  - [x] 7.2 Crear componente `src/app/dashboard/settings/whatsapp/components/corporate-card.tsx`
     - Mostrar estado de conexión (conectado/desconectado)
     - Botón conectar/desconectar
     - Mostrar número conectado y métricas
     - _Requirements: 2.1, 2.3_
-  - [ ] 7.3 Crear componente `src/app/dashboard/settings/whatsapp/components/qr-modal.tsx`
+  - [x] 7.3 Crear componente `src/app/dashboard/settings/whatsapp/components/qr-modal.tsx`
     - Modal con código QR
     - Polling de estado cada 3 segundos
     - Cierre automático al conectar
     - _Requirements: 2.2, 2.3_
-  - [ ] 7.4 Crear componente `src/app/dashboard/settings/whatsapp/components/personal-card.tsx`
+  - [x] 7.4 Crear componente `src/app/dashboard/settings/whatsapp/components/personal-card.tsx`
     - Configuración de WhatsApp personal para notificaciones
     - Toggles para tipos de notificación
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
-  - [ ] 7.5 Crear página `src/app/dashboard/settings/whatsapp/page.tsx`
+  - [x] 7.5 Crear página `src/app/dashboard/settings/whatsapp/page.tsx`
     - Integrar corporate-card, personal-card
     - Mostrar uso vs límite del plan
     - _Requirements: 2.1, 7.2_
 
-- [ ] 8. Checkpoint - Verificar conexión WhatsApp
+- [x] 8. Checkpoint - Verificar conexión WhatsApp
 
 - [ ] 9. Implementar webhook handler
   - [ ] 9.1 Crear webhook handler `src/app/api/webhooks/whatsapp/route.ts`

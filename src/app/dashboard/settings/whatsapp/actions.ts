@@ -1,0 +1,449 @@
+"use server"
+
+import { createClient } from "@/lib/supabase/server"
+import { createEvolutionClient } from "@/lib/evolution"
+import { revalidatePath } from "next/cache"
+import {
+    type ActionResult,
+    success,
+    failure,
+    UpdateWhatsAppInstanceInputSchema,
+    type WhatsAppInstance,
+    deserializeWhatsAppInstance,
+} from "@/types"
+
+/**
+ * Obtiene la organización del usuario actual
+ */
+async function getCurrentOrganization() {
+    const supabase = await createClient()
+    const {
+        data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) return null
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    return profile?.organization_id || null
+}
+
+/**
+ * Obtiene el estado de WhatsApp de la organización
+ */
+export async function getWhatsAppStatus(): Promise<
+    ActionResult<{
+        corporate: WhatsAppInstance | null
+        personal: WhatsAppInstance | null
+        plan_limit: number
+    }>
+> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+
+        // Obtener instancias
+        const { data: instances, error: instancesError } = await supabase
+            .from("whatsapp_instances")
+            .select("*")
+            .eq("organization_id", orgId)
+
+        if (instancesError) {
+            return failure(instancesError.message)
+        }
+
+        // Obtener límite del plan
+        const { data: org } = await supabase
+            .from("organizations")
+            .select("plan_id")
+            .eq("id", orgId)
+            .single()
+
+        let planLimit = 0
+        if (org?.plan_id) {
+            const { data: plan } = await supabase
+                .from("plans")
+                .select("max_whatsapp_conversations")
+                .eq("id", org.plan_id)
+                .single()
+
+            planLimit = plan?.max_whatsapp_conversations || 0
+        }
+
+        const corporate =
+            instances?.find((i) => i.instance_type === "corporate") || null
+        const personal =
+            instances?.find((i) => i.instance_type === "personal") || null
+
+        return success({
+            corporate: corporate ? deserializeWhatsAppInstance(corporate) : null,
+            personal: personal ? deserializeWhatsAppInstance(personal) : null,
+            plan_limit: planLimit,
+        })
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al obtener estado"
+        )
+    }
+}
+
+/**
+ * Conecta WhatsApp corporativo
+ */
+export async function connectWhatsApp(): Promise<
+    ActionResult<{ qr_code: string; instance_id: string }>
+> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+
+        // Verificar límite del plan
+        const { data: org } = await supabase
+            .from("organizations")
+            .select("plan_id")
+            .eq("id", orgId)
+            .single()
+
+        if (!org?.plan_id) {
+            return failure("Organización sin plan asignado")
+        }
+
+        const { data: plan } = await supabase
+            .from("plans")
+            .select("max_whatsapp_conversations")
+            .eq("id", org.plan_id)
+            .single()
+
+        if (!plan || plan.max_whatsapp_conversations === 0) {
+            return failure(
+                "Tu plan no incluye WhatsApp. Actualiza tu plan para usar esta función."
+            )
+        }
+
+        // Verificar si ya existe una instancia corporativa
+        const { data: existing } = await supabase
+            .from("whatsapp_instances")
+            .select("id, status")
+            .eq("organization_id", orgId)
+            .eq("instance_type", "corporate")
+            .single()
+
+        if (existing && existing.status === "connected") {
+            return failure("Ya tienes un WhatsApp conectado")
+        }
+
+        // Crear cliente Evolution
+        const evolutionClient = await createEvolutionClient(supabase)
+        if (!evolutionClient) {
+            return failure("Evolution API no configurado")
+        }
+
+        const instanceName = `org_${orgId}`
+
+        // Si existe instancia, eliminarla primero
+        if (existing) {
+            try {
+                await evolutionClient.deleteInstance(instanceName)
+            } catch {
+                // Ignorar error si no existe
+            }
+        }
+
+        // Crear nueva instancia en Evolution
+        const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
+        await evolutionClient.createInstance({
+            instanceName,
+            token: orgId, // Usamos orgId como token para identificar
+            qrcode: true,
+            webhook: webhookUrl,
+            webhookByEvents: true,
+            events: [
+                "MESSAGES_UPSERT",
+                "CONNECTION_UPDATE",
+                "QRCODE_UPDATED",
+            ],
+        })
+
+        // Obtener QR code
+        const qrData = await evolutionClient.getQRCode(instanceName)
+
+        // Guardar/actualizar instancia en DB
+        const qrExpiresAt = new Date()
+        qrExpiresAt.setMinutes(qrExpiresAt.getMinutes() + 2) // QR expira en 2 minutos
+
+        const instanceData = {
+            organization_id: orgId,
+            instance_name: instanceName,
+            instance_type: "corporate" as const,
+            status: "connecting" as const,
+            qr_code: qrData.base64 || qrData.code,
+            qr_expires_at: qrExpiresAt.toISOString(),
+            updated_at: new Date().toISOString(),
+        }
+
+        let instanceId: string
+
+        if (existing) {
+            const { error } = await supabase
+                .from("whatsapp_instances")
+                .update(instanceData)
+                .eq("id", existing.id)
+
+            if (error) {
+                return failure(error.message)
+            }
+            instanceId = existing.id
+        } else {
+            const { data: newInstance, error } = await supabase
+                .from("whatsapp_instances")
+                .insert(instanceData)
+                .select("id")
+                .single()
+
+            if (error) {
+                return failure(error.message)
+            }
+            instanceId = newInstance.id
+        }
+
+        revalidatePath("/dashboard/settings/whatsapp")
+
+        return success({
+            qr_code: qrData.base64 || qrData.code,
+            instance_id: instanceId,
+        })
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al conectar WhatsApp"
+        )
+    }
+}
+
+/**
+ * Desconecta WhatsApp corporativo
+ */
+export async function disconnectWhatsApp(): Promise<ActionResult<void>> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+
+        // Obtener instancia
+        const { data: instance } = await supabase
+            .from("whatsapp_instances")
+            .select("id, instance_name")
+            .eq("organization_id", orgId)
+            .eq("instance_type", "corporate")
+            .single()
+
+        if (!instance) {
+            return failure("No hay WhatsApp conectado")
+        }
+
+        // Crear cliente Evolution
+        const evolutionClient = await createEvolutionClient(supabase)
+        if (evolutionClient) {
+            try {
+                await evolutionClient.logout(instance.instance_name)
+            } catch (error) {
+                console.error("Error al desconectar de Evolution:", error)
+                // Continuar aunque falle
+            }
+        }
+
+        // Actualizar estado en DB
+        const { error } = await supabase
+            .from("whatsapp_instances")
+            .update({
+                status: "disconnected",
+                phone_number: null,
+                phone_number_display: null,
+                disconnected_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", instance.id)
+
+        if (error) {
+            return failure(error.message)
+        }
+
+        revalidatePath("/dashboard/settings/whatsapp")
+        return success(undefined)
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al desconectar WhatsApp"
+        )
+    }
+}
+
+/**
+ * Obtiene el código QR actualizado
+ */
+export async function getQRCode(): Promise<ActionResult<string>> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+
+        // Obtener instancia
+        const { data: instance } = await supabase
+            .from("whatsapp_instances")
+            .select("qr_code, qr_expires_at, status")
+            .eq("organization_id", orgId)
+            .eq("instance_type", "corporate")
+            .single()
+
+        if (!instance) {
+            return failure("No hay proceso de conexión activo")
+        }
+
+        if (instance.status === "connected") {
+            return failure("WhatsApp ya está conectado")
+        }
+
+        // Verificar si el QR expiró
+        if (
+            instance.qr_expires_at &&
+            new Date(instance.qr_expires_at) < new Date()
+        ) {
+            return failure("QR expirado. Inicia el proceso de conexión nuevamente.")
+        }
+
+        if (!instance.qr_code) {
+            return failure("No hay QR disponible")
+        }
+
+        return success(instance.qr_code)
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al obtener QR"
+        )
+    }
+}
+
+/**
+ * Actualiza la configuración de notificaciones
+ */
+export async function updateNotificationSettings(
+    input: unknown
+): Promise<ActionResult<void>> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        // Validar input
+        const validation = UpdateWhatsAppInstanceInputSchema.safeParse(input)
+        if (!validation.success) {
+            return failure(validation.error.issues[0].message)
+        }
+
+        const data = validation.data
+        const supabase = await createClient()
+
+        // Actualizar configuración
+        const { error } = await supabase
+            .from("whatsapp_instances")
+            .update({
+                ...data,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("organization_id", orgId)
+            .eq("instance_type", "personal")
+
+        if (error) {
+            return failure(error.message)
+        }
+
+        revalidatePath("/dashboard/settings/whatsapp")
+        return success(undefined)
+    } catch (error) {
+        return failure(
+            error instanceof Error
+                ? error.message
+                : "Error al actualizar configuración"
+        )
+    }
+}
+
+/**
+ * Conecta WhatsApp personal para notificaciones
+ */
+export async function connectPersonalWhatsApp(
+    phoneNumber: string
+): Promise<ActionResult<void>> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+
+        // Verificar si ya existe
+        const { data: existing } = await supabase
+            .from("whatsapp_instances")
+            .select("id")
+            .eq("organization_id", orgId)
+            .eq("instance_type", "personal")
+            .single()
+
+        const instanceData = {
+            organization_id: orgId,
+            instance_name: `org_${orgId}_personal`,
+            instance_type: "personal" as const,
+            status: "connected" as const,
+            phone_number: phoneNumber,
+            phone_number_display: phoneNumber.slice(-4),
+            connected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        }
+
+        if (existing) {
+            const { error } = await supabase
+                .from("whatsapp_instances")
+                .update(instanceData)
+                .eq("id", existing.id)
+
+            if (error) {
+                return failure(error.message)
+            }
+        } else {
+            const { error } = await supabase
+                .from("whatsapp_instances")
+                .insert(instanceData)
+
+            if (error) {
+                return failure(error.message)
+            }
+        }
+
+        revalidatePath("/dashboard/settings/whatsapp")
+        return success(undefined)
+    } catch (error) {
+        return failure(
+            error instanceof Error
+                ? error.message
+                : "Error al conectar WhatsApp personal"
+        )
+    }
+}
