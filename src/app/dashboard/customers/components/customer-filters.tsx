@@ -59,15 +59,16 @@ export function CustomerFilters() {
         Papa.parse(file, {
             header: true,
             complete: async (results) => {
-                try {
-                    await importCustomers(results.data)
-                    alert(`Se importaron ${results.data.length} clientes correctamente`)
-                } catch (error: any) {
-                    alert(`Error al importar: ${error.message}`)
-                } finally {
-                    setIsImporting(false)
-                    if (fileInputRef.current) fileInputRef.current.value = ""
+                const importResult = await importCustomers(results.data)
+                
+                if (importResult.success) {
+                    alert(`Se importaron ${importResult.data.imported} clientes correctamente`)
+                } else {
+                    alert(`Error al importar: ${importResult.error}`)
                 }
+                
+                setIsImporting(false)
+                if (fileInputRef.current) fileInputRef.current.value = ""
             },
             error: (error) => {
                 alert(`Error al leer archivo: ${error.message}`)

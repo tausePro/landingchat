@@ -73,15 +73,18 @@ export default function StoreConfigPage() {
 
         setLoading(true)
 
-        try {
-            await updateOrganizationDetails(formData)
+        const result = await updateOrganizationDetails(formData)
+        
+        if (result.success) {
             router.push("/onboarding/agent")
-        } catch (error) {
-            console.error("Error updating organization:", error)
-            alert("Error al guardar. Intenta de nuevo.")
-        } finally {
-            setLoading(false)
+        } else {
+            const errorMsg = result.fieldErrors 
+                ? Object.entries(result.fieldErrors).map(([k, v]) => `${k}: ${v.join(", ")}`).join("\n")
+                : result.error
+            alert(`Error al guardar: ${errorMsg}`)
         }
+        
+        setLoading(false)
     }
 
     const handleSkip = () => {

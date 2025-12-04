@@ -45,8 +45,9 @@ export function CustomerForm({ open, onOpenChange }: CustomerFormProps) {
         e.preventDefault()
         setLoading(true)
 
-        try {
-            await createCustomer(formData)
+        const result = await createCustomer(formData)
+        
+        if (result.success) {
             onOpenChange(false)
             setFormData({
                 full_name: "",
@@ -61,11 +62,14 @@ export function CustomerForm({ open, onOpenChange }: CustomerFormProps) {
                 }
             })
             alert("Cliente creado exitosamente")
-        } catch (error: any) {
-            alert(`Error: ${error.message}`)
-        } finally {
-            setLoading(false)
+        } else {
+            const errorMsg = result.fieldErrors 
+                ? Object.entries(result.fieldErrors).map(([k, v]) => `${k}: ${v.join(", ")}`).join("\n")
+                : result.error
+            alert(`Error: ${errorMsg}`)
         }
+        
+        setLoading(false)
     }
 
     const updateAddress = (key: string, value: string) => {

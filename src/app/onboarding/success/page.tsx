@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { completeOnboarding } from "../actions"
+import { completeOnboardingAndRedirect } from "../actions"
 
 export default function SuccessPage() {
     return (
@@ -70,7 +70,7 @@ export default function SuccessPage() {
             {/* CTA Buttons */}
             <div className="flex justify-center pt-4">
                 <div className="flex w-full flex-col sm:flex-row flex-wrap gap-3 max-w-lg justify-center">
-                    <form action={completeOnboarding}>
+                    <form action={completeOnboardingAndRedirect}>
                         <Button type="submit" className="h-12 px-5">
                             <span className="truncate">Ir al Dashboard</span>
                         </Button>

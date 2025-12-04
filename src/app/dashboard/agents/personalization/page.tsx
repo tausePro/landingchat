@@ -38,12 +38,13 @@ export default function PersonalizationAgentPage() {
 
     const loadData = async () => {
         try {
-            const [productsData, agentsData] = await Promise.all([
+            const [productsResult, agentsData] = await Promise.all([
                 getProducts(),
                 getAgents()
             ])
 
             // Filter only configurable products
+            const productsData = productsResult.success ? productsResult.data : []
             setProducts(productsData.filter(p => p.is_configurable))
 
             if (agentsData.length > 0) {

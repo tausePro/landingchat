@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ProductData, CreateProductData, createProduct, updateProduct, ConfigOption } from "../actions"
+import { createProduct, updateProduct } from "../actions"
+import { ProductData, CreateProductInput, ConfigOption } from "@/types/product"
 import { getBadges } from "../../badges/actions"
 import { RichTextEditor } from "./rich-text-editor"
 import { ImageUpload } from "./image-upload"
@@ -69,7 +70,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
 
         setLoading(true)
         try {
-            const productData: CreateProductData = {
+            const productData: CreateProductInput = {
                 name: name.trim(),
                 description: description.trim() || undefined,
                 price: parseFloat(price),

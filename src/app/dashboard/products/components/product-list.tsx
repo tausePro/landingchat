@@ -14,7 +14,8 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ProductData, deleteProduct } from "../actions"
+import { deleteProduct } from "../actions"
+import { ProductData } from "@/types/product"
 
 interface ProductListProps {
     products: ProductData[]
@@ -27,11 +28,11 @@ export function ProductList({ products }: ProductListProps) {
 
     const handleDelete = async (id: string, name: string) => {
         if (confirm(`¿Estás seguro de eliminar "${name}"?`)) {
-            try {
-                await deleteProduct(id)
+            const result = await deleteProduct(id)
+            if (result.success) {
                 router.refresh()
-            } catch (error: any) {
-                alert(`Error: ${error.message}`)
+            } else {
+                alert(`Error: ${result.error}`)
             }
         }
     }

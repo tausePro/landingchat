@@ -1,3 +1,12 @@
+/**
+ * Middleware de Next.js para LandingChat
+ * 
+ * Este middleware maneja:
+ * 1. Reescritura de subdominios (tienda.landingchat.co → /store/tienda)
+ * 2. Autenticación y protección de rutas
+ * 3. Redirecciones de migración (/products → /productos)
+ */
+
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -7,20 +16,22 @@ export async function middleware(request: NextRequest) {
 
     // ============================================
     // RUTAS QUE NUNCA SE REESCRIBEN
+    // Estas rutas pasan directo al manejador de autenticación
     // ============================================
     if (
-        pathname.startsWith('/_next') ||
-        pathname.startsWith('/api') ||
-        pathname.startsWith('/dashboard') ||
-        pathname.startsWith('/admin') ||
-        pathname.startsWith('/auth') ||
-        pathname.startsWith('/onboarding') ||
-        pathname.includes('.') // archivos estáticos
+        pathname.startsWith('/_next') ||      // Archivos internos de Next.js
+        pathname.startsWith('/api') ||        // Rutas de API
+        pathname.startsWith('/dashboard') ||  // Panel de administración
+        pathname.startsWith('/admin') ||      // Panel de superadmin
+        pathname.startsWith('/auth') ||       // Callbacks de autenticación
+        pathname.startsWith('/onboarding') || // Flujo de onboarding
+        pathname.includes('.')                // Archivos estáticos (favicon, imágenes, etc.)
     ) {
         return handleAuth(request)
     }
 
-    // Redirección de migración /products -> /productos (excluyendo dashboard ya filtrado arriba)
+    // Redirección de migración: /products → /productos
+    // (excluyendo dashboard que ya fue filtrado arriba)
     if (pathname.endsWith('/products')) {
         const newPath = pathname.replace('/products', '/productos')
         return NextResponse.redirect(new URL(newPath, request.url))
@@ -28,17 +39,18 @@ export async function middleware(request: NextRequest) {
 
     // ============================================
     // DETECTAR SLUG DE LA TIENDA
+    // El slug identifica qué tienda mostrar
     // ============================================
     let slug: string | null = null
 
-    // === DESARROLLO ===
+    // === ENTORNO DE DESARROLLO ===
     if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
         // Opción 1: Query param → localhost:3000?store=demo-store
         slug = request.nextUrl.searchParams.get('store')
 
         // Opción 2: Subdominio local → demo-store.localhost:3000
         if (!slug) {
-            const hostPart = hostname.split(':')[0] // quitar puerto
+            const hostPart = hostname.split(':')[0] // Quitar puerto
             const parts = hostPart.split('.')
             if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
                 slug = parts[0]
@@ -46,19 +58,20 @@ export async function middleware(request: NextRequest) {
         }
 
         // Opción 3: Path tradicional → localhost:3000/store/demo-store
+        // En este caso, dejamos que Next.js maneje la ruta normalmente
         if (!slug && (pathname.startsWith('/store/') || pathname.startsWith('/chat/'))) {
             return handleAuth(request)
         }
     }
-    // === PRODUCCIÓN ===
+    // === ENTORNO DE PRODUCCIÓN ===
     else {
         const parts = hostname.split('.')
 
-        // tienda.landingchat.co → ['tienda', 'landingchat', 'co']
+        // Detectar subdominio: tienda.landingchat.co → ['tienda', 'landingchat', 'co']
         if (parts.length >= 3) {
             const subdomain = parts[0]
 
-            // Ignorar subdominios reservados
+            // Ignorar subdominios reservados del sistema
             const reserved = ['www', 'app', 'api', 'dashboard', 'admin', 'wa']
             if (!reserved.includes(subdomain)) {
                 slug = subdomain
@@ -71,15 +84,20 @@ export async function middleware(request: NextRequest) {
         return handleAuth(request)
     }
 
-    // Si estamos en subdominio y la ruta es /dashboard, redirigir al dominio principal
-    // Evitar redirigir en localhost si estamos probando con ?store=...
+    // ============================================
+    // REDIRECCIONES ESPECIALES PARA SUBDOMINIOS
+    // ============================================
+    
     const isProductionSubdomain = !hostname.includes('localhost') && !hostname.includes('127.0.0.1') && slug
+
+    // Si estamos en subdominio y la ruta es /dashboard, redirigir al dominio principal
+    // El dashboard siempre debe estar en www.landingchat.co
     if (isProductionSubdomain && pathname.startsWith('/dashboard')) {
         return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
     }
 
-    // Si estamos en subdominio y alguien accede con /store/[slug]/*, redirigir a la ruta sin prefijo
-    // Ejemplo: qp.landingchat.co/store/qp/producto/123 -> qp.landingchat.co/producto/123
+    // Limpiar URLs redundantes en subdominios
+    // Ejemplo: qp.landingchat.co/store/qp/producto/123 → qp.landingchat.co/producto/123
     if (isProductionSubdomain && pathname.startsWith(`/store/${slug}/`)) {
         const cleanPath = pathname.replace(`/store/${slug}`, '')
         return NextResponse.redirect(new URL(cleanPath, request.url))
@@ -87,19 +105,20 @@ export async function middleware(request: NextRequest) {
 
     // ============================================
     // REESCRIBIR RUTAS PARA LA TIENDA
+    // Mapea las rutas del subdominio a las rutas internas
     // ============================================
 
-    // tienda.landingchat.co/ → /store/tienda
+    // Página principal: tienda.landingchat.co/ → /store/tienda
     if (pathname === '/' || pathname === '') {
         const url = new URL(`/store/${slug}`, request.url)
-        // Preservar query params
+        // Preservar query params (excepto 'store' que ya usamos)
         request.nextUrl.searchParams.forEach((value, key) => {
             if (key !== 'store') url.searchParams.set(key, value)
         })
         return NextResponse.rewrite(url)
     }
 
-    // tienda.landingchat.co/chat → /chat/tienda
+    // Chat de la tienda: tienda.landingchat.co/chat → /chat/tienda
     if (pathname === '/chat' || pathname === '/chat/') {
         const url = new URL(`/chat/${slug}`, request.url)
         request.nextUrl.searchParams.forEach((value, key) => {
@@ -108,21 +127,24 @@ export async function middleware(request: NextRequest) {
         return NextResponse.rewrite(url)
     }
 
-    // tienda.landingchat.co/p/123 → /store/tienda/p/123
+    // Productos por ID corto: tienda.landingchat.co/p/123 → /store/tienda/p/123
     if (pathname.startsWith('/p/')) {
         return NextResponse.rewrite(new URL(`/store/${slug}${pathname}`, request.url))
     }
 
     // Cualquier otra ruta bajo el subdominio
+    // Ejemplo: tienda.landingchat.co/productos → /store/tienda/productos
     return NextResponse.rewrite(new URL(`/store/${slug}${pathname}`, request.url))
 }
 
 // ============================================
-// FUNCIÓN DE AUTENTICACIÓN (existente)
+// FUNCIÓN DE AUTENTICACIÓN
+// Maneja la sesión del usuario y protege rutas
 // ============================================
 async function handleAuth(request: NextRequest) {
     let supabaseResponse = NextResponse.next({ request })
 
+    // Crear cliente de Supabase con manejo de cookies
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -132,8 +154,10 @@ async function handleAuth(request: NextRequest) {
                     return request.cookies.getAll()
                 },
                 setAll(cookiesToSet) {
+                    // Actualizar cookies en la request
                     cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
                     supabaseResponse = NextResponse.next({ request })
+                    // Actualizar cookies en la response
                     cookiesToSet.forEach(({ name, value, options }) =>
                         supabaseResponse.cookies.set(name, value, options)
                     )
@@ -142,16 +166,18 @@ async function handleAuth(request: NextRequest) {
         }
     )
 
+    // Obtener usuario actual
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Rutas públicas
+    // Definir rutas públicas (no requieren autenticación)
     const publicRoutes = ['/', '/store', '/chat', '/api', '/auth', '/login', '/registro', '/recuperar']
     const isPublicRoute = publicRoutes.some(route =>
         request.nextUrl.pathname === route ||
         request.nextUrl.pathname.startsWith(route + '/')
     )
 
-    // Redirigir si no hay usuario y es ruta protegida
+    // Redirigir a login si no hay usuario y es ruta protegida
+    // (excepto onboarding que tiene su propia lógica)
     if (!user && !isPublicRoute && !request.nextUrl.pathname.startsWith('/onboarding')) {
         const url = request.nextUrl.clone()
         url.pathname = '/login'
@@ -161,6 +187,13 @@ async function handleAuth(request: NextRequest) {
     return supabaseResponse
 }
 
+// ============================================
+// CONFIGURACIÓN DEL MATCHER
+// Define qué rutas pasan por el middleware
+// ============================================
 export const config = {
-    matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
+    matcher: [
+        // Excluir archivos estáticos y assets
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'
+    ],
 }

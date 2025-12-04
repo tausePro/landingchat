@@ -16,7 +16,8 @@ const formatCurrency = (amount: number) => {
 };
 
 export default async function ProductsPage() {
-    const products = await getProducts()
+    const result = await getProducts()
+    const products = result.success ? result.data : []
 
     // Placeholder for search, as it's used in the new input field
     const search = '';

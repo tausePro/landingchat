@@ -23,7 +23,7 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
     const channel = searchParams.channel
     const zone = searchParams.zone
 
-    const { customers, total, totalPages } = await getCustomers({
+    const result = await getCustomers({
         page,
         limit: 25,
         search,
@@ -31,6 +31,22 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
         channel,
         zone
     })
+
+    // Handle error case
+    if (!result.success) {
+        return (
+            <DashboardLayout>
+                <div className="flex flex-col gap-6">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Clientes</h1>
+                        <p className="text-destructive">Error: {result.error}</p>
+                    </div>
+                </div>
+            </DashboardLayout>
+        )
+    }
+
+    const { customers, total, totalPages } = result.data
 
     return (
         <DashboardLayout>

@@ -2,84 +2,81 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import type { ActionResult } from "@/types/common"
+import {
+  createCustomerSchema,
+  updateCustomerSchema,
+  type Customer,
+  type CreateCustomerInput,
+  type UpdateCustomerInput,
+  type GetCustomersParams,
+} from "@/types/customer"
 
-export interface Customer {
-    id: string
-    full_name: string
-    email: string | null
-    phone: string | null
-    tags: string[]
-    category: string | null
-    acquisition_channel: string | null
-    total_orders: number
-    total_spent: number
-    created_at: string
-    last_interaction_at?: string
-    address?: {
-        city?: string
-        neighborhood?: string
-    }
-}
+// Re-export types for backward compatibility
+export type { Customer, GetCustomersParams }
 
-export interface GetCustomersParams {
-    page?: number
-    limit?: number
-    search?: string
-    category?: string
-    channel?: string
-    zone?: string
-    tags?: string[]
+// ============================================================================
+// Query Actions
+// ============================================================================
+
+export interface GetCustomersResult {
+  customers: Customer[]
+  total: number
+  totalPages: number
 }
 
 export async function getCustomers({
-    page = 1,
-    limit = 25,
-    search,
-    category,
-    channel,
-    zone,
-    tags
-}: GetCustomersParams) {
+  page = 1,
+  limit = 25,
+  search,
+  category,
+  channel,
+  zone,
+  tags
+}: GetCustomersParams): Promise<ActionResult<GetCustomersResult>> {
+  try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) throw new Error("Unauthorized")
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
+    }
 
     const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
 
-    if (!profile?.organization_id) throw new Error("No organization found")
+    if (!profile?.organization_id) {
+      return { success: false, error: "No organization found" }
+    }
 
     let query = supabase
-        .from("customers")
-        .select("*", { count: "exact" })
-        .eq("organization_id", profile.organization_id)
+      .from("customers")
+      .select("*", { count: "exact" })
+      .eq("organization_id", profile.organization_id)
 
     // Search
     if (search) {
-        query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
     }
 
     // Filters
     if (category && category !== "all") {
-        query = query.eq("category", category)
+      query = query.eq("category", category)
     }
 
     if (channel && channel !== "all") {
-        query = query.eq("acquisition_channel", channel)
+      query = query.eq("acquisition_channel", channel)
     }
 
     if (zone && zone !== "all") {
-        // Filter by JSONB field address->>zone
-        query = query.eq("address->>zone", zone) // Note: This syntax might need adjustment depending on Supabase JS client version, but usually works for simple equality. 
-        // Alternatively: query.filter('address->>zone', 'eq', zone)
+      query = query.eq("address->>zone", zone)
     }
 
     if (tags && tags.length > 0) {
-        query = query.contains("tags", tags)
+      query = query.contains("tags", tags)
     }
 
     // Pagination
@@ -87,134 +84,237 @@ export async function getCustomers({
     const to = from + limit - 1
 
     const { data, error, count } = await query
-        .order("created_at", { ascending: false })
-        .range(from, to)
+      .order("created_at", { ascending: false })
+      .range(from, to)
 
     if (error) {
-        console.error("Error fetching customers:", error)
-        throw new Error("Failed to fetch customers")
+      return { success: false, error: `Failed to fetch customers: ${error.message}` }
     }
 
     return {
+      success: true,
+      data: {
         customers: data as Customer[],
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit)
+      }
     }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error fetching customers"
+    }
+  }
 }
 
-export async function updateCustomer(customerId: string, data: Partial<Customer>) {
+// ============================================================================
+// Mutation Actions
+// ============================================================================
+
+export async function createCustomer(
+  input: CreateCustomerInput
+): Promise<ActionResult<{ id: string }>> {
+  // 1. Validate input
+  const parsed = createCustomerSchema.safeParse(input)
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Validation failed",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>
+    }
+  }
+
+  try {
+    // 2. Auth check
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) throw new Error("Unauthorized")
-
-    const { error } = await supabase
-        .from("customers")
-        .update(data)
-        .eq("id", customerId)
-
-    if (error) {
-        throw new Error(`Failed to update customer: ${error.message}`)
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
     }
 
-    revalidatePath("/dashboard/customers")
-    return { success: true }
-}
-
-export async function deleteCustomer(customerId: string) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
-
-    const { error } = await supabase
-        .from("customers")
-        .delete()
-        .eq("id", customerId)
-
-    if (error) {
-        throw new Error(`Failed to delete customer: ${error.message}`)
-    }
-
-    revalidatePath("/dashboard/customers")
-    return { success: true }
-}
-
-export async function createCustomer(data: {
-    full_name: string
-    email?: string
-    phone?: string
-    category?: string
-    acquisition_channel?: string
-    address?: any
-}) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
-
+    // 3. Get org context
     const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
 
-    if (!profile?.organization_id) throw new Error("No organization found")
-
-    const { error } = await supabase
-        .from("customers")
-        .insert({
-            organization_id: profile.organization_id,
-            full_name: data.full_name,
-            email: data.email || null,
-            phone: data.phone || null,
-            category: data.category || 'nuevo',
-            acquisition_channel: data.acquisition_channel || 'web',
-            address: data.address || {},
-            tags: []
-        })
-
-    if (error) {
-        throw new Error(`Failed to create customer: ${error.message}`)
+    if (!profile?.organization_id) {
+      return { success: false, error: "No organization found" }
     }
 
-    revalidatePath("/dashboard/customers")
-    return { success: true }
-}
-
-export async function importCustomers(customers: any[]) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) throw new Error("Unauthorized")
-
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
-
-    if (!profile?.organization_id) throw new Error("No organization found")
-
-    // Prepare data for bulk insert
-    const customersToInsert = customers.map(c => ({
+    // 4. Execute operation
+    const { data, error } = await supabase
+      .from("customers")
+      .insert({
         organization_id: profile.organization_id,
-        full_name: c.full_name || c.nombre || "Sin Nombre",
-        email: c.email || null,
-        phone: c.phone || c.telefono || null,
-        category: c.category || c.categoria || 'nuevo',
-        acquisition_channel: c.channel || c.canal || 'importado',
-        tags: c.tags ? c.tags.split(',').map((t: string) => t.trim()) : []
+        full_name: parsed.data.full_name,
+        email: parsed.data.email || null,
+        phone: parsed.data.phone || null,
+        category: parsed.data.category || "nuevo",
+        acquisition_channel: parsed.data.acquisition_channel || "web",
+        address: parsed.data.address || {},
+        tags: parsed.data.tags || []
+      })
+      .select("id")
+      .single()
+
+    if (error) {
+      return { success: false, error: `Failed to create customer: ${error.message}` }
+    }
+
+    revalidatePath("/dashboard/customers")
+    return { success: true, data: { id: data.id } }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error creating customer"
+    }
+  }
+}
+
+export async function updateCustomer(
+  customerId: string,
+  input: UpdateCustomerInput
+): Promise<ActionResult<void>> {
+  // 1. Validate input
+  const parsed = updateCustomerSchema.safeParse(input)
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Validation failed",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>
+    }
+  }
+
+  try {
+    // 2. Auth check
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    // 3. Execute operation
+    const { error } = await supabase
+      .from("customers")
+      .update(parsed.data)
+      .eq("id", customerId)
+
+    if (error) {
+      return { success: false, error: `Failed to update customer: ${error.message}` }
+    }
+
+    revalidatePath("/dashboard/customers")
+    return { success: true, data: undefined }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error updating customer"
+    }
+  }
+}
+
+export async function deleteCustomer(
+  customerId: string
+): Promise<ActionResult<void>> {
+  try {
+    // 1. Auth check
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    // 2. Execute operation
+    const { error } = await supabase
+      .from("customers")
+      .delete()
+      .eq("id", customerId)
+
+    if (error) {
+      return { success: false, error: `Failed to delete customer: ${error.message}` }
+    }
+
+    revalidatePath("/dashboard/customers")
+    return { success: true, data: undefined }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error deleting customer"
+    }
+  }
+}
+
+// ============================================================================
+// Bulk Import Action
+// ============================================================================
+
+export interface ImportCustomerRow {
+  full_name?: string
+  nombre?: string
+  email?: string
+  phone?: string
+  telefono?: string
+  category?: string
+  categoria?: string
+  channel?: string
+  canal?: string
+  tags?: string
+}
+
+export async function importCustomers(
+  customers: ImportCustomerRow[]
+): Promise<ActionResult<{ imported: number }>> {
+  try {
+    // 1. Auth check
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    // 2. Get org context
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return { success: false, error: "No organization found" }
+    }
+
+    // 3. Prepare and validate data for bulk insert
+    const customersToInsert = customers.map(c => ({
+      organization_id: profile.organization_id,
+      full_name: c.full_name || c.nombre || "Sin Nombre",
+      email: c.email || null,
+      phone: c.phone || c.telefono || null,
+      category: c.category || c.categoria || "nuevo",
+      acquisition_channel: c.channel || c.canal || "importado",
+      tags: c.tags ? c.tags.split(",").map((t: string) => t.trim()) : []
     }))
 
+    // 4. Execute operation
     const { error } = await supabase
-        .from("customers")
-        .insert(customersToInsert)
+      .from("customers")
+      .insert(customersToInsert)
 
     if (error) {
-        throw new Error(`Failed to import customers: ${error.message}`)
+      return { success: false, error: `Failed to import customers: ${error.message}` }
     }
 
     revalidatePath("/dashboard/customers")
-    return { success: true }
+    return { success: true, data: { imported: customersToInsert.length } }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error importing customers"
+    }
+  }
 }

@@ -18,18 +18,21 @@ export default function AgentSetupPage() {
         e.preventDefault()
         setLoading(true)
 
-        try {
-            await createFirstAgent({
-                type: selectedType,
-                name: agentName || getDefaultName(selectedType)
-            })
+        const result = await createFirstAgent({
+            type: selectedType,
+            name: agentName || getDefaultName(selectedType)
+        })
+        
+        if (result.success) {
             router.push("/onboarding/products")
-        } catch (error) {
-            console.error("Error creating agent:", error)
-            alert("Error al crear el agente. Intenta de nuevo.")
-        } finally {
-            setLoading(false)
+        } else {
+            const errorMsg = result.fieldErrors 
+                ? Object.entries(result.fieldErrors).map(([k, v]) => `${k}: ${v.join(", ")}`).join("\n")
+                : result.error
+            alert(`Error al crear el agente: ${errorMsg}`)
         }
+        
+        setLoading(false)
     }
 
     const handleSkip = () => {

@@ -2,280 +2,278 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-
-export interface SubscriptionConfig {
-    enabled: boolean
-    price: number
-    interval: 'day' | 'week' | 'month' | 'year'
-    interval_count: number
-    trial_days?: number
-    discount_percentage?: number
-}
-
-export interface ConfigOption {
-    name: string
-    type: 'text' | 'select' | 'number' | 'color'
-    required: boolean
-    placeholder?: string
-    max_length?: number
-    choices?: string[]
-    min?: number
-    max?: number
-    default?: any
-    affects_preview?: boolean
-}
-
-export interface ProductData {
-    id: string
-    organization_id: string
-    name: string
-    description?: string
-    price: number
-    sale_price?: number
-    image_url?: string
-    stock: number
-    sku?: string
-    categories?: string[]
-    images?: string[]
-    variants?: Array<{ type: string; values: string[]; priceAdjustment?: number }>
-    options?: Array<{ name: string; values: string[] }>
-    is_active?: boolean
-    is_subscription?: boolean
-    is_configurable?: boolean
-    subscription_config?: SubscriptionConfig
-    configurable_options?: ConfigOption[]
-    // Marketing fields
-    badge_id?: string
-    free_shipping_enabled?: boolean
-    free_shipping_min_amount?: number
-    free_shipping_conditions?: string
-    meta_title?: string
-    meta_description?: string
-    keywords?: string[]
-    tags?: string[]
-    is_featured?: boolean
-    max_quantity_per_customer?: number
-    created_at: string
-}
-
-export interface CreateProductData {
-    name: string
-    description?: string
-    price: number
-    sale_price?: number
-    image_url?: string
-    stock?: number
-    sku?: string
-    categories?: string[]
-    images?: string[]
-    variants?: Array<{ type: string; values: string[]; priceAdjustment?: number }>
-    options?: Array<{ name: string; values: string[] }>
-    is_active?: boolean
-    is_subscription?: boolean
-    is_configurable?: boolean
-    subscription_config?: SubscriptionConfig
-    configurable_options?: ConfigOption[]
-    // Marketing fields
-    badge_id?: string
-    free_shipping_enabled?: boolean
-    free_shipping_min_amount?: number
-    free_shipping_conditions?: string
-    meta_title?: string
-    meta_description?: string
-    keywords?: string[]
-    tags?: string[]
-    is_featured?: boolean
-    max_quantity_per_customer?: number
-}
-
-export async function getProducts() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return []
-
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
-
-    if (!profile?.organization_id) return []
-
-    const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("organization_id", profile.organization_id)
-        .order("created_at", { ascending: false })
-
-    if (error) {
-        console.error("Error fetching products:", error)
-        return []
-    }
-
-    return data as ProductData[]
-}
-
-export async function getProductById(id: string) {
-    const supabase = await createClient()
-
-    const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single()
-
-    if (error) {
-        console.error("Error fetching product:", error)
-        return null
-    }
-
-    return data as ProductData
-}
-
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug"
+import {
+  createProductSchema,
+  updateProductSchema,
+  type CreateProductInput,
+  type UpdateProductInput,
+  type ProductData,
+} from "@/types/product"
+import { type ActionResult, success, failure } from "@/types/common"
 
-export async function createProduct(productData: CreateProductData) {
+// Re-export types for backward compatibility
+export type {
+  CreateProductInput,
+  UpdateProductInput,
+  ProductData,
+} from "@/types/product"
+
+/**
+ * Fetches all products for the current user's organization
+ * @returns Array of products or empty array on error
+ */
+export async function getProducts(): Promise<ActionResult<ProductData[]>> {
+  try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) throw new Error("Unauthorized")
+    if (!user) {
+      return failure("Unauthorized")
+    }
 
     const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
 
-    if (!profile?.organization_id) throw new Error("No organization found")
+    if (!profile?.organization_id) {
+      return failure("No organization found")
+    }
 
-    // Generate slug
-    const baseSlug = generateSlug(productData.name)
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("organization_id", profile.organization_id)
+      .order("created_at", { ascending: false })
 
-    // Check for existing slugs in this organization
+    if (error) {
+      return failure(error.message)
+    }
+
+    return success(data as ProductData[])
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error fetching products")
+  }
+}
+
+
+/**
+ * Fetches a single product by ID
+ * @param id - Product UUID
+ * @returns Product data or null on error
+ */
+export async function getProductById(id: string): Promise<ActionResult<ProductData | null>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (error) {
+      return failure(error.message)
+    }
+
+    return success(data as ProductData)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error fetching product")
+  }
+}
+
+/**
+ * Creates a new product with Zod validation
+ * @param productData - Product data to create
+ * @returns Created product data or error
+ */
+export async function createProduct(
+  productData: CreateProductInput
+): Promise<ActionResult<{ id: string; product: ProductData }>> {
+  // 1. Validate input with Zod
+  const parsed = createProductSchema.safeParse(productData)
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Validation failed",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+    }
+  }
+
+  try {
+    // 2. Auth check
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return failure("Unauthorized")
+    }
+
+    // 3. Get org context
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return failure("No organization found")
+    }
+
+    // 4. Generate slug
+    const baseSlug = generateSlug(parsed.data.name)
     const { data: existingSlugs } = await supabase
-        .from("products")
-        .select("slug")
-        .eq("organization_id", profile.organization_id)
-        .ilike("slug", `${baseSlug}%`)
+      .from("products")
+      .select("slug")
+      .eq("organization_id", profile.organization_id)
+      .ilike("slug", `${baseSlug}%`)
 
     const slugs = existingSlugs?.map(p => p.slug) || []
     const slug = generateUniqueSlug(baseSlug, slugs)
 
+    // 5. Insert product
     const { data, error } = await supabase
-        .from("products")
-        .insert({
-            organization_id: profile.organization_id,
-            name: productData.name,
-            slug: slug,
-            description: productData.description,
-            price: productData.price,
-            image_url: productData.image_url,
-            stock: productData.stock ?? 0,
-            sku: productData.sku,
-            categories: productData.categories ?? [],
-            images: productData.images ?? [],
-            variants: productData.variants ?? [],
-            options: productData.options ?? [],
-            is_active: productData.is_active ?? true,
-            is_subscription: productData.is_subscription ?? false,
-            is_configurable: productData.is_configurable ?? false,
-            subscription_config: productData.subscription_config ?? null,
-            configurable_options: productData.configurable_options ?? null,
-            sale_price: productData.sale_price ?? null,
-            badge_id: productData.badge_id ?? null
-        })
-        .select()
-        .single()
+      .from("products")
+      .insert({
+        organization_id: profile.organization_id,
+        name: parsed.data.name,
+        slug: slug,
+        description: parsed.data.description,
+        price: parsed.data.price,
+        image_url: parsed.data.image_url,
+        stock: parsed.data.stock ?? 0,
+        sku: parsed.data.sku,
+        categories: parsed.data.categories ?? [],
+        images: parsed.data.images ?? [],
+        variants: parsed.data.variants ?? [],
+        options: parsed.data.options ?? [],
+        is_active: parsed.data.is_active ?? true,
+        is_subscription: parsed.data.is_subscription ?? false,
+        is_configurable: parsed.data.is_configurable ?? false,
+        subscription_config: parsed.data.subscription_config ?? null,
+        configurable_options: parsed.data.configurable_options ?? null,
+        sale_price: parsed.data.sale_price ?? null,
+        badge_id: parsed.data.badge_id ?? null,
+      })
+      .select()
+      .single()
 
     if (error) {
-        console.error("Error creating product:", error)
-        return { success: false, error: error.message }
+      return failure(error.message)
     }
 
     revalidatePath("/dashboard/products")
-    return { success: true, product: data }
+    return success({ id: data.id, product: data as ProductData })
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error creating product")
+  }
 }
 
-export async function updateProduct(id: string, productData: Partial<CreateProductData>) {
+
+/**
+ * Updates an existing product with Zod validation
+ * @param id - Product UUID
+ * @param productData - Partial product data to update
+ * @returns Success or error
+ */
+export async function updateProduct(
+  id: string,
+  productData: UpdateProductInput
+): Promise<ActionResult<void>> {
+  // 1. Validate input with Zod
+  const parsed = updateProductSchema.safeParse(productData)
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Validation failed",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+    }
+  }
+
+  try {
+    // 2. Auth check
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) throw new Error("Unauthorized")
-
-    // If name is updated, we might want to update slug, but usually slugs should be stable for SEO.
-    // For now, we'll keep the slug stable unless explicitly requested or if it's missing.
-    // If we wanted to update slug on name change:
-    /*
-    let updateData: any = { ...productData }
-    
-    if (productData.name) {
-        const { data: product } = await supabase.from("products").select("organization_id").eq("id", id).single()
-        if (product) {
-            const baseSlug = generateSlug(productData.name)
-            const { data: existingSlugs } = await supabase
-                .from("products")
-                .select("slug")
-                .eq("organization_id", product.organization_id)
-                .neq("id", id) // Exclude current product
-                .ilike("slug", `${baseSlug}%`)
-            
-            const slugs = existingSlugs?.map(p => p.slug) || []
-            updateData.slug = generateUniqueSlug(baseSlug, slugs)
-        }
+    if (!user) {
+      return failure("Unauthorized")
     }
-    */
 
+    // 3. Update product
     const { error } = await supabase
-        .from("products")
-        .update(productData)
-        .eq("id", id)
+      .from("products")
+      .update(parsed.data)
+      .eq("id", id)
 
     if (error) {
-        console.error("Error updating product:", error)
-        return { success: false, error: error.message }
+      return failure(error.message)
     }
 
     revalidatePath("/dashboard/products")
     revalidatePath(`/dashboard/products/${id}/edit`)
-    return { success: true }
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error updating product")
+  }
 }
 
-export async function deleteProduct(id: string) {
+/**
+ * Deletes a product by ID
+ * @param id - Product UUID
+ * @returns Success or error
+ */
+export async function deleteProduct(id: string): Promise<ActionResult<void>> {
+  try {
     const supabase = await createClient()
 
     const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", id)
+      .from("products")
+      .delete()
+      .eq("id", id)
 
     if (error) {
-        console.error("Error deleting product:", error)
-        return { success: false, error: error.message }
+      return failure(error.message)
     }
 
     revalidatePath("/dashboard/products")
-    return { success: true }
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error deleting product")
+  }
 }
 
-export async function uploadProductImage(file: File, organizationId: string): Promise<string> {
+/**
+ * Uploads a product image to storage
+ * @param file - Image file to upload
+ * @param organizationId - Organization UUID
+ * @returns Public URL of uploaded image
+ */
+export async function uploadProductImage(
+  file: File,
+  organizationId: string
+): Promise<ActionResult<{ url: string }>> {
+  try {
     const supabase = await createClient()
 
     const fileExt = file.name.split('.').pop()
     const fileName = `${organizationId}/${Date.now()}.${fileExt}`
 
     const { data, error } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, file)
+      .from('product-images')
+      .upload(fileName, file)
 
     if (error) {
-        console.error("Error uploading image:", error)
-        throw new Error(`Failed to upload image: ${error.message}`)
+      return failure(`Failed to upload image: ${error.message}`)
     }
 
     const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(data.path)
+      .from('product-images')
+      .getPublicUrl(data.path)
 
-    return publicUrl
+    return success({ url: publicUrl })
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error uploading image")
+  }
 }
