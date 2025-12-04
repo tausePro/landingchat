@@ -113,16 +113,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         if (contextParts.length > 0) params.set('context', contextParts.join(', '))
 
         // Check if customer is already identified
-        const customerId = localStorage.getItem(`customer_${slug}`)
+        const customerId = localStorage.getItem(`customer_${organization.slug}`)
 
         if (customerId) {
             // User is identified, go directly to chat
-            let chatUrl = getChatUrl(isSubdomain, slug)
+            let chatUrl = getChatUrl(isSubdomain, organization.slug)
             if (params.toString()) chatUrl += `?${params.toString()}`
             router.push(chatUrl)
         } else {
             // User needs to identify first, go to store home with chat action
-            const homeUrl = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, slug)
+            const homeUrl = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, organization.slug)
             router.push(homeUrl)
         }
     }

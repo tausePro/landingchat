@@ -14,6 +14,9 @@ export function getStoreBasePath(isSubdomain: boolean, slug: string): string {
 export function getStoreLink(path: string, isSubdomain: boolean, slug: string): string {
     if (!slug || slug === 'undefined') {
         console.error('getStoreLink called with invalid slug:', { path, isSubdomain, slug })
+        // Fallback: si es subdominio, no importa el slug. Si no, retornamos root para evitar 404 feo
+        if (isSubdomain) return path.startsWith('/') ? path : `/${path}`
+        return '/'
     }
     const base = getStoreBasePath(isSubdomain, slug)
     const normalizedPath = path.startsWith('/') ? path : `/${path}`

@@ -50,11 +50,11 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
         if (action === 'chat') {
             // Verificar si ya está identificado
-            const customerId = localStorage.getItem(`customer_${slug}`)
+            const customerId = localStorage.getItem(`customer_${organization.slug}`)
 
             if (customerId) {
                 // Ya identificado, ir directamente al chat
-                let chatUrl = getChatUrl(isSubdomain, slug)
+                let chatUrl = getChatUrl(isSubdomain, organization.slug)
                 const params = new URLSearchParams()
                 if (productId) params.set('product', productId)
                 if (context) params.set('context', context)
@@ -68,15 +68,15 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 setShowGateModal(true)
             }
         }
-    }, [searchParams, slug, router, isSubdomain])
+    }, [searchParams, organization.slug, router, isSubdomain])
 
     const handleStartChat = (productId?: string) => {
         // Verificar si ya está identificado
-        const customerId = localStorage.getItem(`customer_${slug}`)
+        const customerId = localStorage.getItem(`customer_${organization.slug}`)
 
         if (customerId) {
             // Ya identificado, ir al chat
-            let chatUrl = getChatUrl(isSubdomain, slug)
+            let chatUrl = getChatUrl(isSubdomain, organization.slug)
             if (productId) chatUrl += `?product=${productId}`
             router.push(chatUrl)
         } else {
@@ -91,14 +91,14 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
     const handleCustomerIdentified = (customer: any) => {
         // Guardar en localStorage
-        localStorage.setItem(`customer_${slug}`, customer.id)
-        localStorage.setItem(`customer_name_${slug}`, customer.full_name)
+        localStorage.setItem(`customer_${organization.slug}`, customer.id)
+        localStorage.setItem(`customer_name_${organization.slug}`, customer.full_name)
 
         // Cerrar modal e ir al chat
         setShowGateModal(false)
 
         // Construir URL del chat con producto y contexto si existen
-        let chatUrl = getChatUrl(isSubdomain, slug)
+        let chatUrl = getChatUrl(isSubdomain, organization.slug)
         const params = new URLSearchParams()
         if (pendingProductId) params.set('product', pendingProductId)
         if (pendingContext) params.set('context', pendingContext)
