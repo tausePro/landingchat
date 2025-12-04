@@ -51,7 +51,10 @@ export async function POST(request: Request) {
 
         const { data, error } = await supabase
             .from("system_settings")
-            .upsert({ key, value, updated_at: new Date().toISOString() })
+            .upsert(
+                { key, value, updated_at: new Date().toISOString() },
+                { onConflict: "key" }
+            )
             .select()
             .single()
 
