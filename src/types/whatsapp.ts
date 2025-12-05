@@ -171,30 +171,47 @@ export type ChannelType = z.infer<typeof ChannelTypeSchema>
 export function deserializeWhatsAppInstance(
     data: Record<string, unknown>
 ): WhatsAppInstance {
-    return WhatsAppInstanceSchema.parse({
-        id: data.id,
-        organization_id: data.organization_id,
-        instance_name: data.instance_name,
-        instance_type: data.instance_type,
-        status: data.status ?? "disconnected",
-        phone_number: data.phone_number,
-        phone_number_display: data.phone_number_display,
-        qr_code: data.qr_code,
-        qr_expires_at: data.qr_expires_at,
-        connected_at: data.connected_at,
-        disconnected_at: data.disconnected_at,
-        notifications_enabled: data.notifications_enabled ?? true,
-        notify_on_sale: data.notify_on_sale ?? true,
-        notify_on_low_stock: data.notify_on_low_stock ?? false,
-        notify_on_new_conversation: data.notify_on_new_conversation ?? false,
-        conversations_this_month: data.conversations_this_month ?? 0,
-        messages_sent_this_month: data.messages_sent_this_month ?? 0,
-        last_message_at: data.last_message_at,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        // Preservar datos de la organización si vienen del JOIN
-        organizations: data.organizations as { name: string; slug: string } | undefined,
-    })
+    try {
+        // Extraer datos de organización si existen
+        let organizations: { name: string; slug: string } | undefined
+        if (data.organizations) {
+            const org = data.organizations as Record<string, unknown>
+            if (org.name && org.slug) {
+                organizations = {
+                    name: String(org.name),
+                    slug: String(org.slug),
+                }
+            }
+        }
+
+        return WhatsAppInstanceSchema.parse({
+            id: data.id,
+            organization_id: data.organization_id,
+            instance_name: data.instance_name,
+            instance_type: data.instance_type,
+            status: data.status ?? "disconnected",
+            phone_number: data.phone_number,
+            phone_number_display: data.phone_number_display,
+            qr_code: data.qr_code,
+            qr_expires_at: data.qr_expires_at,
+            connected_at: data.connected_at,
+            disconnected_at: data.disconnected_at,
+            notifications_enabled: data.notifications_enabled ?? true,
+            notify_on_sale: data.notify_on_sale ?? true,
+            notify_on_low_stock: data.notify_on_low_stock ?? false,
+            notify_on_new_conversation: data.notify_on_new_conversation ?? false,
+            conversations_this_month: data.conversations_this_month ?? 0,
+            messages_sent_this_month: data.messages_sent_this_month ?? 0,
+            last_message_at: data.last_message_at,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            organizations,
+        })
+    } catch (error) {
+        console.error("[deserializeWhatsAppInstance] Error:", error)
+        console.error("[deserializeWhatsAppInstance] Data:", JSON.stringify(data, null, 2))
+        throw error
+    }
 }
 
 // ============================================

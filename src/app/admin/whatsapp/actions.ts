@@ -39,6 +39,7 @@ export async function getAllInstances(filters?: {
     try {
         const isSuperAdmin = await checkSuperAdmin()
         if (!isSuperAdmin) {
+            console.error("[getAllInstances] User is not superadmin")
             return failure("No autorizado")
         }
 
@@ -67,12 +68,34 @@ export async function getAllInstances(filters?: {
         const { data, error } = await query
 
         if (error) {
+            console.error("[getAllInstances] Query error:", error)
             return failure(error.message)
         }
 
-        const instances = data.map((item) => deserializeWhatsAppInstance(item))
-        return success(instances)
+        console.log("[getAllInstances] Raw data from DB:", JSON.stringify(data, null, 2))
+
+        if (!data || data.length === 0) {
+            console.log("[getAllInstances] No instances found")
+            return success([])
+        }
+
+        try {
+            const instances = data.map((item) => {
+                console.log("[getAllInstances] Deserializing item:", JSON.stringify(item, null, 2))
+                return deserializeWhatsAppInstance(item)
+            })
+            console.log("[getAllInstances] Successfully deserialized", instances.length, "instances")
+            return success(instances)
+        } catch (deserializeError) {
+            console.error("[getAllInstances] Deserialization error:", deserializeError)
+            return failure(
+                deserializeError instanceof Error
+                    ? `Error al deserializar: ${deserializeError.message}`
+                    : "Error al deserializar instancias"
+            )
+        }
     } catch (error) {
+        console.error("[getAllInstances] Unexpected error:", error)
         return failure(
             error instanceof Error ? error.message : "Error al obtener instancias"
         )
