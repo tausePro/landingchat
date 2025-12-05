@@ -13,18 +13,43 @@ type Chat = {
     status: string
     created_at: string
     last_message?: string
+    organization_id: string
 }
 
 export default function ChatsPage() {
     const [chats, setChats] = useState<Chat[]>([])
     const [loading, setLoading] = useState(true)
+    const [orgId, setOrgId] = useState<string | null>(null)
 
     useEffect(() => {
         const fetchChats = async () => {
             const supabase = createClient()
+            
+            // Primero obtener el organization_id del usuario
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+                setLoading(false)
+                return
+            }
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("organization_id")
+                .eq("id", user.id)
+                .single()
+
+            if (!profile?.organization_id) {
+                setLoading(false)
+                return
+            }
+
+            setOrgId(profile.organization_id)
+
+            // Filtrar chats por organization_id
             const { data, error } = await supabase
                 .from("chats")
                 .select("*")
+                .eq("organization_id", profile.organization_id)
                 .order("created_at", { ascending: false })
 
             if (error) {
@@ -36,12 +61,21 @@ export default function ChatsPage() {
         }
 
         fetchChats()
+    }, [])
 
-        // Realtime subscription for new chats
+    // Realtime subscription for new chats (solo de la organización)
+    useEffect(() => {
+        if (!orgId) return
+
         const supabase = createClient()
         const channel = supabase
-            .channel('public:chats')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, payload => {
+            .channel('org:chats')
+            .on('postgres_changes', { 
+                event: 'INSERT', 
+                schema: 'public', 
+                table: 'chats',
+                filter: `organization_id=eq.${orgId}`
+            }, payload => {
                 setChats(prev => [payload.new as Chat, ...prev])
             })
             .subscribe()
@@ -49,7 +83,7 @@ export default function ChatsPage() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [])
+    }, [orgId])
 
     return (
         <DashboardLayout>
