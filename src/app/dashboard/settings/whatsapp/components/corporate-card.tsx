@@ -75,24 +75,26 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
 
     return (
         <>
-            <Card>
+            <Card className="border-gray-200 dark:border-gray-800 shadow-sm">
                 <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5" />
-                                WhatsApp Corporativo
-                            </CardTitle>
-                            <CardDescription>
-                                Conecta tu WhatsApp para atender clientes
-                            </CardDescription>
+                    <div className="flex items-start justify-between">
+                        <div className="flex gap-3">
+                            <MessageSquare className="h-6 w-6 text-gray-700 dark:text-gray-300 mt-0.5" />
+                            <div>
+                                <CardTitle className="text-xl font-bold">
+                                    WhatsApp Corporativo
+                                </CardTitle>
+                                <CardDescription className="text-sm mt-1">
+                                    Conecta tu WhatsApp para atender clientes
+                                </CardDescription>
+                            </div>
                         </div>
                         <Badge
                             variant={isConnected ? "default" : "secondary"}
                             className={
                                 isConnected
-                                    ? "bg-green-500 hover:bg-green-600"
-                                    : ""
+                                    ? "bg-green-500 hover:bg-green-600 text-white"
+                                    : "text-gray-600 dark:text-gray-400"
                             }
                         >
                             {isConnected

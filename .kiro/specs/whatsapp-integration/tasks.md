@@ -120,7 +120,7 @@
     - Función sendLowStockNotification(orgId, product)
     - Función sendNewConversationNotification(orgId, customer)
     - _Requirements: 6.2, 6.3, 6.4_
-  - [ ] 13.2 Integrar notificaciones en flujo de órdenes
+  - [x] 13.2 Integrar notificaciones en flujo de órdenes
     - Trigger al cambiar payment_status a 'paid'
     - Verificar configuración de notificaciones antes de enviar
     - _Requirements: 6.2, 6.5_

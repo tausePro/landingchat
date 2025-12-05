@@ -42,10 +42,10 @@ export function WhatsAppContentClient({ initialData }: WhatsAppContentClientProp
     return (
         <div className="space-y-6">
             {plan_limit === 0 && (
-                <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>WhatsApp no disponible</AlertTitle>
-                    <AlertDescription>
+                <Alert variant="destructive" className="border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800">
+                    <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    <AlertTitle className="text-red-900 dark:text-red-200">WhatsApp no disponible</AlertTitle>
+                    <AlertDescription className="text-red-700 dark:text-red-300">
                         Tu plan actual no incluye integración con WhatsApp. Actualiza
                         tu plan para acceder a esta funcionalidad.
                     </AlertDescription>
@@ -67,25 +67,31 @@ export function WhatsAppContentClient({ initialData }: WhatsAppContentClientProp
                 onUpdate={handleUpdate}
             />
 
-            <Card>
+            <Card className="border-gray-200 dark:border-gray-800">
                 <CardContent className="pt-6">
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                        <h4 className="font-medium text-foreground">
-                            ℹ️ Información importante
-                        </h4>
-                        <ul className="list-disc list-inside space-y-1">
-                            <li>
-                                El WhatsApp corporativo se usa para atender clientes
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                            <AlertCircle className="h-4 w-4 text-primary" />
+                            <h4 className="text-sm font-semibold text-foreground">
+                                Información importante
+                            </h4>
+                        </div>
+                        <ul className="space-y-1.5 text-sm text-muted-foreground ml-1">
+                            <li className="flex gap-2 items-start">
+                                <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-1.5 shrink-0"></span>
+                                <span>El WhatsApp corporativo se usa para atender clientes</span>
                             </li>
-                            <li>
-                                El WhatsApp personal solo recibe notificaciones
+                            <li className="flex gap-2 items-start">
+                                <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-1.5 shrink-0"></span>
+                                <span>El WhatsApp personal solo recibe notificaciones</span>
                             </li>
-                            <li>
-                                Las conversaciones se cuentan por cliente único al mes
+                            <li className="flex gap-2 items-start">
+                                <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-1.5 shrink-0"></span>
+                                <span>Las conversaciones se cuentan por cliente único al mes</span>
                             </li>
-                            <li>
-                                Los mensajes del agente IA son automáticos y no
-                                consumen tu límite
+                            <li className="flex gap-2 items-start">
+                                <span className="w-1.5 h-1.5 rounded-full bg-foreground mt-1.5 shrink-0"></span>
+                                <span>Los mensajes del agente IA son automáticos y no consumen tu límite</span>
                             </li>
                         </ul>
                     </div>

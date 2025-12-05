@@ -79,13 +79,15 @@ export function PersonalCard({ instance, onUpdate }: PersonalCardProps) {
     }
 
     return (
-        <Card>
+        <Card className="border-gray-200 dark:border-gray-800 shadow-sm">
             <CardHeader>
-                <div className="flex items-center gap-2">
-                    <Bell className="h-5 w-5" />
+                <div className="flex gap-3">
+                    <Bell className="h-6 w-6 text-gray-700 dark:text-gray-300 mt-0.5" />
                     <div>
-                        <CardTitle>WhatsApp Personal (Notificaciones)</CardTitle>
-                        <CardDescription>
+                        <CardTitle className="text-xl font-bold">
+                            WhatsApp Personal (Notificaciones)
+                        </CardTitle>
+                        <CardDescription className="text-sm mt-1">
                             Recibe notificaciones importantes en tu WhatsApp personal
                         </CardDescription>
                     </div>
@@ -95,23 +97,27 @@ export function PersonalCard({ instance, onUpdate }: PersonalCardProps) {
                 {!isConnected ? (
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="phone">Número de WhatsApp</Label>
-                            <div className="flex gap-2">
+                            <Label htmlFor="phone" className="text-sm font-medium">
+                                Número de WhatsApp
+                            </Label>
+                            <div className="flex gap-3 items-stretch">
                                 <Input
                                     id="phone"
                                     type="tel"
                                     placeholder="+57 300 123 4567"
                                     value={phoneNumber}
                                     onChange={(e) => setPhoneNumber(e.target.value)}
+                                    className="flex-1 h-11"
                                 />
                                 <Button
                                     onClick={handleConnect}
                                     disabled={isConnecting}
+                                    className="h-11 px-6"
                                 >
                                     {isConnecting ? "Conectando..." : "Conectar"}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground mt-1">
                                 Ingresa tu número personal para recibir notificaciones
                             </p>
                         </div>

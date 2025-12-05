@@ -160,6 +160,47 @@ export async function POST(request: Request) {
                         updated_at: new Date().toISOString(),
                     })
                     .eq("id", existingTx.order_id)
+
+                // Enviar notificación de venta si el pago fue aprobado
+                if (status === "approved") {
+                    try {
+                        const { data: order } = await supabase
+                            .from("orders")
+                            .select(`
+                                id,
+                                total,
+                                customers!inner(name),
+                                order_items(
+                                    quantity,
+                                    products!inner(name)
+                                )
+                            `)
+                            .eq("id", existingTx.order_id)
+                            .single()
+
+                        if (order) {
+                            const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
+                            const customer = order.customers as any
+                            const orderItems = order.order_items as any[]
+                            
+                            await sendSaleNotification(
+                                { organizationId: org.id },
+                                {
+                                    id: order.id,
+                                    total: order.total,
+                                    customerName: customer?.name || "Cliente",
+                                    items: orderItems?.map((item: any) => ({
+                                        name: item.products?.name || "Producto",
+                                        quantity: item.quantity,
+                                    })) || [],
+                                }
+                            )
+                        }
+                    } catch (notifError) {
+                        console.error("Error sending sale notification:", notifError)
+                        // No fallar el webhook si la notificación falla
+                    }
+                }
             }
         } else {
             // Crear nueva transacción si no existe
