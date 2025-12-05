@@ -202,20 +202,25 @@ export async function connectWhatsApp(): Promise<
                 orgId
             })
             
+            // Evolution API v2.x format
             const createRequest = {
                 instanceName,
                 token: orgId, // Usamos orgId como token para identificar
                 qrcode: true,
-                webhook: webhookUrl,
-                webhookByEvents: true,
-                events: [
-                    "MESSAGES_UPSERT",
-                    "CONNECTION_UPDATE",
-                    "QRCODE_UPDATED",
-                ],
+                integration: "WHATSAPP-BAILEYS" as const, // Required in v2.x
+                webhook: {
+                    url: webhookUrl,
+                    byEvents: true,
+                    base64: false,
+                    events: [
+                        "MESSAGES_UPSERT",
+                        "CONNECTION_UPDATE",
+                        "QRCODE_UPDATED",
+                    ],
+                },
             }
             
-            console.log("[connectWhatsApp] Request to Evolution API:", JSON.stringify(createRequest, null, 2))
+            console.log("[connectWhatsApp] Request to Evolution API v2.x:", JSON.stringify(createRequest, null, 2))
             
             await evolutionClient.createInstance(createRequest)
 

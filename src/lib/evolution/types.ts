@@ -12,11 +12,27 @@ export interface EvolutionConfig {
 // Gestión de Instancias
 // ============================================
 
+/**
+ * Evolution API v2.x - Create Instance Request
+ * @see https://doc.evolution-api.com/v2/pt/get-started/instances#criar-instância
+ */
 export interface CreateInstanceRequest {
     instanceName: string
     token?: string
+    number?: string
     qrcode?: boolean
-    webhook?: string
+    // Integration type - required in v2.x
+    integration?: "WHATSAPP-BAILEYS" | "WHATSAPP-BUSINESS"
+    // Webhook configuration for v2.x
+    webhook?: {
+        url: string
+        byEvents?: boolean
+        base64?: boolean
+        headers?: Record<string, string>
+        events?: string[]
+    }
+    // Legacy fields (v1.x) - kept for compatibility
+    webhookUrl?: string
     webhookByEvents?: boolean
     webhookBase64?: boolean
     events?: string[]
