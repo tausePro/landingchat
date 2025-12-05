@@ -140,99 +140,124 @@ export async function connectWhatsApp(): Promise<
 
         // Obtener configuración de Evolution API desde system_settings
         // Usamos serviceClient porque system_settings tiene RLS restrictivo
-        const serviceClient = createServiceClient()
-        const { data: settings, error: settingsError } = await serviceClient
-            .from("system_settings")
-            .select("value")
-            .eq("key", "evolution_api_config")
-            .single()
-
-        if (settingsError || !settings?.value) {
-            console.error("[connectWhatsApp] Evolution API not configured:", settingsError)
-            return failure("Evolution API no está configurado. Contacta al administrador.")
-        }
-
-        const config = settings.value as { url: string; apiKey: string }
-        const { EvolutionClient } = await import("@/lib/evolution")
-        const evolutionClient = new EvolutionClient({
-            baseUrl: config.url,
-            apiKey: config.apiKey,
-        })
-
-        const instanceName = `org_${orgId}`
-
-        // Si existe instancia, eliminarla primero
-        if (existing) {
-            try {
-                await evolutionClient.deleteInstance(instanceName)
-            } catch {
-                // Ignorar error si no existe
-            }
-        }
-
-        // Crear nueva instancia en Evolution
-        const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
-        await evolutionClient.createInstance({
-            instanceName,
-            token: orgId, // Usamos orgId como token para identificar
-            qrcode: true,
-            webhook: webhookUrl,
-            webhookByEvents: true,
-            events: [
-                "MESSAGES_UPSERT",
-                "CONNECTION_UPDATE",
-                "QRCODE_UPDATED",
-            ],
-        })
-
-        // Obtener QR code
-        const qrData = await evolutionClient.getQRCode(instanceName)
-
-        // Guardar/actualizar instancia en DB
-        const qrExpiresAt = new Date()
-        qrExpiresAt.setMinutes(qrExpiresAt.getMinutes() + 2) // QR expira en 2 minutos
-
-        const instanceData = {
-            organization_id: orgId,
-            instance_name: instanceName,
-            instance_type: "corporate" as const,
-            status: "connecting" as const,
-            qr_code: qrData.base64 || qrData.code,
-            qr_expires_at: qrExpiresAt.toISOString(),
-            updated_at: new Date().toISOString(),
-        }
-
-        let instanceId: string
-
-        if (existing) {
-            const { error } = await supabase
-                .from("whatsapp_instances")
-                .update(instanceData)
-                .eq("id", existing.id)
-
-            if (error) {
-                return failure(error.message)
-            }
-            instanceId = existing.id
-        } else {
-            const { data: newInstance, error } = await supabase
-                .from("whatsapp_instances")
-                .insert(instanceData)
-                .select("id")
+        try {
+            const serviceClient = createServiceClient()
+            const { data: settings, error: settingsError } = await serviceClient
+                .from("system_settings")
+                .select("value")
+                .eq("key", "evolution_api_config")
                 .single()
 
-            if (error) {
-                return failure(error.message)
+            if (settingsError) {
+                console.error("[connectWhatsApp] Error fetching Evolution config:", settingsError)
+                return failure(`Error al obtener configuración: ${settingsError.message}`)
             }
-            instanceId = newInstance.id
+
+            if (!settings?.value) {
+                console.error("[connectWhatsApp] Evolution API config not found in database")
+                return failure("Evolution API no está configurado. Contacta al administrador.")
+            }
+
+            const config = settings.value as { url: string; apiKey: string }
+            
+            if (!config.url || !config.apiKey) {
+                console.error("[connectWhatsApp] Invalid Evolution config:", config)
+                return failure("Configuración de Evolution API incompleta.")
+            }
+
+            const { EvolutionClient } = await import("@/lib/evolution")
+            const evolutionClient = new EvolutionClient({
+                baseUrl: config.url,
+                apiKey: config.apiKey,
+            })
+
+            const instanceName = `org_${orgId}`
+
+            // Si existe instancia, eliminarla primero
+            if (existing) {
+                try {
+                    await evolutionClient.deleteInstance(instanceName)
+                } catch (deleteError) {
+                    console.log("[connectWhatsApp] Could not delete existing instance:", deleteError)
+                    // Ignorar error si no existe
+                }
+            }
+
+            // Crear nueva instancia en Evolution
+            const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
+            console.log("[connectWhatsApp] Creating instance with webhook:", webhookUrl)
+            
+            await evolutionClient.createInstance({
+                instanceName,
+                token: orgId, // Usamos orgId como token para identificar
+                qrcode: true,
+                webhook: webhookUrl,
+                webhookByEvents: true,
+                events: [
+                    "MESSAGES_UPSERT",
+                    "CONNECTION_UPDATE",
+                    "QRCODE_UPDATED",
+                ],
+            })
+
+            // Obtener QR code
+            const qrData = await evolutionClient.getQRCode(instanceName)
+
+            // Guardar/actualizar instancia en DB
+            const qrExpiresAt = new Date()
+            qrExpiresAt.setMinutes(qrExpiresAt.getMinutes() + 2) // QR expira en 2 minutos
+
+            const instanceData = {
+                organization_id: orgId,
+                instance_name: instanceName,
+                instance_type: "corporate" as const,
+                status: "connecting" as const,
+                qr_code: qrData.base64 || qrData.code,
+                qr_expires_at: qrExpiresAt.toISOString(),
+                updated_at: new Date().toISOString(),
+            }
+
+            let instanceId: string
+
+            if (existing) {
+                const { error } = await supabase
+                    .from("whatsapp_instances")
+                    .update(instanceData)
+                    .eq("id", existing.id)
+
+                if (error) {
+                    return failure(error.message)
+                }
+                instanceId = existing.id
+            } else {
+                const { data: newInstance, error } = await supabase
+                    .from("whatsapp_instances")
+                    .insert(instanceData)
+                    .select("id")
+                    .single()
+
+                if (error) {
+                    return failure(error.message)
+                }
+                instanceId = newInstance.id
+            }
+
+            revalidatePath("/dashboard/settings/whatsapp")
+
+            return success({
+                qr_code: qrData.base64 || qrData.code,
+                instance_id: instanceId,
+            })
+        } catch (serviceError) {
+            console.error("[connectWhatsApp] Service client error:", serviceError)
+            return failure(
+                serviceError instanceof Error 
+                    ? `Error del servicio: ${serviceError.message}` 
+                    : "Error al conectar con el servicio"
+            )
         }
 
-        revalidatePath("/dashboard/settings/whatsapp")
 
-        return success({
-            qr_code: qrData.base64 || qrData.code,
-            instance_id: instanceId,
-        })
     } catch (error) {
         return failure(
             error instanceof Error ? error.message : "Error al conectar WhatsApp"
