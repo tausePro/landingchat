@@ -110,24 +110,18 @@ export async function connectWhatsApp(): Promise<
 
         const supabase = await createClient()
 
-        // Verificar límite del plan
-        const { data: org } = await supabase
-            .from("organizations")
-            .select("plan_id")
-            .eq("id", orgId)
+        // Verificar límite del plan desde subscriptions
+        const { data: subscription } = await supabase
+            .from("subscriptions")
+            .select("plans(max_whatsapp_conversations)")
+            .eq("organization_id", orgId)
+            .eq("status", "active")
             .single()
 
-        if (!org?.plan_id) {
-            return failure("Organización sin plan asignado")
-        }
+        // Si no hay suscripción, usar plan gratuito por defecto (10 conversaciones)
+        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 10
 
-        const { data: plan } = await supabase
-            .from("plans")
-            .select("max_whatsapp_conversations")
-            .eq("id", org.plan_id)
-            .single()
-
-        if (!plan || plan.max_whatsapp_conversations === 0) {
+        if (planLimit === 0) {
             return failure(
                 "Tu plan no incluye WhatsApp. Actualiza tu plan para usar esta función."
             )
