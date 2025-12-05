@@ -184,6 +184,42 @@ async function handleAuth(request: NextRequest) {
         return NextResponse.redirect(url)
     }
 
+    // Si el usuario está autenticado y va al dashboard, verificar onboarding
+    if (user && request.nextUrl.pathname.startsWith('/dashboard')) {
+        try {
+            // Obtener el perfil del usuario
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("organization_id")
+                .eq("id", user.id)
+                .single()
+
+            if (profile?.organization_id) {
+                // Verificar si la organización completó el onboarding
+                const { data: org } = await supabase
+                    .from("organizations")
+                    .select("onboarding_completed")
+                    .eq("id", profile.organization_id)
+                    .single()
+
+                // Si no ha completado el onboarding, redirigir
+                if (org && !org.onboarding_completed) {
+                    const url = request.nextUrl.clone()
+                    url.pathname = '/onboarding'
+                    return NextResponse.redirect(url)
+                }
+            } else {
+                // Si no tiene organización, redirigir al onboarding
+                const url = request.nextUrl.clone()
+                url.pathname = '/onboarding'
+                return NextResponse.redirect(url)
+            }
+        } catch (error) {
+            console.error("Error checking onboarding status:", error)
+            // En caso de error, permitir continuar al dashboard
+        }
+    }
+
     return supabaseResponse
 }
 
