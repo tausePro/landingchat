@@ -108,7 +108,7 @@
     - Función sendResponse(conversationId, response)
     - Función identifyCustomer(phone, email)
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
-  - [ ]* 11.3 Write property test for customer identification
+  - [ ] 11.3 Write property test for customer identification
     - **Property 1: Identificación de cliente por teléfono**
     - **Validates: Requirements 3.2, 3.3, 5.1**
 
@@ -124,7 +124,7 @@
     - Trigger al cambiar payment_status a 'paid'
     - Verificar configuración de notificaciones antes de enviar
     - _Requirements: 6.2, 6.5_
-  - [ ]* 13.3 Write property test for notification delivery
+  - [ ] 13.3 Write property test for notification delivery
     - **Property 4: Persistencia de mensajes**
     - **Validates: Requirements 3.4, 4.5**
 

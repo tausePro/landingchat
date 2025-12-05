@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import {
     type ActionResult,
@@ -139,7 +139,9 @@ export async function connectWhatsApp(): Promise<
         }
 
         // Obtener configuración de Evolution API desde system_settings
-        const { data: settings, error: settingsError } = await supabase
+        // Usamos serviceClient porque system_settings tiene RLS restrictivo
+        const serviceClient = createServiceClient()
+        const { data: settings, error: settingsError } = await serviceClient
             .from("system_settings")
             .select("value")
             .eq("key", "evolution_api_config")
@@ -263,7 +265,9 @@ export async function disconnectWhatsApp(): Promise<ActionResult<void>> {
         }
 
         // Obtener configuración de Evolution API
-        const { data: settings } = await supabase
+        // Usamos serviceClient porque system_settings tiene RLS restrictivo
+        const serviceClient = createServiceClient()
+        const { data: settings } = await serviceClient
             .from("system_settings")
             .select("value")
             .eq("key", "evolution_api_config")
