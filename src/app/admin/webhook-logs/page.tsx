@@ -17,11 +17,11 @@ export default async function WebhookLogsPage() {
     // Verificar que sea superadmin
     const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("is_superadmin")
         .eq("id", user.id)
         .single()
 
-    if (profile?.role !== "superadmin") {
+    if (!profile?.is_superadmin) {
         redirect("/dashboard")
     }
 

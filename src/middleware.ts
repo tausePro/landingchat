@@ -90,9 +90,9 @@ export async function middleware(request: NextRequest) {
     
     const isProductionSubdomain = !hostname.includes('localhost') && !hostname.includes('127.0.0.1') && slug
 
-    // Si estamos en subdominio y la ruta es /dashboard, redirigir al dominio principal
-    // El dashboard siempre debe estar en www.landingchat.co
-    if (isProductionSubdomain && pathname.startsWith('/dashboard')) {
+    // Si estamos en subdominio y la ruta es /dashboard o /admin, redirigir al dominio principal
+    // El dashboard y admin siempre deben estar en www.landingchat.co
+    if (isProductionSubdomain && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
         return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
     }
 
