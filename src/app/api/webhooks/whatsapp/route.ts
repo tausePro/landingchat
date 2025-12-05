@@ -50,25 +50,41 @@ const ConnectionUpdateSchema = z.object({
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
+        const url = new URL(request.url)
+        const pathSegments = url.pathname.split("/")
+        
+        // Evolution API v2.x envía eventos en rutas diferentes
+        // Ejemplo: /api/webhooks/whatsapp/connection-update
+        const eventFromPath = pathSegments[pathSegments.length - 1]
         
         // Log completo del payload para debugging
         console.log("[WhatsApp Webhook] Raw payload:", JSON.stringify(body, null, 2))
+        console.log("[WhatsApp Webhook] Path:", url.pathname)
+        console.log("[WhatsApp Webhook] Event from path:", eventFromPath)
         
-        // Validar estructura básica del webhook
-        const validation = WebhookPayloadSchema.safeParse(body)
-        if (!validation.success) {
-            console.error("[WhatsApp Webhook] Invalid payload:", validation.error)
-            // Intentar procesar de todas formas si tiene los campos básicos
-            if (!body.event || !body.instance) {
-                return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
-            }
+        // Determinar el evento (puede venir en el body o en la ruta)
+        let event = body.event || eventFromPath
+        
+        // Normalizar nombres de eventos de Evolution API v2.x
+        const eventMap: Record<string, string> = {
+            "connection-update": "connection.update",
+            "qrcode-updated": "qrcode.updated",
+            "messages-upsert": "messages.upsert",
         }
-
-        const event = body.event
-        const instance = body.instance
+        
+        if (eventMap[event]) {
+            event = eventMap[event]
+        }
+        
+        const instance = body.instance || body.instanceName
         const data = body.data || body
         
-        console.log(`[WhatsApp Webhook] Event: ${event}, Instance: ${instance}`)
+        console.log(`[WhatsApp Webhook] Normalized Event: ${event}, Instance: ${instance}`)
+        
+        if (!instance) {
+            console.error("[WhatsApp Webhook] No instance found in payload")
+            return NextResponse.json({ error: "Instance required" }, { status: 400 })
+        }
 
         // Obtener cliente de Supabase con permisos de servicio
         const supabase = await createServiceClient()
