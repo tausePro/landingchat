@@ -184,7 +184,13 @@ export async function connectWhatsApp(): Promise<
             }
 
             // Crear nueva instancia en Evolution
-            const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL
+            if (!appUrl) {
+                console.error("[connectWhatsApp] NEXT_PUBLIC_APP_URL not configured")
+                return failure("Variable de entorno NEXT_PUBLIC_APP_URL no configurada. Contacta al administrador.")
+            }
+            
+            const webhookUrl = `${appUrl}/api/webhooks/whatsapp`
             console.log("[connectWhatsApp] Creating instance with webhook:", webhookUrl)
             
             await evolutionClient.createInstance({
