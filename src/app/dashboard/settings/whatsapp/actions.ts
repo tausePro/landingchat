@@ -83,10 +83,18 @@ export async function getWhatsAppStatus(): Promise<
         const personal =
             instances?.find((i) => i.instance_type === "personal") || null
 
+        // Obtener contador de conversaciones usadas
+        const { data: orgData } = await supabase
+            .from("organizations")
+            .select("whatsapp_conversations_used")
+            .eq("id", orgId)
+            .single()
+
         return success({
             corporate: corporate ? deserializeWhatsAppInstance(corporate) : null,
             personal: personal ? deserializeWhatsAppInstance(personal) : null,
             plan_limit: planLimit,
+            conversations_used: orgData?.whatsapp_conversations_used || 0,
         })
     } catch (error) {
         return failure(

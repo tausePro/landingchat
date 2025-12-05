@@ -98,12 +98,12 @@
 
 - [x] 10. Checkpoint - Verificar webhook handler
 
-- [ ] 11. Integrar con agente IA existente
-  - [ ] 11.1 Modificar `src/lib/ai/agent.ts` para soportar canal WhatsApp
+- [x] 11. Integrar con agente IA existente
+  - [x] 11.1 Modificar `src/lib/ai/agent.ts` para soportar canal WhatsApp
     - Agregar parámetro de canal al procesar mensaje
     - Formatear respuestas según canal (texto plano para WA)
     - _Requirements: 3.4, 4.1_
-  - [ ] 11.2 Crear servicio de mensajería unificada `src/lib/messaging/unified.ts`
+  - [x] 11.2 Crear servicio de mensajería unificada `src/lib/messaging/unified.ts`
     - Función processIncomingMessage(channel, message)
     - Función sendResponse(conversationId, response)
     - Función identifyCustomer(phone, email)
@@ -112,10 +112,10 @@
     - **Property 1: Identificación de cliente por teléfono**
     - **Validates: Requirements 3.2, 3.3, 5.1**
 
-- [ ] 12. Checkpoint - Verificar integración con agente
+- [x] 12. Checkpoint - Verificar integración con agente
 
-- [ ] 13. Implementar notificaciones al propietario
-  - [ ] 13.1 Crear servicio de notificaciones `src/lib/notifications/whatsapp.ts`
+- [x] 13. Implementar notificaciones al propietario
+  - [x] 13.1 Crear servicio de notificaciones `src/lib/notifications/whatsapp.ts`
     - Función sendSaleNotification(orgId, order)
     - Función sendLowStockNotification(orgId, product)
     - Función sendNewConversationNotification(orgId, customer)
@@ -128,15 +128,15 @@
     - **Property 4: Persistencia de mensajes**
     - **Validates: Requirements 3.4, 4.5**
 
-- [ ] 14. Checkpoint - Verificar notificaciones
+- [x] 14. Checkpoint - Verificar notificaciones
 
-- [ ] 15. Implementar control de límites
-  - [ ] 15.1 Crear utilidades de límites `src/lib/utils/whatsapp-limits.ts`
+- [x] 15. Implementar control de límites
+  - [x] 15.1 Crear utilidades de límites `src/lib/utils/whatsapp-limits.ts`
     - Función checkConversationLimit(orgId)
     - Función incrementConversationCount(orgId)
     - Función resetMonthlyCounters() - para cron job
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
-  - [ ] 15.2 Agregar indicador de uso en dashboard
+  - [x] 15.2 Agregar indicador de uso en dashboard
     - Mostrar conversaciones usadas vs límite
     - Alerta cuando uso > 80%
     - _Requirements: 7.2_
@@ -144,4 +144,4 @@
     - **Property 2: Límite de conversaciones por plan**
     - **Validates: Requirements 7.1, 7.4**
 
-- [ ] 16. Final Checkpoint - Verificar implementación completa
+- [x] 16. Final Checkpoint - Verificar implementación completa

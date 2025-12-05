@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { CorporateCard } from "./corporate-card"
 import { PersonalCard } from "./personal-card"
+import { UsageIndicator } from "./usage-indicator"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -13,6 +14,7 @@ interface WhatsAppContentClientProps {
         corporate: WhatsAppInstance | null
         personal: WhatsAppInstance | null
         plan_limit: number
+        conversations_used?: number
     }>
 }
 
@@ -31,7 +33,7 @@ export function WhatsAppContentClient({ initialData }: WhatsAppContentClientProp
         )
     }
 
-    const { corporate, personal, plan_limit } = initialData.data
+    const { corporate, personal, plan_limit, conversations_used = 0 } = initialData.data
 
     const handleUpdate = () => {
         router.refresh()
@@ -48,6 +50,10 @@ export function WhatsAppContentClient({ initialData }: WhatsAppContentClientProp
                         tu plan para acceder a esta funcionalidad.
                     </AlertDescription>
                 </Alert>
+            )}
+
+            {plan_limit > 0 && (
+                <UsageIndicator used={conversations_used} limit={plan_limit} />
             )}
 
             <CorporateCard

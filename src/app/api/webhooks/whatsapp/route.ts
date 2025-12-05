@@ -178,8 +178,18 @@ async function handleIncomingMessage(
         },
     })
 
-    // TODO: Integrar con agente IA para respuesta automática
-    // Por ahora solo guardamos el mensaje
+    // Procesar mensaje con el agente IA
+    const { processIncomingMessage } = await import("@/lib/messaging/unified")
+    await processIncomingMessage({
+        channel: "whatsapp",
+        chatId: chat.id,
+        content: messageText,
+        metadata: {
+            whatsapp_message_id: message.key.id,
+            phone_number: phoneNumber,
+            push_name: message.pushName,
+        },
+    })
 }
 
 /**
