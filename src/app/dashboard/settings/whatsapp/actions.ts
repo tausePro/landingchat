@@ -1,7 +1,6 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { createEvolutionClient } from "@/lib/evolution"
 import { revalidatePath } from "next/cache"
 import {
     type ActionResult,
@@ -139,11 +138,24 @@ export async function connectWhatsApp(): Promise<
             return failure("Ya tienes un WhatsApp conectado")
         }
 
-        // Crear cliente Evolution
-        const evolutionClient = await createEvolutionClient(supabase)
-        if (!evolutionClient) {
-            return failure("Evolution API no configurado")
+        // Obtener configuración de Evolution API desde system_settings
+        const { data: settings, error: settingsError } = await supabase
+            .from("system_settings")
+            .select("value")
+            .eq("key", "evolution_api_config")
+            .single()
+
+        if (settingsError || !settings?.value) {
+            console.error("[connectWhatsApp] Evolution API not configured:", settingsError)
+            return failure("Evolution API no está configurado. Contacta al administrador.")
         }
+
+        const config = settings.value as { url: string; apiKey: string }
+        const { EvolutionClient } = await import("@/lib/evolution")
+        const evolutionClient = new EvolutionClient({
+            baseUrl: config.url,
+            apiKey: config.apiKey,
+        })
 
         const instanceName = `org_${orgId}`
 
@@ -250,9 +262,21 @@ export async function disconnectWhatsApp(): Promise<ActionResult<void>> {
             return failure("No hay WhatsApp conectado")
         }
 
-        // Crear cliente Evolution
-        const evolutionClient = await createEvolutionClient(supabase)
-        if (evolutionClient) {
+        // Obtener configuración de Evolution API
+        const { data: settings } = await supabase
+            .from("system_settings")
+            .select("value")
+            .eq("key", "evolution_api_config")
+            .single()
+
+        if (settings?.value) {
+            const config = settings.value as { url: string; apiKey: string }
+            const { EvolutionClient } = await import("@/lib/evolution")
+            const evolutionClient = new EvolutionClient({
+                baseUrl: config.url,
+                apiKey: config.apiKey,
+            })
+
             try {
                 await evolutionClient.logout(instance.instance_name)
             } catch (error) {

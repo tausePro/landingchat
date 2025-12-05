@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard: Conexión WhatsApp</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#2b7cee",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101822",
+              "success": "#28A745",
+              "warning": "#FFC107",
+              "danger": "#DC3545",
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings:
+        'FILL' 0,
+        'wght' 400,
+        'GRAD' 0,
+        'opsz' 24
+      }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark">
+<div class="relative flex min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="flex flex-row h-full">
+<aside class="flex-shrink-0 w-64 bg-white dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-800">
+<div class="flex h-full min-h-[700px] flex-col justify-between p-4">
+<div class="flex flex-col gap-4">
+<div class="flex gap-3 items-center px-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="LandingChat company logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDguvJfxAaSH5MktTUqCibkKRRsMOWFHhsMezOp8Yw4AnNyNbRgJ13qytIArXWO--cucWw1XqzLPEDfECRlH4gsL8JfOiswobWcQ3oT3OEa1oHcaXH6aOgl5GxDKxCEQnImJN1Nj0jUv_jidAUtd7eDPMmCajlb9s_mT8kFRpsydVeucd1VeSDFyLPh9Muf2eOMVPFEct-yMHYllgGpKYyacEQxUYlobTl7yDB9IVzqDPW_Yzok3FogNPRfxLBKeHOaBReC233ElRI");'></div>
+<div class="flex flex-col">
+<h1 class="text-gray-900 dark:text-white text-base font-medium leading-normal">LandingChat</h1>
+<p class="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Plan Pro</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2 mt-4">
+<a class="flex items-center gap-3 px-3 py-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">chat</span>
+<p class="text-sm font-medium leading-normal">Chats</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/20 text-primary dark:text-white dark:bg-primary/50" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">link</span>
+<p class="text-sm font-medium leading-normal">Conexiones</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<p class="text-sm font-medium leading-normal">Contactos</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<p class="text-sm font-medium leading-normal">Analíticas</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+<p class="text-sm font-medium leading-normal">Configuración</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-primary/10 transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<p class="text-sm font-medium leading-normal">Ayuda</p>
+</a>
+</div>
+</div>
+</aside>
+<main class="flex-1 p-6 sm:p-8 lg:p-10 bg-background-light dark:bg-background-dark">
+<div class="max-w-5xl mx-auto flex flex-col gap-8">
+<div class="flex flex-col gap-1">
+<h1 class="text-gray-900 dark:text-white text-3xl font-bold leading-tight">WhatsApp</h1>
+<p class="text-gray-500 dark:text-gray-400 text-base font-normal leading-normal">Conecta WhatsApp para atender clientes y recibir notificaciones</p>
+</div>
+<div class="flex items-start gap-4 p-4 rounded-lg bg-[#F5F5F5] border border-gray-300 dark:bg-gray-800 dark:border-gray-700">
+<span class="material-symbols-outlined text-gray-700 dark:text-gray-300 mt-0.5">error_outline</span>
+<div class="flex flex-col gap-1">
+<h3 class="text-gray-900 dark:text-white text-sm font-semibold">WhatsApp no disponible</h3>
+<p class="text-gray-600 dark:text-gray-400 text-sm">Tu plan actual no incluye integración con WhatsApp. Actualiza tu plan para acceder a esta funcionalidad.</p>
+</div>
+</div>
+<div class="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6 flex flex-col gap-6">
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-gray-900 dark:text-white">chat_bubble_outline</span>
+<h2 class="text-xl font-bold text-gray-900 dark:text-white">WhatsApp Corporativo</h2>
+</div>
+<p class="text-gray-500 dark:text-gray-400 text-sm">Conecta tu WhatsApp para atender clientes</p>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10 dark:bg-gray-800 dark:text-gray-400">Desconectado</span>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<p class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+                            Conecta tu WhatsApp Business para recibir y responder mensajes de clientes directamente desde la plataforma.
+                        </p>
+<div class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+<span class="material-symbols-outlined text-lg" style="font-size: 18px;">trending_up</span>
+<span>Tu plan incluye hasta <span class="font-medium text-gray-900 dark:text-white">0</span> conversaciones por mes</span>
+</div>
+</div>
+<div class="flex flex-col items-center gap-4 mt-2">
+<button class="w-full bg-primary hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors duration-200 text-center">
+                            Conectar WhatsApp
+                        </button>
+<a class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline decoration-gray-300 underline-offset-4" href="#">
+                            Actualiza tu plan para usar WhatsApp
+                        </a>
+</div>
+</div>
+<div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-primary text-sm">info</span>
+<h4 class="text-sm font-semibold text-gray-900 dark:text-white">Información importante</h4>
+</div>
+<ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1 ml-1">
+<li>El WhatsApp corporativo se usa para atender clientes</li>
+<li>Las conversaciones se cuentan por cliente único al mes</li>
+<li>Los mensajes del agente IA son automáticos y no consumen tu límite</li>
+</ul>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+
+</body></html>
