@@ -76,19 +76,19 @@
 
 - [x] 8. Checkpoint - Verificar conexión WhatsApp
 
-- [ ] 9. Implementar webhook handler
-  - [ ] 9.1 Crear webhook handler `src/app/api/webhooks/whatsapp/route.ts`
+- [x] 9. Implementar webhook handler
+  - [x] 9.1 Crear webhook handler `src/app/api/webhooks/whatsapp/route.ts`
     - Validar firma del webhook
     - Parsear eventos: messages.upsert, connection.update, qrcode.updated
     - Identificar organización por instance_name
     - _Requirements: 3.1, 3.5_
-  - [ ] 9.2 Implementar procesamiento de mensajes entrantes
+  - [x] 9.2 Implementar procesamiento de mensajes entrantes
     - Buscar/crear cliente por número de teléfono
     - Buscar/crear conversación (chat)
     - Guardar mensaje en base de datos
     - Verificar límite de conversaciones
     - _Requirements: 3.2, 3.3, 3.4, 7.1_
-  - [ ] 9.3 Implementar actualización de estado de conexión
+  - [x] 9.3 Implementar actualización de estado de conexión
     - Actualizar status de instancia en DB
     - Notificar al frontend via polling
     - _Requirements: 2.3, 2.4_
@@ -96,7 +96,7 @@
     - **Property 5: Validación de webhook**
     - **Validates: Requirements 3.5, 5.4**
 
-- [ ] 10. Checkpoint - Verificar webhook handler
+- [x] 10. Checkpoint - Verificar webhook handler
 
 - [ ] 11. Integrar con agente IA existente
   - [ ] 11.1 Modificar `src/lib/ai/agent.ts` para soportar canal WhatsApp
