@@ -194,7 +194,7 @@ async function handleIncomingMessage(
     // Guardar mensaje en la base de datos
     await supabase.from("messages").insert({
         chat_id: chat.id,
-        role: "user",
+        sender_type: "user",
         content: messageText,
         metadata: {
             whatsapp_message_id: message.key.id,
@@ -204,8 +204,9 @@ async function handleIncomingMessage(
     })
 
     // Procesar mensaje con el agente IA
+    console.log(`[WhatsApp Webhook] Processing message with AI agent for chat ${chat.id}`)
     const { processIncomingMessage } = await import("@/lib/messaging/unified")
-    await processIncomingMessage({
+    const result = await processIncomingMessage({
         channel: "whatsapp",
         chatId: chat.id,
         content: messageText,
@@ -215,6 +216,12 @@ async function handleIncomingMessage(
             push_name: message.pushName,
         },
     })
+    
+    if (result.success) {
+        console.log(`[WhatsApp Webhook] AI response sent successfully`)
+    } else {
+        console.error(`[WhatsApp Webhook] AI processing failed:`, result.error)
+    }
 }
 
 /**
@@ -362,6 +369,7 @@ async function findOrCreateChat(
             customer_id: customerId,
             channel: "whatsapp",
             whatsapp_chat_id: phoneNumber,
+            phone_number: phoneNumber, // Guardar también en phone_number para búsquedas
             status: "active",
         })
         .select("id")

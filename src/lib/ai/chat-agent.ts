@@ -248,15 +248,8 @@ REGLAS CRÍTICAS DE INVENTARIO:
             })
         }
 
-        // 10. Save user message to DB
-        await supabase.from("messages").insert({
-            chat_id: input.chatId,
-            sender_type: "user",
-            content: input.message,
-            metadata: {}
-        })
-
-        // 11. Save assistant response to DB
+        // 10. Save assistant response to DB
+        // Nota: El mensaje del usuario ya fue guardado por el webhook/caller
         await supabase.from("messages").insert({
             chat_id: input.chatId,
             sender_type: "bot",

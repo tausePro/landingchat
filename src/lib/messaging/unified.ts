@@ -122,14 +122,18 @@ async function sendWhatsAppResponse(
         // Obtener número del cliente desde el chat
         const { data: chat } = await supabase
             .from("chats")
-            .select("phone_number")
+            .select("phone_number, whatsapp_chat_id")
             .eq("id", chatId)
             .single()
 
-        if (!chat?.phone_number) {
+        const phoneNumber = chat?.phone_number || chat?.whatsapp_chat_id
+        
+        if (!phoneNumber) {
             console.error("[Unified Messaging] No phone number in chat:", chatId)
             return
         }
+
+        console.log("[Unified Messaging] Sending WhatsApp message to:", phoneNumber)
 
         // Obtener configuración de Evolution API
         const { data: settings } = await supabase
@@ -149,13 +153,13 @@ async function sendWhatsAppResponse(
             apiKey: config.apiKey,
         })
 
-        // Enviar mensaje
+        // Enviar mensaje - Evolution API espera el número sin @s.whatsapp.net
         await client.sendTextMessage(instance.instance_name, {
-            number: chat.phone_number,
+            number: phoneNumber,
             text: response,
         })
 
-        console.log("[Unified Messaging] WhatsApp message sent to:", chat.phone_number)
+        console.log("[Unified Messaging] WhatsApp message sent successfully to:", phoneNumber)
     } catch (error) {
         console.error("[Unified Messaging] Error sending WhatsApp response:", error)
     }
@@ -251,7 +255,7 @@ export async function sendResponse(
         // Guardar mensaje en la base de datos
         await supabase.from("messages").insert({
             chat_id: conversationId,
-            role: "assistant",
+            sender_type: "bot",
             content: response,
         })
 
