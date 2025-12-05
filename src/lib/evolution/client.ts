@@ -43,6 +43,8 @@ export class EvolutionClient {
     async createInstance(
         request: CreateInstanceRequest
     ): Promise<CreateInstanceResponse> {
+        console.log("[EvolutionClient] Creating instance with request:", JSON.stringify(request, null, 2))
+        
         const response = await fetch(`${this.config.baseUrl}/instance/create`, {
             method: "POST",
             headers: this.getHeaders(),
@@ -50,10 +52,22 @@ export class EvolutionClient {
         })
 
         if (!response.ok) {
-            const error = await response.json()
-            throw new Error(
-                `Evolution API error: ${error.message || "Failed to create instance"}`
-            )
+            const errorText = await response.text()
+            console.error("[EvolutionClient] Error response:", {
+                status: response.status,
+                statusText: response.statusText,
+                body: errorText
+            })
+            
+            let errorMessage = "Failed to create instance"
+            try {
+                const errorJson = JSON.parse(errorText)
+                errorMessage = errorJson.message || errorJson.error || errorText
+            } catch {
+                errorMessage = errorText || errorMessage
+            }
+            
+            throw new Error(`Evolution API error (${response.status}): ${errorMessage}`)
         }
 
         return response.json()

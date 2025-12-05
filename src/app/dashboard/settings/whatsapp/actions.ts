@@ -185,15 +185,24 @@ export async function connectWhatsApp(): Promise<
 
             // Crear nueva instancia en Evolution
             const appUrl = process.env.NEXT_PUBLIC_APP_URL
+            console.log("[connectWhatsApp] Environment check:", {
+                NEXT_PUBLIC_APP_URL: appUrl,
+                NODE_ENV: process.env.NODE_ENV
+            })
+            
             if (!appUrl) {
                 console.error("[connectWhatsApp] NEXT_PUBLIC_APP_URL not configured")
                 return failure("Variable de entorno NEXT_PUBLIC_APP_URL no configurada. Contacta al administrador.")
             }
             
             const webhookUrl = `${appUrl}/api/webhooks/whatsapp`
-            console.log("[connectWhatsApp] Creating instance with webhook:", webhookUrl)
+            console.log("[connectWhatsApp] Creating instance:", {
+                instanceName,
+                webhookUrl,
+                orgId
+            })
             
-            await evolutionClient.createInstance({
+            const createRequest = {
                 instanceName,
                 token: orgId, // Usamos orgId como token para identificar
                 qrcode: true,
@@ -204,7 +213,11 @@ export async function connectWhatsApp(): Promise<
                     "CONNECTION_UPDATE",
                     "QRCODE_UPDATED",
                 ],
-            })
+            }
+            
+            console.log("[connectWhatsApp] Request to Evolution API:", JSON.stringify(createRequest, null, 2))
+            
+            await evolutionClient.createInstance(createRequest)
 
             // Obtener QR code
             const qrData = await evolutionClient.getQRCode(instanceName)
