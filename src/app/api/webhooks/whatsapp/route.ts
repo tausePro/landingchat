@@ -51,14 +51,23 @@ export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
         
+        // Log completo del payload para debugging
+        console.log("[WhatsApp Webhook] Raw payload:", JSON.stringify(body, null, 2))
+        
         // Validar estructura básica del webhook
         const validation = WebhookPayloadSchema.safeParse(body)
         if (!validation.success) {
             console.error("[WhatsApp Webhook] Invalid payload:", validation.error)
-            return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
+            // Intentar procesar de todas formas si tiene los campos básicos
+            if (!body.event || !body.instance) {
+                return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
+            }
         }
 
-        const { event, instance, data } = validation.data
+        const event = body.event
+        const instance = body.instance
+        const data = body.data || body
+        
         console.log(`[WhatsApp Webhook] Event: ${event}, Instance: ${instance}`)
 
         // Obtener cliente de Supabase con permisos de servicio
@@ -200,32 +209,53 @@ async function handleConnectionUpdate(
     instance: WhatsAppInstanceRecord,
     data: Record<string, unknown>
 ) {
-    const validation = ConnectionUpdateSchema.safeParse(data)
-    if (!validation.success) {
-        console.error("[WhatsApp Webhook] Invalid connection update:", validation.error)
+    console.log("[WhatsApp Webhook] Connection update data:", JSON.stringify(data, null, 2))
+    
+    // Evolution API v2.x puede enviar el estado en diferentes formatos
+    let state: string | undefined
+    
+    // Intentar obtener el estado de diferentes ubicaciones
+    if (typeof data.state === "string") {
+        state = data.state
+    } else if (typeof data.status === "string") {
+        state = data.status
+    } else if (data.connection && typeof (data.connection as Record<string, unknown>).state === "string") {
+        state = (data.connection as Record<string, unknown>).state as string
+    }
+    
+    if (!state) {
+        console.error("[WhatsApp Webhook] Could not extract state from connection update")
         return
     }
 
-    const { state } = validation.data
     console.log(`[WhatsApp Webhook] Connection state for ${instance.id}: ${state}`)
 
     // Mapear estado de Evolution a nuestro estado
     const statusMap: Record<string, string> = {
         open: "connected",
         close: "disconnected",
+        closed: "disconnected",
         connecting: "connecting",
     }
 
-    const newStatus = statusMap[state] || "disconnected"
+    const newStatus = statusMap[state.toLowerCase()] || "disconnected"
+    console.log(`[WhatsApp Webhook] Updating instance ${instance.id} to status: ${newStatus}`)
 
     // Actualizar estado en la base de datos
-    await supabase
+    const { error } = await supabase
         .from("whatsapp_instances")
         .update({
             status: newStatus,
+            connected_at: newStatus === "connected" ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),
         })
         .eq("id", instance.id)
+    
+    if (error) {
+        console.error("[WhatsApp Webhook] Error updating instance status:", error)
+    } else {
+        console.log(`[WhatsApp Webhook] Successfully updated instance ${instance.id} to ${newStatus}`)
+    }
 }
 
 /**
