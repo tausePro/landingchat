@@ -57,28 +57,28 @@ export function WebhookLogsList({ initialLogs }: Props) {
             {/* Filtros */}
             <div className="flex gap-2">
                 <Button
-                    variant={filter === "all" ? "default" : "outline"}
+                    variant={filter === "all" ? "secondary" : "outline"}
                     size="sm"
                     onClick={() => setFilter("all")}
                 >
                     Todos ({logs.length})
                 </Button>
                 <Button
-                    variant={filter === "success" ? "default" : "outline"}
+                    variant={filter === "success" ? "secondary" : "outline"}
                     size="sm"
                     onClick={() => setFilter("success")}
                 >
                     Success ({logs.filter((l) => l.processing_result === "success").length})
                 </Button>
                 <Button
-                    variant={filter === "error" ? "default" : "outline"}
+                    variant={filter === "error" ? "secondary" : "outline"}
                     size="sm"
                     onClick={() => setFilter("error")}
                 >
                     Errors ({logs.filter((l) => l.processing_result === "error").length})
                 </Button>
                 <Button
-                    variant={filter === "warning" ? "default" : "outline"}
+                    variant={filter === "warning" ? "secondary" : "outline"}
                     size="sm"
                     onClick={() => setFilter("warning")}
                 >
