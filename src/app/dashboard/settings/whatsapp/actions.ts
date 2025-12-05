@@ -60,23 +60,15 @@ export async function getWhatsAppStatus(): Promise<
             return failure(instancesError.message)
         }
 
-        // Obtener límite del plan
-        const { data: org } = await supabase
-            .from("organizations")
-            .select("plan_id")
-            .eq("id", orgId)
+        // Obtener límite del plan desde subscriptions
+        const { data: subscription } = await supabase
+            .from("subscriptions")
+            .select("plans(max_whatsapp_conversations)")
+            .eq("organization_id", orgId)
+            .eq("status", "active")
             .single()
 
-        let planLimit = 0
-        if (org?.plan_id) {
-            const { data: plan } = await supabase
-                .from("plans")
-                .select("max_whatsapp_conversations")
-                .eq("id", org.plan_id)
-                .single()
-
-            planLimit = plan?.max_whatsapp_conversations || 0
-        }
+        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 0
 
         const corporate =
             instances?.find((i) => i.instance_type === "corporate") || null

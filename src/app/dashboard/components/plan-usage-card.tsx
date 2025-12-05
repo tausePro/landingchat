@@ -4,13 +4,14 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Package, Bot, MessageSquare } from "lucide-react"
+import { AlertTriangle, Package, Bot, MessageSquare, MessageCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 interface UsageData {
     products: { current: number; limit: number; percentage: number }
     agents: { current: number; limit: number; percentage: number }
     conversations: { current: number; limit: number; percentage: number }
+    whatsapp: { current: number; limit: number; percentage: number }
     planName: string
 }
 
@@ -42,7 +43,7 @@ export function PlanUsageCard() {
                     max_products,
                     max_agents,
                     max_monthly_conversations,
-                    plan:plans(name, max_products, max_agents, max_monthly_conversations)
+                    plan:plans(name, max_products, max_agents, max_monthly_conversations, max_whatsapp_conversations)
                 `)
                 .eq("organization_id", orgId)
                 .eq("status", "active")
@@ -55,6 +56,7 @@ export function PlanUsageCard() {
                 max_products: subscription?.max_products || planData?.max_products || 10,
                 max_agents: subscription?.max_agents || planData?.max_agents || 1,
                 max_monthly_conversations: subscription?.max_monthly_conversations || planData?.max_monthly_conversations || 100,
+                max_whatsapp_conversations: planData?.max_whatsapp_conversations || 0,
             }
             const planName = planData?.name || "Gratis"
 
@@ -84,6 +86,15 @@ export function PlanUsageCard() {
             const agents = agentsCount || 0
             const conversations = conversationsCount || 0
 
+            // Obtener uso de WhatsApp
+            const { data: orgData } = await supabase
+                .from("organizations")
+                .select("whatsapp_conversations_used")
+                .eq("id", orgId)
+                .single()
+
+            const whatsappUsed = orgData?.whatsapp_conversations_used || 0
+
             setUsage({
                 products: {
                     current: products,
@@ -99,6 +110,13 @@ export function PlanUsageCard() {
                     current: conversations,
                     limit: limits.max_monthly_conversations,
                     percentage: Math.min((conversations / limits.max_monthly_conversations) * 100, 100),
+                },
+                whatsapp: {
+                    current: whatsappUsed,
+                    limit: limits.max_whatsapp_conversations,
+                    percentage: limits.max_whatsapp_conversations > 0 
+                        ? Math.min((whatsappUsed / limits.max_whatsapp_conversations) * 100, 100)
+                        : 0,
                 },
                 planName,
             })
@@ -208,6 +226,30 @@ export function PlanUsageCard() {
                         />
                     </div>
                 </div>
+
+                {/* WhatsApp - Solo mostrar si el plan incluye WhatsApp */}
+                {usage.whatsapp.limit > 0 && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                                <span>WhatsApp/mes</span>
+                                {showAlert(usage.whatsapp.percentage) && (
+                                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                )}
+                            </div>
+                            <span className="text-muted-foreground">
+                                {usage.whatsapp.current} / {usage.whatsapp.limit}
+                            </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden dark:bg-slate-700">
+                            <div
+                                className={`h-full rounded-full transition-all ${getProgressColor(usage.whatsapp.percentage)}`}
+                                style={{ width: `${usage.whatsapp.percentage}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
             </CardContent>
         </Card>
     )
