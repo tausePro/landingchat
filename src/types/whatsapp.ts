@@ -40,6 +40,11 @@ export const WhatsAppInstanceSchema = z.object({
     last_message_at: z.string().nullable().optional(),
     created_at: z.string(),
     updated_at: z.string(),
+    // Datos de la organización (cuando se hace JOIN)
+    organizations: z.object({
+        name: z.string(),
+        slug: z.string(),
+    }).optional(),
 })
 
 export type WhatsAppInstance = z.infer<typeof WhatsAppInstanceSchema>
@@ -187,6 +192,8 @@ export function deserializeWhatsAppInstance(
         last_message_at: data.last_message_at,
         created_at: data.created_at,
         updated_at: data.updated_at,
+        // Preservar datos de la organización si vienen del JOIN
+        organizations: data.organizations as { name: string; slug: string } | undefined,
     })
 }
 
