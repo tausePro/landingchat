@@ -68,7 +68,8 @@ export async function getWhatsAppStatus(): Promise<
             .eq("status", "active")
             .single()
 
-        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 0
+        // Si no hay suscripción, usar plan gratuito por defecto (10 conversaciones)
+        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 10
 
         const corporate =
             instances?.find((i) => i.instance_type === "corporate") || null

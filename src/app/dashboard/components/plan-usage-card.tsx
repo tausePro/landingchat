@@ -56,7 +56,7 @@ export function PlanUsageCard() {
                 max_products: subscription?.max_products || planData?.max_products || 10,
                 max_agents: subscription?.max_agents || planData?.max_agents || 1,
                 max_monthly_conversations: subscription?.max_monthly_conversations || planData?.max_monthly_conversations || 100,
-                max_whatsapp_conversations: planData?.max_whatsapp_conversations || 0,
+                max_whatsapp_conversations: planData?.max_whatsapp_conversations || 10, // Plan gratuito incluye 10 conversaciones WhatsApp
             }
             const planName = planData?.name || "Gratis"
 
