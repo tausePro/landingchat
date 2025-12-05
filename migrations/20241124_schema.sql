@@ -1,15 +1,19 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- Clean up existing tables (Order matters for foreign keys)
-drop table if exists messages cascade;
-drop table if exists chats cascade;
-drop table if exists quick_responses cascade;
-drop table if exists schedules cascade;
-drop table if exists agents cascade;
-drop table if exists products cascade;
-drop table if exists profiles cascade;
-drop table if exists organizations cascade;
+-- ⚠️ WARNING: The DROP statements below are DESTRUCTIVE!
+-- They were used for initial development but should NEVER be run in production.
+-- If you need to reset the database, use a proper backup/restore process.
+-- 
+-- COMMENTED OUT TO PREVENT DATA LOSS:
+-- drop table if exists messages cascade;
+-- drop table if exists chats cascade;
+-- drop table if exists quick_responses cascade;
+-- drop table if exists schedules cascade;
+-- drop table if exists agents cascade;
+-- drop table if exists products cascade;
+-- drop table if exists profiles cascade;
+-- drop table if exists organizations cascade;
 
 -- 1. Organizations (Tenants)
 create table organizations (

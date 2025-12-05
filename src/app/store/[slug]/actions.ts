@@ -8,7 +8,7 @@ export async function getStoreData(slug: string, limit: number = 6) {
     // 1. Fetch Organization by Slug
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, settings, contact_email")
+        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, settings")
         .eq("slug", slug)
         .single()
 
@@ -46,7 +46,7 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     // 1. Fetch Organization
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, settings")
+        .select("id, name, slug, storefront_config, storefront_template, settings")
         .eq("slug", slug)
         .single()
 

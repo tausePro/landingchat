@@ -195,7 +195,12 @@ export async function connectWhatsApp(): Promise<
                 return failure("Variable de entorno NEXT_PUBLIC_APP_URL no configurada. Contacta al administrador.")
             }
             
-            const webhookUrl = `${appUrl}/api/webhooks/whatsapp`
+            // Asegurar que la URL incluya www si es landingchat.co
+            let webhookUrl = `${appUrl}/api/webhooks/whatsapp`
+            if (appUrl.includes('landingchat.co') && !appUrl.includes('www.')) {
+                webhookUrl = webhookUrl.replace('landingchat.co', 'www.landingchat.co')
+            }
+            
             console.log("[connectWhatsApp] Creating instance:", {
                 instanceName,
                 webhookUrl,

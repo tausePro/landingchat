@@ -15,7 +15,7 @@ export const organizationDetailsSchema = z.object({
     .max(200, "Organization name must be 200 characters or less")
     .refine((val) => val.trim().length > 0, "Organization name cannot be empty or whitespace only"),
   subdomain: z.string()
-    .min(3, "Subdomain must be at least 3 characters")
+    .min(2, "Subdomain must be at least 2 characters")
     .max(50, "Subdomain must be 50 characters or less")
     .regex(/^[a-z0-9-]+$/, "Subdomain can only contain lowercase letters, numbers, and hyphens")
     .refine((val) => !val.startsWith("-") && !val.endsWith("-"), "Subdomain cannot start or end with a hyphen"),

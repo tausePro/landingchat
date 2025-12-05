@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { z } from "zod"
+import crypto from "crypto"
 
 // Schema para validar el payload del webhook
 const WebhookPayloadSchema = z.object({
@@ -47,9 +48,74 @@ const ConnectionUpdateSchema = z.object({
     statusReason: z.number().optional(),
 })
 
+/**
+ * Valida la firma del webhook usando HMAC-SHA256
+ */
+async function validateWebhookSignature(
+    request: NextRequest,
+    body: string,
+    webhookSecret: string
+): Promise<boolean> {
+    const signature = request.headers.get("x-webhook-signature") || 
+                     request.headers.get("x-hub-signature-256")
+    
+    if (!signature) {
+        return false
+    }
+
+    // Calcular HMAC-SHA256 del body
+    const hmac = crypto.createHmac("sha256", webhookSecret)
+    hmac.update(body)
+    const expectedSignature = `sha256=${hmac.digest("hex")}`
+
+    // Comparación segura contra timing attacks
+    return crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expectedSignature)
+    )
+}
+
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
+        // Leer el body como texto primero para validar firma
+        const bodyText = await request.text()
+        const body = JSON.parse(bodyText)
+        
+        // Obtener cliente de Supabase con permisos de servicio
+        const supabase = createServiceClient()
+
+        // Obtener configuración de Evolution API (incluye webhookSecret)
+        const { data: config } = await supabase
+            .from("system_settings")
+            .select("value")
+            .eq("key", "evolution_api_config")
+            .single()
+
+        // Validar firma SOLO si hay webhookSecret configurado Y la firma está presente
+        if (config?.value?.webhookSecret) {
+            const signature = request.headers.get("x-webhook-signature") || 
+                             request.headers.get("x-hub-signature-256")
+            
+            // Solo validar si Evolution envía firma
+            if (signature) {
+                const isValid = await validateWebhookSignature(
+                    request,
+                    bodyText,
+                    config.value.webhookSecret
+                )
+
+                if (!isValid) {
+                    console.error("[WhatsApp Webhook] Invalid signature")
+                    return NextResponse.json(
+                        { error: "Invalid signature" },
+                        { status: 401 }
+                    )
+                }
+            } else {
+                console.warn("[WhatsApp Webhook] webhookSecret configured but no signature received")
+            }
+        }
+        
         const url = new URL(request.url)
         const pathSegments = url.pathname.split("/")
         
@@ -62,18 +128,42 @@ export async function POST(request: NextRequest) {
         console.log("[WhatsApp Webhook] Path:", url.pathname)
         console.log("[WhatsApp Webhook] Event from path:", eventFromPath)
         
+        // Guardar log en DB para debugging en producción (no bloquear si falla)
+        try {
+            const headers: Record<string, string> = {}
+            request.headers.forEach((value, key) => {
+                headers[key] = value
+            })
+            
+            await supabase.from("webhook_logs").insert({
+                webhook_type: "whatsapp",
+                event_type: body.event || eventFromPath,
+                instance_name: body.instance || body.instanceName,
+                payload: body,
+                headers,
+                processing_result: "processing",
+            })
+        } catch (logError) {
+            console.error("Failed to log webhook (non-blocking):", logError)
+        }
+        
         // Determinar el evento (puede venir en el body o en la ruta)
         let event = body.event || eventFromPath
         
         // Normalizar nombres de eventos de Evolution API v2.x
+        // Evolution puede enviar eventos en diferentes formatos:
+        // - MAYÚSCULAS con guiones bajos: CONNECTION_UPDATE
+        // - minúsculas con guiones: connection-update
+        // - minúsculas con puntos: connection.update
+        const eventLower = event.toLowerCase().replace(/_/g, "-")
         const eventMap: Record<string, string> = {
             "connection-update": "connection.update",
             "qrcode-updated": "qrcode.updated",
             "messages-upsert": "messages.upsert",
         }
         
-        if (eventMap[event]) {
-            event = eventMap[event]
+        if (eventMap[eventLower]) {
+            event = eventMap[eventLower]
         }
         
         const instance = body.instance || body.instanceName
@@ -85,9 +175,6 @@ export async function POST(request: NextRequest) {
             console.error("[WhatsApp Webhook] No instance found in payload")
             return NextResponse.json({ error: "Instance required" }, { status: 400 })
         }
-
-        // Obtener cliente de Supabase con permisos de servicio
-        const supabase = await createServiceClient()
 
         // Buscar la instancia en la base de datos
         const { data: whatsappInstance, error: instanceError } = await supabase
@@ -103,25 +190,52 @@ export async function POST(request: NextRequest) {
         }
 
         // Procesar según el tipo de evento
-        switch (event) {
-            case "messages.upsert":
-                await handleIncomingMessage(supabase, whatsappInstance, data)
-                break
+        let processingResult = "success"
+        let errorMessage: string | null = null
+        
+        try {
+            switch (event) {
+                case "messages.upsert":
+                    await handleIncomingMessage(supabase, whatsappInstance, data)
+                    break
 
-            case "connection.update":
-                await handleConnectionUpdate(supabase, whatsappInstance, data)
-                break
+                case "connection.update":
+                    await handleConnectionUpdate(supabase, whatsappInstance, data)
+                    break
 
-            case "qrcode.updated":
-                // Los QR codes se manejan via polling desde el frontend
-                console.log(`[WhatsApp Webhook] QR updated for ${instance}`)
-                break
+                case "qrcode.updated":
+                    // Los QR codes se manejan via polling desde el frontend
+                    console.log(`[WhatsApp Webhook] QR updated for ${instance}`)
+                    break
 
-            default:
-                console.log(`[WhatsApp Webhook] Unhandled event: ${event}`)
+                default:
+                    console.log(`[WhatsApp Webhook] Unhandled event: ${event}`)
+                    processingResult = "warning"
+                    errorMessage = `Unhandled event type: ${event}`
+            }
+        } catch (processingError) {
+            processingResult = "error"
+            errorMessage = processingError instanceof Error ? processingError.message : String(processingError)
+            console.error("[WhatsApp Webhook] Processing error:", processingError)
+        }
+        
+        // Actualizar log con resultado (no bloquear si falla)
+        try {
+            await supabase
+                .from("webhook_logs")
+                .update({
+                    processing_result: processingResult,
+                    error_message: errorMessage,
+                })
+                .eq("instance_name", instance)
+                .eq("webhook_type", "whatsapp")
+                .order("created_at", { ascending: false })
+                .limit(1)
+        } catch (logError) {
+            console.error("Failed to update webhook log (non-blocking):", logError)
         }
 
-        return NextResponse.json({ received: true })
+        return NextResponse.json({ received: true, status: processingResult })
     } catch (error) {
         console.error("[WhatsApp Webhook] Error:", error)
         return NextResponse.json(
@@ -264,14 +378,52 @@ async function handleConnectionUpdate(
     const newStatus = statusMap[state.toLowerCase()] || "disconnected"
     console.log(`[WhatsApp Webhook] Updating instance ${instance.id} to status: ${newStatus}`)
 
+    // Intentar extraer número de teléfono si está conectado
+    let phoneNumber: string | null = null
+    let phoneNumberDisplay: string | null = null
+    
+    if (newStatus === "connected") {
+        // Evolution API puede enviar el número en diferentes ubicaciones
+        const possiblePhoneFields = [
+            data.instance,
+            data.phoneNumber,
+            data.phone,
+            (data.connection as any)?.phoneNumber,
+            (data.connection as any)?.phone,
+        ]
+        
+        for (const field of possiblePhoneFields) {
+            if (typeof field === "string" && field.length > 0) {
+                // Limpiar el número (remover @s.whatsapp.net si existe)
+                phoneNumber = field.replace("@s.whatsapp.net", "").replace(/\D/g, "")
+                if (phoneNumber.length >= 4) {
+                    phoneNumberDisplay = phoneNumber.slice(-4)
+                    console.log(`[WhatsApp Webhook] Extracted phone number: ***${phoneNumberDisplay}`)
+                    break
+                }
+            }
+        }
+    }
+
     // Actualizar estado en la base de datos
+    const updateData: Record<string, any> = {
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+    }
+    
+    if (newStatus === "connected") {
+        updateData.connected_at = new Date().toISOString()
+        if (phoneNumber) {
+            updateData.phone_number = phoneNumber
+            updateData.phone_number_display = phoneNumberDisplay
+        }
+    } else if (newStatus === "disconnected") {
+        updateData.disconnected_at = new Date().toISOString()
+    }
+    
     const { error } = await supabase
         .from("whatsapp_instances")
-        .update({
-            status: newStatus,
-            connected_at: newStatus === "connected" ? new Date().toISOString() : null,
-            updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq("id", instance.id)
     
     if (error) {

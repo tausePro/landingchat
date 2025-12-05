@@ -1,4 +1,4 @@
-# Plan de Implementación - Integración WhatsApp con Evolution API
+    # Plan de Implementación - Integración WhatsApp con Evolution API
 
 - [x] 1. Configurar infraestructura de base de datos y tipos
   - [x] 1.1 Crear migración SQL para tabla whatsapp_instances
@@ -92,7 +92,7 @@
     - Actualizar status de instancia en DB
     - Notificar al frontend via polling
     - _Requirements: 2.3, 2.4_
-  - [ ]* 9.4 Write property test for webhook signature validation
+  - [x]* 9.4 Write property test for webhook signature validation
     - **Property 5: Validación de webhook**
     - **Validates: Requirements 3.5, 5.4**
 
@@ -108,7 +108,7 @@
     - Función sendResponse(conversationId, response)
     - Función identifyCustomer(phone, email)
     - _Requirements: 5.1, 5.2, 5.3, 5.4_
-  - [ ] 11.3 Write property test for customer identification
+  - [x] 11.3 Write property test for customer identification
     - **Property 1: Identificación de cliente por teléfono**
     - **Validates: Requirements 3.2, 3.3, 5.1**
 
@@ -124,7 +124,7 @@
     - Trigger al cambiar payment_status a 'paid'
     - Verificar configuración de notificaciones antes de enviar
     - _Requirements: 6.2, 6.5_
-  - [ ] 13.3 Write property test for notification delivery
+  - [x] 13.3 Write property test for notification delivery
     - **Property 4: Persistencia de mensajes**
     - **Validates: Requirements 3.4, 4.5**
 
