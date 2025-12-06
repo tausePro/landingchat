@@ -44,17 +44,11 @@ export async function getAllInstances(filters?: {
         }
 
         const supabase = await createClient()
+        
+        // Query instances without JOIN (no FK relationship exists)
         let query = supabase
             .from("whatsapp_instances")
-            .select(
-                `
-                *,
-                organizations!left (
-                    name,
-                    slug
-                )
-            `
-            )
+            .select("*")
             .order("created_at", { ascending: false })
 
         if (filters?.organizationId) {
@@ -65,26 +59,44 @@ export async function getAllInstances(filters?: {
             query = query.eq("status", filters.status)
         }
 
-        const { data, error } = await query
+        const { data: instancesData, error: instancesError } = await query
 
-        if (error) {
-            console.error("[getAllInstances] Query error:", error)
-            return failure(error.message)
+        if (instancesError) {
+            console.error("[getAllInstances] Query error:", instancesError)
+            return failure(instancesError.message)
         }
 
-        console.log("[getAllInstances] Raw data from DB:", JSON.stringify(data, null, 2))
-
-        if (!data || data.length === 0) {
+        if (!instancesData || instancesData.length === 0) {
             console.log("[getAllInstances] No instances found")
             return success([])
         }
 
+        // Get unique organization IDs
+        const orgIds = [...new Set(instancesData.map(i => i.organization_id))]
+        
+        // Fetch organizations separately
+        const { data: orgsData } = await supabase
+            .from("organizations")
+            .select("id, name, slug")
+            .in("id", orgIds)
+
+        // Create a map for quick lookup
+        const orgsMap = new Map(
+            (orgsData || []).map(org => [org.id, { name: org.name, slug: org.slug }])
+        )
+
+        // Combine data
+        const combinedData = instancesData.map(instance => ({
+            ...instance,
+            organizations: orgsMap.get(instance.organization_id) || null
+        }))
+
+        console.log("[getAllInstances] Found", combinedData.length, "instances")
+
         try {
-            const instances = data.map((item) => {
-                console.log("[getAllInstances] Deserializing item:", JSON.stringify(item, null, 2))
+            const instances = combinedData.map((item) => {
                 return deserializeWhatsAppInstance(item)
             })
-            console.log("[getAllInstances] Successfully deserialized", instances.length, "instances")
             return success(instances)
         } catch (deserializeError) {
             console.error("[getAllInstances] Deserialization error:", deserializeError)
