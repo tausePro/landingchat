@@ -32,15 +32,22 @@ export default function WhatsAppInstancesPage() {
     }, [instances, searchQuery, statusFilter])
 
     const fetchInstances = async () => {
+        console.log("[WhatsAppInstancesPage] Fetching instances...")
         const result = await getAllInstances()
+        console.log("[WhatsAppInstancesPage] Result:", result)
+        
         if (result.success) {
+            console.log("[WhatsAppInstancesPage] Setting instances:", result.data.length, "items")
             setInstances(result.data)
+        } else {
+            console.error("[WhatsAppInstancesPage] Error:", result.error)
         }
         setLoading(false)
     }
 
     const filterInstances = () => {
         let filtered = instances
+        console.log("[WhatsAppInstancesPage] Filtering", instances.length, "instances")
 
         if (statusFilter !== "all") {
             filtered = filtered.filter((i) => i.status === statusFilter)
@@ -54,6 +61,7 @@ export default function WhatsAppInstancesPage() {
             )
         }
 
+        console.log("[WhatsAppInstancesPage] Filtered to", filtered.length, "instances")
         setFilteredInstances(filtered)
     }
 
