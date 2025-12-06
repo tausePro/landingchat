@@ -545,27 +545,43 @@ async function checkConversationLimit(
     supabase: SupabaseClient,
     organizationId: string
 ): Promise<boolean> {
-    // Obtener organización con su plan
-    const { data: org } = await supabase
+    // Obtener organización
+    const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select(`
-            id,
-            whatsapp_conversations_used,
-            subscriptions(
-                plans(max_whatsapp_conversations)
-            )
-        `)
+        .select("id, whatsapp_conversations_used")
         .eq("id", organizationId)
         .single()
 
-    if (!org) return false
+    if (orgError || !org) {
+        console.error("[WhatsApp Webhook] Error fetching org:", orgError)
+        return false
+    }
 
-    // Si no hay suscripción/plan, usar límite por defecto de 1000 (para testing/admin)
-    const DEFAULT_LIMIT = 1000
-    const limit = org.subscriptions?.[0]?.plans?.max_whatsapp_conversations || DEFAULT_LIMIT
+    // Obtener suscripción activa con plan
+    const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("id, plan_id, plans(max_whatsapp_conversations)")
+        .eq("organization_id", organizationId)
+        .eq("status", "active")
+        .single()
+
+    // Límite por defecto si no hay suscripción (plan gratuito = 10, pero para admin/testing = 1000)
+    const DEFAULT_LIMIT_NO_SUBSCRIPTION = 1000
+    const DEFAULT_LIMIT_FREE_PLAN = 10
+    
+    let limit: number
+    if (subscription?.plans) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const planData = subscription.plans as any
+        limit = planData.max_whatsapp_conversations || DEFAULT_LIMIT_FREE_PLAN
+    } else {
+        // Sin suscripción - usar límite alto para no bloquear (admin/testing)
+        limit = DEFAULT_LIMIT_NO_SUBSCRIPTION
+    }
+    
     const used = org.whatsapp_conversations_used || 0
 
-    console.log(`[WhatsApp Webhook] Conversation limit check: used=${used}, limit=${limit}`)
+    console.log(`[WhatsApp Webhook] Conversation limit: used=${used}, limit=${limit}, hasSubscription=${!!subscription}`)
     
     return used < limit
 }
