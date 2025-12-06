@@ -445,20 +445,20 @@ async function findOrCreateCustomer(
     // Buscar cliente existente
     const { data: existing } = await supabase
         .from("customers")
-        .select("id, name, phone")
+        .select("id, full_name, phone")
         .eq("organization_id", organizationId)
         .eq("phone", phoneNumber)
         .single()
 
     if (existing) {
         // Actualizar nombre si tenemos uno nuevo
-        if (pushName && !existing.name) {
+        if (pushName && !existing.full_name) {
             await supabase
                 .from("customers")
-                .update({ name: pushName })
+                .update({ full_name: pushName })
                 .eq("id", existing.id)
         }
-        return existing
+        return { ...existing, name: existing.full_name }
     }
 
     // Crear nuevo cliente
@@ -467,10 +467,10 @@ async function findOrCreateCustomer(
         .insert({
             organization_id: organizationId,
             phone: phoneNumber,
-            name: pushName || `WhatsApp ${phoneNumber.slice(-4)}`,
-            source: "whatsapp",
+            full_name: pushName || `WhatsApp ${phoneNumber.slice(-4)}`,
+            metadata: { source: "whatsapp" },
         })
-        .select("id, name, phone")
+        .select("id, full_name, phone")
         .single()
 
     if (error) {
@@ -478,7 +478,7 @@ async function findOrCreateCustomer(
         throw error
     }
 
-    return newCustomer
+    return { ...newCustomer, name: newCustomer.full_name }
 }
 
 /**
