@@ -49,7 +49,7 @@ export async function getAllInstances(filters?: {
             .select(
                 `
                 *,
-                organizations (
+                organizations!left (
                     name,
                     slug
                 )

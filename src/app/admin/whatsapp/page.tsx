@@ -38,9 +38,11 @@ export default function WhatsAppInstancesPage() {
         
         if (result.success) {
             console.log("[WhatsAppInstancesPage] Setting instances:", result.data.length, "items")
+            console.log("[WhatsAppInstancesPage] Instance data:", JSON.stringify(result.data, null, 2))
             setInstances(result.data)
         } else {
             console.error("[WhatsAppInstancesPage] Error:", result.error)
+            toast.error("Error al cargar instancias", { description: result.error })
         }
         setLoading(false)
     }
