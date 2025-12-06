@@ -551,8 +551,8 @@ async function checkConversationLimit(
         .select(`
             id,
             whatsapp_conversations_used,
-            subscriptions!inner(
-                plans!inner(max_whatsapp_conversations)
+            subscriptions(
+                plans(max_whatsapp_conversations)
             )
         `)
         .eq("id", organizationId)
@@ -560,9 +560,13 @@ async function checkConversationLimit(
 
     if (!org) return false
 
-    const limit = org.subscriptions?.[0]?.plans?.max_whatsapp_conversations || 0
+    // Si no hay suscripción/plan, usar límite por defecto de 1000 (para testing/admin)
+    const DEFAULT_LIMIT = 1000
+    const limit = org.subscriptions?.[0]?.plans?.max_whatsapp_conversations || DEFAULT_LIMIT
     const used = org.whatsapp_conversations_used || 0
 
+    console.log(`[WhatsApp Webhook] Conversation limit check: used=${used}, limit=${limit}`)
+    
     return used < limit
 }
 
