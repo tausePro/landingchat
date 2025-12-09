@@ -31,11 +31,13 @@ export function OrderActions({ orderId, currentStatus }: OrderActionsProps) {
     }
 
     const statusOptions = [
-        { value: 'pendiente', label: 'Pendiente' },
-        { value: 'procesando', label: 'Procesando' },
-        { value: 'enviado', label: 'Enviado' },
-        { value: 'entregado', label: 'Entregado' },
-        { value: 'cancelado', label: 'Cancelado' },
+        { value: 'pending', label: 'Pendiente' },
+        { value: 'confirmed', label: 'Confirmado' },
+        { value: 'processing', label: 'Procesando' },
+        { value: 'shipped', label: 'Enviado' },
+        { value: 'delivered', label: 'Entregado' },
+        { value: 'cancelled', label: 'Cancelado' },
+        { value: 'refunded', label: 'Reembolsado' },
     ]
 
     return (
