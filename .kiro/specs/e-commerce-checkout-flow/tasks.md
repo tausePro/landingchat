@@ -105,7 +105,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
 
 ## Phase 5: Webhook Enhancement
 
-- [ ] 5. Enhance Wompi webhook handler
+- [x] 5. Enhance Wompi webhook handler
   - Modify `src/app/api/webhooks/payments/wompi/route.ts`
   - Implement webhook signature validation
   - Check for existing transaction (idempotency)
@@ -136,7 +136,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Test transaction record creation
   - _Requirements: 4.1, 4.3, 4.5_
 
-- [ ] 6. Enhance ePayco webhook handler
+- [x] 6. Enhance ePayco webhook handler
   - Modify `src/app/api/webhooks/payments/epayco/route.ts`
   - Implement same enhancements as Wompi webhook
   - Handle ePayco-specific response codes
