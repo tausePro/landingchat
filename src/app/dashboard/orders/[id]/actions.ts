@@ -55,8 +55,11 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             updated_at,
             status,
             total,
+            subtotal,
+            shipping_cost,
             items,
-            customer:customers(id, full_name, email, phone)
+            customer_info,
+            customers(id, name, email, phone)
         `)
         .eq("id", orderId)
         .eq("organization_id", profile.organization_id)
@@ -69,20 +72,28 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
 
     if (!order) return null
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const customer = order.customers as any
+
     return {
         id: order.id,
         created_at: order.created_at,
         updated_at: order.updated_at,
         status: order.status,
         total: order.total || 0,
-        subtotal: order.total || 0, // Use total as subtotal since we don't have separate column
-        tax: 0, // Not available in schema
-        shipping_cost: 0, // Not available in schema
+        subtotal: order.subtotal || 0,
+        tax: 0, // Calculate from subtotal and total if needed
+        shipping_cost: order.shipping_cost || 0,
         notes: null, // Not available in schema
-        customer: Array.isArray(order.customer) ? order.customer[0] : order.customer,
+        customer: customer ? {
+            id: customer.id,
+            full_name: customer.name || 'Cliente anónimo',
+            email: customer.email || null,
+            phone: customer.phone || null
+        } : null,
         items: Array.isArray(order.items) ? order.items : [],
-        shipping_address: null, // Not available in schema
-        billing_address: null // Not available in schema
+        shipping_address: null, // Could be extracted from customer_info if needed
+        billing_address: null // Could be extracted from customer_info if needed
     }
 }
 
