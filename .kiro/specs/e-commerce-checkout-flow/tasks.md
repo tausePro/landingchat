@@ -18,7 +18,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Add RLS policies for orders table
   - _Requirements: 2.6, 9.1, 9.2, 10.5, 10.6_
 
-- [ ]* 1.1 Write unit tests for order schema validation
+- [ ] 1.1 Write unit tests for order schema validation
   - Test order creation with all required fields
   - Test order creation fails without required fields
   - Test order_number uniqueness constraint
@@ -37,13 +37,13 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Generate proper return URLs for success/error/pending
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [ ]* 2.1 Write property test for payment URL generation
+- [ ] 2.1 Write property test for payment URL generation
   - **Property 9: Payment URL Generation**
   - **Validates: Requirements 3.3, 3.6**
   - Test that generated URLs include correct return paths
   - Test with various order amounts and currencies
 
-- [ ]* 2.2 Write unit tests for gateway selection logic
+- [ ] 2.2 Write unit tests for gateway selection logic
   - Test Wompi gateway selection when configured
   - Test ePayco gateway selection when configured
   - Test error when no gateway configured
@@ -63,18 +63,18 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Handle errors gracefully and return user-friendly messages
   - _Requirements: 2.5, 2.6, 3.1, 3.4, 10.1, 10.2, 10.3, 10.5, 10.6_
 
-- [ ]* 3.1 Write property test for order creation atomicity
+- [ ] 3.1 Write property test for order creation atomicity
   - **Property 2: Order Creation Atomicity**
   - **Validates: Requirements 2.5, 2.6**
   - Test that successful order creation always results in database record
   - Test that failed order creation does not leave partial data
 
-- [ ]* 3.2 Write unit tests for order number generation
+- [ ] 3.2 Write unit tests for order number generation
   - Test uniqueness of generated order numbers
   - Test format matches expected pattern
   - _Requirements: 2.6_
 
-- [ ]* 3.3 Write property test for tax information completeness
+- [ ] 3.3 Write property test for tax information completeness
   - **Property 11: Tax Information Completeness**
   - **Validates: Requirements 10.1, 10.2, 10.3, 10.5**
   - Test that all orders have required tax fields
@@ -95,7 +95,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Show different success flow for manual vs gateway payments
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.7, 10.1, 10.2, 10.3, 10.4, 11.6, 11.7_
 
-- [ ]* 4.1 Write integration test for checkout flow
+- [ ] 4.1 Write integration test for checkout flow
   - Test complete flow: fill form → submit → order created
   - Test validation errors display correctly
   - Test loading states appear during submission
@@ -117,20 +117,20 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Log all webhook events to webhook_logs
   - _Requirements: 4.1, 4.3, 4.4, 4.6, 4.7, 9.1, 9.2, 9.3_
 
-- [ ]* 5.1 Write property test for webhook idempotency
+- [ ] 5.1 Write property test for webhook idempotency
   - **Property 4: Webhook Idempotency**
   - **Validates: Requirements 4.7**
   - Test that duplicate webhooks don't create duplicate transactions
   - Test with same provider_transaction_id sent multiple times
 
-- [ ]* 5.2 Write property test for webhook signature validation
+- [ ] 5.2 Write property test for webhook signature validation
   - **Property 10: Webhook Signature Validation**
   - **Validates: Requirements 4.6, 10.2**
   - Test that valid signatures are accepted
   - Test that invalid signatures are rejected
   - Test with various payload combinations
 
-- [ ]* 5.3 Write unit tests for webhook processing
+- [ ] 5.3 Write unit tests for webhook processing
   - Test approved payment updates order correctly
   - Test declined payment updates order to cancelled
   - Test transaction record creation
@@ -142,7 +142,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Handle ePayco-specific response codes
   - _Requirements: 4.2, 4.3, 4.4, 4.6, 4.7_
 
-- [ ]* 6.1 Write unit tests for ePayco webhook
+- [ ] 6.1 Write unit tests for ePayco webhook
   - Test ePayco status code mapping
   - Test signature validation with ePayco format
   - _Requirements: 4.2, 4.6_
@@ -175,7 +175,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Add "Return to Store" button
   - _Requirements: 5.5, 5.6, 5.7_
 
-- [ ]* 9.1 Write integration tests for confirmation pages
+- [ ] 9.1 Write integration tests for confirmation pages
   - Test success page displays correct order data
   - Test error page shows error message
   - Test pending page shows instructions
@@ -202,7 +202,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Return order with status and timeline data
   - _Requirements: 7.1_
 
-- [ ]* 10.2 Write property test for customer order access
+- [ ] 10.2 Write property test for customer order access
   - **Property 8: Customer Order Access**
   - **Validates: Requirements 7.1**
   - Test that orders are only accessible for correct organization

@@ -93,7 +93,6 @@ export async function createOrder(params: CreateOrderParams) {
                 subtotal: params.subtotal,
                 shipping_cost: params.shippingCost,
                 total: params.total,
-                currency: 'COP',
                 status: 'pending',
                 payment_status: 'pending',
                 payment_method: params.paymentMethod,
