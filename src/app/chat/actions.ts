@@ -81,7 +81,11 @@ export async function createOrder(params: CreateOrderParams) {
         // 3. Generate unique order number
         const orderNumber = generateOrderNumber()
 
-        // 4. Create Order
+        // 4. Calculate tax (IVA 19% included in total)
+        // Formula: tax = total / 1.19 * 0.19
+        const calculatedTax = Math.round((params.total / 1.19 * 0.19) * 100) / 100
+
+        // 5. Create Order
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .insert({
@@ -92,6 +96,7 @@ export async function createOrder(params: CreateOrderParams) {
                 items: params.items,
                 subtotal: params.subtotal,
                 shipping_cost: params.shippingCost,
+                tax: calculatedTax,
                 total: params.total,
                 status: 'pending',
                 payment_status: 'pending',
@@ -105,7 +110,7 @@ export async function createOrder(params: CreateOrderParams) {
             return { success: false, error: "Error al crear la orden" }
         }
 
-        // 5. If payment method is not manual, initiate payment
+        // 6. If payment method is not manual, initiate payment
         if (params.paymentMethod !== 'manual') {
             const paymentResult = await paymentService.initiatePayment({
                 orderId: order.id,
