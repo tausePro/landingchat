@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { useCartStore } from "@/store/cart-store"
 import { createOrder } from "../actions"
 import { toast } from "sonner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 interface CheckoutModalProps {
     isOpen: boolean
@@ -25,7 +27,12 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
         email: "",
         phone: "",
         address: "",
-        city: ""
+        city: "",
+        // Tax/Invoicing fields
+        document_type: "CC" as string,
+        document_number: "",
+        person_type: "Natural" as string,
+        business_name: ""
     })
 
     const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'manual'>('manual')
@@ -38,8 +45,24 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
 
+    const handleSelectChange = (name: string, value: string) => {
+        setFormData({ ...formData, [name]: value })
+    }
+
     const handleSubmitContact = (e: React.FormEvent) => {
         e.preventDefault()
+        
+        // Validate tax fields
+        if (!formData.document_type || !formData.document_number || !formData.person_type) {
+            toast.error("Por favor completa todos los campos de facturación")
+            return
+        }
+
+        // If Jurídica, business_name is recommended but not required
+        if (formData.person_type === "Jurídica" && !formData.business_name) {
+            toast.warning("Se recomienda ingresar el nombre de la empresa para personas jurídicas")
+        }
+
         setStep('payment')
     }
 
@@ -57,6 +80,13 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
             })
 
             if (result.success) {
+                // If payment URL exists, redirect to gateway
+                if (result.paymentUrl) {
+                    window.location.href = result.paymentUrl
+                    return
+                }
+                
+                // Manual payment - show success
                 setStep('success')
                 clearCart()
             } else {
@@ -103,6 +133,55 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                             <Label htmlFor="phone">Teléfono</Label>
                             <Input id="phone" name="phone" type="tel" required value={formData.phone} onChange={handleInputChange} placeholder="+57 300 123 4567" />
                         </div>
+                        
+                        {/* Tax/Invoicing Fields */}
+                        <div className="border-t pt-4 space-y-4">
+                            <h4 className="font-medium text-sm">Información de Facturación</h4>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="document_type">Tipo de Documento</Label>
+                                    <Select value={formData.document_type} onValueChange={(value) => handleSelectChange('document_type', value)}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Selecciona" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
+                                            <SelectItem value="NIT">NIT</SelectItem>
+                                            <SelectItem value="CE">Cédula de Extranjería</SelectItem>
+                                            <SelectItem value="Passport">Pasaporte</SelectItem>
+                                            <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="document_number">Número de Documento</Label>
+                                    <Input id="document_number" name="document_number" required value={formData.document_number} onChange={handleInputChange} placeholder="123456789" />
+                                </div>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Tipo de Persona</Label>
+                                <RadioGroup value={formData.person_type} onValueChange={(value: string) => handleSelectChange('person_type', value)} className="flex gap-4">
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="Natural" id="natural" />
+                                        <Label htmlFor="natural" className="font-normal cursor-pointer">Natural (Persona)</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="Jurídica" id="juridica" />
+                                        <Label htmlFor="juridica" className="font-normal cursor-pointer">Jurídica (Empresa)</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
+
+                            {formData.person_type === "Jurídica" && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="business_name">Nombre de la Empresa</Label>
+                                    <Input id="business_name" name="business_name" value={formData.business_name} onChange={handleInputChange} placeholder="Mi Empresa S.A.S." />
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="city">Ciudad</Label>

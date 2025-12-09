@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { paymentService } from "@/lib/payments/payment-service"
 
 interface CreateOrderParams {
     slug: string
@@ -10,6 +11,11 @@ interface CreateOrderParams {
         phone: string
         address: string
         city: string
+        // Tax/Invoicing fields
+        document_type: string
+        document_number: string
+        person_type: string
+        business_name?: string
     }
     items: any[]
     subtotal: number
@@ -18,66 +24,128 @@ interface CreateOrderParams {
     paymentMethod: string
 }
 
+/**
+ * Generate unique order number
+ * Format: ORD-YYYYMMDD-XXX
+ */
+function generateOrderNumber(): string {
+    const date = new Date()
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    return `ORD-${year}${month}${day}-${random}`
+}
+
 export async function createOrder(params: CreateOrderParams) {
     const supabase = await createClient()
 
-    // 1. Get Organization ID from Slug
-    const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("id")
-        .eq("slug", params.slug)
-        .single()
+    try {
+        // 1. Get Organization ID from Slug
+        const { data: org, error: orgError } = await supabase
+            .from("organizations")
+            .select("id")
+            .eq("slug", params.slug)
+            .single()
 
-    if (orgError || !org) {
-        return { success: false, error: "Organization not found" }
-    }
+        if (orgError || !org) {
+            return { success: false, error: "Organización no encontrada" }
+        }
 
-    // 2. Create/Update Customer (Upsert by email)
-    // We use the organization_id and email as unique constraint if defined, 
-    // or just insert. The schema has UNIQUE(organization_id, email).
-    const { data: customer, error: customerError } = await supabase
-        .from("customers")
-        .upsert({
-            organization_id: org.id,
-            email: params.customerInfo.email,
-            phone: params.customerInfo.phone,
-            full_name: params.customerInfo.name,
-            metadata: {
-                address: params.customerInfo.address,
-                city: params.customerInfo.city
+        // 2. Create/Update Customer (Upsert by email)
+        const { data: customer, error: customerError } = await supabase
+            .from("customers")
+            .upsert({
+                organization_id: org.id,
+                email: params.customerInfo.email,
+                phone: params.customerInfo.phone,
+                full_name: params.customerInfo.name,
+                // Tax/Invoicing fields
+                document_type: params.customerInfo.document_type,
+                document_number: params.customerInfo.document_number,
+                person_type: params.customerInfo.person_type,
+                business_name: params.customerInfo.business_name,
+                metadata: {
+                    address: params.customerInfo.address,
+                    city: params.customerInfo.city
+                }
+            }, { onConflict: 'organization_id, email' })
+            .select()
+            .single()
+
+        if (customerError) {
+            console.error("[createOrder] Error creating customer:", customerError)
+            // Continue with order creation even if customer upsert fails
+        }
+
+        // 3. Generate unique order number
+        const orderNumber = generateOrderNumber()
+
+        // 4. Create Order
+        const { data: order, error: orderError } = await supabase
+            .from("orders")
+            .insert({
+                organization_id: org.id,
+                customer_id: customer?.id,
+                order_number: orderNumber,
+                customer_info: params.customerInfo, // Store complete customer info including tax fields
+                items: params.items,
+                subtotal: params.subtotal,
+                shipping_cost: params.shippingCost,
+                total: params.total,
+                currency: 'COP',
+                status: 'pending',
+                payment_status: 'pending',
+                payment_method: params.paymentMethod,
+            })
+            .select()
+            .single()
+
+        if (orderError) {
+            console.error("[createOrder] Error creating order:", orderError)
+            return { success: false, error: "Error al crear la orden" }
+        }
+
+        // 5. If payment method is not manual, initiate payment
+        if (params.paymentMethod !== 'manual') {
+            const paymentResult = await paymentService.initiatePayment({
+                orderId: order.id,
+                organizationId: org.id,
+                amount: Math.round(params.total * 100), // Convert to cents
+                currency: 'COP',
+                customerEmail: params.customerInfo.email,
+                customerName: params.customerInfo.name,
+                customerDocument: params.customerInfo.document_number,
+                customerDocumentType: params.customerInfo.document_type,
+                customerPhone: params.customerInfo.phone,
+                returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}/order/${order.id}`,
+                paymentMethod: params.paymentMethod as "wompi" | "epayco"
+            })
+
+            if (!paymentResult.success) {
+                // Payment initiation failed, but order was created
+                return {
+                    success: false,
+                    error: paymentResult.error || "Error al iniciar el pago",
+                    order
+                }
             }
-        }, { onConflict: 'organization_id, email' })
-        .select()
-        .single()
 
-    if (customerError) {
-        console.error("Error creating customer:", customerError)
-        // Continue even if customer creation fails? Maybe not.
-        // But for now let's proceed with order creation using the info provided.
+            return {
+                success: true,
+                order,
+                paymentUrl: paymentResult.paymentUrl
+            }
+        }
+
+        // Manual payment - no payment URL needed
+        return { success: true, order }
+
+    } catch (error) {
+        console.error("[createOrder] Unexpected error:", error)
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : "Error inesperado al crear la orden"
+        }
     }
-
-    // 3. Create Order
-    const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-            organization_id: org.id,
-            customer_id: customer?.id, // Link if customer created
-            customer_info: params.customerInfo,
-            items: params.items,
-            subtotal: params.subtotal,
-            shipping_cost: params.shippingCost,
-            total: params.total,
-            status: 'pending',
-            payment_method: params.paymentMethod,
-            // chat_id: ??? // We don't have chat_id passed yet, maybe add later
-        })
-        .select()
-        .single()
-
-    if (orderError) {
-        console.error("Error creating order:", orderError)
-        return { success: false, error: "Failed to create order" }
-    }
-
-    return { success: true, order }
 }

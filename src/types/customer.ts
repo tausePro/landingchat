@@ -18,6 +18,26 @@ export const customerAddressSchema = z.object({
 })
 
 // ============================================================================
+// Tax/Invoicing Enums
+// ============================================================================
+
+export const documentTypeSchema = z.enum([
+  "CC",      // Cédula de Ciudadanía
+  "NIT",     // Número de Identificación Tributaria
+  "CE",      // Cédula de Extranjería
+  "Passport", // Pasaporte
+  "TI",      // Tarjeta de Identidad
+])
+
+export const personTypeSchema = z.enum([
+  "Natural",   // Individual person
+  "Jurídica",  // Business entity
+])
+
+export type DocumentType = z.infer<typeof documentTypeSchema>
+export type PersonType = z.infer<typeof personTypeSchema>
+
+// ============================================================================
 // Create Customer Schema
 // ============================================================================
 
@@ -32,6 +52,11 @@ export const createCustomerSchema = z.object({
   acquisition_channel: z.enum(["web", "chat", "referido", "importado", "manual"]).default("web"),
   address: customerAddressSchema.optional(),
   tags: z.array(z.string()).default([]),
+  // Tax/Invoicing fields
+  document_type: documentTypeSchema.optional(),
+  document_number: z.string().max(50).optional(),
+  person_type: personTypeSchema.optional(),
+  business_name: z.string().max(200).optional(),
 })
 
 // ============================================================================
@@ -66,6 +91,11 @@ export interface Customer {
   created_at: string
   last_interaction_at?: string
   address?: CustomerAddress
+  // Tax/Invoicing fields
+  document_type?: DocumentType
+  document_number?: string
+  person_type?: PersonType
+  business_name?: string
 }
 
 // ============================================================================
