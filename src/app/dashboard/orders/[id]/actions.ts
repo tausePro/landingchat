@@ -46,54 +46,56 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
 
     if (!profile?.organization_id) throw new Error("No organization found")
 
-    // Fetch order with all details
+    // Fetch order - don't join customers, use customer_info instead
     const { data: order, error } = await supabase
         .from("orders")
-        .select(`
-            id,
-            created_at,
-            updated_at,
-            status,
-            total,
-            subtotal,
-            shipping_cost,
-            items,
-            customer_info,
-            customers(id, name, email, phone)
-        `)
+        .select("*")
         .eq("id", orderId)
         .eq("organization_id", profile.organization_id)
         .single()
 
     if (error) {
-        console.error("Error fetching order:", error)
+        console.error("[getOrderDetail] Error fetching order:", error)
         return null
     }
 
-    if (!order) return null
+    if (!order) {
+        console.error("[getOrderDetail] Order not found:", orderId)
+        return null
+    }
 
+    console.log("[getOrderDetail] Order found:", {
+        id: order.id,
+        status: order.status,
+        total: order.total,
+        hasItems: Array.isArray(order.items),
+        itemsCount: Array.isArray(order.items) ? order.items.length : 0,
+        hasCustomerInfo: !!order.customer_info
+    })
+
+    // Extract customer info from JSONB field
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const customer = order.customers as any
-
+    const customerInfo = order.customer_info as any
+    
     return {
         id: order.id,
         created_at: order.created_at,
-        updated_at: order.updated_at,
+        updated_at: order.updated_at || order.created_at,
         status: order.status,
         total: order.total || 0,
         subtotal: order.subtotal || 0,
-        tax: 0, // Calculate from subtotal and total if needed
+        tax: order.tax || 0,
         shipping_cost: order.shipping_cost || 0,
-        notes: null, // Not available in schema
-        customer: customer ? {
-            id: customer.id,
-            full_name: customer.name || 'Cliente anónimo',
-            email: customer.email || null,
-            phone: customer.phone || null
+        notes: order.notes || null,
+        customer: customerInfo ? {
+            id: order.customer_id || 'anonymous',
+            full_name: customerInfo.name || customerInfo.full_name || 'Cliente anónimo',
+            email: customerInfo.email || null,
+            phone: customerInfo.phone || null
         } : null,
         items: Array.isArray(order.items) ? order.items : [],
-        shipping_address: null, // Could be extracted from customer_info if needed
-        billing_address: null // Could be extracted from customer_info if needed
+        shipping_address: order.shipping_address || null,
+        billing_address: null
     }
 }
 
