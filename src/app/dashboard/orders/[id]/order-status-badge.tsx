@@ -7,12 +7,22 @@ interface OrderStatusBadgeProps {
 export function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
     const getStatusConfig = (status: string) => {
         switch (status.toLowerCase()) {
+            case 'delivered':
             case 'completed':
             case 'entregado':
                 return {
                     label: 'Entregado',
                     className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
                     dotClassName: 'bg-green-500'
+                }
+            case 'confirmed':
+            case 'confirmado':
+            case 'paid':
+            case 'pagado':
+                return {
+                    label: 'Confirmado',
+                    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300',
+                    dotClassName: 'bg-emerald-500'
                 }
             case 'enviado':
             case 'shipped':
@@ -41,6 +51,13 @@ export function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
                     label: 'Cancelado',
                     className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
                     dotClassName: 'bg-red-500'
+                }
+            case 'refunded':
+            case 'reembolsado':
+                return {
+                    label: 'Reembolsado',
+                    className: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+                    dotClassName: 'bg-purple-500'
                 }
             default:
                 return {

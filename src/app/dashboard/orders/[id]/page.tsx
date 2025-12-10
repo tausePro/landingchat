@@ -76,11 +76,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                             <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">
                                                 {item.product_name}
                                             </h3>
-                                            {item.variant_info && (
+                                            {item.variant_info && Array.isArray(item.variant_info) && item.variant_info.length > 0 && (
                                                 <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
-                                                    {Object.entries(item.variant_info).map(([key, value]) =>
-                                                        `${key}: ${value}`
-                                                    ).join(', ')}
+                                                    {item.variant_info.map((v: { type: string; values: string[] }) =>
+                                                        `${v.type}: ${v.values?.join(', ') || ''}`
+                                                    ).join(' | ')}
                                                 </p>
                                             )}
                                             <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">

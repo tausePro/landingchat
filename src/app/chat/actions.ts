@@ -17,7 +17,12 @@ interface CreateOrderParams {
         person_type: string
         business_name?: string
     }
-    items: any[]
+    items: Array<{
+        id: string
+        name: string
+        price: number
+        quantity: number
+    }>
     subtotal: number
     shippingCost: number
     total: number
@@ -35,6 +40,20 @@ function generateOrderNumber(): string {
     const day = String(date.getDate()).padStart(2, '0')
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
     return `ORD-${year}${month}${day}-${random}`
+}
+
+/**
+ * Transform cart items to order items format
+ */
+function transformCartItemsToOrderItems(cartItems: Array<{id: string, name: string, price: number, quantity: number}>) {
+    return cartItems.map(item => ({
+        product_id: item.id,
+        product_name: item.name,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total_price: item.price * item.quantity,
+        variant_info: null
+    }))
 }
 
 export async function createOrder(params: CreateOrderParams) {
@@ -85,7 +104,10 @@ export async function createOrder(params: CreateOrderParams) {
         // Formula: tax = total / 1.19 * 0.19
         const calculatedTax = Math.round((params.total / 1.19 * 0.19) * 100) / 100
 
-        // 5. Create Order
+        // 5. Transform cart items to order items format
+        const orderItems = transformCartItemsToOrderItems(params.items)
+
+        // 6. Create Order
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .insert({
@@ -93,7 +115,7 @@ export async function createOrder(params: CreateOrderParams) {
                 customer_id: customer?.id,
                 order_number: orderNumber,
                 customer_info: params.customerInfo, // Store complete customer info including tax fields
-                items: params.items,
+                items: orderItems,
                 subtotal: params.subtotal,
                 shipping_cost: params.shippingCost,
                 tax: calculatedTax,
@@ -110,7 +132,7 @@ export async function createOrder(params: CreateOrderParams) {
             return { success: false, error: "Error al crear la orden" }
         }
 
-        // 6. If payment method is not manual, initiate payment
+        // 7. If payment method is not manual, initiate payment
         if (params.paymentMethod !== 'manual') {
             const paymentResult = await paymentService.initiatePayment({
                 orderId: order.id,

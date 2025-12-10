@@ -76,7 +76,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     // Extract customer info from JSONB field
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const customerInfo = order.customer_info as any
-    
+
     return {
         id: order.id,
         created_at: order.created_at,
@@ -101,19 +101,37 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
 
 export async function updateOrderStatus(orderId: string, newStatus: string) {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    console.log("[updateOrderStatus] Auth check:", {
+        userId: user?.id,
+        authError: authError?.message
+    })
 
     if (!user) throw new Error("Unauthorized")
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("organization_id")
         .eq("id", user.id)
         .single()
 
+    console.log("[updateOrderStatus] Profile check:", {
+        userId: user.id,
+        organizationId: profile?.organization_id,
+        profileError: profileError?.message
+    })
+
     if (!profile?.organization_id) throw new Error("No organization found")
 
-    const { error } = await supabase
+    console.log("[updateOrderStatus] Attempting update:", {
+        orderId,
+        newStatus,
+        userId: user.id,
+        organizationId: profile.organization_id
+    })
+
+    const { data, error } = await supabase
         .from("orders")
         .update({
             status: newStatus,
@@ -121,11 +139,19 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
         })
         .eq("id", orderId)
         .eq("organization_id", profile.organization_id)
+        .select()
 
     if (error) {
-        console.error("Error updating order status:", error)
-        throw new Error("Failed to update order status")
+        console.error("[updateOrderStatus] Error:", error)
+        throw new Error("Failed to update order status: " + error.message)
     }
+
+    if (!data || data.length === 0) {
+        console.error("[updateOrderStatus] No order found to update")
+        throw new Error("Order not found or you don't have permission to update it")
+    }
+
+    console.log("[updateOrderStatus] Successfully updated:", data[0])
 
     return { success: true }
 }
