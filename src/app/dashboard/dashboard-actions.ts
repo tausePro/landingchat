@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 
 export interface DashboardStats {
+    userName: string
     revenue: {
         total: number
         growth: number // vs last month
@@ -96,7 +97,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         .eq("organization_id", orgId)
         .eq("status", "available")
 
+    const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuario"
+
     return {
+        userName,
         revenue: {
             total: totalRevenue,
             growth: 12.5, // Dummy growth for now

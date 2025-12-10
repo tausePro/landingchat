@@ -24,7 +24,7 @@ export default async function DashboardPage() {
                         Dashboard
                     </h1>
                     <p className="text-text-light-secondary dark:text-text-dark-secondary mt-2">
-                        Bienvenido, aquí tienes un resumen del rendimiento de tu tienda.
+                        Bienvenido, {stats.userName}. Aquí tienes un resumen del rendimiento de tu tienda.
                     </p>
                 </div>
 
