@@ -34,7 +34,9 @@ export const configOptionSchema = z.object({
 export const variantSchema = z.object({
   type: z.string().min(1),
   values: z.array(z.string()),
-  priceAdjustment: z.number().optional(),
+  priceAdjustment: z.number().optional(), // Legacy field
+  hasPriceAdjustment: z.boolean().optional().default(false),
+  priceAdjustments: z.record(z.string(), z.number()).optional(), // { "XL": 5000, "XXL": 10000 }
 })
 
 export const optionSchema = z.object({

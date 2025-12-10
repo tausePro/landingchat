@@ -4,10 +4,23 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+
+interface VariantValue {
+    name: string
+    priceAdjustment: number
+}
+
+interface Variant {
+    type: string
+    values: string[]
+    hasPriceAdjustment?: boolean
+    priceAdjustments?: Record<string, number> // { "S": 0, "XL": 5000 }
+}
 
 interface VariantsEditorProps {
-    variants: Array<{ type: string; values: string[]; priceAdjustment?: number }>
-    onChange: (variants: Array<{ type: string; values: string[]; priceAdjustment?: number }>) => void
+    variants: Variant[]
+    onChange: (variants: Variant[]) => void
 }
 
 export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
@@ -19,10 +32,10 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
     // Sync local state when variants prop changes externally
     useEffect(() => {
         setLocalValues(variants.map(v => v.values.join(', ')))
-    }, [variants.length]) // Only sync when number of variants changes
+    }, [variants.length])
 
     const handleAdd = () => {
-        const newVariants = [...variants, { type: "", values: [], priceAdjustment: 0 }]
+        const newVariants = [...variants, { type: "", values: [], hasPriceAdjustment: false, priceAdjustments: {} }]
         setLocalValues([...localValues, ""])
         onChange(newVariants)
     }
@@ -40,24 +53,27 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
         onChange(newVariants)
     }
 
-    // Update local input value (does not trigger parent onChange)
     const handleLocalValueChange = (index: number, value: string) => {
         const newLocalValues = [...localValues]
         newLocalValues[index] = value
         setLocalValues(newLocalValues)
     }
 
-    // Parse and commit values to parent state (on blur or Enter)
     const commitValues = (index: number) => {
         const valuesStr = localValues[index] || ""
-        // Split by comma, trim whitespace, filter empty
         const values = valuesStr.split(',').map(v => v.trim()).filter(v => v.length > 0)
 
         const newVariants = [...variants]
-        newVariants[index] = { ...newVariants[index], values }
+        // Preserve existing price adjustments for values that still exist
+        const oldAdjustments = newVariants[index].priceAdjustments || {}
+        const newAdjustments: Record<string, number> = {}
+        values.forEach(v => {
+            newAdjustments[v] = oldAdjustments[v] || 0
+        })
+
+        newVariants[index] = { ...newVariants[index], values, priceAdjustments: newAdjustments }
         onChange(newVariants)
 
-        // Update local value to normalized format
         const newLocalValues = [...localValues]
         newLocalValues[index] = values.join(', ')
         setLocalValues(newLocalValues)
@@ -68,6 +84,33 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
             e.preventDefault()
             commitValues(index)
         }
+    }
+
+    const handlePriceToggle = (index: number, enabled: boolean) => {
+        const newVariants = [...variants]
+        newVariants[index] = { ...newVariants[index], hasPriceAdjustment: enabled }
+        if (!enabled) {
+            // Reset all price adjustments to 0 when disabled
+            const resetAdjustments: Record<string, number> = {}
+            newVariants[index].values.forEach(v => {
+                resetAdjustments[v] = 0
+            })
+            newVariants[index].priceAdjustments = resetAdjustments
+        }
+        onChange(newVariants)
+    }
+
+    const handlePriceChange = (variantIndex: number, valueName: string, price: string) => {
+        const newVariants = [...variants]
+        const adjustments = { ...(newVariants[variantIndex].priceAdjustments || {}) }
+        adjustments[valueName] = parseFloat(price) || 0
+        newVariants[variantIndex] = { ...newVariants[variantIndex], priceAdjustments: adjustments }
+        onChange(newVariants)
+    }
+
+    const formatPrice = (price: number) => {
+        if (price === 0) return ""
+        return price > 0 ? `+$${price.toLocaleString()}` : `-$${Math.abs(price).toLocaleString()}`
     }
 
     return (
@@ -94,9 +137,6 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
                                 onKeyDown={(e) => handleKeyDown(e, index)}
                                 placeholder="S, M, L, XL o Rojo, Azul, Verde"
                             />
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Presiona Enter o haz clic afuera para confirmar
-                            </p>
                         </div>
                         <button
                             type="button"
@@ -109,16 +149,59 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
 
                     {/* Show parsed values as chips */}
                     {variant.values.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                            {variant.values.map((val, valIndex) => (
-                                <span
-                                    key={valIndex}
-                                    className="px-2 py-1 bg-primary/10 text-primary text-sm rounded-md"
-                                >
-                                    {val}
-                                </span>
-                            ))}
-                        </div>
+                        <>
+                            <div className="flex flex-wrap gap-2">
+                                {variant.values.map((val, valIndex) => (
+                                    <span
+                                        key={valIndex}
+                                        className="px-2 py-1 bg-primary/10 text-primary text-sm rounded-md flex items-center gap-1"
+                                    >
+                                        {val}
+                                        {variant.hasPriceAdjustment && variant.priceAdjustments?.[val] !== 0 && (
+                                            <span className="text-xs opacity-70">
+                                                {formatPrice(variant.priceAdjustments?.[val] || 0)}
+                                            </span>
+                                        )}
+                                    </span>
+                                ))}
+                            </div>
+
+                            {/* Price Adjustment Toggle */}
+                            <div className="flex items-center gap-3 pt-2 border-t">
+                                <Checkbox
+                                    id={`price-toggle-${index}`}
+                                    checked={variant.hasPriceAdjustment || false}
+                                    onCheckedChange={(checked) => handlePriceToggle(index, checked as boolean)}
+                                />
+                                <Label htmlFor={`price-toggle-${index}`} className="cursor-pointer text-sm font-normal">
+                                    Esta variante afecta el precio
+                                </Label>
+                            </div>
+
+                            {/* Price Inputs per Value */}
+                            {variant.hasPriceAdjustment && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                    {variant.values.map((val) => (
+                                        <div key={val} className="flex flex-col gap-1">
+                                            <Label className="text-xs text-muted-foreground">{val}</Label>
+                                            <div className="relative">
+                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+$</span>
+                                                <Input
+                                                    type="number"
+                                                    className="pl-8 h-8 text-sm"
+                                                    value={variant.priceAdjustments?.[val] || ""}
+                                                    onChange={(e) => handlePriceChange(index, val, e.target.value)}
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <p className="col-span-full text-xs text-muted-foreground mt-1">
+                                        Ej: XL +$5,000 se suma al precio base
+                                    </p>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             ))}
