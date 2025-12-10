@@ -16,6 +16,7 @@ interface Product {
     price: number
     image_url: string
     description: string
+    stock: number
 }
 
 interface Message {
