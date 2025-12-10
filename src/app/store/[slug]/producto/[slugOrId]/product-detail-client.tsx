@@ -59,10 +59,15 @@ export function ProductDetailClient({ product, organization, badges, promotions,
             ? product.subscription_config.price
             : (product.sale_price || product.price) // Use sale_price if available
 
-        // 1. Add Variant Adjustments
+        // 1. Add Variant Adjustments based on selected values
         if (product.variants) {
             product.variants.forEach((v: any) => {
-                if (v.priceAdjustment) {
+                const selectedValue = selectedVariants[v.type]
+                if (selectedValue && v.hasPriceAdjustment && v.priceAdjustments) {
+                    const adjustment = v.priceAdjustments[selectedValue] || 0
+                    price += adjustment
+                } else if (v.priceAdjustment) {
+                    // Legacy: flat adjustment for the whole variant
                     price += v.priceAdjustment
                 }
             })
