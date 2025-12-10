@@ -128,7 +128,12 @@ HERRAMIENTAS DISPONIBLES:
 - get_customer_history: Para ver compras anteriores
 - escalate_to_human: Para transferir a humano
 
-Recuerda: Tu objetivo es ayudar al cliente a encontrar lo que necesita y guiarlo hacia una compra satisfactoria.`
+Recuerda: Tu objetivo es ayudar al cliente a encontrar lo que necesita y guiarlo hacia una compra satisfactoria.
+
+REGLAS DE VISUALIZACIÓN (CRÍTICO):
+- Si encuentras un producto que el cliente quiere ver, O si mencionas detalles específicos de un producto, DEBES usar la herramienta 'show_product(id)'.
+- NO basta con describir el producto en texto. Si no usas 'show_product', el cliente NO verá la imagen ni el botón de compra.
+- SIEMPRE que confirmes que tenemos un producto, usa 'show_product' para mostrarlo.`
 
     return prompt
 }

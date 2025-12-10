@@ -6,26 +6,42 @@ import { Button } from "@/components/ui/button"
 
 interface ChatLayoutProps {
     children: React.ReactNode
+    rightSidebar?: React.ReactNode
+    organizationName?: string
+    logoUrl?: string
+    showHistory?: boolean
 }
 
-export function ChatLayout({ children }: ChatLayoutProps) {
+export function ChatLayout({
+    children,
+    rightSidebar,
+    organizationName = "LandingChat",
+    logoUrl,
+    showHistory = true
+}: ChatLayoutProps) {
     return (
         <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark">
             {/* Header */}
             <header className="flex items-center justify-between whitespace-nowrap border-b border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-6 py-3 shrink-0">
                 <div className="flex items-center gap-4">
-                    <div className="size-6 text-primary">
-                        <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                clipRule="evenodd"
-                                d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z"
-                                fill="currentColor"
-                                fillRule="evenodd"
-                            ></path>
-                        </svg>
+                    <div className="size-8 rounded overflow-hidden">
+                        {logoUrl ? (
+                            <img src={logoUrl} alt={organizationName} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full bg-primary flex items-center justify-center text-white">
+                                <svg fill="none" viewBox="0 0 48 48" className="size-5" xmlns="http://www.w3.org/2000/svg">
+                                    <path
+                                        clipRule="evenodd"
+                                        d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z"
+                                        fill="currentColor"
+                                        fillRule="evenodd"
+                                    ></path>
+                                </svg>
+                            </div>
+                        )}
                     </div>
                     <h2 className="text-text-light-primary dark:text-text-dark-primary text-lg font-bold tracking-[-0.015em]">
-                        LandingChat
+                        {organizationName}
                     </h2>
                 </div>
                 <div className="flex items-center gap-4">
@@ -49,9 +65,9 @@ export function ChatLayout({ children }: ChatLayoutProps) {
             </header>
 
             <main className="flex flex-1 overflow-hidden">
-                <div className="flex flex-1">
-                    {/* Sidebar */}
-                    <aside className="w-64 flex flex-col border-r border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shrink-0 hidden md:flex">
+                {/* Sidebar Left (History) */}
+                {showHistory && (
+                    <aside className="w-80 flex flex-col border-r border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shrink-0 hidden md:flex">
                         <div className="p-4 border-b border-border-light dark:border-border-dark flex items-center justify-between">
                             <h3 className="font-bold text-text-light-primary dark:text-text-dark-primary">
                                 Historial
@@ -61,11 +77,12 @@ export function ChatLayout({ children }: ChatLayoutProps) {
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            <div className="p-3 rounded-lg bg-primary/10 dark:bg-primary/20">
+                            {/* Mock History Items (for now) */}
+                            <div className="p-3 rounded-lg bg-primary/10 dark:bg-primary/20 cursor-pointer">
                                 <p className="font-semibold text-sm text-primary dark:text-white truncate">
                                     Búsqueda de zapatillas...
                                 </p>
-                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
                                     Hoy, 10:30 AM
                                 </p>
                             </div>
@@ -73,24 +90,31 @@ export function ChatLayout({ children }: ChatLayoutProps) {
                                 <p className="font-medium text-sm text-text-light-primary dark:text-text-dark-primary truncate">
                                     Consulta sobre mi pedido
                                 </p>
-                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
                                     Ayer, 4:15 PM
                                 </p>
                             </div>
                         </div>
-                        <div className="p-2 border-t border-border-light dark:border-border-dark">
-                            <Button variant="secondary" className="w-full justify-start gap-2">
+                        <div className="p-4 border-t border-border-light dark:border-border-dark">
+                            <Button variant="outline" className="w-full justify-start gap-2 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800">
                                 <span className="material-symbols-outlined text-lg">add</span>
                                 <span>Nueva conversación</span>
                             </Button>
                         </div>
                     </aside>
+                )}
 
-                    {/* Main Content Area */}
-                    <div className="flex flex-col flex-1 bg-background-light dark:bg-background-dark relative">
-                        {children}
-                    </div>
+                {/* Main Content Area */}
+                <div className="flex flex-col flex-1 bg-background-light dark:bg-background-dark relative min-w-0">
+                    {children}
                 </div>
+
+                {/* Right Sidebar (Cart/Details) */}
+                {rightSidebar && (
+                    <aside className="w-96 flex flex-col border-l border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shrink-0 hidden lg:flex">
+                        {rightSidebar}
+                    </aside>
+                )}
             </main>
         </div>
     )
