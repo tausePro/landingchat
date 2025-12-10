@@ -38,21 +38,63 @@ export default async function OrdersPage({
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
+            case 'delivered':
             case 'completed':
             case 'entregado':
-            case 'enviado':
                 return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+            case 'confirmed':
+            case 'confirmado':
+            case 'paid':
+            case 'pagado':
+                return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300"
+            case 'shipped':
+            case 'enviado':
+                return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
             case 'processing':
             case 'procesando':
                 return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
             case 'pending':
             case 'pendiente':
-                return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300"
             case 'cancelled':
             case 'cancelado':
                 return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+            case 'refunded':
+            case 'reembolsado':
+                return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300"
             default:
                 return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
+        }
+    }
+
+    const getStatusLabel = (status: string) => {
+        switch (status.toLowerCase()) {
+            case 'delivered':
+            case 'completed':
+            case 'entregado':
+                return "Entregado"
+            case 'confirmed':
+            case 'confirmado':
+            case 'paid':
+            case 'pagado':
+                return "Confirmado"
+            case 'shipped':
+            case 'enviado':
+                return "Enviado"
+            case 'processing':
+            case 'procesando':
+                return "Procesando"
+            case 'pending':
+            case 'pendiente':
+                return "Pendiente"
+            case 'cancelled':
+            case 'cancelado':
+                return "Cancelado"
+            case 'refunded':
+            case 'reembolsado':
+                return "Reembolsado"
+            default:
+                return status.charAt(0).toUpperCase() + status.slice(1)
         }
     }
 
@@ -151,7 +193,7 @@ export default async function OrdersPage({
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                                                     <span className={`size-2 rounded-full ${getStatusColor(order.status).replace('text-', 'bg-').replace('100', '500').replace('800', '500').split(' ')[0]}`}></span>
-                                                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                                                    {getStatusLabel(order.status)}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-text-light-primary dark:text-text-dark-primary font-semibold">
