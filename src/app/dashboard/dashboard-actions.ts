@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export interface DashboardStats {
     userName: string
+    organizationSlug: string
     revenue: {
         total: number
         growth: number // vs last month
@@ -39,6 +40,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     if (!profile?.organization_id) throw new Error("No organization found")
     const orgId = profile.organization_id
+
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("slug")
+        .eq("id", orgId)
+        .single()
+
+    const orgSlug = org?.slug || ""
 
     // Helper for date ranges
     const now = new Date()
@@ -101,6 +110,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     return {
         userName,
+        organizationSlug: orgSlug,
         revenue: {
             total: totalRevenue,
             growth: 12.5, // Dummy growth for now

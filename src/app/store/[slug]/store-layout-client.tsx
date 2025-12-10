@@ -8,6 +8,7 @@ import { TemplateRenderer } from "@/components/store/templates/template-renderer
 import { StoreHeader } from "@/components/store/store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
+import { StorePresence } from "@/components/store/store-presence"
 
 interface StoreLayoutClientProps {
     slug: string
@@ -109,6 +110,9 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
     return (
         <div className="min-h-screen bg-white text-slate-900" style={{ fontFamily: fontFamily }}>
+            {/* Real-time Presence Tracking */}
+            <StorePresence slug={slug} />
+
             {/* --- Header --- */}
             {!hideNavigation && (
                 <StoreHeader
