@@ -45,7 +45,7 @@ export async function getOrders({ page = 1, limit = 10, status, search }: GetOrd
             created_at,
             status,
             total,
-            customer:customers(full_name, email),
+            customer_info,
             items
         `, { count: 'exact' })
         .eq("organization_id", profile.organization_id)
@@ -78,15 +78,23 @@ export async function getOrders({ page = 1, limit = 10, status, search }: GetOrd
     }
 
     // Transform data to match interface
-    const orders: Order[] = data.map((order: any) => ({
-        id: order.id,
-        created_at: order.created_at,
-        status: order.status,
-        total_amount: order.total,
-        currency: 'COP', // Default to COP as it's not in schema
-        customer: order.customer,
-        items_count: Array.isArray(order.items) ? order.items.length : 0
-    }))
+    const orders: Order[] = data.map((order: any) => {
+        // Extract customer info from JSONB field
+        const customerInfo = order.customer_info as { name?: string; email?: string } | null
+
+        return {
+            id: order.id,
+            created_at: order.created_at,
+            status: order.status,
+            total_amount: order.total,
+            currency: 'COP', // Default to COP as it's not in schema
+            customer: customerInfo ? {
+                full_name: customerInfo.name || 'Cliente Anónimo',
+                email: customerInfo.email || ''
+            } : null,
+            items_count: Array.isArray(order.items) ? order.items.length : 0
+        }
+    })
 
     return {
         orders,
