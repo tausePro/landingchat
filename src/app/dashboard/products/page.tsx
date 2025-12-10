@@ -2,7 +2,7 @@ import { getProducts } from "./actions"
 import { ProductList } from "./components/product-list"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import Link from "next/link" // Added Link import
-
+import { WooImportModal } from "./components/woo-import-modal"
 export const dynamic = 'force-dynamic'
 
 // Helper function for currency formatting (assuming it's needed for the new code)
@@ -30,10 +30,13 @@ export default async function ProductsPage() {
                         <h1 className="text-text-light-primary dark:text-text-dark-primary text-3xl font-bold tracking-tight">Gestión de Productos</h1>
                         <p className="text-text-light-secondary dark:text-text-dark-secondary text-base font-normal leading-normal mt-1">Añade, edita y gestiona todos los productos de tu tienda.</p>
                     </div>
-                    <Link href="/dashboard/products/new" className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 text-white text-sm font-bold shadow-sm hover:bg-primary/90">
-                        <span className="material-symbols-outlined text-lg">add_circle</span>
-                        <span className="truncate">Añadir Nuevo Producto</span>
-                    </Link>
+                    <div className="flex gap-3">
+                        <WooImportModal />
+                        <Link href="/dashboard/products/new" className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 text-white text-sm font-bold shadow-sm hover:bg-primary/90">
+                            <span className="material-symbols-outlined text-lg">add_circle</span>
+                            <span className="truncate">Añadir Nuevo Producto</span>
+                        </Link>
+                    </div>
                 </div>
                 <div className="mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-hidden">
                     <div className="p-6 flex flex-wrap items-center justify-between gap-4">
