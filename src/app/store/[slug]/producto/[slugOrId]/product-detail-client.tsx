@@ -304,9 +304,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         </div>
                     )}
 
-                    <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed mt-4 md:text-lg">
-                        {product.description || "Sin descripción disponible."}
-                    </p>
+                    {product.description ? (
+                        <div
+                            className="text-slate-600 dark:text-slate-300 text-base leading-relaxed mt-4 md:text-lg prose prose-slate dark:prose-invert max-w-none [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4"
+                            dangerouslySetInnerHTML={{ __html: product.description }}
+                        />
+                    ) : (
+                        <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed mt-4 md:text-lg">
+                            Sin descripción disponible.
+                        </p>
+                    )}
 
                     {/* Variants */}
                     {product.variants && product.variants.length > 0 && (
