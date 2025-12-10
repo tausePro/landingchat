@@ -31,7 +31,6 @@ export default async function DashboardPage() {
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <VisitorsCard organizationSlug={stats.organizationSlug} />
                     {/* Revenue */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -56,29 +55,8 @@ export default async function DashboardPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Orders */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-text-light-secondary dark:text-text-dark-secondary">
-                                Nuevos Pedidos
-                            </CardTitle>
-                            <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
-                                shopping_bag
-                            </span>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.orders.total}</div>
-                            <div className="flex items-center text-xs mt-1">
-                                <span className="text-green-500 font-medium flex items-center">
-                                    <span className="material-symbols-outlined text--[16px] mr-1">chat</span>
-                                    +{stats.orders.growth}%
-                                </span>
-                                <span className="text-text-light-secondary dark:text-text-dark-secondary ml-2">
-                                    crecimiento
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {/* Visitors */}
+                    <VisitorsCard organizationSlug={stats.organizationSlug} />
 
                     {/* Conversion */}
                     <Card>

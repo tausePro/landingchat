@@ -40,7 +40,7 @@ export function VisitorsCard({ organizationSlug }: { organizationSlug: string })
             <CardContent>
                 <div className="text-2xl font-bold">{visitors}</div>
                 <p className="text-xs text-muted-foreground">
-                    Clientes explorando la tienda
+                    Usuarios viendo tu tienda ahora mismo
                 </p>
             </CardContent>
         </Card>

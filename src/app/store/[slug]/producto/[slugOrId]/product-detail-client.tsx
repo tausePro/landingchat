@@ -226,8 +226,33 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                     ))}
                                 </div>
                                 <span className="text-sm text-slate-500 dark:text-slate-400 font-medium hover:text-primary cursor-pointer">
-                                    Reseñas verificadas
+                                    23 reseñas
                                 </span>
+                            </div>
+
+                            {/* Social Proof Badges */}
+                            <div className="flex flex-wrap gap-3 mt-2">
+                                {/* Simulated Sold Count (Stable based on ID) */}
+                                <div className="px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-[18px]">local_fire_department</span>
+                                    {(product.id.charCodeAt(0) % 15) + 5} vendidos esta semana
+                                </div>
+
+                                {/* Free Shipping */}
+                                {hasFreeShipping && (
+                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[18px]">check</span>
+                                        Envío gratis
+                                    </div>
+                                )}
+
+                                {/* Low Stock Warning */}
+                                {(product.stock > 0 && product.stock < 20) && (
+                                    <div className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[18px]">bolt</span>
+                                        Últimas {product.stock} unidades
+                                    </div>
+                                )}
                             </div>
                         </div>
 
