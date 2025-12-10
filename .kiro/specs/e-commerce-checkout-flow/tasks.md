@@ -218,7 +218,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
 
 ## Phase 8: Organization Dashboard - Orders List
 
-- [ ] 11. Create orders list page
+- [x] 11. Create orders list page
   - Create `src/app/dashboard/orders/page.tsx`
   - Display table of all orders for organization
   - Show order number, customer name, total, status, date
@@ -227,7 +227,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Add pagination (20 orders per page)
   - _Requirements: 6.1, 6.2, 6.7_
 
-- [ ] 11.1 Create orders list server actions
+- [x] 11.1 Create orders list server actions
   - Create `src/app/dashboard/orders/actions.ts`
   - Implement `getOrders(filters)` function
   - Support filtering by status

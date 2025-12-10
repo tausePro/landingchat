@@ -156,6 +156,11 @@ export async function createProduct(
         configurable_options: parsed.data.configurable_options ?? null,
         sale_price: parsed.data.sale_price ?? null,
         badge_id: parsed.data.badge_id ?? null,
+        // Bundle fields
+        is_bundle: parsed.data.is_bundle ?? false,
+        bundle_items: parsed.data.bundle_items ?? [],
+        bundle_discount_type: parsed.data.bundle_discount_type ?? null,
+        bundle_discount_value: parsed.data.bundle_discount_value ?? 0,
       })
       .select()
       .single()

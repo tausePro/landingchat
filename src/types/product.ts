@@ -42,6 +42,13 @@ export const optionSchema = z.object({
   values: z.array(z.string()),
 })
 
+// Schema para items de un bundle (combo)
+export const bundleItemSchema = z.object({
+  product_id: z.string().uuid("ID de producto inválido"),
+  quantity: z.number().int().positive("La cantidad debe ser positiva").default(1),
+  variant: z.string().optional(), // Variante específica si aplica
+})
+
 // ============================================================================
 // Create Product Schema
 // ============================================================================
@@ -77,6 +84,11 @@ export const createProductSchema = z.object({
   tags: z.array(z.string()).optional(),
   is_featured: z.boolean().optional(),
   max_quantity_per_customer: z.number().int().positive().optional().nullable(),
+  // Bundle/Combo fields
+  is_bundle: z.boolean().default(false),
+  bundle_items: z.array(bundleItemSchema).default([]),
+  bundle_discount_type: z.enum(['fixed', 'percentage']).optional().nullable(),
+  bundle_discount_value: z.number().min(0).default(0),
 })
 
 // ============================================================================
@@ -95,6 +107,7 @@ export type SubscriptionConfig = z.infer<typeof subscriptionConfigSchema>
 export type ConfigOption = z.infer<typeof configOptionSchema>
 export type ProductVariant = z.infer<typeof variantSchema>
 export type ProductOption = z.infer<typeof optionSchema>
+export type BundleItem = z.infer<typeof bundleItemSchema>
 
 // ============================================================================
 // Product Data Interface (full product from database)
@@ -131,5 +144,10 @@ export interface ProductData {
   tags?: string[]
   is_featured?: boolean
   max_quantity_per_customer?: number | null
+  // Bundle/Combo fields
+  is_bundle?: boolean
+  bundle_items?: BundleItem[]
+  bundle_discount_type?: 'fixed' | 'percentage' | null
+  bundle_discount_value?: number
   created_at: string
 }

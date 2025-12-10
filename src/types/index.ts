@@ -23,12 +23,14 @@ export {
   configOptionSchema,
   variantSchema,
   optionSchema,
+  bundleItemSchema,
   type CreateProductInput,
   type UpdateProductInput,
   type SubscriptionConfig,
   type ConfigOption,
   type ProductVariant,
   type ProductOption,
+  type BundleItem,
   type ProductData,
 } from "./product"
 

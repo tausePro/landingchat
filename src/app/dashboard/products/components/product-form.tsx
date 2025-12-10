@@ -11,6 +11,8 @@ import { ImageUpload } from "./image-upload"
 import { VariantsEditor } from "./variants-editor"
 import { CategoriesInput } from "./categories-input"
 import { ConfigurableOptionsEditor } from "./configurable-options-editor"
+import { BundleEditor } from "./bundle-editor"
+import { BundleItem } from "@/types/product"
 
 interface ProductFormProps {
     organizationId: string
@@ -50,6 +52,12 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     // Marketing state
     const [badgeId, setBadgeId] = useState(initialData?.badge_id || "")
     const [badges, setBadges] = useState<any[]>([])
+
+    // Bundle state
+    const [isBundle, setIsBundle] = useState(initialData?.is_bundle ?? false)
+    const [bundleItems, setBundleItems] = useState<BundleItem[]>(initialData?.bundle_items || [])
+    const [bundleDiscountType, setBundleDiscountType] = useState<'fixed' | 'percentage' | null>(initialData?.bundle_discount_type || null)
+    const [bundleDiscountValue, setBundleDiscountValue] = useState(initialData?.bundle_discount_value ?? 0)
 
     // Load badges
     useEffect(() => {
@@ -94,7 +102,12 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     trial_days: subscriptionTrialDays ? parseInt(subscriptionTrialDays) : undefined,
                     discount_percentage: subscriptionDiscount ? parseFloat(subscriptionDiscount) : undefined
                 } : undefined,
-                badge_id: badgeId || undefined
+                badge_id: badgeId || undefined,
+                // Bundle fields
+                is_bundle: isBundle,
+                bundle_items: isBundle ? bundleItems : [],
+                bundle_discount_type: isBundle ? bundleDiscountType : undefined,
+                bundle_discount_value: isBundle ? bundleDiscountValue : 0,
             }
 
             let result
@@ -239,6 +252,54 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Opciones Avanzadas</h2>
                         <div className="mt-6 flex flex-col gap-4">
+                            {/* Bundle/Combo Toggle */}
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">inventory_2</span>
+                                            Bundle/Combo
+                                        </h3>
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                            Agrupa varios productos en un combo con descuento.
+                                        </p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={isBundle}
+                                            onChange={e => {
+                                                setIsBundle(e.target.checked)
+                                                // Reset subscription if enabling bundle
+                                                if (e.target.checked) {
+                                                    setSubscriptionEnabled(false)
+                                                }
+                                            }}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                    </label>
+                                </div>
+
+                                {/* Bundle Editor */}
+                                {isBundle && (
+                                    <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-primary/20">
+                                        <BundleEditor
+                                            items={bundleItems}
+                                            onChange={setBundleItems}
+                                            discountType={bundleDiscountType}
+                                            discountValue={bundleDiscountValue}
+                                            onDiscountTypeChange={setBundleDiscountType}
+                                            onDiscountValueChange={setBundleDiscountValue}
+                                            organizationId={organizationId}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="border-t border-border-light dark:border-border-dark"></div>
+
+                            {/* Subscription Toggle */}
                             <div className="flex flex-col gap-4">
                                 <div className="flex items-center justify-between">
                                     <div>
