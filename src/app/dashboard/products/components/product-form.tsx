@@ -13,6 +13,7 @@ import { CategoriesInput } from "./categories-input"
 import { ConfigurableOptionsEditor } from "./configurable-options-editor"
 import { BundleEditor } from "./bundle-editor"
 import { BundleItem } from "@/types/product"
+import { enhanceProductDescription } from "../ai-actions"
 
 interface ProductFormProps {
     organizationId: string
@@ -58,6 +59,9 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [bundleItems, setBundleItems] = useState<BundleItem[]>(initialData?.bundle_items || [])
     const [bundleDiscountType, setBundleDiscountType] = useState<'fixed' | 'percentage' | null>(initialData?.bundle_discount_type || null)
     const [bundleDiscountValue, setBundleDiscountValue] = useState(initialData?.bundle_discount_value ?? 0)
+
+    // AI Enhancement state
+    const [isEnhancing, setIsEnhancing] = useState(false)
 
     // Load badges
     useEffect(() => {
@@ -183,6 +187,43 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                         placeholder="Describe tu producto..."
                                     />
                                 </div>
+                                {/* AI Enhancement Button */}
+                                <button
+                                    type="button"
+                                    disabled={isEnhancing || !name.trim()}
+                                    onClick={async () => {
+                                        if (!name.trim()) {
+                                            alert("Primero ingresa el nombre del producto")
+                                            return
+                                        }
+                                        setIsEnhancing(true)
+                                        try {
+                                            const result = await enhanceProductDescription({
+                                                name: name.trim(),
+                                                description: description.trim() || undefined,
+                                                category: categories[0],
+                                                price: parseFloat(price) || 0
+                                            })
+                                            if (result.success) {
+                                                setDescription(result.data.description)
+                                                // Could also set meta fields if you have them
+                                                alert(`✨ Descripción mejorada!\n\nSugerencias SEO:\n• Título: ${result.data.meta_title}\n• Meta: ${result.data.meta_description}\n• Keywords: ${result.data.keywords.join(', ')}`)
+                                            } else {
+                                                alert(`Error: ${result.error}`)
+                                            }
+                                        } catch (error: any) {
+                                            alert(`Error: ${error.message}`)
+                                        } finally {
+                                            setIsEnhancing(false)
+                                        }
+                                    }}
+                                    className="mt-2 flex items-center gap-2 text-sm text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <span className="material-symbols-outlined text-lg">
+                                        {isEnhancing ? 'sync' : 'auto_awesome'}
+                                    </span>
+                                    {isEnhancing ? 'Mejorando...' : '✨ Mejorar con IA'}
+                                </button>
                             </div>
                         </div>
                     </div>
