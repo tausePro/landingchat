@@ -1,162 +1,182 @@
-"use client"
-
-import { useEffect, useState } from "react"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { createClient } from "@/lib/supabase/client"
-import { PlanUsageCard } from "./components/plan-usage-card"
+import { getDashboardStats } from "./dashboard-actions"
+import Link from "next/link"
+import { DashboardCharts } from "./components/dashboard-charts"
 
-export default function DashboardPage() {
-    const [stats, setStats] = useState({
-        activeChats: 0,
-        activeAgents: 0,
-    })
-    const [loading, setLoading] = useState(true)
+export const dynamic = 'force-dynamic'
 
-    useEffect(() => {
-        const fetchStats = async () => {
-            const supabase = createClient()
+export default async function DashboardPage() {
+    const stats = await getDashboardStats()
 
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-
-            const { data: profile } = await supabase
-                .from("profiles")
-                .select("organization_id")
-                .eq("id", user.id)
-                .single()
-
-            if (!profile?.organization_id) return
-
-            // Fetch Active Chats
-            const { count: chatsCount } = await supabase
-                .from("chats")
-                .select("*", { count: "exact", head: true })
-                .eq("organization_id", profile.organization_id)
-                .eq("status", "active")
-
-            // Fetch Active Agents
-            const { count: agentsCount } = await supabase
-                .from("agents")
-                .select("*", { count: "exact", head: true })
-                .eq("organization_id", profile.organization_id)
-                .eq("status", "available")
-
-            setStats({
-                activeChats: chatsCount || 0,
-                activeAgents: agentsCount || 0,
-            })
-            setLoading(false)
-        }
-
-        fetchStats()
-    }, [])
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(amount)
+    }
 
     return (
         <DashboardLayout>
-            <div className="space-y-6">
-                <h1 className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">
-                    Dashboard
-                </h1>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">
+                        Dashboard
+                    </h1>
+                    <p className="text-text-light-secondary dark:text-text-dark-secondary mt-2">
+                        Bienvenido, aquí tienes un resumen del rendimiento de tu tienda.
+                    </p>
+                </div>
 
-                {/* Metrics Grid */}
+                {/* KPI Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {/* Revenue */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Ventas Totales
+                            <CardTitle className="text-sm font-medium text-text-light-secondary dark:text-text-dark-secondary">
+                                Ingresos Totales
                             </CardTitle>
                             <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
-                                attach_money
+                                payments
                             </span>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">$0.00</div>
-                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
-                                Sin datos de ventas aún
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Chats Activos
-                            </CardTitle>
-                            <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
-                                chat
-                            </span>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">
-                                {loading ? "..." : stats.activeChats}
+                            <div className="text-2xl font-bold">{formatCurrency(stats.revenue.total)}</div>
+                            <div className="flex items-center text-xs mt-1">
+                                <span className="text-green-500 font-medium flex items-center">
+                                    <span className="material-symbols-outlined text-[16px] mr-1">trending_up</span>
+                                    +{stats.revenue.growth}%
+                                </span>
+                                <span className="text-text-light-secondary dark:text-text-dark-secondary ml-2">
+                                    vs mes anterior
+                                </span>
                             </div>
-                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
-                                En tiempo real
-                            </p>
                         </CardContent>
                     </Card>
+
+                    {/* Orders */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Tasa de Conversión
+                            <CardTitle className="text-sm font-medium text-text-light-secondary dark:text-text-dark-secondary">
+                                Nuevos Pedidos
                             </CardTitle>
                             <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
-                                trending_up
+                                shopping_bag
                             </span>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">0%</div>
-                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
-                                Necesita más datos
-                            </p>
+                            <div className="text-2xl font-bold">{stats.orders.total}</div>
+                            <div className="flex items-center text-xs mt-1">
+                                <span className="text-green-500 font-medium flex items-center">
+                                    <span className="material-symbols-outlined text--[16px] mr-1">chat</span>
+                                    +{stats.orders.growth}%
+                                </span>
+                                <span className="text-text-light-secondary dark:text-text-dark-secondary ml-2">
+                                    crecimiento
+                                </span>
+                            </div>
                         </CardContent>
                     </Card>
+
+                    {/* Conversion */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                Agentes Disponibles
+                            <CardTitle className="text-sm font-medium text-text-light-secondary dark:text-text-dark-secondary">
+                                Conversiones del Chat
+                            </CardTitle>
+                            <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
+                                swap_horiz
+                            </span>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.chats.conversionRate}%</div>
+                            <div className="flex items-center text-xs mt-1">
+                                <span className="text-red-500 font-medium flex items-center">
+                                    <span className="material-symbols-outlined text-[16px] mr-1">trending_down</span>
+                                    {stats.chats.growth}%
+                                </span>
+                                <span className="text-text-light-secondary dark:text-text-dark-secondary ml-2">
+                                    vs semana anterior
+                                </span>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Agents */}
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-text-light-secondary dark:text-text-dark-secondary">
+                                Rendimiento Agente
                             </CardTitle>
                             <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
                                 support_agent
                             </span>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">
-                                {loading ? "..." : stats.activeAgents}
-                            </div>
-                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
-                                Listos para atender
+                            <div className="text-2xl font-bold">{stats.agents.responseTime}</div>
+                            <p className="text-xs text-blue-500 mt-1">
+                                Tiempo de respuesta prom.
                             </p>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Recent Activity & Charts Placeholder */}
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                    <Card className="col-span-4">
-                        <CardHeader>
-                            <CardTitle>Resumen de Ingresos</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pl-2">
-                            <div className="h-[200px] flex items-center justify-center text-text-light-secondary dark:text-text-dark-secondary bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                Gráfico de Ingresos (Próximamente)
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <div className="col-span-3 space-y-4">
-                        <PlanUsageCard />
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Chats Recientes</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                                        Implementando lista de chats...
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                {/* Charts Section */}
+                <DashboardCharts
+                    revenueHistory={stats.revenue.history}
+                    chatChannels={stats.chats.byChannel}
+                    totalChats={stats.chats.total}
+                />
+
+                {/* Quick Actions */}
+                <div>
+                    <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary mb-4">
+                        Acciones Rápidas
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Link href="/dashboard/products" className="block group">
+                            <Card className="h-full border border-border-light dark:border-border-dark hover:border-primary/50 transition-colors">
+                                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full">
+                                    <div className="size-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-2xl">inventory_2</span>
+                                    </div>
+                                    <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">Gestionar Productos</h3>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
+                        <Link href="/dashboard/orders?status=pending" className="block group">
+                            <Card className="h-full border border-border-light dark:border-border-dark hover:border-primary/50 transition-colors">
+                                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full">
+                                    <div className="size-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-2xl">remove_shopping_cart</span>
+                                    </div>
+                                    <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">Revisar Carritos<br />Abandonados</h3>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
+                        <Link href="/dashboard/agents" className="block group">
+                            <Card className="h-full border border-border-light dark:border-border-dark hover:border-primary/50 transition-colors">
+                                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full">
+                                    <div className="size-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-2xl">smart_toy</span>
+                                    </div>
+                                    <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">Configurar Agentes</h3>
+                                </CardContent>
+                            </Card>
+                        </Link>
+
+                        <Link href="/dashboard/marketing" className="block group">
+                            <Card className="h-full border border-border-light dark:border-border-dark hover:border-primary/50 transition-colors">
+                                <CardContent className="flex flex-col items-center justify-center p-6 text-center h-full">
+                                    <div className="size-12 rounded-xl bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                        <span className="material-symbols-outlined text-2xl">campaign</span>
+                                    </div>
+                                    <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">Crear Nueva<br />Promoción</h3>
+                                </CardContent>
+                            </Card>
+                        </Link>
                     </div>
                 </div>
             </div>
