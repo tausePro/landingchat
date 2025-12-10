@@ -18,26 +18,27 @@ interface ProductDetailClientProps {
 
 export function ProductDetailClient({ product, organization, badges, promotions, slug, initialIsSubdomain = false }: ProductDetailClientProps) {
     const router = useRouter()
-    // Use initial value from server if available, otherwise default to hook behavior
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
 
-    console.log('ProductDetailClient Debug:', { slug, isSubdomain, hostname: typeof window !== 'undefined' ? window.location.hostname : 'SSR' })
-    console.log('ProductDetailClient received slug:', slug)
+    const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
 
-    if (!slug) {
-        console.error('ERROR: slug is undefined in ProductDetailClient!')
-    }
+    // Images
+    const images = product.images && product.images.length > 0
+        ? product.images
+        : [product.image_url || "/placeholder-product.png"]
 
-    const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
-    const images = product.images || []
-    const mainImage = images[0] || product.image_url || "/placeholder-product.png"
+    const [selectedImage, setSelectedImage] = useState(images[0])
 
     // State
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
-    const [purchaseType, setPurchaseType] = useState<'one-time' | 'subscription'>('one-time')
     const [currentPrice, setCurrentPrice] = useState(product.price)
     const [activePromotion, setActivePromotion] = useState<any>(null)
+
+    // Initial Image Update (if changed)
+    useEffect(() => {
+        if (images.length > 0) setSelectedImage(images[0])
+    }, [product])
 
     // Initialize default variants
     useEffect(() => {
@@ -54,21 +55,15 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
     // Calculate Price & Promotion
     useEffect(() => {
-        // Determine base price based on purchase type
-        let price = purchaseType === 'subscription' && product.subscription_config?.enabled
-            ? product.subscription_config.price
-            : (product.sale_price || product.price) // Use sale_price if available
+        let price = product.sale_price || product.price
 
-        // 1. Add Variant Adjustments based on selected values
+        // 1. Add Variant Adjustments
         if (product.variants) {
             product.variants.forEach((v: any) => {
                 const selectedValue = selectedVariants[v.type]
                 if (selectedValue && v.hasPriceAdjustment && v.priceAdjustments) {
                     const adjustment = v.priceAdjustments[selectedValue] || 0
                     price += adjustment
-                } else if (v.priceAdjustment) {
-                    // Legacy: flat adjustment for the whole variant
-                    price += v.priceAdjustment
                 }
             })
         }
@@ -99,15 +94,13 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
         setCurrentPrice(bestPrice)
         setActivePromotion(bestPromo)
-    }, [product, selectedVariants, promotions, purchaseType])
+    }, [product, selectedVariants, promotions])
 
     const handleVariantChange = (type: string, value: string) => {
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
     }
 
     const handleChat = (productId?: string) => {
-        console.log('DEBUG handleChat:', { slug, isSubdomain, productId })
-        // Build context string
         const contextParts: string[] = []
         Object.entries(selectedVariants).forEach(([type, value]) => {
             contextParts.push(`${type}: ${value}`)
@@ -117,217 +110,157 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         if (productId) params.set('product', productId)
         if (contextParts.length > 0) params.set('context', contextParts.join(', '))
 
-        // Check if customer is already identified
         const customerId = localStorage.getItem(`customer_${organization.slug}`)
 
         if (customerId) {
-            // User is identified, go directly to chat
             let chatUrl = getChatUrl(isSubdomain, organization.slug)
             if (params.toString()) chatUrl += `?${params.toString()}`
             router.push(chatUrl)
         } else {
-            // User needs to identify first, go to store home with chat action
             const homeUrl = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, organization.slug)
             router.push(homeUrl)
         }
     }
 
-    // Filter visible badges
-    const visibleBadges = badges.filter(badge => {
-        // Show manually assigned badge
-        if (badge.type === 'manual' && product.badge_id === badge.id) {
-            return true
-        }
+    // Logic for Brand/Category Label
+    const brandOrCategory = product.brand || product.category || organization.name
 
-        // Show automatic badges based on rules
-        if (badge.type === 'automatic') {
-            if (badge.rules?.stock_status === 'low' && product.stock < 5 && product.stock > 0) return true
-            if (badge.rules?.stock_status === 'out' && product.stock === 0) return true
-            if (badge.rules?.discount_greater_than && activePromotion && activePromotion.value >= badge.rules.discount_greater_than) return true
-        }
-
-        return false
-    })
+    // Logic for Free Shipping
+    const freeShippingThreshold = organization.settings?.shipping?.free_shipping_threshold || 100000 // Default to 100k if not set
+    const hasFreeShipping = product.free_shipping_enabled || (currentPrice >= freeShippingThreshold)
 
     return (
         <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
 
-            <div className="md:container md:mx-auto md:px-4 md:grid md:grid-cols-2 md:gap-12 lg:gap-16">
-                {/* Custom Sticky Header (Mobile Only) */}
-                <header className="fixed top-0 left-0 right-0 z-20 flex justify-between items-center px-4 py-3 bg-white/10 backdrop-blur-md md:hidden">
-                    <Link href={getStoreLink('/', isSubdomain, slug)} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
-                        <span className="material-symbols-outlined text-2xl">arrow_back</span>
-                    </Link>
-                    {organization.logo_url && (
-                        <div className="absolute left-1/2 -translate-x-1/2">
+                    {/* Left Column: Gallery */}
+                    <div className="flex flex-col items-center gap-4">
+                        {/* Mobile Header (Only visible on small screens) */}
+                        <div className="md:hidden w-full flex justify-between items-center mb-4">
+                            <Link href={getStoreLink('/', isSubdomain, slug)} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white">
+                                <span className="material-symbols-outlined">arrow_back</span>
+                            </Link>
+                            <div className="flex gap-2">
+                                <button className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white">
+                                    <span className="material-symbols-outlined">share</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="w-full relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-800">
                             <Image
-                                src={organization.logo_url}
-                                alt={organization.name}
-                                width={32}
-                                height={32}
-                                className="rounded-full"
+                                src={selectedImage}
+                                alt={product.name}
+                                fill
+                                className="object-cover"
+                                priority
                             />
-                        </div>
-                    )}
-                    <div className="flex gap-2">
-                        <button className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
-                            <span className="material-symbols-outlined text-2xl">share</span>
-                        </button>
-                        <button className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-slate-900 dark:text-white transition-colors">
-                            <span className="material-symbols-outlined text-2xl">favorite_border</span>
-                        </button>
-                    </div>
-                </header>
-
-                {/* Hero Image */}
-                <div className="relative w-full h-[50vh] min-h-[400px] md:h-auto md:aspect-square md:rounded-2xl md:overflow-hidden md:shadow-sm">
-                    <Image
-                        src={mainImage}
-                        alt={product.name}
-                        fill
-                        className="object-cover"
-                        priority
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent md:hidden" />
-
-                    {/* Badges Overlay */}
-                    <div className="absolute top-4 left-4 flex flex-col gap-2">
-                        {visibleBadges.map(badge => (
-                            <div
-                                key={badge.id}
-                                className="px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"
-                                style={{ backgroundColor: badge.background_color, color: badge.text_color }}
-                            >
-                                {badge.icon && <span className="material-symbols-outlined text-[14px]">{badge.icon}</span>}
-                                {badge.display_text}
+                            {/* Badges Overlay */}
+                            <div className="absolute top-4 left-4 flex flex-col gap-2">
+                                {badges.map(badge => (
+                                    <div
+                                        key={badge.id}
+                                        className="px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"
+                                        style={{ backgroundColor: badge.background_color, color: badge.text_color }}
+                                    >
+                                        {badge.icon && <span className="material-symbols-outlined text-[14px]">{badge.icon}</span>}
+                                        {badge.display_text}
+                                    </div>
+                                ))}
+                                {activePromotion && (
+                                    <div className="px-3 py-1 rounded-full text-xs font-bold shadow-sm bg-red-500 text-white animate-pulse">
+                                        {activePromotion.type === 'percentage' ? `-${activePromotion.value}%` : 'OFERTA'}
+                                    </div>
+                                )}
+                                {hasFreeShipping && (
+                                    <div className="px-3 py-1 rounded-full text-xs font-bold shadow-sm bg-green-500 text-white flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[14px]">local_shipping</span>
+                                        ENVÍO GRATIS
+                                    </div>
+                                )}
                             </div>
-                        ))}
-                        {activePromotion && (
-                            <div className="px-3 py-1 rounded-full text-xs font-bold shadow-sm bg-red-500 text-white animate-pulse">
-                                {activePromotion.type === 'percentage' ? `-${activePromotion.value}%` : 'OFERTA'}
+                        </div>
+
+                        {images.length > 1 && (
+                            <div className="grid grid-cols-5 gap-3 w-full">
+                                {images.map((img: string, idx: number) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setSelectedImage(img)}
+                                        className={`w-full relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${selectedImage === img ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
+                                    >
+                                        <Image src={img} alt={`View ${idx}`} fill className="object-cover" />
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Carousel Indicators */}
-                    {images.length > 1 && (
-                        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 md:bottom-4">
-                            {images.map((_: any, idx: number) => (
-                                <div
-                                    key={idx}
-                                    className={`size-2 rounded-full ${idx === 0 ? 'bg-white' : 'bg-white/50'}`}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </div>
+                    {/* Right Column: Info */}
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-primary tracking-wide uppercase mb-2">
+                            {brandOrCategory}
+                        </span>
 
-                {/* Product Info */}
-                <div className="flex flex-col gap-2 pt-6 px-5 -mt-6 relative z-10 bg-background-light dark:bg-background-dark rounded-t-3xl md:mt-0 md:rounded-none md:bg-transparent md:pt-0 md:px-0 md:static">
-                    <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mb-4 md:hidden" />
+                        <h1 className="text-slate-900 dark:text-white text-3xl md:text-4xl font-bold leading-tight">
+                            {product.name}
+                        </h1>
 
-                    <h1 className="text-slate-900 dark:text-white text-3xl font-bold leading-tight tracking-tight md:text-4xl">
-                        {product.name}
-                    </h1>
-
-                    <div className="flex items-baseline gap-3">
-                        <h2 className="text-2xl font-bold md:text-3xl md:mt-2" style={{ color: primaryColor }}>
-                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(currentPrice)}
-                        </h2>
-                        {(activePromotion || product.sale_price) && (
-                            <span className="text-lg text-slate-400 line-through">
-                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Subscription Options */}
-                    {product.subscription_config?.enabled && (
-                        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Opciones de Compra</h3>
-                            <div className="grid grid-cols-2 gap-3">
-                                {/* One-time Purchase */}
-                                <button
-                                    onClick={() => setPurchaseType('one-time')}
-                                    className={`p-3 rounded-lg border-2 transition-all ${purchaseType === 'one-time'
-                                        ? 'border-primary bg-primary/10'
-                                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
-                                        }`}
-                                >
-                                    <div className="text-left">
-                                        <div className="text-xs font-medium text-slate-600 dark:text-slate-400">Compra Única</div>
-                                        <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
-                                        </div>
-                                    </div>
-                                </button>
-
-                                {/* Subscription */}
-                                <button
-                                    onClick={() => setPurchaseType('subscription')}
-                                    className={`p-3 rounded-lg border-2 transition-all relative ${purchaseType === 'subscription'
-                                        ? 'border-primary bg-primary/10'
-                                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
-                                        }`}
-                                >
-                                    {product.subscription_config.discount_percentage && (
-                                        <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                            -{product.subscription_config.discount_percentage}%
-                                        </div>
-                                    )}
-                                    <div className="text-left">
-                                        <div className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                                            <span className="material-symbols-outlined text-sm">autorenew</span>
-                                            Suscripción
-                                        </div>
-                                        <div className="text-lg font-bold text-slate-900 dark:text-white mt-1">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.subscription_config.price)}
-                                            <span className="text-xs font-normal text-slate-500">
-                                                /{product.subscription_config.interval === 'day' ? 'día' :
-                                                    product.subscription_config.interval === 'week' ? 'sem' :
-                                                        product.subscription_config.interval === 'month' ? 'mes' : 'año'}
-                                            </span>
-                                        </div>
-                                        {product.subscription_config.trial_days && (
-                                            <div className="text-xs text-green-600 dark:text-green-400 font-medium mt-1">
-                                                {product.subscription_config.trial_days} días gratis
-                                            </div>
-                                        )}
-                                    </div>
-                                </button>
-                            </div>
-
-                            {purchaseType === 'subscription' && product.subscription_config.interval_count > 1 && (
-                                <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 text-center">
-                                    Cobro cada {product.subscription_config.interval_count} {
-                                        product.subscription_config.interval === 'day' ? 'días' :
-                                            product.subscription_config.interval === 'week' ? 'semanas' :
-                                                product.subscription_config.interval === 'month' ? 'meses' : 'años'
-                                    }
+                        <div className="mt-4 flex flex-col gap-2">
+                            <div className="flex items-baseline gap-3">
+                                <p className="text-slate-900 dark:text-slate-200 text-3xl font-bold">
+                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(currentPrice)}
                                 </p>
-                            )}
+                                {(activePromotion || product.sale_price) && (
+                                    <span className="text-lg text-slate-400 line-through">
+                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex text-yellow-400">
+                                    {[1, 2, 3, 4, 5].map(i => (
+                                        <span key={i} className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                    ))}
+                                </div>
+                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium hover:text-primary cursor-pointer">
+                                    Reseñas verificadas
+                                </span>
+                            </div>
                         </div>
-                    )}
 
-                    {product.description ? (
-                        <div
-                            className="text-slate-600 dark:text-slate-300 text-base leading-relaxed mt-4 md:text-lg prose prose-slate dark:prose-invert max-w-none [&>ul]:list-disc [&>ul]:ml-4 [&>ol]:list-decimal [&>ol]:ml-4"
-                            dangerouslySetInnerHTML={{ __html: product.description }}
-                        />
-                    ) : (
-                        <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed mt-4 md:text-lg">
-                            Sin descripción disponible.
-                        </p>
-                    )}
+                        {/* Description */}
+                        {product.description ? (
+                            <div
+                                className="mt-6 text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none line-clamp-4 hover:line-clamp-none transition-all cursor-pointer"
+                                dangerouslySetInnerHTML={{ __html: product.description }}
+                            />
+                        ) : (
+                            <p className="mt-6 text-slate-600 dark:text-slate-300">
+                                Sin descripción disponible.
+                            </p>
+                        )}
 
-                    {/* Variants */}
-                    {product.variants && product.variants.length > 0 && (
-                        <div className="mt-6 space-y-5">
-                            {product.variants.map((variant: any, idx: number) => (
+                        {/* Testimonial Placeholder */}
+                        <div className="mt-8 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+                                {product.name.charAt(0)}
+                            </div>
+                            <div>
+                                <p className="font-semibold text-slate-700 dark:text-slate-200">"Excelente calidad y servicio"</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">- Cliente verificado</p>
+                            </div>
+                        </div>
+
+                        {/* Variants */}
+                        <div className="mt-8 space-y-6">
+                            {product.variants?.map((variant: any, idx: number) => (
                                 <div key={idx}>
-                                    <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-3">
+                                    <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-2">
                                         {variant.type}
-                                    </h3>
+                                    </label>
                                     <div className="flex gap-3 flex-wrap">
                                         {variant.values.map((value: string, vIdx: number) => {
                                             const isSelected = selectedVariants[variant.type] === value
@@ -335,13 +268,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                                 <button
                                                     key={vIdx}
                                                     onClick={() => handleVariantChange(variant.type, value)}
-                                                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${isSelected
-                                                        ? 'text-white shadow-lg shadow-primary/30'
-                                                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-slate-700 dark:text-slate-300 hover:border-primary/50'
-                                                        }`}
-                                                    style={isSelected ? { backgroundColor: primaryColor } : {}}
+                                                    className={`
+                                                        ${variant.type.toLowerCase().includes('color') ? 'w-10 h-10 rounded-full' : 'px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem]'}
+                                                        ${isSelected
+                                                            ? (variant.type.toLowerCase().includes('color') ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary')
+                                                            : (variant.type.toLowerCase().includes('color') ? 'ring-1 ring-slate-200 dark:ring-slate-700' : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200')
+                                                        }
+                                                    `}
+                                                    style={variant.type.toLowerCase().includes('color') ? { backgroundColor: value } : {}}
                                                 >
-                                                    {value}
+                                                    {!variant.type.toLowerCase().includes('color') && value}
                                                 </button>
                                             )
                                         })}
@@ -349,73 +285,96 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 </div>
                             ))}
                         </div>
-                    )}
 
-                    {/* Configurable Product Notice */}
-                    {product.is_configurable && (
-                        <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-xl">
-                            <div className="flex gap-3">
-                                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-800 flex items-center justify-center text-purple-600 dark:text-purple-300">
-                                    <span className="material-symbols-outlined">smart_toy</span>
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-purple-900 dark:text-purple-100">Personaliza este producto</h3>
-                                    <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
-                                        Nuestro agente de IA te ayudará a elegir las mejores opciones para ti.
-                                    </p>
+                        {/* Desktop CTA */}
+                        <div className="hidden md:flex flex-col gap-4 mt-10">
+                            <button
+                                onClick={() => handleChat(product.id)}
+                                className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-14 rounded-lg transform transition-transform duration-200 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                                style={{ backgroundColor: primaryColor }}
+                            >
+                                <span className="material-symbols-outlined">chat</span>
+                                <span>{product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}</span>
+                            </button>
+                        </div>
+
+                        {/* Benefits */}
+                        {product.benefits && product.benefits.length > 0 && (
+                            <div className="mt-10 border-t border-slate-200 dark:border-slate-800 pt-6">
+                                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Por qué elegir este producto</h3>
+                                <div className="space-y-3">
+                                    {product.benefits.map((benefit: string, idx: number) => (
+                                        <div key={idx} className="flex items-center gap-3">
+                                            <div className="flex-shrink-0 size-6 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
+                                                <span className="material-symbols-outlined text-sm text-green-600 dark:text-green-400">check</span>
+                                            </div>
+                                            <span className="text-slate-600 dark:text-slate-300">{benefit}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Desktop Actions */}
-                    <div className="hidden md:flex flex-col gap-4 mt-8">
-                        <button
-                            onClick={() => handleChat(product.id)}
-                            className="flex w-full items-center justify-center gap-2 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:opacity-90 transition-opacity"
-                            style={{ backgroundColor: primaryColor }}
-                        >
-                            <span className="material-symbols-outlined">chat_bubble</span>
-                            <span>
-                                {product.is_configurable ? "Personalizar con Agente" : "Chatear para Comprar"}
-                            </span>
-                        </button>
-                        <div className="flex gap-4 text-sm text-slate-500 justify-center">
-                            <span className="flex items-center gap-1"><span className="material-symbols-outlined text-lg">verified_user</span> Compra segura</span>
-                            <span className="flex items-center gap-1"><span className="material-symbols-outlined text-lg">local_shipping</span> Envíos a todo el país</span>
+                        {/* Accordions */}
+                        <div className="mt-8 border-t border-slate-200 dark:border-slate-800">
+                            {/* Specifications */}
+                            {product.specifications && product.specifications.length > 0 && (
+                                <details className="group border-b border-slate-200 dark:border-slate-800 py-4">
+                                    <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
+                                        <span>Especificaciones</span>
+                                        <span className="material-symbols-outlined transform group-open:rotate-180 transition-transform">expand_more</span>
+                                    </summary>
+                                    <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                                        {product.specifications.map((spec: any, idx: number) => (
+                                            <div key={idx} className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2 last:border-0">
+                                                <span className="font-medium">{spec.label}</span>
+                                                <span>{spec.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
+
+                            {/* FAQ */}
+                            {product.faq && product.faq.length > 0 && (
+                                <details className="group border-b border-slate-200 dark:border-slate-800 py-4">
+                                    <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
+                                        <span>Preguntas frecuentes</span>
+                                        <span className="material-symbols-outlined transform group-open:rotate-180 transition-transform">expand_more</span>
+                                    </summary>
+                                    <div className="mt-4 space-y-4">
+                                        {product.faq.map((item: any, idx: number) => (
+                                            <div key={idx}>
+                                                <p className="font-medium text-slate-900 dark:text-white">{item.question}</p>
+                                                <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm">{item.answer}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
                         </div>
                     </div>
+                </div>
 
-                    {/* Accordions */}
-                    <div className="mt-8 space-y-2 border-t border-gray-200 dark:border-gray-800 pt-6">
-                        <details className="group border-b border-gray-200 dark:border-gray-800 pb-4">
-                            <summary className="flex justify-between items-center cursor-pointer list-none py-2">
-                                <span className="text-lg font-semibold text-slate-900 dark:text-white">Especificaciones</span>
-                                <span className="material-symbols-outlined transform transition-transform duration-200 group-open:rotate-180">expand_more</span>
-                            </summary>
-                            <div className="mt-2 text-slate-600 dark:text-slate-400 text-sm">
-                                <p>SKU: {product.sku || product.id.slice(0, 8).toUpperCase()}</p>
-                                <p>Stock: {product.stock > 0 ? 'Disponible' : 'Agotado'}</p>
-                            </div>
-                        </details>
+                {/* Customers Also Bought (Placeholder Layout) */}
+                <div className="mt-16 border-t border-slate-200 dark:border-slate-800 pt-12">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Clientes también compraron</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                        {/* Placeholder */}
                     </div>
                 </div>
             </div>
 
-            {/* Sticky Footer CTA (Mobile Only) */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 md:hidden">
-                <div className="max-w-md mx-auto">
-                    <button
-                        onClick={() => handleChat(product.id)}
-                        className="flex w-full items-center justify-center gap-2 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg hover:opacity-90 transition-opacity"
-                        style={{ backgroundColor: primaryColor }}
-                    >
-                        <span className="material-symbols-outlined">chat_bubble</span>
-                        <span>
-                            {product.is_configurable ? "Personalizar" : "Chatear"}
-                        </span>
-                    </button>
-                </div>
+            {/* Mobile Sticky CTA */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 md:hidden">
+                <button
+                    onClick={() => handleChat(product.id)}
+                    className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-12 rounded-lg"
+                    style={{ backgroundColor: primaryColor }}
+                >
+                    <span className="material-symbols-outlined">chat</span>
+                    <span>{product.is_configurable ? "Personalizar" : "Chatear para Comprar"}</span>
+                </button>
             </div>
         </div>
     )

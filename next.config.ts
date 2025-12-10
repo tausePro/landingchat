@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '**.supabase.co',
       },
+      {
+        protocol: 'https',
+        hostname: 'tez.com.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.gravatar.com',
+      },
     ],
   },
 };

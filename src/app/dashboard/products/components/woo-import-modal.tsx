@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { importWooCommerceProducts } from "./woo-actions"
+import { importWooCommerceProducts } from "../woo-actions"
 
 export function WooImportModal() {
     const [isOpen, setIsOpen] = useState(false)
@@ -32,7 +32,9 @@ export function WooImportModal() {
             if (result.success) {
                 toast.success(`Importación completada: ${result.imported} productos creados`)
                 if (result.errors.length > 0) {
-                    toast.warning(`Algunos productos fallaron: ${result.errors.length}`)
+                    toast.warning(`Fallaron ${result.errors.length}. Ejemplo: ${result.errors[0]}`)
+                    // Log all errors to console for debugging
+                    console.error("Import errors:", result.errors)
                 }
                 setIsOpen(false)
             } else {

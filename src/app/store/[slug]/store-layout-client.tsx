@@ -8,6 +8,7 @@ import { TemplateRenderer } from "@/components/store/templates/template-renderer
 import { StoreHeader } from "@/components/store/store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
+import { StorePresence } from "@/components/store/store-presence" // Ensuring this is imported too since we fixed it
 
 interface StoreLayoutClientProps {
     slug: string

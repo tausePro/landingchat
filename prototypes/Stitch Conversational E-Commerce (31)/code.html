@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Página Detalles Producto (Impacto Max.)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#3B82F6", // Updated primary blue
+              "background-light": "#ffffff", // Changed to white as per reference
+              "background-dark": "#101822",
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style type="text/tailwindcss">
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-800 dark:text-slate-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 px-10 py-3 bg-white dark:bg-background-dark/50 sticky top-0 z-50 backdrop-blur-sm">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-slate-900 dark:text-white">
+<div class="size-6 text-primary">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-lg font-bold tracking-[-0.015em]">LandingChat</h2>
+</div>
+</div>
+<div class="flex flex-1 justify-end gap-8">
+<div class="flex items-center gap-9">
+<a class="text-sm font-medium text-slate-900 dark:text-slate-50" href="#">Home</a>
+<a class="text-sm font-medium text-primary" href="#">Shop</a>
+<a class="text-sm font-medium text-slate-900 dark:text-slate-50" href="#">Categories</a>
+<a class="text-sm font-medium text-slate-900 dark:text-slate-50" href="#">About</a>
+</div>
+<div class="flex gap-2">
+<button class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50 gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5">
+<span class="material-symbols-outlined text-xl">favorite</span>
+</button>
+<button class="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-50 gap-2 text-sm font-bold leading-normal tracking-[0.015em] min-w-0 px-2.5">
+<span class="material-symbols-outlined text-xl">shopping_cart</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User profile picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAIE9hIi6gCcZwHOKvXvF-LsWd9R-PYaTF7DMqMmBTvw_q8Ne2BbhbWnZPVdfUvpaIoo-ytfrgeKJzA_RPzMcG6h6hKAuUl8lliwSi47Hq46YiA9f9wbyVsqJ2egPfFaV5j_4wRuSKFDqF6kg6tST4pKFzrq10Rf-lwKgpdE_rp7OLcc6Z41nPPN_XkFnKEC44D65QkIdn9wam-S4zbhcq1nPWZlsHRlGUfe0oz1bQETthq3LDbWhMty3n_Mp-utE8fDN_2FrDgM6s");'></div>
+</div>
+</header>
+<main class="flex-1 px-4 sm:px-6 lg:px-10 py-8">
+<div class="max-w-7xl mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16 mt-6">
+<div class="flex flex-col items-center gap-4">
+<div class="w-full bg-center bg-no-repeat bg-cover flex flex-col justify-end overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-xl aspect-[4/3] ring-1 ring-slate-200 dark:ring-slate-800" data-alt="A pair of sleek, modern black wireless headphones on a clean background." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAU9RvJfyYl2QRZzXmpmpUNyBkTVtX9qgExLBvkqUQn6t4-Dwm3qKzDgQeaKmAoupCq_t2bnoTKLiEOcIJLxRE8S9ul5J08Dz52IaYvCak8ALfJmIVvewvktKNGxkuYpE-x2hlxVhs2slqaoFbT2YXpgUMd6ishQsd1JF49ljI3rPGtGfo4xfp0LhLcqdQ6mFl8fwImnVluKYDMKBXBN5CRuwLBTJwye4gl5tt6CbMRwyp0g4SfbWjQwfdpXSOK3748jh7zLpnLbds");'></div>
+<div class="grid grid-cols-5 gap-3 w-full">
+<button class="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg ring-2 ring-primary ring-offset-2 ring-offset-background-light dark:ring-offset-background-dark" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAU9RvJfyYl2QRZzXmpmpUNyBkTVtX9qgExLBvkqUQn6t4-Dwm3qKzDgQeaKmAoupCq_t2bnoTKLiEOcIJLxRE8S9ul5J08Dz52IaYvCak8ALfJmIVvewvktKNGxkuYpE-x2hlxVhs2slqaoFbT2YXpgUMd6ishQsd1JF49ljI3rPGtGfo4xfp0LhLcqdQ6mFl8fwImnVluKYDMKBXBN5CRuwLBTJwye4gl5tt6CbMRwyp0g4SfbWjQwfdpXSOK3748jh7zLpnLbds");'></button>
+<button class="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg ring-1 ring-slate-200 dark:ring-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAiSqVz_neO0D5_8OO8gYEx06W-x0rzp4iG0ui0yf2LNJGD_52dLHlp3stGleUyTRSt3M6XXi0tPmdThX6wcpmnHmLkxA29Ks2DqWZNXm4HrO1ye61InXAr3vr3Ps6dzVF6_UkNNN5B2uzVwjqJcEMnsWS7LHlCoPh5vAkpIiGC0BdDSc3DSBENRfZetcAzaK8MeIfqmXH6cqtAwqyiYRcu-dh2mFVW5BDbOBbFr9GiXoSQq9Zgrm0qLQM_d4gsraC_i3xt-uUxb10");'></button>
+<button class="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg ring-1 ring-slate-200 dark:ring-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDL0-GPzxG4sKd6dTVtszn7aY-8ijNU3JpxZNt9lfM5N1V5pjxUUrqL-PM3n0K6Og6LIaCJXk6uFano9R1psRUmfX4O2C8T8ZpKNOXPf3MFCor24lqZfJ1UREbH6TlK91lGSPIuK9QhtqLDpahIBagQtvEOa6TQTz8u85MAb4A1UsSoVUxnBz9PmvikF7fU3NqiM6MizuiT3i79EXMUphFE4E9-MQrcgefyNst80JrwlRojvkR5GRLvZtm786ncu0bM9ywvJBID9tU");'></button>
+<button class="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg ring-1 ring-slate-200 dark:ring-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCkihGnchoVm1OCysrkz3bsNDElMZYcYDjfyhcHZucdbykwiKdKEgFEx20hnP-2fL9lFJFGZmZVr7MbH4ZHrgApw5ibveiWUNUC5jDjatLGrSWFMnImrmmf67U-zS0ojHf9m-dfe1zBZoW9lUpsxb-QMNNOHmO8LAH-C6tL-MjcWsNCWHzZ_g8o0LAlBSp0TZBL6e0KMoqx2HODNndvVzTbomi6f2abwNcu-XNV6LRcDHCSzWKm-3PQDDrdFDOd30i-06iLIIDBeD0");'></button>
+<button class="w-full aspect-square bg-center bg-no-repeat bg-cover rounded-lg ring-1 ring-slate-200 dark:ring-slate-700" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCjr4P-ot_nlxldoQ0GUKSNPpYoqLGtYXkj50IQ9C7v8886j-GWt_iz7ljeSCNGdeM7N3Q5oP0aqKiLBxQYCL0eCxIbxZjkVjf7spYRf0g4Z9IbleXiFpU7pHHZaEb5yk14LZrRTKxRgXBi8dFXpaZn55dnWR8V5gkeBNszdxDKBYZcraT7wRizWk9D0N8lZ0lBPc9k9OBxOZ8x-m69UUasZ5hs-R0_WdZROUFpwMRPdOe6r56XWy2OtHXivBrWVRhDW_Qn6FFJB_U");'></button>
+</div>
+</div>
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-500 dark:text-slate-400">AURATECH</span>
+<h1 class="text-slate-900 dark:text-white text-4xl font-bold leading-tight mt-1">Nombre del Producto</h1>
+<p class="text-slate-900 dark:text-slate-200 text-3xl font-bold mt-2">$160.000</p>
+<div class="flex items-center gap-2 mt-2">
+<div class="flex text-yellow-400">
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined text-xl">star</span>
+</div>
+<a class="text-sm text-slate-500 dark:text-slate-400 font-medium hover:text-primary" href="#">23 reseñas</a>
+</div>
+<div class="flex flex-wrap items-center gap-3 mt-4">
+<div class="flex items-center gap-1.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-full px-3 py-1 text-sm font-medium">
+<span>🔥</span>
+<span>12 vendidos esta semana</span>
+</div>
+<div class="flex items-center gap-1.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full px-3 py-1 text-sm font-medium">
+<span>✓</span>
+<span>Envío gratis</span>
+</div>
+<div class="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-full px-3 py-1 text-sm font-medium">
+<span>⚡️</span>
+<span>Últimas 5 unidades</span>
+</div>
+</div>
+<p class="mt-6 text-slate-600 dark:text-slate-300">Recupera tu piel y tu energía en minutos. El RITUAL EXPRESS de TEZ es la solución rápida y efectiva para revivir la piel después del cansancio.</p>
+<div class="mt-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+<div class="flex items-center gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-12" data-alt="User avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAPBmKAqXuMmcVAeHHW8Is7Ov7kInlH5PYPfltHu23v4gDBuCXa0FPqfOCPqu2nmcFKcvKucgF0Hnn8tlq9U3Cod60KnliXQO1Pcf-0O1K1CoR8hD_XzsKv_FNviA7IaW3A4RKQ3mQWQfsrFuj86ZDw2l9E-rdG7U-lwM-7UIPI7VVvEHOsRF-xe9vq86PCFymA3Q_Qx5XiEIGS0Nuhc97oPE-h9J0r_0LTx0aloujIBMicAWcqEB7z6MzKKNeHrM6nhSwhUnXk6s4");'></div>
+<div>
+<p class="font-semibold text-slate-700 dark:text-slate-200">"Me encantó para después del gym"</p>
+<p class="text-sm text-slate-500 dark:text-slate-400">- María, Bogotá</p>
+</div>
+</div>
+</div>
+<div class="mt-8 space-y-6">
+<div>
+<label class="text-sm font-semibold text-slate-800 dark:text-slate-200">Color</label>
+<div class="flex gap-3 mt-2">
+<button class="size-8 rounded-full bg-slate-900 ring-2 ring-primary ring-offset-2 ring-offset-background-light dark:ring-offset-background-dark"></button>
+<button class="size-8 rounded-full bg-slate-200 border border-slate-300 dark:border-slate-700"></button>
+<button class="size-8 rounded-full bg-rose-500"></button>
+<button class="size-8 rounded-full bg-blue-500"></button>
+</div>
+</div>
+<div>
+<label class="text-sm font-semibold text-slate-800 dark:text-slate-200">Talla</label>
+<div class="flex gap-3 mt-2">
+<button class="flex items-center justify-center rounded-lg h-10 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-4 text-sm font-bold">S</button>
+<button class="flex items-center justify-center rounded-lg h-10 border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary px-4 text-sm font-bold">M</button>
+<button class="flex items-center justify-center rounded-lg h-10 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 px-4 text-sm font-bold">L</button>
+</div>
+</div>
+</div>
+<div class="mt-10 flex flex-col gap-4">
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-primary text-white gap-3 text-base font-bold leading-normal tracking-wide min-w-0 px-6 transform transition-transform duration-200 hover:scale-105">
+<span class="material-symbols-outlined">chat</span>
+<span>Chatear para Comprar</span>
+</button>
+</div>
+<div class="mt-10 border-t border-slate-200 dark:border-slate-800 pt-6">
+<h3 class="text-lg font-semibold text-slate-800 dark:text-slate-200">Por qué elegir este producto</h3>
+<div class="mt-4 space-y-3">
+<div class="flex items-center gap-3">
+<div class="flex-shrink-0 size-6 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm text-green-600 dark:text-green-400">check</span></div>
+<span class="text-slate-600 dark:text-slate-300">Aporta hidratación profunda y suavidad</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex-shrink-0 size-6 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm text-green-600 dark:text-green-400">check</span></div>
+<span class="text-slate-600 dark:text-slate-300">Reduce ojeras y signos de fatiga</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex-shrink-0 size-6 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center"><span class="material-symbols-outlined text-sm text-green-600 dark:text-green-400">check</span></div>
+<span class="text-slate-600 dark:text-slate-300">Ilumina y mejora el aspecto del rostro</span>
+</div>
+</div>
+</div>
+<div class="mt-8 border-t border-slate-200 dark:border-slate-800">
+<div class="border-b border-slate-200 dark:border-slate-800 py-4">
+<button class="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200">
+<span>Preguntas frecuentes</span>
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+</div>
+<div class="border-b border-slate-200 dark:border-slate-800 py-4">
+<button class="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200">
+<span>Especificaciones</span>
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-16">
+<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Clientes también compraron</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+<div class="flex flex-col gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-lg aspect-square bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA11TfF06J0qqnDujzV3Dz5yraYcejSpEj8eQj9Wl51kGf3taJNvUJM2cv2YPLH0uZb28t4otSl1dFkROesMVAW1AHo6RDL1tiCia9Gm9h6B79I5FFqfL5k_Fod3Q6rwezluctjXlBogW6BpuRctKOcwk2o1uALd-v3fFS8DPLeb67RUB8vfZGqd64ssldFFLxibLyKZ3_U749vAt4ho-G5Ubafz4Cp53FYFg74IrlzyUua6hLPqBBg0wkjZFnqeU_TDsM6ss1INgo")'></div>
+<h3 class="font-semibold group-hover:text-primary">Gafas de sol</h3>
+<p class="font-bold text-slate-800 dark:text-slate-200">$45.000</p>
+</div>
+<div class="flex flex-col gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-lg aspect-square bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCUJtz6MsntQf8X0wUURpc34e_Q9lOr9GT6C6p4O5dri1Hj-TSU6FuHzjFlArOlOV1jVtkOPZ96T97fXRDjDlwF7fVZQTSFXfYoAIJ_e8EJA1QEQ81Leb4SU2MQw9mSVCRv4raFlJwVgAWaYkxCBxm8pM_5yA1dS2GJ9xNQhckxzt515WieNdhs3vKXd3hugi5afuplaUCdRHCxZOTzr8TSc31VNchT2YUfcbC2bfshEyk9-dhTAh0Uf3NE42-Hv2H_jFraKUDHuls")'></div>
+<h3 class="font-semibold group-hover:text-primary">Reloj Analógico</h3>
+<p class="font-bold text-slate-800 dark:text-slate-200">$120.000</p>
+</div>
+<div class="flex flex-col gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-lg aspect-square bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBQFmz5BagoNnsj63zCb298D5pFO4uGSx1taZAZOwWjJNKEGgYJYwBqIw2ckM7Xb_SYxJ9uwm0V4A8YqIr8NOsfP9LlojLz8QAJPyX2GmdbHQqp8nXoL9MK5c88DtQ8LwkHB_xY-Hn6ydnSr9fNhtlZvhwfpKfqnZ134A3Y2w4nx0Kkwm_ApQewNvXY9cKIWDeCj8whUq6w9KK1A7cqR3YHdbJ9X0ER5nbjsO6lfNlTRiKFsqFFGg66dAoRk6xOaLfEmAQxFouYKo4")'></div>
+<h3 class="font-semibold group-hover:text-primary">Zapatillas Deportivas</h3>
+<p class="font-bold text-slate-800 dark:text-slate-200">$250.000</p>
+</div>
+<div class="flex flex-col gap-2 group">
+<div class="w-full bg-slate-100 dark:bg-slate-800 rounded-lg aspect-square bg-cover bg-center" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuANLdCeUL8-zcITHuZHgy7eqhCTfJ67HLs4Ild2IytB0nM9FFLg5BwtfKVv9khnCiBn0Mm1C7uGQJ56exqsqOwuJeNtobxKq0Ny2zrBGgR275BwU22PM6I2CXmdm4X-E7z4d2S0UvAcuThq9GLmdvxmtv7ezrQc7unnAZBAfNct6iiNztMlddJ8PAU58khdHM50xigUWmSAY2g8cnVp46NMce_T5-VhVV3eOrvVmAGLtCbQ5lRrXlzKY3qNP33XsreVvFq1IGD2uAo")'></div>
+<h3 class="font-semibold group-hover:text-primary">Zapatos de Cuero</h3>
+<p class="font-bold text-slate-800 dark:text-slate-200">$310.000</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

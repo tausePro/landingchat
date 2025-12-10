@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export interface DashboardStats {
     userName: string
+    organizationSlug: string
     revenue: {
         total: number
         growth: number // vs last month
@@ -99,8 +100,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuario"
 
+    // Get Organization Slug for Realtime
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("slug")
+        .eq("id", orgId)
+        .single()
+
+    const organizationSlug = org?.slug || ""
+
     return {
         userName,
+        organizationSlug,
         revenue: {
             total: totalRevenue,
             growth: 12.5, // Dummy growth for now

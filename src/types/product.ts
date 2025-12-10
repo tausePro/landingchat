@@ -91,6 +91,11 @@ export const createProductSchema = z.object({
   bundle_items: z.array(bundleItemSchema).default([]),
   bundle_discount_type: z.enum(['fixed', 'percentage']).optional().nullable(),
   bundle_discount_value: z.number().min(0).default(0),
+  // UI Fields (Stitch Design)
+  brand: z.string().optional().nullable(),
+  benefits: z.array(z.string()).optional().nullable(),
+  faq: z.array(z.object({ question: z.string(), answer: z.string() })).optional().nullable(),
+  specifications: z.array(z.object({ label: z.string(), value: z.string() })).optional().nullable(),
 })
 
 // ============================================================================
@@ -151,5 +156,10 @@ export interface ProductData {
   bundle_items?: BundleItem[]
   bundle_discount_type?: 'fixed' | 'percentage' | null
   bundle_discount_value?: number
+  // UI Fields
+  brand?: string | null
+  benefits?: string[] | null
+  faq?: { question: string; answer: string }[] | null
+  specifications?: { label: string; value: string }[] | null
   created_at: string
 }

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getDashboardStats } from "./dashboard-actions"
 import Link from "next/link"
 import { DashboardCharts } from "./components/dashboard-charts"
+import { VisitorsCard } from "./components/visitors-card"
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,7 @@ export default async function DashboardPage() {
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <VisitorsCard organizationSlug={stats.organizationSlug} />
                     {/* Revenue */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
