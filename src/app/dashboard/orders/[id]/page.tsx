@@ -67,10 +67,18 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                             <div className="divide-y divide-border-light dark:divide-border-dark">
                                 {order.items.map((item, index) => (
                                     <div key={index} className="p-6 flex items-start gap-4">
-                                        <div className="size-16 rounded-lg bg-background-light dark:bg-background-dark flex items-center justify-center shrink-0">
-                                            <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
-                                                shopping_bag
-                                            </span>
+                                        <div className="size-16 rounded-lg bg-background-light dark:bg-background-dark flex items-center justify-center shrink-0 overflow-hidden">
+                                            {item.image_url ? (
+                                                <img
+                                                    src={item.image_url}
+                                                    alt={item.product_name}
+                                                    className="size-16 object-cover"
+                                                />
+                                            ) : (
+                                                <span className="material-symbols-outlined text-text-light-secondary dark:text-text-dark-secondary">
+                                                    shopping_bag
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">

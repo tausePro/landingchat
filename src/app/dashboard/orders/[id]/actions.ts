@@ -26,6 +26,7 @@ export interface OrderDetail {
         unit_price: number
         total_price: number
         variant_info: any
+        image_url?: string
     }>
     shipping_address: any
     billing_address: any
