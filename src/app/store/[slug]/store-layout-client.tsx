@@ -143,6 +143,9 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 organizationName={organization.name}
                 onIdentified={handleCustomerIdentified}
             />
+
+            {/* Presence Tracking */}
+            <StorePresence slug={organization.slug} />
         </div>
     )
 }

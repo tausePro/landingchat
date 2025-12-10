@@ -129,10 +129,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                 context: context ? decodeURIComponent(context) : undefined
                             })
                         })
-                        
+
                         if (aiResponse.ok) {
                             const aiData = await aiResponse.json()
-                            
+
                             // Procesar acciones (show_product)
                             if (aiData.actions && aiData.actions.length > 0) {
                                 for (const action of aiData.actions) {
@@ -213,8 +213,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     chatId,
                     slug,
                     customerId, // Enviar customerId explícitamente
-                    currentProductId: new URLSearchParams(window.location.search).get('product'),
-                    context: new URLSearchParams(window.location.search).get('context')
+                    currentProductId: new URLSearchParams(window.location.search).get('product') || undefined,
+                    context: new URLSearchParams(window.location.search).get('context') || undefined
                 })
             })
 
