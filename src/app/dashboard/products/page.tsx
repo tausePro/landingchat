@@ -3,6 +3,7 @@ import { ProductList } from "./components/product-list"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import Link from "next/link" // Added Link import
 import { WooImportModal } from "./components/woo-import-modal"
+import { DeleteProductButton } from "./components/delete-product-button"
 export const dynamic = 'force-dynamic'
 
 // Helper function for currency formatting (assuming it's needed for the new code)
@@ -103,9 +104,10 @@ export default async function ProductsPage() {
                                                 <Link href={`/dashboard/products/${product.id}`} className="p-2 text-text-light-secondary dark:text-text-dark-secondary hover:text-primary dark:hover:text-primary">
                                                     <span className="material-symbols-outlined">edit</span>
                                                 </Link>
-                                                <button className="p-2 text-text-light-secondary dark:text-text-dark-secondary hover:text-danger dark:hover:text-danger">
-                                                    <span className="material-symbols-outlined">delete</span>
-                                                </button>
+                                                <DeleteProductButton
+                                                    productId={product.id}
+                                                    productName={product.name}
+                                                />
                                             </td>
                                         </tr>
                                     ))
