@@ -29,10 +29,14 @@ interface Order {
 interface AgentConfig {
     name: string
     system_prompt?: string
+    avatar_url?: string
     configuration?: {
         greeting?: string
         tone?: string
-        personality?: string
+        personality?: {
+            tone?: string
+            instructions?: string
+        }
     }
 }
 
@@ -49,91 +53,75 @@ export function buildSystemPrompt(
     customer?: Customer,
     currentProduct?: Product
 ): string {
-    const basePrompt = agent.system_prompt || `Eres ${agent.name}, asistente de ventas de ${organizationName}.`
+    // Check if there are custom instructions from dashboard
+    const customInstructions = agent.configuration?.personality?.instructions
+    const hasCustomPrompt = customInstructions && customInstructions.trim().length > 50
 
-    const personality = agent.configuration?.personality || "amigable y profesional"
-    const tone = agent.configuration?.tone || "conversacional"
+    // Log for debugging
+    console.log("[buildSystemPrompt] Custom instructions found:", hasCustomPrompt, customInstructions?.substring(0, 80) + "...")
 
-    let prompt = `${basePrompt}
+    let prompt = ""
 
-PERSONALIDAD Y TONO:
-- Sé ${personality}
-- Usa un tono ${tone}
-- Sé natural y conversacional, no robótico
+    if (hasCustomPrompt) {
+        // USE CUSTOM PROMPT AS PRIMARY - Only add minimal technical context
+        prompt = `${customInstructions}
 
-OBJETIVO:
-Ayudar al cliente a encontrar productos y completar su compra de forma natural y conversacional.
-`
+---
+CONTEXTO TÉCNICO (información adicional para esta conversación):
 
-    if (currentProduct) {
-        prompt += `
-CONTEXTO ACTUAL - MUY IMPORTANTE:
-El cliente llegó al chat desde la página del producto "${currentProduct.name}". Esto significa que ESTÁ INTERESADO en este producto específico.
+${customer ? `CLIENTE: Estás hablando con ${customer.name || 'el cliente'}.` : 'CLIENTE: Nuevo cliente, no identificado aún.'}
 
-PRODUCTO QUE EL CLIENTE ESTÁ VIENDO:
-- Nombre: ${currentProduct.name}
-- Precio: $${currentProduct.price.toLocaleString()}
-- ID: ${currentProduct.id}
-- Descripción: ${currentProduct.description || 'Sin descripción'}
-- Stock disponible: ${currentProduct.stock} unidades
-${currentProduct.variants ? `- Variantes disponibles: ${JSON.stringify(currentProduct.variants)}` : ''}
+CATÁLOGO: Tienes acceso a ${products.length} productos de ${organizationName}.
 
-INSTRUCCIÓN ESPECIAL: 
-- Si el cliente dice "hola" o un saludo simple, DEBES mencionar que ves que está interesado en "${currentProduct.name}" y preguntarle si quiere más información o agregarlo al carrito.
-- NO ignores el contexto del producto. El cliente espera que hables sobre este producto.
-`
-    }
+${currentProduct ? `PRODUCTO ACTUAL: El cliente llegó desde la página de "${currentProduct.name}" ($${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).` : ''}
 
-    prompt += `
-REGLAS IMPORTANTES:
-1. Siempre saluda si es el primer mensaje de la conversación.
-2. Haz preguntas para entender las necesidades del cliente antes de recomendar.
-3. Muestra máximo 3 productos por respuesta para no abrumar.
-4. Si el cliente pregunta algo fuera de tu alcance, ofrece escalar a un agente humano.
-5. NUNCA inventes información sobre productos que no existe.
-6. Usa SOLO el catálogo proporcionado como fuente de verdad.
-7. Si un producto no está en stock, no lo recomiendes.
-8. Sé proactivo: sugiere productos complementarios cuando sea relevante.
-9. Confirma antes de agregar productos al carrito.
-`
+HERRAMIENTAS DISPONIBLES (úsalas cuando sea necesario):
+- search_products: Buscar productos por nombre o categoría
+- show_product: Mostrar tarjeta visual de un producto (IMPORTANTE: úsala para que el cliente vea imagen y botón de compra)
+- add_to_cart: Agregar producto al carrito
+- get_cart: Ver contenido del carrito
+- start_checkout: Iniciar proceso de pago
+- escalate_to_human: Transferir a agente humano si es necesario
 
-    if (!customer) {
-        prompt += `
-10. IMPORTANTE: No conoces al cliente. Si el cliente proporciona su nombre y contacto (email o teléfono), USA INMEDIATAMENTE la herramienta 'identify_customer' para registrarlo.
-`
+REGLA CRÍTICA: Si mencionas un producto, usa 'show_product' para que el cliente lo vea visualmente con imagen y botón de agregar.
+---`
     } else {
-        prompt += `
-10. Estás hablando con ${customer.name || 'el cliente'}. Usa su nombre ocasionalmente para personalizar la conversación.
-`
+        // FALLBACK: Use generic prompt for agents without custom instructions
+        const basePrompt = agent.system_prompt || `Eres ${agent.name}, asistente de ventas de ${organizationName}.`
+        const personality = agent.configuration?.personality?.tone || "amigable y profesional"
+
+        prompt = `${basePrompt}
+
+PERSONALIDAD: Sé ${personality}, natural y conversacional.
+
+OBJETIVO: Ayudar al cliente a encontrar productos y completar su compra.
+
+${customer ? `CLIENTE: ${customer.name || 'Cliente'}` : 'CLIENTE: Nuevo cliente.'}
+
+${currentProduct ? `
+CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}" ($${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).
+Menciona este producto cuando saluden.
+` : ''}
+
+REGLAS:
+1. Saluda amablemente si es el primer mensaje.
+2. Haz preguntas para entender necesidades.
+3. Muestra máximo 3 productos por respuesta.
+4. NO inventes productos. Usa solo el catálogo.
+5. Confirma antes de agregar al carrito.
+
+CATÁLOGO: ${products.length} productos disponibles.
+
+HERRAMIENTAS:
+- search_products: Buscar productos
+- show_product: Mostrar tarjeta del producto (usa siempre que menciones un producto)
+- add_to_cart: Agregar al carrito
+- get_cart: Ver carrito
+- start_checkout: Iniciar pago
+- escalate_to_human: Transferir a humano
+
+IMPORTANTE: Usa 'show_product' para que el cliente vea imagen y botón de compra.`
     }
-
-    prompt += `
-CATÁLOGO DISPONIBLE:
-Tienes acceso a ${products.length} productos. Usa la herramienta 'search_products' para buscar productos relevantes basándote en lo que el cliente necesita.
-
-HERRAMIENTAS DISPONIBLES:
-- identify_customer: Para registrar al cliente si da sus datos
-- search_products: Para buscar productos
-- show_product: Para mostrar detalles de un producto
-- get_product_availability: Para verificar stock
-- add_to_cart: Para agregar al carrito
-- get_cart: Para ver el carrito
-- remove_from_cart: Para eliminar del carrito
-- update_cart_quantity: Para cambiar cantidades
-- start_checkout: Para iniciar el pago
-- get_shipping_options: Para ver costos de envío
-- apply_discount: Para cupones
-- get_store_info: Para horarios y políticas
-- get_order_status: Para ver estado de pedidos
-- get_customer_history: Para ver compras anteriores
-- escalate_to_human: Para transferir a humano
-
-Recuerda: Tu objetivo es ayudar al cliente a encontrar lo que necesita y guiarlo hacia una compra satisfactoria.
-
-REGLAS DE VISUALIZACIÓN (CRÍTICO):
-- Si encuentras un producto que el cliente quiere ver, O si mencionas detalles específicos de un producto, DEBES usar la herramienta 'show_product(id)'.
-- NO basta con describir el producto en texto. Si no usas 'show_product', el cliente NO verá la imagen ni el botón de compra.
-- SIEMPRE que confirmes que tenemos un producto, usa 'show_product' para mostrarlo.`
 
     return prompt
 }

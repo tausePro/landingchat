@@ -49,6 +49,15 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
 
         if (!agent) throw new Error("Agent not found")
 
+        // Debug: Log agent configuration to verify custom prompt is loaded
+        console.log("[processMessage] Agent loaded:", {
+            name: agent.name,
+            hasSystemPrompt: !!agent.system_prompt,
+            hasConfig: !!agent.configuration,
+            configPersonality: agent.configuration?.personality,
+            customInstructions: agent.configuration?.personality?.instructions?.substring(0, 100) + "..."
+        })
+
         // 2. Load organization
         const { data: organization } = await supabase
             .from("organizations")
@@ -73,7 +82,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
                 .eq("id", input.currentProductId)
                 .eq("organization_id", input.organizationId)
                 .single()
-            
+
             if (productError) {
                 console.error("[processMessage] Error loading current product:", productError)
             } else {
@@ -137,11 +146,6 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             customer || undefined,
             currentProduct || undefined
         )
-        
-        // Log para verificar si el contexto del producto está en el prompt
-        if (currentProduct) {
-            console.log("[processMessage] System prompt includes product context:", systemPrompt.includes(currentProduct.name))
-        }
 
         // Add strict rules about inventory and variants
         systemPrompt += `

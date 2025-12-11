@@ -24,6 +24,7 @@ interface Message {
     role: 'user' | 'assistant'
     content: string
     product?: Product
+    products?: Product[] // Multiple products for carousel
     timestamp: Date
 }
 
@@ -44,8 +45,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [badges, setBadges] = useState<any[]>([])
     const [promotions, setPromotions] = useState<any[]>([])
     const [messages, setMessages] = useState<Message[]>([])
+    const [customerChats, setCustomerChats] = useState<Array<{ id: string; title: string; created_at: string; updated_at?: string }>>([])
     const [isLoading, setIsLoading] = useState(false)
-    const { addItem } = useCartStore()
+    const { addItem, items, removeItem, updateQuantity, clearCart, toggleCart, total: cartTotal } = useCartStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
@@ -90,6 +92,23 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         })
     }, [slug, router])
 
+    // Fetch customer's chat history
+    useEffect(() => {
+        if (!customerId) return
+        const fetchCustomerChats = async () => {
+            try {
+                const res = await fetch(`/api/store/${slug}/customer/${customerId}/chats`)
+                const data = await res.json()
+                if (data.chats) {
+                    setCustomerChats(data.chats)
+                }
+            } catch (e) {
+                console.error("Error fetching customer chats:", e)
+            }
+        }
+        fetchCustomerChats()
+    }, [customerId, slug])
+
     const initializeChat = async (custId: string, existingChatId: string | null, loadedProducts: any[]) => {
         try {
             const response = await fetch(`/api/store/${slug}/chat/init`, {
@@ -111,7 +130,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 // Cargar historial de mensajes
                 await fetchHistory(data.chatId)
 
-                // Si hay un producto en la URL, hacer llamada inicial al AI con contexto del producto
+                // Si hay un producto en la URL, mostrar ese producto con contexto
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
                 const context = urlParams.get('context')
@@ -136,21 +155,27 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             const aiData = await aiResponse.json()
 
                             // Procesar acciones (show_product)
+                            let collectedProducts: any[] = []
                             if (aiData.actions && aiData.actions.length > 0) {
                                 for (const action of aiData.actions) {
                                     if (action.type === 'show_product' && action.data.product) {
-                                        const productMsg: Message = {
-                                            id: "product-" + Date.now(),
-                                            role: 'assistant',
-                                            content: aiData.message,
-                                            product: action.data.product,
-                                            timestamp: new Date()
-                                        }
-                                        setMessages(prev => [...prev, productMsg])
+                                        collectedProducts.push(action.data.product)
                                     }
                                 }
+                            }
+
+                            if (collectedProducts.length > 0) {
+                                const productMsg: Message = {
+                                    id: "product-" + Date.now(),
+                                    role: 'assistant',
+                                    content: aiData.message,
+                                    products: collectedProducts.length > 1 ? collectedProducts : undefined,
+                                    product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
+                                    timestamp: new Date()
+                                }
+                                setMessages(prev => [...prev, productMsg])
                             } else {
-                                // Si no hay acciones, solo mostrar el mensaje
+                                // Si no hay productos, solo mostrar el mensaje
                                 const aiMsg: Message = {
                                     id: "ai-init-" + Date.now(),
                                     role: 'assistant',
@@ -214,9 +239,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     message: currentInput,
                     chatId,
                     slug,
-                    customerId, // Enviar customerId explícitamente
-                    currentProductId: new URLSearchParams(window.location.search).get('product') || undefined,
-                    context: new URLSearchParams(window.location.search).get('context') || undefined
+                    customerId
+                    // Note: NOT passing currentProductId here - that context is only for initial message
+                    // The AI should use search_products tool to find products for user queries
                 })
             })
 
@@ -227,19 +252,14 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             const data = await response.json()
 
             // Process actions from AI
+            let collectedProducts: Product[] = []
             let hasProductAction = false
+
             if (data.actions && data.actions.length > 0) {
                 for (const action of data.actions) {
                     if (action.type === 'show_product' && action.data.product) {
                         hasProductAction = true
-                        const productMsg: Message = {
-                            id: (Date.now() + Math.random()).toString(),
-                            role: 'assistant',
-                            content: data.message, // Usar el mensaje principal
-                            product: action.data.product,
-                            timestamp: new Date()
-                        }
-                        setMessages(prev => [...prev, productMsg])
+                        collectedProducts.push(action.data.product)
                     } else if (action.type === 'add_to_cart' && action.data.added) {
                         // Producto agregado al carrito
                         const addedProduct = action.data.added
@@ -253,8 +273,21 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 }
             }
 
-            // Solo agregar mensaje de texto si NO hubo acción de producto (para evitar duplicados)
-            if (!hasProductAction) {
+            // If we collected products, create a single message with them
+            if (collectedProducts.length > 0) {
+                const productMsg: Message = {
+                    id: (Date.now() + Math.random()).toString(),
+                    role: 'assistant',
+                    content: data.message,
+                    products: collectedProducts.length > 1 ? collectedProducts : undefined,
+                    product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
+                    timestamp: new Date()
+                }
+                setMessages(prev => [...prev, productMsg])
+            }
+
+            // Solo agregar mensaje de texto si NO hubo productos (para evitar duplicados)
+            if (collectedProducts.length === 0) {
                 const aiMsg: Message = {
                     id: (Date.now() + 1).toString(),
                     role: 'assistant',
@@ -312,107 +345,60 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const agentName = agentSettings.name || agent?.name || 'Asistente'
     const agentAvatar = agentSettings.avatar || agent?.avatar_url || 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o'
 
-    // Cart Logic
-    const { items, removeItem, updateQuantity, clearCart, total: cartTotal } = useCartStore()
+    // Handler to delete a chat
+    const handleDeleteChat = async (deleteChatId: string) => {
+        if (!customerId || !confirm('¿Estás seguro de eliminar esta conversación?')) return
 
-    const CartSidebar = (
-        <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-border-light dark:border-border-dark flex items-center justify-between">
-                <h3 className="font-bold text-text-light-primary dark:text-text-dark-primary">
-                    Carrito de Compras
-                </h3>
-                {items.length > 0 && (
-                    <button
-                        onClick={clearCart}
-                        className="text-xs text-red-500 hover:text-red-600"
-                    >
-                        Vaciar
-                    </button>
-                )}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {items.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-40 text-gray-500 text-center">
-                        <span className="material-symbols-outlined text-4xl mb-2 opacity-50">shopping_cart_off</span>
-                        <p className="text-sm">Tu carrito está vacío</p>
-                    </div>
-                ) : (
-                    items.map((item) => (
-                        <div key={item.id} className="flex gap-3">
-                            <div className="size-16 rounded-md bg-gray-100 overflow-hidden shrink-0 border border-gray-200">
-                                {item.image_url ? (
-                                    <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                        <span className="material-symbols-outlined">image</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary line-clamp-2">
-                                    {item.name}
-                                </h4>
-                                <div className="flex items-center justify-between mt-1">
-                                    <p className="text-sm font-bold text-primary">
-                                        {formatPrice(item.price)}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            value={item.quantity}
-                                            onChange={(e) => updateQuantity(item.id, parseInt(e.target.value))}
-                                            className="text-xs border rounded p-0.5 bg-transparent"
-                                        >
-                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                                                <option key={n} value={n}>{n}</option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            onClick={() => removeItem(item.id)}
-                                            className="text-gray-400 hover:text-red-500"
-                                        >
-                                            <span className="material-symbols-outlined text-base">delete</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-
-            <div className="p-4 border-t border-border-light dark:border-border-dark bg-gray-50 dark:bg-gray-800/50">
-                <div className="space-y-2 mb-4">
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Subtotal</span>
-                        <span className="font-medium">{formatPrice(items.reduce((s, i) => s + i.price * i.quantity, 0))}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Envío</span>
-                        <span className="font-medium text-green-600">Gratis</span>
-                    </div>
-                </div>
-                <div className="flex justify-between items-center mb-4">
-                    <span className="font-bold text-lg text-text-light-primary dark:text-text-dark-primary">Total</span>
-                    <span className="font-bold text-xl text-primary">{formatPrice(items.reduce((s, i) => s + i.price * i.quantity, 0))}</span>
-                </div>
-                <button
-                    disabled={items.length === 0}
-                    className="w-full h-12 bg-primary text-white font-bold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                    <span>Proceder al pago</span>
-                    <span className="material-symbols-outlined">arrow_forward</span>
-                </button>
-            </div>
-        </div>
-    )
-
+        try {
+            const res = await fetch(`/api/store/${slug}/customer/${customerId}/chats/${deleteChatId}`, {
+                method: 'DELETE'
+            })
+            if (res.ok) {
+                // Remove from local state
+                setCustomerChats(prev => prev.filter(c => c.id !== deleteChatId))
+                // If we deleted the current chat, start a new one
+                if (deleteChatId === chatId) {
+                    localStorage.removeItem(`chatId_${slug}`)
+                    setMessages([])
+                    setChatId(null)
+                }
+            }
+        } catch (e) {
+            console.error('Error deleting chat:', e)
+        }
+    }
 
     return (
         <ChatLayout
             organizationName={organization.name || "LandingChat"}
             logoUrl={organization.settings?.branding?.logoUrl}
-            rightSidebar={CartSidebar}
+            chatHistory={customerChats}
+            currentChatId={chatId || undefined}
+            cartItemCount={items.length}
+            onChatSelect={(selectedChatId) => {
+                // Navigate to selected chat or reload messages
+                if (selectedChatId !== chatId) {
+                    setChatId(selectedChatId)
+                    localStorage.setItem(`chatId_${slug}`, selectedChatId)
+                    fetchHistory(selectedChatId)
+                }
+            }}
+            onNewConversation={() => {
+                // Clear current chat and start fresh
+                localStorage.removeItem(`chatId_${slug}`)
+                setMessages([])
+                setChatId(null)
+
+                // IMPORTANT: Clear URL parameters so old product doesn't persist
+                const cleanUrl = window.location.pathname
+                window.history.replaceState({}, '', cleanUrl)
+
+                if (customerId) {
+                    initializeChat(customerId, null, products)
+                }
+            }}
+            onCartClick={toggleCart}
+            onDeleteChat={handleDeleteChat}
         >
             {/* Main Chat Container - Now simplified as it's inside layout */}
             <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-gray-950 md:bg-white md:dark:bg-gray-950 relative">
@@ -436,7 +422,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         </div>
                         {/* Mobile Cart Button */}
                         <button
-                            onClick={() => { /* Toggle mobile cart modal maybe? */ }}
+                            onClick={toggleCart}
                             className="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 transition-colors relative"
                         >
                             <span className="material-symbols-outlined text-lg">shopping_cart</span>
@@ -516,6 +502,37 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                     <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
                                                     <span>Agregar</span>
                                                 </button>
+                                            </div>
+                                        )}
+
+                                        {/* Carousel for multiple products - Stitch 34 style */}
+                                        {msg.products && msg.products.length > 0 && (
+                                            <div className="flex overflow-x-auto space-x-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md max-w-[85vw] md:max-w-lg">
+                                                {msg.products.map((product) => (
+                                                    <div key={product.id} className="flex-none w-40 flex flex-col gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+                                                        <div
+                                                            className="bg-center bg-no-repeat aspect-video bg-cover rounded-md w-full"
+                                                            style={{ backgroundImage: `url("${product.image_url}")` }}
+                                                        />
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-1">{product.name}</h3>
+                                                            <p className="text-xs font-bold text-primary">{formatPrice(product.price)}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => addItem({
+                                                                id: product.id,
+                                                                name: product.name,
+                                                                price: product.price,
+                                                                image_url: product.image_url
+                                                            })}
+                                                            disabled={product.stock <= 0}
+                                                            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-md h-8 bg-primary/20 text-primary gap-1 text-xs font-bold leading-normal tracking-[0.015em] hover:bg-primary/30 transition-colors disabled:opacity-50"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">add_shopping_cart</span>
+                                                            <span>Agregar</span>
+                                                        </button>
+                                                    </div>
+                                                ))}
                                             </div>
                                         )}
                                     </div>

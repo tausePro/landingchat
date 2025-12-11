@@ -80,12 +80,12 @@ export function CartDrawer({ slug }: { slug: string }) {
                             </div>
                             <div className="flex justify-between text-base">
                                 <span className="text-text-secondary dark:text-gray-400">Envío</span>
-                                <span className="font-semibold text-text-primary dark:text-white">$5.00</span>
+                                <span className="text-sm text-text-secondary dark:text-gray-400">Calculado al pagar</span>
                             </div>
                             <div className="border-t border-gray-200 dark:border-gray-600 my-2"></div>
                             <div className="flex justify-between text-lg font-bold">
                                 <span className="text-text-primary dark:text-white">Total</span>
-                                <span className="text-primary">{formatPrice(total() + 5)}</span>
+                                <span className="text-primary">{formatPrice(total())}</span>
                             </div>
                             <button
                                 onClick={handleCheckout}
