@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Clock } from "lucide-react"
@@ -10,7 +10,7 @@ interface PendingPageProps {
 
 export default async function OrderPendingPage({ params }: PendingPageProps) {
     const { slug, orderId } = await params
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Get organization
     const { data: org } = await supabase

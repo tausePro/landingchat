@@ -1,10 +1,10 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 
 export async function retryPayment(orderId: string, slug: string) {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     try {
         // Get organization

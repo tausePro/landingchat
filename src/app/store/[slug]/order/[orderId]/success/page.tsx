@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { CheckCircle } from "lucide-react"
@@ -9,7 +9,7 @@ interface SuccessPageProps {
 
 export default async function OrderSuccessPage({ params }: SuccessPageProps) {
     const { slug, orderId } = await params
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Get organization
     const { data: org } = await supabase
