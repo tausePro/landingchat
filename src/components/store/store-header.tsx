@@ -4,6 +4,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { useCartStore } from "@/store/cart-store"
+import { ShoppingBag } from "lucide-react"
+import { useEffect, useState } from "react"
 
 interface StoreHeaderProps {
     slug: string
@@ -28,6 +31,13 @@ export function StoreHeader({
 }: StoreHeaderProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
+    const { items, toggleCart } = useCartStore()
+
+    // Prevent hydration mismatch for cart count
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => setMounted(true), [])
+
+    const cartCount = items.reduce((acc, item) => acc + item.quantity, 0)
 
     const homeLink = getStoreLink('/', isSubdomain, slug)
     const productsLink = getStoreLink('/productos', isSubdomain, slug)
@@ -43,7 +53,7 @@ export function StoreHeader({
                             className="h-10 w-auto object-contain max-w-[120px] md:max-w-[150px]"
                         />
                     ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg" style={{ backgroundColor: primaryColor }}>
                             {organization.name.substring(0, 1)}
                         </div>
                     )}
@@ -56,6 +66,20 @@ export function StoreHeader({
                     <a href={productsLink} className="hover:text-primary transition-colors">Productos</a>
                 </nav>
                 <div className="flex items-center gap-4">
+                    {/* Cart Button */}
+                    <button
+                        onClick={() => toggleCart()}
+                        className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                        aria-label="Ver carrito"
+                    >
+                        <ShoppingBag className="w-6 h-6" />
+                        {mounted && cartCount > 0 && (
+                            <span className="absolute top-0 right-0 -mt-1 -mr-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center border-2 border-white">
+                                {cartCount}
+                            </span>
+                        )}
+                    </button>
+
                     {!hideChatButton && (
                         <Button
                             onClick={onStartChat}

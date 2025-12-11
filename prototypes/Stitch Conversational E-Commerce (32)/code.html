@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LandingChat - Asistente de Compras</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#3B82F6",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101822",
+              "chat-user": "#e9ecef",
+              "chat-assistant": "#ffffff",
+              "text-primary": "#212529",
+              "text-secondary": "#6c757d"
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-text-primary dark:text-gray-200">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark px-6 py-3 shrink-0">
+<div class="flex items-center gap-4">
+<div class="size-6 text-primary">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-text-primary dark:text-white text-lg font-bold tracking-[-0.015em]">LandingChat</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-gray-100 dark:bg-gray-800 text-text-primary dark:text-gray-300">
+<span class="material-symbols-outlined text-xl">shopping_cart</span>
+<span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">2</span>
+</button>
+<button class="flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-gray-100 dark:bg-gray-800 text-text-primary dark:text-gray-300">
+<span class="material-symbols-outlined text-xl">notifications</span>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar with a gradient background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDmmm9RczVmjBXMiKdkm5pvg1NEelwdSnGZI5XTDSWhTKMukD8Sn8PLtiW7E_bI3Bib79WS_BldOGal6XNZNUt71QYQ-qN8UpXenXXe5EN9AL-06-wJbS_qhZNgQnYXoyrfJgWvx-4Ghyfu67NO1jrcQ36On8CoinRere-8phyVBbNeyNAL7xLP1wwLq1FYV78ZHR0-CKQ2e_-I4Ph2p1CrPeMMtuPZNjIcyK9pF1VWbe81S15u9zLsjRPoK7DTFcmkPgMWqlEo0M8");'></div>
+</div>
+</header>
+<main class="flex flex-1 overflow-hidden">
+<div class="flex flex-1">
+<aside class="w-64 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50 shrink-0">
+<div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+<h3 class="font-bold text-text-primary dark:text-white">Historial</h3>
+<button class="text-text-secondary dark:text-gray-400 hover:text-primary dark:hover:text-primary">
+<span class="material-symbols-outlined text-xl">search</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-2 space-y-1">
+<div class="p-3 rounded-lg bg-primary/10 dark:bg-primary/20">
+<p class="font-semibold text-sm text-primary dark:text-white truncate">Búsqueda de zapatillas...</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">Hoy, 10:30 AM</p>
+</div>
+<div class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer">
+<p class="font-medium text-sm text-text-primary dark:text-gray-300 truncate">Consulta sobre mi pedido</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">Ayer, 4:15 PM</p>
+</div>
+<div class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer">
+<p class="font-medium text-sm text-text-primary dark:text-gray-300 truncate">Recomendación de regalos</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">24 Mayo 2024, 11:20 AM</p>
+</div>
+<div class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer">
+<p class="font-medium text-sm text-text-primary dark:text-gray-300 truncate">Problema con cupón</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">22 Mayo 2024, 09:05 AM</p>
+</div>
+</div>
+<div class="p-2 border-t border-gray-200 dark:border-gray-700">
+<button class="flex w-full items-center justify-center gap-2 rounded-md h-10 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-text-primary dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>Nueva conversación</span>
+</button>
+</div>
+</aside>
+<div class="flex flex-col flex-1 bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Shopping Assistant Avatar with a blue background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o");'></div>
+<div class="flex flex-col">
+<h1 class="text-base font-medium leading-normal text-text-primary dark:text-white">Asistente de Compras</h1>
+<p class="text-green-500 text-sm font-normal leading-normal">Online</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<div class="flex items-end gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-10 shrink-0" data-alt="Shopping Assistant Avatar with a blue background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuABYiCqkKfc3mL8n_3PA4iiEZ8NMebpBGWhucKIghuTyTGZdComQeTLHkvA8UFiJrJNsmxZPTn5nXT9UCg9yAD1jEIe-oG_ApH3GuQ86p9BtN_JDLy0RIZinJu-2vNHhgBTDOA6aPChj8apsiAPzRStv1awSlqqMlickwbadFcaMt2MzIPnJth8zfWAE3QU-s8RMrfZ_X2UhYIRLGeap9VWacsjQQ3MyFxkn23XKpB7pqoaxjZYP2rR1_E9QloFH7xKYKJ1czXwADw");'></div>
+<div class="flex flex-1 flex-col gap-1 items-start">
+<p class="text-text-secondary text-[13px] font-normal leading-normal max-w-full">Asistente de Compras • 10:30 AM</p>
+<p class="text-base font-normal leading-normal flex max-w-lg rounded-lg rounded-bl-none px-4 py-3 bg-chat-assistant dark:bg-gray-700 text-text-primary dark:text-gray-200 shadow-sm">
+                                ¡Hola! Soy tu asistente de compras. ¿Qué buscas hoy?
+                            </p>
+</div>
+</div>
+<div class="flex items-end gap-3 justify-end">
+<div class="flex flex-1 flex-col gap-1 items-end">
+<p class="text-text-secondary text-[13px] font-normal leading-normal max-w-full text-right">Tú • 10:31 AM</p>
+<p class="text-base font-normal leading-normal flex max-w-lg rounded-lg rounded-br-none px-4 py-3 bg-primary text-white">Estoy buscando unas zapatillas de running nuevas.</p>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-10 shrink-0" data-alt="User avatar with a gradient background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBez3Wh3agYQeBwWeASILSTqaBe3tIarckNMJm5uni28U-Z11srs7519cWP45jUQlvdS8FggmImC-hpa8LgZYTE3ddw_g_z3kCP6PmZ82eE5XB3cKus1H45UFA__-6UdPiJ-NyVy2qMGq4RHtS7q0WiOM2_35U0Spgx9E8eI2c6zKEkVct9XymP0Jc33bq5dBbihPgeWUAInDNMwC7GDXkCqoWhsIlFCIQdyCtc3UISdbxxjq2JPQjGPN4XOz0FhLZ8w269JN6Z-dk");'></div>
+</div>
+<div class="flex items-end gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-10 shrink-0" data-alt="Shopping Assistant Avatar with a blue background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuANUbs7QMP-UuEesdAeBn8-dAS0paLvl9fh8hFd7XQ0syzoFqVp9PBwX76XPR6Dd1F0Rz-qKHKGELRXY8yM_67rZ3MMyR9geogbdOx1wxOPFLAY9Pl90UtBf141PqA0kQwv6e_KlOwkVqwPttocD_KEaVhDGHVgOjRKo00KS2ynCfN8CTWBmptoOciWiZgp_FcIcTLdIFpOyhfKfuJiZtDw8_X4Rumcfmf9I24oRKRlvZG4AWfePuuIBoNot8JobtAZmM2CHwrOKW0");'></div>
+<div class="flex flex-1 flex-col gap-1 items-start">
+<p class="text-text-secondary text-[13px] font-normal leading-normal max-w-full">Asistente de Compras • 10:32 AM</p>
+<div class="space-y-2">
+<p class="text-base font-normal leading-normal flex max-w-lg rounded-lg rounded-bl-none px-4 py-3 bg-chat-assistant dark:bg-gray-700 text-text-primary dark:text-gray-200 shadow-sm">
+                                  ¡Claro! He encontrado una opción popular que podría gustarte.
+                                </p>
+<div class="flex flex-col gap-3 p-3 rounded-lg bg-chat-assistant dark:bg-gray-700 border border-gray-200 dark:border-gray-600 max-w-xs shadow-sm">
+<div class="bg-center bg-no-repeat aspect-video bg-cover rounded-lg w-full" data-alt="A pair of modern running shoes in blue and white." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCmZ9LzMRwgL55qeqRPqEZsqHrAkE3XHwleHmyP3Pnip8PKWHTo_uR_lFJRyf5oLxvs8iLI7-S_3kBej-D_P0RJl0Py-ethTULkSLnIhPKL_59XvPKr8P0qcy5kVSDxiFlecfiGIakpalA6GAhpVWBtszLuAKU_jH1c__jQM37jsMduvAO1rKBs-QP2HdMmZjutBY7E9iLDuQ-ouaeo1zXX4daV4uiF-e1dQizOyEtIN3GqgXAGKalxnchZ-ydaqepCpXGyN2PWDI");'></div>
+<div class="flex flex-col gap-1 px-1">
+<h3 class="text-base font-bold text-text-primary dark:text-white">Zapatillas Velocity Boost</h3>
+<p class="text-sm text-text-secondary dark:text-gray-400">Perfectas para corredores de larga distancia.</p>
+<p class="text-lg font-bold text-primary">$120.00</p>
+</div>
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-primary/20 text-primary gap-2 text-sm font-bold leading-normal tracking-[0.015em]">
+<span class="material-symbols-outlined text-base">visibility</span>
+<span>Ver más detalles</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50 shrink-0">
+<div class="flex items-center gap-2 mb-3">
+<button class="px-3 py-1.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-full text-text-secondary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Ver ofertas</button>
+<button class="px-3 py-1.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-full text-text-secondary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Seguir mi pedido</button>
+<button class="px-3 py-1.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-full text-text-secondary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">¿Necesitas ayuda?</button>
+</div>
+<div class="relative">
+<input class="w-full h-12 rounded-lg pl-4 pr-28 bg-gray-100 dark:bg-gray-800 border-transparent focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white" placeholder="Escribe tu mensaje aquí..." type="text"/>
+<div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+<button class="flex items-center justify-center size-9 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-text-secondary dark:text-gray-400">
+<span class="material-symbols-outlined text-xl">add</span>
+</button>
+<button class="flex items-center justify-center size-9 rounded-lg bg-primary text-white">
+<span class="material-symbols-outlined text-xl">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="w-1/3 flex flex-col bg-white dark:bg-gray-900/50 border-l border-gray-200 dark:border-gray-700">
+<div class="flex flex-col h-full">
+<div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+<h2 class="text-lg font-bold text-text-primary dark:text-white">Carrito de Compras</h2>
+<button class="text-text-secondary dark:text-gray-400 hover:text-text-primary dark:hover:text-white">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto">
+<div class="p-4 border-b border-gray-200 dark:border-gray-700">
+<div class="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 mb-2">
+<span class="material-symbols-outlined text-base">check_circle</span>
+<span class="font-medium">¡Envío GRATIS! Has alcanzado el mínimo de compra.</span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-green-500 h-2 rounded-full" style="width: 100%"></div>
+</div>
+</div>
+<div class="p-4 space-y-4">
+<div class="flex gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg w-20 h-20 shrink-0 border border-gray-200 dark:border-gray-700" data-alt="A pair of black and red running shoes." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCws_wBMP0GIA_5N408bZQpd_OF_XuzIHTL1qLSYrxcbWGNcv_HtY7UTS8lGHbo9deUVwVDB0TqFnKpu7hSwmQVeCxq36PyBa7AyGX7n-t0JzIEtBBFbaL2uUdJXC57CjOQAJylI7F7YCUJJNTWaAXroyI7aKXUB60M_ESAUM6Herx19tN0Ac_b2Q5vllLhAnF2UT9RVdBzsF8iHXvlVJJjXpgQelu6otmOFT_YXq1sHj9XnYysS_ejjHYPy0ZDRDvayulzP76gNCs");'></div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<h4 class="font-semibold text-sm text-text-primary dark:text-white">Zapatillas SprintWave</h4>
+<p class="font-bold text-sm text-primary mt-1">$95.00</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center border border-gray-300 dark:border-gray-600 rounded-md">
+<button class="px-2 py-1 text-text-secondary dark:text-gray-400 hover:text-text-primary dark:hover:text-white">-</button>
+<input class="w-8 text-center bg-transparent border-0 p-0 text-sm focus:ring-0 dark:text-white" type="text" value="1"/>
+<button class="px-2 py-1 text-text-secondary dark:text-gray-400 hover:text-text-primary dark:hover:text-white">+</button>
+</div>
+<button class="text-text-secondary dark:text-gray-500 hover:text-red-500">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex gap-4">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg w-20 h-20 shrink-0 border border-gray-200 dark:border-gray-700" data-alt="A smartwatch with a black band." style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDu4LnT753WoA9M6WP0Dts_DEOAC5-zmP_-GJ_rkpotzTVg5axNL40HqN91dZOEAowsdaIrvumICD9Ylvazn9_ecdhjDvQOvOqiiikaC0119eil7_NPCD_rTVF1ysXTh4A8thX0otZ9mBL3zI5iA_jtED7M8zJykHcg-PzabLH5gA1AjnhzeBCwUgdTdMBs4iegewKL5l_tjG56DIyS7sd3YH7GQEkEQHNg8sfZkt6RpUKct_lnInpZpsGXBvZrPUKRWO9D7-YvfwM");'></div>
+<div class="flex-1 flex flex-col justify-between">
+<div>
+<h4 class="font-semibold text-sm text-text-primary dark:text-white">Smartwatch Fitness</h4>
+<p class="font-bold text-sm text-primary mt-1">$150.00</p>
+</div>
+<div class="flex items-center justify-between">
+<div class="flex items-center border border-gray-300 dark:border-gray-600 rounded-md">
+<button class="px-2 py-1 text-text-secondary dark:text-gray-400 hover:text-text-primary dark:hover:text-white">-</button>
+<input class="w-8 text-center bg-transparent border-0 p-0 text-sm focus:ring-0 dark:text-white" type="text" value="1"/>
+<button class="px-2 py-1 text-text-secondary dark:text-gray-400 hover:text-text-primary dark:hover:text-white">+</button>
+</div>
+<button class="text-text-secondary dark:text-gray-500 hover:text-red-500">
+<span class="material-symbols-outlined text-xl">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="px-4 py-4 border-t border-b border-gray-200 dark:border-gray-700">
+<label class="text-sm font-medium text-text-primary dark:text-gray-300" for="coupon">Código de descuento</label>
+<div class="flex gap-2 mt-2">
+<input class="flex-grow h-10 rounded-md border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-primary focus:border-primary text-sm dark:text-white" id="coupon" placeholder="Ingresa tu cupón" type="text"/>
+<button class="flex-shrink-0 h-10 px-4 rounded-md border border-primary text-primary text-sm font-bold hover:bg-primary/10 transition-colors">Aplicar</button>
+</div>
+</div>
+<div class="p-4">
+<h3 class="text-base font-semibold text-text-primary dark:text-white mb-2">También te puede interesar</h3>
+<div class="flex space-x-4 overflow-x-auto pb-2 -mx-4 px-4">
+<div class="flex-shrink-0 w-32 text-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg border border-gray-200 dark:border-gray-700" data-alt="Product image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCmZ9LzMRwgL55qeqRPqEZsqHrAkE3XHwleHmyP3Pnip8PKWHTo_uR_lFJRyf5oLxvs8iLI7-S_3kBej-D_P0RJl0Py-ethTULkSLnIhPKL_59XvPKr8P0qcy5kVSDxiFlecfiGIakpalA6GAhpVWBtszLuAKU_jH1c__jQM37jsMduvAO1rKBs-QP2HdMmZjutBY7E9iLDuQ-ouaeo1zXX4daV4uiF-e1dQizOyEtIN3GqgXAGKalxnchZ-ydaqepCpXGyN2PWDI");'></div>
+<h5 class="text-xs font-medium mt-2 truncate dark:text-gray-300">Zapatillas Velocity</h5>
+<p class="text-xs font-bold text-primary">$120.00</p>
+</div>
+<div class="flex-shrink-0 w-32 text-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg border border-gray-200 dark:border-gray-700" data-alt="Product image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCmZ9LzMRwgL55qeqRPqEZsqHrAkE3XHwleHmyP3Pnip8PKWHTo_uR_lFJRyf5oLxvs8iLI7-S_3kBej-D_P0RJl0Py-ethTULkSLnIhPKL_59XvPKr8P0qcy5kVSDxiFlecfiGIakpalA6GAhpVWBtszLuAKU_jH1c__jQM37jsMduvAO1rKBs-QP2HdMmZjutBY7E9iLDuQ-ouaeo1zXX4daV4uiF-e1dQizOyEtIN3GqgXAGKalxnchZ-ydaqepCpXGyN2PWDI");'></div>
+<h5 class="text-xs font-medium mt-2 truncate dark:text-gray-300">Zapatillas Runner Pro</h5>
+<p class="text-xs font-bold text-primary">$135.00</p>
+</div>
+<div class="flex-shrink-0 w-32 text-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-lg border border-gray-200 dark:border-gray-700" data-alt="Product image" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDCmZ9LzMRwgL55qeqRPqEZsqHrAkE3XHwleHmyP3Pnip8PKWHTo_uR_lFJRyf5oLxvs8iLI7-S_3kBej-D_P0RJl0Py-ethTULkSLnIhPKL_59XvPKr8P0qcy5kVSDxiFlecfiGIakpalA6GAhpVWBtszLuAKU_jH1c__jQM37jsMduvAO1rKBs-QP2HdMmZjutBY7E9iLDuQ-ouaeo1zXX4daV4uiF-e1dQizOyEtIN3GqgXAGKalxnchZ-ydaqepCpXGyN2PWDI");'></div>
+<h5 class="text-xs font-medium mt-2 truncate dark:text-gray-300">Zapatillas AirFlex</h5>
+<p class="text-xs font-bold text-primary">$110.00</p>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 mt-auto">
+<div class="space-y-2 text-sm">
+<div class="flex justify-between">
+<span class="text-text-secondary dark:text-gray-400">Subtotal</span>
+<span class="font-semibold text-text-primary dark:text-white">$245.00</span>
+</div>
+<div class="flex justify-between">
+<span class="text-text-secondary dark:text-gray-400">Envío</span>
+<span class="font-semibold text-text-primary dark:text-white">$5.00</span>
+</div>
+<div class="flex justify-between">
+<span class="text-text-secondary dark:text-gray-400">Descuento</span>
+<span class="font-semibold text-text-primary dark:text-white">-$0.00</span>
+</div>
+<div class="border-t border-gray-200 dark:border-gray-600 my-2"></div>
+<div class="flex justify-between text-base font-bold">
+<span class="text-text-primary dark:text-white">Total</span>
+<span class="text-primary">$250.00</span>
+</div>
+</div>
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 bg-primary text-white text-base font-bold mt-4 hover:bg-blue-600 transition-colors">
+<span>Finalizar Compra</span>
+</button>
+<div class="mt-4">
+<p class="text-center text-xs text-text-secondary dark:text-gray-400 mb-2">Medios de pago aceptados</p>
+<div class="flex justify-center items-center space-x-3">
+<div class="bg-center bg-no-repeat bg-contain w-10 h-6" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDonXPSCr1wU5MBlZOcdpJpua0EMf24-VHJDPIZTNdUcf6t4WB7JxnpQ3CADMlMvPBEi6B5Qi-JULociYhgSU7s8voGHiGdbyz8_AtwJJm27wloYNlectNg4OAqqUCXcnhizP1jyQuRMudhdoj2MGTh4eDkt3-MHx-96DAtsmdRlAJjnaZWT2OUcRhI9s2kSnLhpTWiJLR5aaeGP2hwwiRpcTVqwnu3RlZyADjG2gF3tUWJ0sFXdxyPv4zzA7NzHw-vo0DKDdiaxjA");'></div>
+<div class="bg-center bg-no-repeat bg-contain w-10 h-6" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA94JtflsPSSvUHnjhYVjjNYqP_BnLVkgMIUBhIwDNxfCC6UTgAQy19TmMduRcjyoHO2szRRFcWwh8g-RKNLy77Fkd4Y2fRylyXfEoQkfyqQW1mn52PUdZDuPnVoSFvu9Ye3NSzxyxzNK76PuksF7_RpmjF6M2qIhxaFCjKxfFcz7hHDxm_HaTC5ouixqiEjQpMjgdblspuCeq5vup9VzQVuIpfQ_Wnzf6lQLTaHdXsgwVuWzd50gwX-BgZ3cvloUdRjF2ykgsHZ5k");'></div>
+<div class="bg-center bg-no-repeat bg-contain w-10 h-6" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA673y1bo1jUXDZXyM81haEL08oIlW3N6M7EBKH1Kzm_kdlAPXbf7hRR04ApKflOszxNAhZy78DylPnAdXiLCdvGw_OC1q3fNPwJsN5bZuagLs0yRBJJ3s_nKZu2tZz-RIA0XS2CjsIvwxv0-bJOmO32TVvqCZaN2lR2e6kCmAM7LRwHsVALphsYbwvQPJjtQi2oZ0G4IIYiELsHmie-IvuKK8ASGCkt3YIdHM3cJIOgq23uNHZ7RPkdOcHcGWlETYvr8qetYi5ZTE");'></div>
+<div class="bg-center bg-no-repeat bg-contain w-10 h-6" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDOMrBsQq5Na3EaepLISNyDqPN-6jiVEaGh5mzZraRbyHViNK3dynWhG0c3BxGRoSUblvSOofwT0yd8CE0oyYUYa5tPhVd28AXNmQwLnNWHE6I7nj4c6DcYhVoS6koGTOMxA1aYjzSkc60-lYMyebMqrJSeYvtfg1Y0IBju1BDUbSjxuCQTMl0coYaVoYpRzzN-YK02Mdx2N2SI78g2ZpC5mPCqU6ry8_r1hrOU8bQU9UBa3gEiXewlj_bnxtUTq31o2m7Q71Tfxp8");'></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

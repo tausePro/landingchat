@@ -1,7 +1,8 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
+import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 
 interface CreateOrderParams {
     slug: string
@@ -45,7 +46,7 @@ function generateOrderNumber(): string {
 /**
  * Transform cart items to order items format
  */
-function transformCartItemsToOrderItems(cartItems: Array<{id: string, name: string, price: number, quantity: number}>) {
+function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: string, price: number, quantity: number }>) {
     return cartItems.map(item => ({
         product_id: item.id,
         product_name: item.name,
@@ -57,7 +58,9 @@ function transformCartItemsToOrderItems(cartItems: Array<{id: string, name: stri
 }
 
 export async function createOrder(params: CreateOrderParams) {
-    const supabase = await createClient()
+    // ⚠️ Security: Use service client to bypass RLS restrictions on orders/customers table
+    // Since we blocked public anonymity access in production
+    const supabase = createServiceClient()
 
     try {
         // 1. Get Organization ID from Slug
@@ -164,7 +167,24 @@ export async function createOrder(params: CreateOrderParams) {
             }
         }
 
-        // Manual payment - no payment URL needed
+        // 8. Manual Payment & Success Handler
+        // Notify Store Owner via WhatsApp (Fire and Forget)
+        try {
+            // Send notification asynchronously
+            console.log("[createOrder] Sending WhatsApp notification for order:", orderNumber)
+            await sendSaleNotification(
+                { organizationId: org.id },
+                {
+                    id: order.order_number,
+                    total: params.total,
+                    customerName: params.customerInfo.name,
+                    items: params.items
+                }
+            )
+        } catch (e) {
+            console.error("Failed to send notification:", e)
+        }
+
         return { success: true, order }
 
     } catch (error) {

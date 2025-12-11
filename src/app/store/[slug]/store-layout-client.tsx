@@ -8,7 +8,8 @@ import { TemplateRenderer } from "@/components/store/templates/template-renderer
 import { StoreHeader } from "@/components/store/store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
-import { StorePresence } from "@/components/store/store-presence" // Ensuring this is imported too since we fixed it
+import { StorePresence } from "@/components/store/store-presence"
+import { CartDrawer } from "@/app/chat/components/cart-drawer"
 
 interface StoreLayoutClientProps {
     slug: string
@@ -131,6 +132,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                         primaryColor={primaryColor}
                         heroSettings={heroSettings}
                         onStartChat={handleStartChat}
+                        isSubdomain={isSubdomain}
                     />
                 )}
             </main>
@@ -144,8 +146,11 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 onIdentified={handleCustomerIdentified}
             />
 
+            <CartDrawer slug={slug} />
+
             {/* Presence Tracking */}
             <StorePresence slug={organization.slug} />
         </div>
     )
 }
+

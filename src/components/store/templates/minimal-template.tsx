@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
+import { ProductCard } from "../product-card"
+import { getStoreLink } from "@/lib/utils/store-urls"
 
 interface MinimalTemplateProps {
     organization: any
@@ -9,6 +11,7 @@ interface MinimalTemplateProps {
     primaryColor: string
     heroSettings: any
     onStartChat: (productId?: string) => void
+    isSubdomain: boolean
 }
 
 export function MinimalTemplate({
@@ -16,7 +19,8 @@ export function MinimalTemplate({
     products,
     primaryColor,
     heroSettings,
-    onStartChat
+    onStartChat,
+    isSubdomain
 }: MinimalTemplateProps) {
     const heroTitle = heroSettings.title || "Encuentra tu producto ideal, chateando."
     const heroSubtitle = heroSettings.subtitle || "Sin buscar, sin filtros, solo conversación."
@@ -105,41 +109,17 @@ export function MinimalTemplate({
                 <div className="container mx-auto px-4">
                     <h2 className="text-3xl font-bold text-center mb-12">Nuestros Productos</h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8 max-w-7xl mx-auto">
-                        {displayProducts.map((product) => (
-                            <div key={product.id} className="bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col h-full">
-                                <div className="aspect-square bg-gray-100 relative group overflow-hidden">
-                                    {product.image_url ? (
-                                        <img
-                                            src={product.image_url}
-                                            alt={product.name}
-                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-gray-200 text-gray-400">
-                                            Sin Imagen
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4 flex flex-col flex-1">
-                                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2 text-sm md:text-base">{product.name}</h3>
-                                    {product.brand && (
-                                        <p className="text-xs text-gray-500 mb-2">{product.brand}</p>
-                                    )}
-                                    <div className="mt-auto pt-2 flex items-center justify-between">
-                                        <p className="text-lg md:text-xl font-bold" style={{ color: primaryColor }}>
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
-                                        </p>
-                                    </div>
-                                    <Link
-                                        href={`/store/${organization.slug}/producto/${product.slug || product.id}`}
-                                        className="mt-3 block w-full text-center py-2 px-4 rounded-lg border-2 text-sm font-bold transition-colors hover:opacity-80"
-                                        style={{ borderColor: primaryColor, color: primaryColor }}
-                                    >
-                                        Ver Detalles
-                                    </Link>
-                                </div>
-                            </div>
-                        ))}
+                        {displayProducts.map((product) => {
+                            const productUrl = getStoreLink(`/producto/${product.slug || product.id}`, isSubdomain, organization.slug)
+                            return (
+                                <ProductCard
+                                    key={product.id}
+                                    product={product}
+                                    productUrl={productUrl}
+                                    primaryColor={primaryColor}
+                                />
+                            )
+                        })}
                     </div>
                     {/* Infinite Scroll Trigger */}
                     {displayProducts.length < products.length && (

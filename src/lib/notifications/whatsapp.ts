@@ -175,7 +175,7 @@ async function sendNotification(
 ): Promise<void> {
     const supabase = await createServiceClient()
 
-    // Obtener configuración de Evolution API
+    // 1. Obtener configuración de Evolution API
     const { data: settings } = await supabase
         .from("system_settings")
         .select("value")
@@ -188,17 +188,18 @@ async function sendNotification(
 
     const config = settings.value as { url: string; apiKey: string }
 
-    // Obtener instancia personal
-    const { data: instance } = await supabase
+    // 2. Obtener instancia CORPORATIVA (Sender - El Bot)
+    const { data: corporateInstance } = await supabase
         .from("whatsapp_instances")
         .select("instance_name")
         .eq("organization_id", organizationId)
-        .eq("instance_type", "personal")
+        .eq("instance_type", "corporate")
         .eq("status", "connected")
         .single()
 
-    if (!instance) {
-        throw new Error("Personal WhatsApp instance not found")
+    if (!corporateInstance) {
+        console.warn("[WhatsApp Notifications] No connected corporate instance found to send message")
+        return // No podemos enviar si no hay bot conectado
     }
 
     const client = new EvolutionClient({
@@ -206,10 +207,15 @@ async function sendNotification(
         apiKey: config.apiKey,
     })
 
-    await client.sendTextMessage(instance.instance_name, {
-        number: phoneNumber,
-        text: message,
-    })
-
-    console.log("[WhatsApp Notifications] Notification sent to:", phoneNumber)
+    // 3. Enviar mensaje desde el Bot al número Personal
+    try {
+        await client.sendTextMessage(corporateInstance.instance_name, {
+            number: phoneNumber,
+            text: message,
+        })
+        console.log("[WhatsApp Notifications] Notification sent to:", phoneNumber)
+    } catch (error) {
+        console.error("[WhatsApp Notifications] Failed to send via Evolution:", error)
+        throw error
+    }
 }

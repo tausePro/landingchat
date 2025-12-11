@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export async function getStoreData(slug: string, limit: number = 6) {
     const supabase = await createClient()
@@ -93,5 +93,36 @@ export async function getProductDetails(slug: string, slugOrId: string) {
         product,
         badges: badges || [],
         promotions: promotions || []
+    }
+}
+
+export async function getOrderDetails(slug: string, orderId: string) {
+    const supabase = createServiceClient()
+
+    // 1. Fetch Organization
+    const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, phone")
+        .eq("slug", slug)
+        .single()
+
+    if (orgError || !org) return null
+
+    // 2. Fetch Order
+    const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .eq("organization_id", org.id)
+        .single()
+
+    if (orderError || !order) return null
+
+    // 3. (Optional) Fetch Items details if needed, but they are stored in JSONB 'items' column usually.
+    // The current schema stores items in the JSONB column, so we might not need a join.
+
+    return {
+        organization: org,
+        order
     }
 }

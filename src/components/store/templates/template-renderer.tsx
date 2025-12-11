@@ -10,6 +10,7 @@ interface TemplateRendererProps {
     primaryColor: string
     heroSettings: any
     onStartChat: (productId?: string) => void
+    isSubdomain: boolean
 }
 
 export function TemplateRenderer({
@@ -18,14 +19,16 @@ export function TemplateRenderer({
     products,
     primaryColor,
     heroSettings,
-    onStartChat
+    onStartChat,
+    isSubdomain
 }: TemplateRendererProps) {
     const templateProps = {
         organization,
         products,
         primaryColor,
         heroSettings,
-        onStartChat
+        onStartChat,
+        isSubdomain
     }
 
     switch (template) {
