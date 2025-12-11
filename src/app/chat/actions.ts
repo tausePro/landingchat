@@ -23,6 +23,7 @@ interface CreateOrderParams {
         name: string
         price: number
         quantity: number
+        image?: string
     }>
     subtotal: number
     shippingCost: number
@@ -46,14 +47,17 @@ function generateOrderNumber(): string {
 /**
  * Transform cart items to order items format
  */
-function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: string, price: number, quantity: number }>) {
+const FALLBACK_IMAGE = 'https://landingchat.co/images/placeholder.png' // Use a valid placeholder
+
+function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: string, price: number, quantity: number, image?: string }>) {
     return cartItems.map(item => ({
         product_id: item.id,
         product_name: item.name,
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,
-        variant_info: null
+        variant_info: null,
+        image_url: item.image || FALLBACK_IMAGE // Persist image URL
     }))
 }
 

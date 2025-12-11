@@ -17,10 +17,29 @@ interface CheckoutModalProps {
     slug: string
 }
 
+import { getStoreSettings } from "../../store/[slug]/actions"
+import { useEffect } from "react"
+
 export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     const { items, total, clearCart } = useCartStore()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
+    const [configShipping, setConfigShipping] = useState<number>(0)
+    const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
+
+    useEffect(() => {
+        if (isOpen) {
+            getStoreSettings(slug).then(settings => {
+                if (settings && typeof settings.shipping_cost === 'number') {
+                    setConfigShipping(settings.shipping_cost)
+                }
+            })
+        }
+    }, [isOpen, slug])
+
+    const subtotal = total()
+    const shippingCost = configShipping
+    const finalTotal = subtotal + shippingCost
 
     const [formData, setFormData] = useState({
         name: "",
@@ -37,10 +56,6 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
 
     const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'manual'>('manual')
 
-    const subtotal = total()
-    const shippingCost = 5.00 // Fixed for now, should come from settings
-    const finalTotal = subtotal + shippingCost
-
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
     }
@@ -51,7 +66,7 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
 
     const handleSubmitContact = (e: React.FormEvent) => {
         e.preventDefault()
-        
+
         // Validate tax fields
         if (!formData.document_type || !formData.document_number || !formData.person_type) {
             toast.error("Por favor completa todos los campos de facturación")
@@ -80,12 +95,16 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
             })
 
             if (result.success) {
+                if (result.order) {
+                    setCreatedOrderId(result.order.id) // Store ID for redirection
+                }
+
                 // If payment URL exists, redirect to gateway
                 if (result.paymentUrl) {
                     window.location.href = result.paymentUrl
                     return
                 }
-                
+
                 // Manual payment - show success
                 setStep('success')
                 clearCart()
@@ -133,11 +152,11 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                             <Label htmlFor="phone">Teléfono</Label>
                             <Input id="phone" name="phone" type="tel" required value={formData.phone} onChange={handleInputChange} placeholder="+57 300 123 4567" />
                         </div>
-                        
+
                         {/* Tax/Invoicing Fields */}
                         <div className="border-t pt-4 space-y-4">
                             <h4 className="font-medium text-sm">Información de Facturación</h4>
-                            
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="document_type">Tipo de Documento</Label>
@@ -259,8 +278,17 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                         <p className="text-slate-500 max-w-xs">
                             Hemos recibido tu orden correctamente. Te enviaremos un correo con los detalles y el número de guía.
                         </p>
-                        <Button onClick={onClose} className="mt-4 min-w-[200px]">
-                            Volver a la tienda
+                        <Button
+                            onClick={() => {
+                                if (createdOrderId) {
+                                    window.location.href = `/store/${slug}/order/${createdOrderId}`
+                                } else {
+                                    onClose()
+                                }
+                            }}
+                            className="mt-4 min-w-[200px]"
+                        >
+                            Ver Pedido
                         </Button>
                     </div>
                 )}

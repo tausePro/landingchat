@@ -54,7 +54,7 @@ export async function getCustomers({
 
     let query = supabase
       .from("customers")
-      .select("*", { count: "exact" })
+      .select("*, orders(count)", { count: "exact" })
       .eq("organization_id", profile.organization_id)
 
     // Search

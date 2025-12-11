@@ -95,7 +95,13 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             phone: customerInfo.phone || null
         } : null,
         items: Array.isArray(order.items) ? order.items : [],
-        shipping_address: order.shipping_address || null,
+        shipping_address: order.shipping_address || (customerInfo ? {
+            street: customerInfo.address,
+            city: customerInfo.city,
+            state: 'Colombia', // Default/Fallback
+            postal_code: '',
+            country: 'Colombia'
+        } : null),
         billing_address: null
     }
 }
