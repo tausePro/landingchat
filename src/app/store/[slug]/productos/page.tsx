@@ -6,6 +6,20 @@ import Link from "next/link"
 import { headers } from "next/headers"
 import { isSubdomain, getStoreLink } from "@/lib/utils/store-urls"
 
+// Helper to strip HTML tags from description
+function stripHtml(html: string | null | undefined): string {
+    if (!html) return ""
+    return html
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
+        .replace(/&amp;/g, '&') // Replace &amp; with &
+        .replace(/&lt;/g, '<') // Replace &lt; with <
+        .replace(/&gt;/g, '>') // Replace &gt; with >
+        .replace(/&quot;/g, '"') // Replace &quot; with "
+        .replace(/\s+/g, ' ') // Collapse multiple spaces
+        .trim()
+}
+
 export default async function ProductsPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
     const data = await getStoreData(slug, 100)
@@ -67,7 +81,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
                                             </h3>
                                         </Link>
                                         <p className="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">
-                                            {product.description || "Sin descripción"}
+                                            {stripHtml(product.description) || "Sin descripción"}
                                         </p>
 
                                         <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
