@@ -407,18 +407,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         </div>
     )
 
-    return (
-        <div className="h-screen bg-white dark:bg-gray-900 font-sans">
-            {/* Using the new ChatLayout wrapper */}
-            {/* Note: We need to import ChatLayout at the top if not present */}
-            {/* Assuming ChatLayout handles the full page structure */}
-            {/* But since we can't easily change imports with replace_file_content in complex block, we'll assume imports are added or handle it below */}
 
-            {/* WAIT: I missed adding the import. I will do it in a separate step if needed. For now I replace the main return */}
-        </div>
-    )
-
-    // Replacing the whole return block with ChatLayout usage
     return (
         <ChatLayout
             organizationName={organization.name || "LandingChat"}
