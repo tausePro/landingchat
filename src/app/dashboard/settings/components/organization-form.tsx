@@ -46,14 +46,6 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
             tiktok_pixel_id: ""
         },
         settings: organization.settings || {
-            payments: {
-                wompi: { enabled: false, publicKey: "" },
-                manual: { enabled: true, instructions: "" }
-            },
-            shipping: {
-                cost: 0,
-                freeThreshold: 0
-            },
             branding: {
                 primaryColor: "#2b7cee"
             }
@@ -62,20 +54,6 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
 
     // Ensure nested objects exist even if settings object exists but is partial
     const safeSettings = {
-        payments: {
-            wompi: {
-                enabled: formData.settings?.payments?.wompi?.enabled ?? false,
-                publicKey: formData.settings?.payments?.wompi?.publicKey ?? ""
-            },
-            manual: {
-                enabled: formData.settings?.payments?.manual?.enabled ?? true,
-                instructions: formData.settings?.payments?.manual?.instructions ?? ""
-            }
-        },
-        shipping: {
-            cost: formData.settings?.shipping?.cost ?? 0,
-            freeThreshold: formData.settings?.shipping?.freeThreshold ?? 0
-        },
         branding: {
             primaryColor: formData.settings?.branding?.primaryColor ?? "#2b7cee"
         }
@@ -108,21 +86,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         }))
     }
 
-    const updatePaymentSettings = (method: string, key: string, value: any) => {
-        setFormData(prev => ({
-            ...prev,
-            settings: {
-                ...prev.settings,
-                payments: {
-                    ...prev.settings.payments,
-                    [method]: {
-                        ...prev.settings.payments[method],
-                        [key]: value
-                    }
-                }
-            }
-        }))
-    }
+
 
     const updateTrackingConfig = (key: string, value: string) => {
         setFormData(prev => ({
@@ -145,10 +109,8 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
             <CardContent>
                 <form onSubmit={handleSubmit}>
                     <Tabs defaultValue="general" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-5">
+                        <TabsList className="grid w-full grid-cols-3">
                             <TabsTrigger value="general">General</TabsTrigger>
-                            <TabsTrigger value="payments">Pagos</TabsTrigger>
-                            <TabsTrigger value="shipping">Envíos</TabsTrigger>
                             <TabsTrigger value="branding">Apariencia</TabsTrigger>
                             <TabsTrigger value="seo">SEO & Tracking</TabsTrigger>
                         </TabsList>
@@ -214,75 +176,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                             </div>
                         </TabsContent>
 
-                        <TabsContent value="payments" className="space-y-6">
-                            <div className="space-y-4 border p-4 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5">
-                                        <Label className="text-base">Wompi (Pasarela de Pagos)</Label>
-                                        <p className="text-sm text-muted-foreground">Acepta tarjetas y PSE.</p>
-                                    </div>
-                                    <Switch
-                                        checked={safeSettings.payments.wompi.enabled}
-                                        onCheckedChange={(checked) => updatePaymentSettings('wompi', 'enabled', checked)}
-                                    />
-                                </div>
-                                {safeSettings.payments.wompi.enabled && (
-                                    <div className="space-y-2">
-                                        <Label>Llave Pública (Public Key)</Label>
-                                        <Input
-                                            value={safeSettings.payments.wompi.publicKey}
-                                            onChange={(e) => updatePaymentSettings('wompi', 'publicKey', e.target.value)}
-                                            placeholder="pub_prod_..."
-                                        />
-                                    </div>
-                                )}
-                            </div>
 
-                            <div className="space-y-4 border p-4 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5">
-                                        <Label className="text-base">Pago Manual / Contra Entrega</Label>
-                                        <p className="text-sm text-muted-foreground">Instrucciones para transferencia o efectivo.</p>
-                                    </div>
-                                    <Switch
-                                        checked={safeSettings.payments.manual.enabled}
-                                        onCheckedChange={(checked) => updatePaymentSettings('manual', 'enabled', checked)}
-                                    />
-                                </div>
-                                {safeSettings.payments.manual.enabled && (
-                                    <div className="space-y-2">
-                                        <Label>Instrucciones de Pago</Label>
-                                        <Textarea
-                                            value={safeSettings.payments.manual.instructions}
-                                            onChange={(e) => updatePaymentSettings('manual', 'instructions', e.target.value)}
-                                            placeholder="Ej: Nequi 3001234567. Enviar comprobante al WhatsApp..."
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
-
-                        <TabsContent value="shipping" className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Costo de Envío Fijo (COP)</Label>
-                                    <Input
-                                        type="number"
-                                        value={safeSettings.shipping.cost}
-                                        onChange={(e) => updateSettings('shipping', 'cost', Number(e.target.value))}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Envío Gratis desde (COP)</Label>
-                                    <Input
-                                        type="number"
-                                        value={safeSettings.shipping.freeThreshold}
-                                        onChange={(e) => updateSettings('shipping', 'freeThreshold', Number(e.target.value))}
-                                        placeholder="0 para desactivar"
-                                    />
-                                </div>
-                            </div>
-                        </TabsContent>
 
                         <TabsContent value="branding" className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

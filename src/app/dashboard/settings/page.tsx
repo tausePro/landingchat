@@ -31,6 +31,7 @@ export default async function SettingsPage() {
                             <TabsTrigger value="identification">Identificación</TabsTrigger>
                             <TabsTrigger value="storefront">Storefront</TabsTrigger>
                             <TabsTrigger value="payments">Pagos</TabsTrigger>
+                            <TabsTrigger value="shipping">Envíos</TabsTrigger>
                             <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
                         </TabsList>
                         <TabsContent value="profile">
@@ -54,6 +55,22 @@ export default async function SettingsPage() {
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                                     >
                                         Ir a Configuración de Pagos
+                                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                    </Link>
+                                </div>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="shipping">
+                            <div className="text-sm text-muted-foreground">
+                                <p>Configura tarifas de envío, zonas geográficas y reglas de envío gratis.</p>
+                                <div className="mt-4">
+                                    <Link 
+                                        href="/dashboard/marketing/shipping"
+                                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                                    >
+                                        Ir a Configuración de Envíos
                                         <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>
