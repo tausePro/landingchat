@@ -126,3 +126,17 @@ export async function getOrderDetails(slug: string, orderId: string) {
         order
     }
 }
+
+export async function getStoreSettings(slug: string) {
+    const supabase = await createClient()
+
+    const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("settings")
+        .eq("slug", slug)
+        .single()
+
+    if (orgError || !org) return null
+
+    return org.settings
+}
