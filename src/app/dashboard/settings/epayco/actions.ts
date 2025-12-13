@@ -161,12 +161,19 @@ export async function testEpaycoConnection(): Promise<ActionResult<{ success: bo
             ? decrypt(config.integrity_secret_encrypted)
             : ""
 
+        // Desencriptar encryption key
+        const encryptionKey = config.encryption_key_encrypted
+            ? decrypt(config.encryption_key_encrypted)
+            : ""
+
         // Crear instancia del gateway
         const { EpaycoGateway } = await import("@/lib/payments/epayco-gateway")
         const gateway = new EpaycoGateway({
-            publicKey: config.public_key,
+            provider: "epayco",
+            publicKey: config.public_key || "",
             privateKey: privateKey,
             integritySecret: customerId,
+            encryptionKey: encryptionKey,
             isTestMode: config.is_test_mode
         })
 
