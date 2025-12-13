@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, ExternalLink } from "lucide-react"
-import { saveEpaycoConfig, getEpaycoConfig, testEpaycoConnection } from "../actions"
+import { saveEpaycoConfig, getEpaycoConfig, testEpaycoConnection } from "@/app/dashboard/settings/epayco/actions"
 
 interface EpaycoConfig {
     isActive: boolean
@@ -98,10 +98,13 @@ export function EpaycoSettings() {
             const result = await testEpaycoConnection()
             if (result.success && result.data?.success) {
                 setConnectionStatus('success')
-                toast.success("Conexión exitosa con ePayco")
+                toast.success(result.data.message || "Conexión exitosa con ePayco")
             } else {
                 setConnectionStatus('error')
-                toast.error(result.data?.message || "Error de conexión")
+                const errorMessage = result.success 
+                    ? result.data?.message || "Error de conexión"
+                    : result.error || "Error de conexión"
+                toast.error(errorMessage)
             }
         } catch (error) {
             setConnectionStatus('error')
@@ -179,7 +182,7 @@ export function EpaycoSettings() {
                                     <li>Ve a <strong>Configuración → Llaves secretas</strong></li>
                                     <li>Copia las 3 credenciales requeridas</li>
                                 </ol>
-                                <Button variant="link" size="sm" className="p-0 h-auto" asChild>
+                                <Button variant="ghost" size="sm" className="p-0 h-auto" asChild>
                                     <a href="https://dashboard.epayco.com/configuration" target="_blank" rel="noopener noreferrer">
                                         Abrir panel de ePayco <ExternalLink className="ml-1 h-3 w-3" />
                                     </a>
