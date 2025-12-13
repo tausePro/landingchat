@@ -112,20 +112,20 @@ export default async function OrderSuccessPage({ params }: SuccessPageProps) {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <span className="text-text-light-secondary dark:text-text-dark-secondary">Número de Cuenta:</span>
-                                        <p className="font-mono font-medium text-text-light-primary dark:text-text-dark-primary">123-456-78901</p>
+                                        <p className="font-mono font-medium text-text-light-primary dark:text-text-dark-primary">60100000000</p>
                                     </div>
                                     <div>
                                         <span className="text-text-light-secondary dark:text-text-dark-secondary">Nequi:</span>
-                                        <p className="font-mono font-medium text-text-light-primary dark:text-text-dark-primary">300 123 4567</p>
+                                        <p className="font-mono font-medium text-text-light-primary dark:text-text-dark-primary">3001234567</p>
                                     </div>
                                 </div>
                                 <div>
                                     <span className="text-text-light-secondary dark:text-text-dark-secondary">Titular:</span>
-                                    <p className="font-medium text-text-light-primary dark:text-text-dark-primary">TEZ COLOMBIA S.A.S</p>
+                                    <p className="font-medium text-text-light-primary dark:text-text-dark-primary">LANDINGCHAT SAS</p>
                                 </div>
                                 <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
                                     <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                        <strong>Importante:</strong> Envía el comprobante de pago por WhatsApp al +57 300 123 4567 
+                                        <strong>Importante:</strong> Envía el comprobante de pago por WhatsApp al +57 301 234 5678 
                                         con el número de pedido <strong>{order.order_number}</strong>
                                     </p>
                                 </div>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
 import { useCartStore } from "@/store/cart-store"
-import { ShoppingBag } from "lucide-react"
+import { ShoppingBag, User } from "lucide-react"
 import { useEffect, useState } from "react"
 
 interface StoreHeaderProps {
@@ -41,6 +41,7 @@ export function StoreHeader({
 
     const homeLink = getStoreLink('/', isSubdomain, slug)
     const productsLink = getStoreLink('/productos', isSubdomain, slug)
+    const profileLink = getStoreLink('/profile', isSubdomain, slug)
 
     return (
         <header className={`sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md ${hideOnMobile ? 'hidden md:block' : ''} ${className}`}>
@@ -64,8 +65,18 @@ export function StoreHeader({
                 <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
                     <a href={homeLink} className="hover:text-primary transition-colors">Inicio</a>
                     <a href={productsLink} className="hover:text-primary transition-colors">Productos</a>
+                    <a href={profileLink} className="hover:text-primary transition-colors">Mi Perfil</a>
                 </nav>
                 <div className="flex items-center gap-4">
+                    {/* Profile Button - Mobile */}
+                    <a
+                        href={profileLink}
+                        className="md:hidden p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                        aria-label="Mi perfil"
+                    >
+                        <User className="w-6 h-6" />
+                    </a>
+
                     {/* Cart Button */}
                     <button
                         onClick={() => toggleCart()}

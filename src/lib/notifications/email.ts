@@ -168,11 +168,11 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
             <div style="color: #92400e;">
                 <p><strong>Banco:</strong> Bancolombia</p>
                 <p><strong>Tipo de Cuenta:</strong> Ahorros</p>
-                <p><strong>Número de Cuenta:</strong> 123-456-78901</p>
-                <p><strong>Nequi:</strong> 300 123 4567</p>
-                <p><strong>Titular:</strong> TEZ COLOMBIA S.A.S</p>
+                <p><strong>Número de Cuenta:</strong> 60100000000</p>
+                <p><strong>Nequi:</strong> 3001234567</p>
+                <p><strong>Titular:</strong> LANDINGCHAT SAS</p>
                 <div style="background: #fbbf24; padding: 12px; border-radius: 6px; margin-top: 16px;">
-                    <strong>Importante:</strong> Envía el comprobante de pago por WhatsApp al +57 300 123 4567 
+                    <strong>Importante:</strong> Envía el comprobante de pago por WhatsApp al +57 301 234 5678 
                     con el número de pedido <strong>${data.orderNumber}</strong>
                 </div>
             </div>
@@ -191,10 +191,12 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
 
         <!-- Footer -->
         <div style="text-align: center; padding-top: 30px; border-top: 1px solid #e5e7eb; color: #6b7280;">
-            <p>¿Tienes preguntas? Contáctanos por WhatsApp: +57 300 123 4567</p>
-            <p style="margin: 16px 0 0 0;">
+            <p>¿Tienes preguntas? Contáctanos por WhatsApp: +57 301 234 5678</p>
+            <div style="margin: 16px 0 0 0; display: flex; justify-content: center; gap: 16px;">
+                <a href="${data.storeUrl}/profile?email=${encodeURIComponent(data.customerEmail)}" style="color: #3b82f6; text-decoration: none;">Ver Mi Perfil</a>
+                <span style="color: #d1d5db;">|</span>
                 <a href="${data.storeUrl}" style="color: #3b82f6; text-decoration: none;">Visitar Tienda</a>
-            </p>
+            </div>
         </div>
 
     </body>
