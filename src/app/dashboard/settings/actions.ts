@@ -23,6 +23,7 @@ export interface SettingsData {
         seo_keywords: string | null
         tracking_config: any
         settings: any
+        custom_domain: string | null
         maintenance_mode: boolean | null
         maintenance_message: string | null
     }
@@ -75,6 +76,7 @@ export async function getSettingsData(): Promise<SettingsData> {
             seo_keywords: organization.seo_keywords,
             tracking_config: organization.tracking_config || {},
             settings: organization.settings || {},
+            custom_domain: organization.custom_domain || null,
             maintenance_mode: organization.maintenance_mode || false,
             maintenance_message: organization.maintenance_message || "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles."
         }

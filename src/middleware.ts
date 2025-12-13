@@ -65,16 +65,47 @@ export async function middleware(request: NextRequest) {
     }
     // === ENTORNO DE PRODUCCIÓN ===
     else {
-        const parts = hostname.split('.')
+        // Primero verificar si es un dominio personalizado
+        if (!hostname.includes('landingchat.co')) {
+            // Es un dominio personalizado, buscar en la base de datos
+            try {
+                const supabase = createServerClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                    {
+                        cookies: {
+                            getAll() { return [] },
+                            setAll() { }
+                        }
+                    }
+                )
 
-        // Detectar subdominio: tienda.landingchat.co → ['tienda', 'landingchat', 'co']
-        if (parts.length >= 3) {
-            const subdomain = parts[0]
+                const { data: org } = await supabase
+                    .from("organizations")
+                    .select("slug")
+                    .eq("custom_domain", hostname)
+                    .single()
 
-            // Ignorar subdominios reservados del sistema
-            const reserved = ['www', 'app', 'api', 'dashboard', 'admin', 'wa']
-            if (!reserved.includes(subdomain)) {
-                slug = subdomain
+                if (org) {
+                    slug = org.slug
+                }
+            } catch (error) {
+                console.error("Error checking custom domain:", error)
+                // En caso de error, continuar con la lógica normal
+            }
+        } else {
+            // Es un subdominio de landingchat.co
+            const parts = hostname.split('.')
+
+            // Detectar subdominio: tienda.landingchat.co → ['tienda', 'landingchat', 'co']
+            if (parts.length >= 3) {
+                const subdomain = parts[0]
+
+                // Ignorar subdominios reservados del sistema
+                const reserved = ['www', 'app', 'api', 'dashboard', 'admin', 'wa']
+                if (!reserved.includes(subdomain)) {
+                    slug = subdomain
+                }
             }
         }
     }
@@ -85,20 +116,26 @@ export async function middleware(request: NextRequest) {
     }
 
     // ============================================
-    // REDIRECCIONES ESPECIALES PARA SUBDOMINIOS
+    // REDIRECCIONES ESPECIALES PARA SUBDOMINIOS Y DOMINIOS PERSONALIZADOS
     // ============================================
     
-    const isProductionSubdomain = !hostname.includes('localhost') && !hostname.includes('127.0.0.1') && slug
+    const isProductionDomain = !hostname.includes('localhost') && !hostname.includes('127.0.0.1') && slug
+    const isCustomDomain = isProductionDomain && !hostname.includes('landingchat.co')
 
-    // Si estamos en subdominio y la ruta es /dashboard o /admin, redirigir al dominio principal
+    // Si estamos en subdominio de landingchat.co y la ruta es /dashboard o /admin, redirigir al dominio principal
     // El dashboard y admin siempre deben estar en www.landingchat.co
-    if (isProductionSubdomain && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+    if (isProductionDomain && !isCustomDomain && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
         return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
     }
 
-    // Limpiar URLs redundantes en subdominios
+    // Para dominios personalizados, redirigir dashboard/admin a landingchat.co
+    if (isCustomDomain && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+        return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
+    }
+
+    // Limpiar URLs redundantes en subdominios (no aplica para dominios personalizados)
     // Ejemplo: qp.landingchat.co/store/qp/producto/123 → qp.landingchat.co/producto/123
-    if (isProductionSubdomain && pathname.startsWith(`/store/${slug}/`)) {
+    if (isProductionDomain && !isCustomDomain && pathname.startsWith(`/store/${slug}/`)) {
         const cleanPath = pathname.replace(`/store/${slug}`, '')
         return NextResponse.redirect(new URL(cleanPath, request.url))
     }
