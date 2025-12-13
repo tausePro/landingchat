@@ -108,11 +108,14 @@ export async function POST(request: Request) {
         }
 
         // Validar firma del webhook
-        const privateKey = config.private_key_encrypted
-            ? decrypt(config.private_key_encrypted)
+        const customerId = config.integrity_secret_encrypted
+            ? decrypt(config.integrity_secret_encrypted)
+            : ""
+        const encryptionKey = config.encryption_key_encrypted
+            ? decrypt(config.encryption_key_encrypted)
             : ""
 
-        const isValid = validateEpaycoSignature(payload, config.public_key || "", privateKey)
+        const isValid = validateEpaycoSignature(payload, customerId, encryptionKey)
         if (!isValid) {
             console.error("[ePayco Webhook] Invalid signature")
             await logWebhook(supabase, org.id, "epayco", "error", payload, { error: "Invalid signature" })
@@ -347,13 +350,18 @@ async function logWebhook(
 
 function validateEpaycoSignature(
     payload: EpaycoWebhookPayload,
-    publicKey: string,
-    privateKey: string
+    customerId: string,
+    encryptionKey: string
 ): boolean {
-    // ePayco signature: SHA256(p_cust_id_cliente + p_key + x_ref_payco + x_transaction_id + x_amount + x_currency_code)
+    if (!customerId || !encryptionKey) {
+        console.error("[ePayco Webhook] Missing P_CUST_ID_CLIENTE or P_ENCRYPTION_KEY")
+        return false
+    }
+
+    // ePayco signature: SHA256(p_cust_id_cliente + p_encryption_key + x_ref_payco + x_transaction_id + x_amount + x_currency_code)
     const stringToSign = [
-        publicKey,
-        privateKey,
+        customerId,
+        encryptionKey,
         payload.x_ref_payco,
         payload.x_transaction_id,
         payload.x_amount,
@@ -364,6 +372,15 @@ function validateEpaycoSignature(
         .createHash("sha256")
         .update(stringToSign)
         .digest("hex")
+
+    console.log("[ePayco Webhook] Signature validation:", {
+        customerId: customerId.substring(0, 4) + "***",
+        encryptionKey: encryptionKey.substring(0, 4) + "***",
+        stringToSign: stringToSign.substring(0, 20) + "...",
+        calculatedSignature,
+        receivedSignature: payload.x_signature,
+        isValid: calculatedSignature === payload.x_signature
+    })
 
     return calculatedSignature === payload.x_signature
 }

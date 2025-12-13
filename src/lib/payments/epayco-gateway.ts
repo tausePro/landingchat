@@ -30,6 +30,8 @@ export class EpaycoGateway implements PaymentGateway {
     private config: GatewayConfig
     private baseUrl: string
     private secureUrl: string
+    private customerId: string
+    private encryptionKey: string
 
     constructor(config: GatewayConfig) {
         this.config = config
@@ -39,6 +41,11 @@ export class EpaycoGateway implements PaymentGateway {
         this.secureUrl = config.isTestMode
             ? EPAYCO_SECURE_URL.sandbox
             : EPAYCO_SECURE_URL.production
+        
+        // Para ePayco, el integrity_secret contiene el P_CUST_ID_CLIENTE
+        this.customerId = config.integritySecret || ""
+        // Y encryptionKey contiene el P_ENCRYPTION_KEY
+        this.encryptionKey = config.encryptionKey || ""
     }
 
     private async getAuthToken(): Promise<string> {
@@ -267,12 +274,12 @@ export class EpaycoGateway implements PaymentGateway {
         payload: { x_ref_payco?: string; x_transaction_id?: string; x_amount?: string; x_currency_code?: string; x_signature?: string },
         signature: string
     ): boolean {
-        if (!this.config.privateKey) return false
+        if (!this.encryptionKey || !this.customerId) return false
 
-        // ePayco usa: SHA256(p_cust_id_cliente + p_key + x_ref_payco + x_transaction_id + x_amount + x_currency_code)
+        // ePayco usa: SHA256(p_cust_id_cliente + p_encryption_key + x_ref_payco + x_transaction_id + x_amount + x_currency_code)
         const stringToSign = [
-            this.config.publicKey,
-            this.config.privateKey,
+            this.customerId, // P_CUST_ID_CLIENTE
+            this.encryptionKey, // P_ENCRYPTION_KEY
             payload.x_ref_payco,
             payload.x_transaction_id,
             payload.x_amount,

@@ -15,6 +15,7 @@ export interface GatewayConfig {
     publicKey: string
     privateKey: string
     integritySecret?: string
+    encryptionKey?: string
     isTestMode: boolean
 }
 

@@ -51,6 +51,7 @@ export const PaymentGatewayConfigSchema = z.object({
     public_key: z.string().nullable().optional(),
     private_key_encrypted: z.string().nullable().optional(),
     integrity_secret_encrypted: z.string().nullable().optional(),
+    encryption_key_encrypted: z.string().nullable().optional(),
     webhook_url: z.string().url().nullable().optional(),
     config: z.record(z.string(), z.unknown()).default({}),
     created_at: z.string(),
@@ -67,6 +68,21 @@ export const PaymentGatewayConfigInputSchema = z.object({
     public_key: z.string().min(1, "La llave pública es requerida"),
     private_key: z.string().min(1, "La llave privada es requerida"),
     integrity_secret: z.string().optional(),
+    encryption_key: z.string().optional(),
+}).refine((data) => {
+    // Para ePayco, integrity_secret y encryption_key son requeridos
+    if (data.provider === "epayco") {
+        if (!data.integrity_secret) {
+            return false
+        }
+        if (!data.encryption_key) {
+            return false
+        }
+    }
+    return true
+}, {
+    message: "P_CUST_ID_CLIENTE y P_ENCRYPTION_KEY son requeridos para ePayco",
+    path: ["integrity_secret"]
 })
 
 export type PaymentGatewayConfigInput = z.infer<typeof PaymentGatewayConfigInputSchema>
@@ -150,6 +166,7 @@ export function deserializePaymentGatewayConfig(
         public_key: data.public_key,
         private_key_encrypted: data.private_key_encrypted,
         integrity_secret_encrypted: data.integrity_secret_encrypted,
+        encryption_key_encrypted: data.encryption_key_encrypted,
         webhook_url: data.webhook_url,
         config: data.config ?? {},
         created_at: data.created_at,

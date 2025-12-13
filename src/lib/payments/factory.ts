@@ -14,7 +14,8 @@ import { decrypt } from "@/lib/utils/encryption"
 export function createPaymentGateway(
     config: PaymentGatewayConfig,
     decryptedPrivateKey?: string,
-    decryptedIntegritySecret?: string
+    decryptedIntegritySecret?: string,
+    decryptedEncryptionKey?: string
 ): PaymentGateway {
     // Desencriptar credenciales si no se proporcionan ya desencriptadas
     const privateKey =
@@ -29,11 +30,18 @@ export function createPaymentGateway(
             ? decrypt(config.integrity_secret_encrypted)
             : undefined)
 
+    const encryptionKey =
+        decryptedEncryptionKey ||
+        (config.encryption_key_encrypted
+            ? decrypt(config.encryption_key_encrypted)
+            : undefined)
+
     const gatewayConfig: GatewayConfig = {
         provider: config.provider,
         publicKey: config.public_key || "",
         privateKey,
         integritySecret,
+        encryptionKey,
         isTestMode: config.is_test_mode,
     }
 

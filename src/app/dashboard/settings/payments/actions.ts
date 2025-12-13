@@ -68,6 +68,9 @@ export async function getPaymentConfig(): Promise<
             integrity_secret_encrypted: config.integrity_secret_encrypted
                 ? "***"
                 : null,
+            encryption_key_encrypted: config.encryption_key_encrypted
+                ? "***"
+                : null,
         })
     } catch (error) {
         return failure(
@@ -102,6 +105,9 @@ export async function savePaymentConfig(
         const encryptedIntegritySecret = data.integrity_secret
             ? encrypt(data.integrity_secret)
             : null
+        const encryptedEncryptionKey = data.encryption_key
+            ? encrypt(data.encryption_key)
+            : null
 
         // Generar URL de webhook
         const { data: org } = await supabase
@@ -122,6 +128,7 @@ export async function savePaymentConfig(
             public_key: data.public_key,
             private_key_encrypted: encryptedPrivateKey,
             integrity_secret_encrypted: encryptedIntegritySecret,
+            encryption_key_encrypted: encryptedEncryptionKey,
             webhook_url: webhookUrl,
             updated_at: new Date().toISOString(),
         }
@@ -145,6 +152,9 @@ export async function savePaymentConfig(
             ...config,
             private_key_encrypted: "***",
             integrity_secret_encrypted: config.integrity_secret_encrypted
+                ? "***"
+                : null,
+            encryption_key_encrypted: config.encryption_key_encrypted
                 ? "***"
                 : null,
         })
@@ -185,13 +195,17 @@ export async function testConnection(): Promise<
         const integritySecret = config.integrity_secret_encrypted
             ? decrypt(config.integrity_secret_encrypted)
             : undefined
+        const encryptionKey = config.encryption_key_encrypted
+            ? decrypt(config.encryption_key_encrypted)
+            : undefined
 
         // Importar dinámicamente para evitar problemas de SSR
         const { createPaymentGateway } = await import("@/lib/payments/factory")
         const gateway = createPaymentGateway(
             deserializePaymentGatewayConfig(config),
             privateKey,
-            integritySecret
+            integritySecret,
+            encryptionKey
         )
 
         const isConnected = await gateway.testConnection()
