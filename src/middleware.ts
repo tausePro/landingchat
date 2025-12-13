@@ -172,7 +172,7 @@ export async function middleware(request: NextRequest) {
 
             const { data: org, error: orgError } = await supabaseService
                 .from("organizations")
-                .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
+                .select("maintenance_mode, maintenance_message, id")
                 .eq("slug", slug)
                 .single()
 
@@ -187,68 +187,40 @@ export async function middleware(request: NextRequest) {
                 console.log(`[MIDDLEWARE] Store ${slug} is in maintenance mode`)
                 let canAccess = false
 
-                // Método 1: Token de bypass en URL (?preview=TOKEN)
-                const previewToken = request.nextUrl.searchParams.get('preview')
-                if (previewToken && org.maintenance_bypass_token && previewToken === org.maintenance_bypass_token) {
-                    canAccess = true
-                    console.log(`[MIDDLEWARE] Maintenance bypass via preview token for ${slug}`)
-                }
-
-                // Método 2: Cookie de bypass
-                const bypassCookie = request.cookies.get(`maintenance_bypass_${slug}`)
-                if (bypassCookie?.value === org.maintenance_bypass_token) {
-                    canAccess = true
-                    console.log(`[MIDDLEWARE] Maintenance bypass via cookie for ${slug}`)
-                }
-
-                // Método 3: Usuario autenticado (dueño de la tienda o superadmin)
-                if (!canAccess) {
-                    const supabaseAuth = createServerClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                        {
-                            cookies: {
-                                getAll() {
-                                    return request.cookies.getAll()
-                                },
-                                setAll() { }
-                            }
+                // Verificar si el usuario está autenticado (dueño de la tienda o superadmin)
+                const supabaseAuth = createServerClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    {
+                        cookies: {
+                            getAll() {
+                                return request.cookies.getAll()
+                            },
+                            setAll() { }
                         }
-                    )
-
-                    const { data: { user } } = await supabaseAuth.auth.getUser()
-                    console.log(`[MIDDLEWARE] Auth check - user found: ${!!user}`)
-
-                    if (user) {
-                        const { data: profile } = await supabaseService
-                            .from("profiles")
-                            .select("organization_id, is_superadmin")
-                            .eq("id", user.id)
-                            .single()
-
-                        const isOwner = profile?.organization_id === org.id
-                        const isSuperadmin = profile?.is_superadmin
-                        canAccess = isSuperadmin || isOwner
-                        console.log(`[MIDDLEWARE] User access check - isOwner: ${isOwner}, isSuperadmin: ${isSuperadmin}, canAccess: ${canAccess}`)
                     }
+                )
+
+                const { data: { user } } = await supabaseAuth.auth.getUser()
+                console.log(`[MIDDLEWARE] Auth check - user found: ${!!user}`)
+
+                if (user) {
+                    const { data: profile } = await supabaseService
+                        .from("profiles")
+                        .select("organization_id, is_superadmin")
+                        .eq("id", user.id)
+                        .single()
+
+                    const isOwner = profile?.organization_id === org.id
+                    const isSuperadmin = profile?.is_superadmin
+                    canAccess = isSuperadmin || isOwner
+                    console.log(`[MIDDLEWARE] User access check - isOwner: ${isOwner}, isSuperadmin: ${isSuperadmin}, canAccess: ${canAccess}`)
                 }
 
                 if (!canAccess) {
                     console.log(`[MIDDLEWARE] Blocking access - showing maintenance page for ${slug}`)
                     const maintenanceUrl = new URL(`/store/${slug}/maintenance`, request.url)
                     return NextResponse.rewrite(maintenanceUrl)
-                }
-
-                // Si tiene acceso via token, establecer cookie para futuras visitas
-                if (canAccess && previewToken) {
-                    const response = NextResponse.rewrite(new URL(`/store/${slug}${pathname === '/' ? '' : pathname}`, request.url))
-                    response.cookies.set(`maintenance_bypass_${slug}`, previewToken, {
-                        httpOnly: true,
-                        secure: true,
-                        sameSite: 'lax',
-                        maxAge: 60 * 60 * 24
-                    })
-                    return response
                 }
                 
                 console.log(`[MIDDLEWARE] Access granted for ${slug} - user is authorized`)
