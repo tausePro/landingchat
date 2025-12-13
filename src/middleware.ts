@@ -68,6 +68,7 @@ export async function middleware(request: NextRequest) {
         // Primero verificar si es un dominio personalizado
         if (!hostname.includes('landingchat.co')) {
             // Es un dominio personalizado, buscar en la base de datos
+            console.log(`[MIDDLEWARE] Custom domain detected: ${hostname}`)
             try {
                 const supabase = createServerClient(
                     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -80,17 +81,23 @@ export async function middleware(request: NextRequest) {
                     }
                 )
 
-                const { data: org } = await supabase
+                console.log(`[MIDDLEWARE] Querying database for custom_domain: ${hostname}`)
+                const { data: org, error } = await supabase
                     .from("organizations")
                     .select("slug")
                     .eq("custom_domain", hostname)
                     .single()
 
+                console.log(`[MIDDLEWARE] Database query result:`, { org, error })
+
                 if (org) {
                     slug = org.slug
+                    console.log(`[MIDDLEWARE] Found organization slug: ${slug}`)
+                } else {
+                    console.log(`[MIDDLEWARE] No organization found for domain: ${hostname}`)
                 }
             } catch (error) {
-                console.error("Error checking custom domain:", error)
+                console.error("[MIDDLEWARE] Error checking custom domain:", error)
                 // En caso de error, continuar con la lógica normal
             }
         } else {
@@ -112,8 +119,11 @@ export async function middleware(request: NextRequest) {
 
     // Si no hay slug, continuar normal (landing page principal)
     if (!slug) {
+        console.log(`[MIDDLEWARE] No slug found for hostname: ${hostname}, continuing to main site`)
         return handleAuth(request)
     }
+
+    console.log(`[MIDDLEWARE] Using slug: ${slug} for hostname: ${hostname}`)
 
     // ============================================
     // REDIRECCIONES ESPECIALES PARA SUBDOMINIOS Y DOMINIOS PERSONALIZADOS
