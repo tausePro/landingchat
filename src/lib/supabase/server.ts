@@ -6,9 +6,33 @@
  * - createServiceClient(): Cliente con permisos de servicio que bypasea RLS
  */
 
-import { createServerClient } from "@supabase/ssr"
+import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
+
+/**
+ * Obtiene las opciones de cookie para compartir sesión entre subdominios
+ * En producción, las cookies se establecen con domain=.landingchat.co
+ * para que sean accesibles desde todos los subdominios (tez.landingchat.co, etc.)
+ */
+function getCookieOptions(options?: CookieOptions): CookieOptions {
+    const isProduction = process.env.NODE_ENV === 'production'
+    
+    // En producción, establecer el dominio para compartir entre subdominios
+    // El punto inicial (.landingchat.co) permite que la cookie sea accesible
+    // desde www.landingchat.co, tez.landingchat.co, etc.
+    if (isProduction) {
+        return {
+            ...options,
+            domain: '.landingchat.co',
+            secure: true,
+            sameSite: 'lax' as const,
+        }
+    }
+    
+    // En desarrollo, usar las opciones por defecto
+    return options || {}
+}
 
 /**
  * Crea un cliente de Supabase autenticado con cookies
@@ -17,6 +41,7 @@ import { cookies } from "next/headers"
  * - Usa las cookies del usuario para autenticación
  * - Respeta las políticas de Row Level Security (RLS)
  * - Es seguro para usar en Server Components y Server Actions
+ * - En producción, comparte sesión entre subdominios de landingchat.co
  * 
  * @returns Cliente de Supabase configurado con la sesión del usuario
  */
@@ -33,9 +58,10 @@ export async function createClient() {
                 },
                 setAll(cookiesToSet) {
                     try {
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            cookieStore.set(name, value, options)
-                        )
+                        cookiesToSet.forEach(({ name, value, options }) => {
+                            const enhancedOptions = getCookieOptions(options)
+                            cookieStore.set(name, value, enhancedOptions)
+                        })
                     } catch {
                         // El método setAll fue llamado desde un Server Component.
                         // Esto se puede ignorar si tienes middleware refrescando

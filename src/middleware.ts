@@ -171,43 +171,73 @@ export async function middleware(request: NextRequest) {
 
             const { data: org } = await supabaseService
                 .from("organizations")
-                .select("maintenance_mode, maintenance_message, id")
+                .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
                 .eq("slug", slug)
                 .single()
 
             if (org?.maintenance_mode) {
-                // Cliente con cookies para verificar autenticación del usuario
-                const supabaseAuth = createServerClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                    {
-                        cookies: {
-                            getAll() {
-                                return request.cookies.getAll()
-                            },
-                            setAll() { }
-                        }
-                    }
-                )
-
-                const { data: { user } } = await supabaseAuth.auth.getUser()
                 let canAccess = false
 
-                if (user) {
-                    const { data: profile } = await supabaseService
-                        .from("profiles")
-                        .select("organization_id, is_superadmin")
-                        .eq("id", user.id)
-                        .single()
+                // Método 1: Token de bypass en URL (?preview=TOKEN)
+                // Esto permite a los dueños acceder desde cualquier dominio/subdominio
+                const previewToken = request.nextUrl.searchParams.get('preview')
+                if (previewToken && org.maintenance_bypass_token && previewToken === org.maintenance_bypass_token) {
+                    canAccess = true
+                    console.log(`[MIDDLEWARE] Maintenance bypass via preview token for ${slug}`)
+                }
 
-                    // Permitir acceso si es superadmin o dueño de la tienda
-                    canAccess = profile?.is_superadmin || profile?.organization_id === org.id
+                // Método 2: Cookie de bypass (se establece después de usar el token una vez)
+                const bypassCookie = request.cookies.get(`maintenance_bypass_${slug}`)
+                if (bypassCookie?.value === org.maintenance_bypass_token) {
+                    canAccess = true
+                    console.log(`[MIDDLEWARE] Maintenance bypass via cookie for ${slug}`)
+                }
+
+                // Método 3: Usuario autenticado (funciona solo si las cookies se comparten)
+                if (!canAccess) {
+                    const supabaseAuth = createServerClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                        {
+                            cookies: {
+                                getAll() {
+                                    return request.cookies.getAll()
+                                },
+                                setAll() { }
+                            }
+                        }
+                    )
+
+                    const { data: { user } } = await supabaseAuth.auth.getUser()
+
+                    if (user) {
+                        const { data: profile } = await supabaseService
+                            .from("profiles")
+                            .select("organization_id, is_superadmin")
+                            .eq("id", user.id)
+                            .single()
+
+                        // Permitir acceso si es superadmin o dueño de la tienda
+                        canAccess = profile?.is_superadmin || profile?.organization_id === org.id
+                    }
                 }
 
                 if (!canAccess) {
                     // Redirigir a página de mantenimiento con el mensaje personalizado
                     const maintenanceUrl = new URL(`/store/${slug}/maintenance`, request.url)
                     return NextResponse.rewrite(maintenanceUrl)
+                }
+
+                // Si tiene acceso via token, establecer cookie para futuras visitas
+                if (canAccess && previewToken) {
+                    const response = NextResponse.rewrite(new URL(`/store/${slug}${pathname === '/' ? '' : pathname}`, request.url))
+                    response.cookies.set(`maintenance_bypass_${slug}`, previewToken, {
+                        httpOnly: true,
+                        secure: true,
+                        sameSite: 'lax',
+                        maxAge: 60 * 60 * 24 // 24 horas
+                    })
+                    return response
                 }
             }
         } catch (error) {
@@ -251,6 +281,24 @@ export async function middleware(request: NextRequest) {
 }
 
 // ============================================
+// HELPER: Opciones de cookies para subdominios
+// ============================================
+function getCookieOptions(options?: Record<string, unknown>): Record<string, unknown> {
+    const isProduction = process.env.NODE_ENV === 'production'
+    
+    if (isProduction) {
+        return {
+            ...options,
+            domain: '.landingchat.co',
+            secure: true,
+            sameSite: 'lax' as const,
+        }
+    }
+    
+    return options || {}
+}
+
+// ============================================
 // FUNCIÓN DE AUTENTICACIÓN
 // Maneja la sesión del usuario y protege rutas
 // ============================================
@@ -258,6 +306,8 @@ async function handleAuth(request: NextRequest) {
     let supabaseResponse = NextResponse.next({ request })
 
     // Crear cliente de Supabase con manejo de cookies
+    // En producción, las cookies se establecen con domain=.landingchat.co
+    // para compartir sesión entre subdominios
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -270,10 +320,11 @@ async function handleAuth(request: NextRequest) {
                     // Actualizar cookies en la request
                     cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
                     supabaseResponse = NextResponse.next({ request })
-                    // Actualizar cookies en la response
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    )
+                    // Actualizar cookies en la response con dominio correcto
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        const enhancedOptions = getCookieOptions(options)
+                        supabaseResponse.cookies.set(name, value, enhancedOptions)
+                    })
                 },
             },
         }
