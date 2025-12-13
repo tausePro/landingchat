@@ -18,6 +18,7 @@ interface EpaycoConfig {
     publicKey: string
     privateKey: string
     customerId: string
+    encryptionKey: string
 }
 
 export function EpaycoSettings() {
@@ -25,6 +26,7 @@ export function EpaycoSettings() {
     const [testing, setTesting] = useState(false)
     const [showPrivateKey, setShowPrivateKey] = useState(false)
     const [showCustomerId, setShowCustomerId] = useState(false)
+    const [showEncryptionKey, setShowEncryptionKey] = useState(false)
     const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown')
     
     const [config, setConfig] = useState<EpaycoConfig>({
@@ -32,7 +34,8 @@ export function EpaycoSettings() {
         isTestMode: true,
         publicKey: "",
         privateKey: "",
-        customerId: ""
+        customerId: "",
+        encryptionKey: ""
     })
 
     // Cargar configuración existente
@@ -49,7 +52,8 @@ export function EpaycoSettings() {
                     isTestMode: result.data.is_test_mode ?? true,
                     publicKey: result.data.public_key || "",
                     privateKey: "", // No mostrar la clave encriptada
-                    customerId: "" // No mostrar el ID encriptado
+                    customerId: "", // No mostrar el ID encriptado
+                    encryptionKey: "" // No mostrar la clave encriptada
                 })
             }
         } catch (error) {
@@ -58,7 +62,7 @@ export function EpaycoSettings() {
     }
 
     const handleSave = async () => {
-        if (!config.publicKey || !config.privateKey || !config.customerId) {
+        if (!config.publicKey || !config.privateKey || !config.customerId || !config.encryptionKey) {
             toast.error("Todos los campos son requeridos")
             return
         }
@@ -71,7 +75,8 @@ export function EpaycoSettings() {
                 is_test_mode: config.isTestMode,
                 public_key: config.publicKey,
                 private_key: config.privateKey,
-                integrity_secret: config.customerId
+                integrity_secret: config.customerId,
+                encryption_key: config.encryptionKey
             })
 
             if (result.success) {
@@ -88,7 +93,7 @@ export function EpaycoSettings() {
     }
 
     const handleTestConnection = async () => {
-        if (!config.publicKey || !config.privateKey || !config.customerId) {
+        if (!config.publicKey || !config.privateKey || !config.customerId || !config.encryptionKey) {
             toast.error("Guarda la configuración antes de probar la conexión")
             return
         }
@@ -180,7 +185,7 @@ export function EpaycoSettings() {
                                 <ol className="list-decimal list-inside space-y-1 text-sm">
                                     <li>Ingresa a tu panel de ePayco</li>
                                     <li>Ve a <strong>Configuración → Llaves secretas</strong></li>
-                                    <li>Copia las 3 credenciales requeridas</li>
+                                    <li>Copia las 4 credenciales requeridas</li>
                                 </ol>
                                 <Button variant="ghost" size="sm" className="p-0 h-auto" asChild>
                                     <a href="https://dashboard.epayco.com/configuration" target="_blank" rel="noopener noreferrer">
@@ -268,6 +273,32 @@ export function EpaycoSettings() {
                         </div>
                         <p className="text-xs text-slate-500">
                             Tu ID de cliente único de ePayco (número)
+                        </p>
+                    </div>
+
+                    {/* P_ENCRYPTION_KEY */}
+                    <div className="space-y-2">
+                        <Label htmlFor="encryptionKey">P_ENCRYPTION_KEY</Label>
+                        <div className="relative">
+                            <Input
+                                id="encryptionKey"
+                                type={showEncryptionKey ? "text" : "password"}
+                                value={config.encryptionKey}
+                                onChange={(e) => setConfig(prev => ({ ...prev, encryptionKey: e.target.value }))}
+                                placeholder="Tu llave de encriptación de ePayco"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3"
+                                onClick={() => setShowEncryptionKey(!showEncryptionKey)}
+                            >
+                                {showEncryptionKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Tu llave de encriptación de ePayco (requerida para webhooks)
                         </p>
                     </div>
 

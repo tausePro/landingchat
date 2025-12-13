@@ -12,6 +12,7 @@ interface EpaycoConfigInput {
     public_key: string
     private_key: string
     integrity_secret: string // P_CUST_ID_CLIENTE
+    encryption_key: string // P_ENCRYPTION_KEY
 }
 
 /**
@@ -75,7 +76,7 @@ export async function saveEpaycoConfig(input: EpaycoConfigInput): Promise<Action
         }
 
         // Validar campos requeridos
-        if (!input.public_key || !input.private_key || !input.integrity_secret) {
+        if (!input.public_key || !input.private_key || !input.integrity_secret || !input.encryption_key) {
             return failure("Todos los campos son requeridos para ePayco")
         }
 
@@ -84,6 +85,7 @@ export async function saveEpaycoConfig(input: EpaycoConfigInput): Promise<Action
         // Encriptar credenciales sensibles
         const encryptedPrivateKey = encrypt(input.private_key)
         const encryptedCustomerId = encrypt(input.integrity_secret)
+        const encryptedEncryptionKey = encrypt(input.encryption_key)
 
         // Generar URL de webhook
         const { data: org } = await supabase
@@ -104,6 +106,7 @@ export async function saveEpaycoConfig(input: EpaycoConfigInput): Promise<Action
             public_key: input.public_key,
             private_key_encrypted: encryptedPrivateKey,
             integrity_secret_encrypted: encryptedCustomerId,
+            encryption_key_encrypted: encryptedEncryptionKey,
             webhook_url: webhookUrl,
             updated_at: new Date().toISOString(),
         }
