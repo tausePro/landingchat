@@ -157,7 +157,8 @@ export async function middleware(request: NextRequest) {
     // Verificar si la tienda está en mantenimiento (solo para rutas públicas)
     if (slug && !pathname.startsWith('/dashboard') && !pathname.startsWith('/admin')) {
         try {
-            const supabase = createServerClient(
+            // Cliente con service role para consultas de DB
+            const supabaseService = createServerClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.SUPABASE_SERVICE_ROLE_KEY!,
                 {
@@ -168,19 +169,32 @@ export async function middleware(request: NextRequest) {
                 }
             )
 
-            const { data: org } = await supabase
+            const { data: org } = await supabaseService
                 .from("organizations")
                 .select("maintenance_mode, maintenance_message, id")
                 .eq("slug", slug)
                 .single()
 
             if (org?.maintenance_mode) {
-                // Verificar si el usuario actual es el dueño de la tienda o superadmin
-                const { data: { user } } = await supabase.auth.getUser()
+                // Cliente con cookies para verificar autenticación del usuario
+                const supabaseAuth = createServerClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    {
+                        cookies: {
+                            getAll() {
+                                return request.cookies.getAll()
+                            },
+                            setAll() { }
+                        }
+                    }
+                )
+
+                const { data: { user } } = await supabaseAuth.auth.getUser()
                 let canAccess = false
 
                 if (user) {
-                    const { data: profile } = await supabase
+                    const { data: profile } = await supabaseService
                         .from("profiles")
                         .select("organization_id, is_superadmin")
                         .eq("id", user.id)
