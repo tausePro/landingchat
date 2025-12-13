@@ -1,0 +1,125 @@
+# Implementation Plan
+
+- [x] 1. Set up testing infrastructure
+  - [x] 1.1 Install coverage dependencies
+    - Add `@vitest/coverage-v8` dependency
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 1.2 Configure coverage in vitest.config.ts
+    - Set up v8 provider with text, HTML, and lcov reporters
+    - Include `src/lib/**` and `src/app/api/**`
+    - Exclude test files and node_modules
+    - Set coverage thresholds to 70%
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 1.3 Add coverage script to package.json
+    - Add `test:coverage` script
+    - _Requirements: 4.1_
+
+- [ ] 2. Implement payment webhook tests
+  - [x] 2.1 Create webhook test utilities
+    - Create signature generation utilities for testing
+    - Create mock payment payload generators
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
+  - [x] 2.2 Write property test for Wompi webhook signature validation
+    - **Property 1: Valid signature processing**
+    - **Property 2: Invalid signature rejection**
+    - **Validates: Requirements 1.1, 1.2**
+  - [x] 2.3 Write property test for webhook idempotency
+    - **Property 3: Idempotent duplicate handling**
+    - **Validates: Requirements 1.3**
+  - [x] 2.4 Write property test for transaction status handling
+    - **Property 4: APPROVED status updates**
+    - **Property 5: DECLINED status preservation**
+    - **Validates: Requirements 1.4, 1.5**
+  - [x] 2.5 Create ePayco webhook tests
+    - Mirror Wompi tests for ePayco webhook endpoint
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
+  - [ ]* 2.6 Write unit tests for webhook edge cases
+    - Test organization without credentials
+    - Test malformed payloads
+    - _Requirements: 1.6_
+
+- [ ] 3. Implement encryption utility tests
+  - [x] 3.1 Create encryption test file
+    - Create `src/__tests__/lib/utils/encryption.property.test.ts`
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
+  - [x] 3.2 Write property test for round-trip encryption
+    - **Property 6: Round-trip consistency**
+    - **Validates: Requirements 2.1**
+  - [x] 3.3 Write property test for error handling
+    - **Property 7: Wrong key error handling**
+    - **Property 8: Corrupted data error handling**
+    - **Validates: Requirements 2.2, 2.3, 2.4**
+  - [x] 3.4 Write property test for encryption detection
+    - **Property 9: Encryption detection accuracy**
+    - **Validates: Requirements 2.5, 2.6**
+  - [ ]* 3.5 Write unit tests for edge cases
+    - Test empty strings, special characters, unicode
+    - Test very long strings
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
+
+- [x] 4. Checkpoint - Ensure critical tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Implement middleware routing tests
+  - [x] 5.1 Create middleware test file
+    - Create `src/__tests__/middleware.test.ts`
+    - Set up Next.js request/response mocking
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+  - [x] 5.2 Write property test for query parameter rewriting
+    - **Property 10: Query parameter rewriting**
+    - **Validates: Requirements 3.2**
+  - [x] 5.3 Write property test for path preservation
+    - **Property 11: Dashboard path preservation**
+    - **Property 12: API path preservation**
+    - **Validates: Requirements 3.3, 3.4**
+  - [x] 5.4 Write property test for reserved subdomains
+    - **Property 13: Reserved subdomain handling**
+    - **Validates: Requirements 3.5**
+  - [x]* 5.5 Write unit tests for specific subdomain examples
+    - Test `tez.landingchat.co` → `/store/tez`
+    - Test localhost with store parameter
+    - _Requirements: 3.1_
+
+- [x] 6. Implement rate limiting
+  - [x] 6.1 Install Upstash dependencies
+    - Add `@upstash/ratelimit` and `@upstash/redis`
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - [x] 6.2 Create rate limiting middleware for AI chat
+    - Implement sliding window rate limiter (10 req/min)
+    - Add to `/api/ai-chat` endpoint
+    - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - [x] 6.3 Write property test for rate limiting
+    - **Property 14: Rate limit enforcement**
+    - **Property 15: Rate limit headers**
+    - **Property 16: Sliding window behavior**
+    - **Validates: Requirements 5.1, 5.2, 5.3**
+  - [x]* 6.4 Write unit tests for rate limiting configuration
+    - Test endpoint configuration
+    - Test Redis connection
+    - _Requirements: 5.4_
+
+- [x] 7. Implement security headers
+  - [x] 7.1 Add security headers to next.config.js
+    - Configure `X-Frame-Options: SAMEORIGIN`
+    - Configure `X-Content-Type-Options: nosniff`
+    - Configure `Referrer-Policy: strict-origin-when-cross-origin`
+    - _Requirements: 6.1, 6.2, 6.3, 6.4_
+  - [x] 7.2 Write property test for security headers
+    - **Property 17: Universal security headers**
+    - **Validates: Requirements 6.1, 6.2, 6.3**
+  - [x]* 7.3 Write unit test for header configuration
+    - Verify headers are configured in next.config.js
+    - _Requirements: 6.4_
+
+- [ ] 8. Final checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 9. Generate coverage report and verify targets
+  - [ ] 9.1 Run coverage analysis
+    - Execute `npm run test:coverage`
+    - Verify >70% coverage on critical paths
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [ ] 9.2 Document coverage results
+    - Create coverage baseline report
+    - Identify any remaining gaps
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_

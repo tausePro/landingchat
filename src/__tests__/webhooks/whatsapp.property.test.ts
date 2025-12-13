@@ -54,7 +54,7 @@ const mockFrom = vi.fn((table: string) => {
 })
 
 vi.mock("@/lib/supabase/server", () => ({
-  createServiceClient: vi.fn(() => Promise.resolve({
+  createServiceClient: vi.fn(() => ({
     from: mockFrom,
     rpc: vi.fn(() => Promise.resolve({ data: null, error: null })),
   })),

@@ -104,6 +104,58 @@ export async function middleware(request: NextRequest) {
     }
 
     // ============================================
+    // VERIFICAR MODO DE MANTENIMIENTO DE LA TIENDA
+    // ============================================
+    
+    // Verificar si la tienda está en mantenimiento (solo para rutas públicas)
+    if (slug && !pathname.startsWith('/dashboard') && !pathname.startsWith('/admin')) {
+        try {
+            const supabase = createServerClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                {
+                    cookies: {
+                        getAll() { return [] },
+                        setAll() { }
+                    }
+                }
+            )
+
+            const { data: org } = await supabase
+                .from("organizations")
+                .select("maintenance_mode, maintenance_message, id")
+                .eq("slug", slug)
+                .single()
+
+            if (org?.maintenance_mode) {
+                // Verificar si el usuario actual es el dueño de la tienda o superadmin
+                const { data: { user } } = await supabase.auth.getUser()
+                let canAccess = false
+
+                if (user) {
+                    const { data: profile } = await supabase
+                        .from("profiles")
+                        .select("organization_id, is_superadmin")
+                        .eq("id", user.id)
+                        .single()
+
+                    // Permitir acceso si es superadmin o dueño de la tienda
+                    canAccess = profile?.is_superadmin || profile?.organization_id === org.id
+                }
+
+                if (!canAccess) {
+                    // Redirigir a página de mantenimiento con el mensaje personalizado
+                    const maintenanceUrl = new URL(`/store/${slug}/maintenance`, request.url)
+                    return NextResponse.rewrite(maintenanceUrl)
+                }
+            }
+        } catch (error) {
+            console.error("Error checking maintenance mode:", error)
+            // En caso de error, continuar normalmente
+        }
+    }
+
+    // ============================================
     // REESCRIBIR RUTAS PARA LA TIENDA
     // Mapea las rutas del subdominio a las rutas internas
     // ============================================

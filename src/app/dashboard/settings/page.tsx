@@ -5,6 +5,7 @@ import { ProfileForm } from "./components/profile-form"
 import { OrganizationForm } from "./components/organization-form"
 import { IdentificationForm } from "./components/identification-form"
 import { StorefrontForm } from "./components/storefront-form"
+import { StoreMaintenanceToggle } from "./components/store-maintenance-toggle"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
@@ -30,6 +31,7 @@ export default async function SettingsPage() {
                             <TabsTrigger value="organization">Organización</TabsTrigger>
                             <TabsTrigger value="identification">Identificación</TabsTrigger>
                             <TabsTrigger value="storefront">Storefront</TabsTrigger>
+                            <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
                             <TabsTrigger value="payments">Pagos</TabsTrigger>
                             <TabsTrigger value="shipping">Envíos</TabsTrigger>
                             <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
@@ -45,6 +47,21 @@ export default async function SettingsPage() {
                         </TabsContent>
                         <TabsContent value="storefront">
                             <StorefrontForm organization={data.organization} />
+                        </TabsContent>
+                        <TabsContent value="maintenance">
+                            <div className="space-y-6">
+                                <div>
+                                    <h3 className="text-lg font-medium">Modo Mantenimiento</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Controla la visibilidad de tu tienda para el público mientras realizas cambios.
+                                    </p>
+                                </div>
+                                <StoreMaintenanceToggle 
+                                    organizationId={data.organization.id}
+                                    initialMaintenanceMode={data.organization.maintenance_mode || false}
+                                    initialMaintenanceMessage={data.organization.maintenance_message || undefined}
+                                />
+                            </div>
                         </TabsContent>
                         <TabsContent value="payments">
                             <div className="text-sm text-muted-foreground">

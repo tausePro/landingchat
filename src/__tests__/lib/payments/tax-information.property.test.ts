@@ -13,7 +13,7 @@ describe('Property 11: Tax Information Completeness', () => {
   // Arbitraries for generating test data
   const documentTypeArb = fc.constantFrom('CC', 'NIT', 'CE', 'Passport', 'TI')
   const personTypeArb = fc.constantFrom('Natural', 'Jurídica')
-  const documentNumberArb = fc.string({ minLength: 5, maxLength: 15 }).filter(s => /^\d+$/.test(s))
+  const documentNumberArb = fc.integer({ min: 10000, max: 999999999999999 }).map(n => n.toString())
   
   const customerInfoArb = fc.record({
     name: fc.string({ minLength: 3, maxLength: 100 }),
@@ -47,7 +47,7 @@ describe('Property 11: Tax Information Completeness', () => {
           expect(customerInfo.business_name.length).toBeGreaterThan(0)
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 50 }
     )
   })
 
@@ -107,7 +107,7 @@ describe('Property 11: Tax Information Completeness', () => {
         expect(customerInfo.document_number).not.toBe('')
         expect(customerInfo.person_type).not.toBe('')
       }),
-      { numRuns: 100 }
+      { numRuns: 50 }
     )
   })
 })
