@@ -15,9 +15,10 @@ interface CustomDomainFormProps {
         slug: string
         custom_domain: string | null
     }
+    hasCustomDomainFeature?: boolean
 }
 
-export function CustomDomainForm({ organization }: CustomDomainFormProps) {
+export function CustomDomainForm({ organization, hasCustomDomainFeature = false }: CustomDomainFormProps) {
     const [customDomain, setCustomDomain] = useState(organization.custom_domain || "")
     const [loading, setLoading] = useState(false)
 
@@ -70,6 +71,16 @@ export function CustomDomainForm({ organization }: CustomDomainFormProps) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                    {!hasCustomDomainFeature && (
+                        <Alert>
+                            <AlertCircle className="size-4" />
+                            <AlertDescription>
+                                <strong>Plan requerido:</strong> Los dominios personalizados están disponibles solo en el plan Enterprise. 
+                                <a href="/dashboard/billing" className="underline ml-1">Actualizar plan</a>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="customDomain">Dominio personalizado</Label>
@@ -79,14 +90,14 @@ export function CustomDomainForm({ organization }: CustomDomainFormProps) {
                                 placeholder="ejemplo: mitienda.com"
                                 value={customDomain}
                                 onChange={(e) => setCustomDomain(e.target.value)}
-                                disabled={loading}
+                                disabled={loading || !hasCustomDomainFeature}
                             />
                             <p className="text-xs text-muted-foreground">
                                 Ingresa tu dominio sin "https://" (ejemplo: mitienda.com)
                             </p>
                         </div>
 
-                        <Button type="submit" disabled={loading}>
+                        <Button type="submit" disabled={loading || !hasCustomDomainFeature}>
                             {loading ? "Guardando..." : "Guardar dominio"}
                         </Button>
                     </form>

@@ -51,7 +51,10 @@ export default async function SettingsPage() {
                             <StorefrontForm organization={data.organization} />
                         </TabsContent>
                         <TabsContent value="domain">
-                            <CustomDomainForm organization={data.organization} />
+                            <CustomDomainForm 
+                                organization={data.organization} 
+                                hasCustomDomainFeature={data.hasCustomDomainFeature}
+                            />
                         </TabsContent>
                         <TabsContent value="maintenance">
                             <div className="space-y-6">
@@ -63,8 +66,11 @@ export default async function SettingsPage() {
                                 </div>
                                 <StoreMaintenanceToggle 
                                     organizationId={data.organization.id}
+                                    storeSlug={data.organization.slug}
+                                    customDomain={data.organization.custom_domain}
                                     initialMaintenanceMode={data.organization.maintenance_mode || false}
                                     initialMaintenanceMessage={data.organization.maintenance_message || undefined}
+                                    initialBypassToken={data.organization.maintenance_bypass_token}
                                 />
                             </div>
                         </TabsContent>

@@ -26,7 +26,9 @@ export interface SettingsData {
         custom_domain: string | null
         maintenance_mode: boolean | null
         maintenance_message: string | null
+        maintenance_bypass_token: string | null
     }
+    hasCustomDomainFeature: boolean
 }
 
 export async function getSettingsData(): Promise<SettingsData> {
@@ -56,6 +58,21 @@ export async function getSettingsData(): Promise<SettingsData> {
         throw new Error("Organization not found")
     }
 
+    // Check if the organization has an active subscription with custom domain feature
+    const { data: activeSubscription } = await supabase
+        .from("subscriptions")
+        .select(`
+            status,
+            plans!inner (
+                features
+            )
+        `)
+        .eq("organization_id", profile.organization_id)
+        .eq("status", "active")
+        .single()
+
+    const hasCustomDomainFeature = activeSubscription?.plans?.[0]?.features?.custom_domain === true
+
     return {
         profile: {
             id: profile.id,
@@ -78,8 +95,10 @@ export async function getSettingsData(): Promise<SettingsData> {
             settings: organization.settings || {},
             custom_domain: organization.custom_domain || null,
             maintenance_mode: organization.maintenance_mode || false,
-            maintenance_message: organization.maintenance_message || "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles."
-        }
+            maintenance_message: organization.maintenance_message || "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles.",
+            maintenance_bypass_token: organization.maintenance_bypass_token || null
+        },
+        hasCustomDomainFeature
     }
 }
 

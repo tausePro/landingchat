@@ -56,6 +56,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
 
+        // If setting a custom domain, verify the organization has a plan that allows it
+        if (customDomain) {
+            const { data: activeSubscription } = await supabase
+                .from("subscriptions")
+                .select(`
+                    id,
+                    status,
+                    plans!inner (
+                        features
+                    )
+                `)
+                .eq("organization_id", organizationId)
+                .eq("status", "active")
+                .single()
+
+            if (!activeSubscription?.plans?.[0]?.features?.custom_domain) {
+                return NextResponse.json({ 
+                    error: "Tu plan actual no incluye dominios personalizados. Actualiza a Enterprise para usar esta función." 
+                }, { status: 403 })
+            }
+        }
+
         // Update organization custom domain
         const { data, error } = await supabase
             .from("organizations")

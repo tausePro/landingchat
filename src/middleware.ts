@@ -172,7 +172,7 @@ export async function middleware(request: NextRequest) {
 
             const { data: org, error: orgError } = await supabaseService
                 .from("organizations")
-                .select("maintenance_mode, maintenance_message, id")
+                .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
                 .eq("slug", slug)
                 .single()
 
@@ -187,34 +187,45 @@ export async function middleware(request: NextRequest) {
                 console.log(`[MIDDLEWARE] Store ${slug} is in maintenance mode`)
                 let canAccess = false
 
-                // Verificar si el usuario está autenticado (dueño de la tienda o superadmin)
-                const supabaseAuth = createServerClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                    {
-                        cookies: {
-                            getAll() {
-                                return request.cookies.getAll()
-                            },
-                            setAll() { }
+                // MÉTODO 1: Verificar token de bypass en URL (?bypass=TOKEN)
+                // Este método funciona en CUALQUIER dominio sin necesidad de cookies
+                const bypassToken = request.nextUrl.searchParams.get('bypass')
+                if (bypassToken && org.maintenance_bypass_token && bypassToken === org.maintenance_bypass_token) {
+                    canAccess = true
+                    console.log(`[MIDDLEWARE] Bypass token valid - granting access`)
+                }
+
+                // MÉTODO 2: Verificar si el usuario está autenticado (dueño o superadmin)
+                // Solo funciona si las cookies están disponibles (mismo dominio)
+                if (!canAccess) {
+                    const supabaseAuth = createServerClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                        {
+                            cookies: {
+                                getAll() {
+                                    return request.cookies.getAll()
+                                },
+                                setAll() { }
+                            }
                         }
+                    )
+
+                    const { data: { user } } = await supabaseAuth.auth.getUser()
+                    console.log(`[MIDDLEWARE] Auth check - user found: ${!!user}`)
+
+                    if (user) {
+                        const { data: profile } = await supabaseService
+                            .from("profiles")
+                            .select("organization_id, is_superadmin")
+                            .eq("id", user.id)
+                            .single()
+
+                        const isOwner = profile?.organization_id === org.id
+                        const isSuperadmin = profile?.is_superadmin
+                        canAccess = isSuperadmin || isOwner
+                        console.log(`[MIDDLEWARE] User access check - isOwner: ${isOwner}, isSuperadmin: ${isSuperadmin}, canAccess: ${canAccess}`)
                     }
-                )
-
-                const { data: { user } } = await supabaseAuth.auth.getUser()
-                console.log(`[MIDDLEWARE] Auth check - user found: ${!!user}`)
-
-                if (user) {
-                    const { data: profile } = await supabaseService
-                        .from("profiles")
-                        .select("organization_id, is_superadmin")
-                        .eq("id", user.id)
-                        .single()
-
-                    const isOwner = profile?.organization_id === org.id
-                    const isSuperadmin = profile?.is_superadmin
-                    canAccess = isSuperadmin || isOwner
-                    console.log(`[MIDDLEWARE] User access check - isOwner: ${isOwner}, isSuperadmin: ${isSuperadmin}, canAccess: ${canAccess}`)
                 }
 
                 if (!canAccess) {
@@ -266,20 +277,9 @@ export async function middleware(request: NextRequest) {
 }
 
 // ============================================
-// HELPER: Opciones de cookies para subdominios
+// HELPER: Opciones de cookies
 // ============================================
 function getCookieOptions(options?: Record<string, unknown>): Record<string, unknown> {
-    const isProduction = process.env.NODE_ENV === 'production'
-    
-    if (isProduction) {
-        return {
-            ...options,
-            domain: '.landingchat.co',
-            secure: true,
-            sameSite: 'lax' as const,
-        }
-    }
-    
     return options || {}
 }
 

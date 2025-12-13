@@ -5,24 +5,33 @@ import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { Wrench, Eye, EyeOff } from "lucide-react"
+import { Wrench, Eye, EyeOff, Copy, RefreshCw, Link } from "lucide-react"
 
 interface StoreMaintenanceToggleProps {
     organizationId: string
+    storeSlug: string
+    customDomain?: string | null
     initialMaintenanceMode?: boolean
     initialMaintenanceMessage?: string
+    initialBypassToken?: string | null
 }
 
 export function StoreMaintenanceToggle({ 
     organizationId, 
+    storeSlug,
+    customDomain,
     initialMaintenanceMode = false,
-    initialMaintenanceMessage = "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles."
+    initialMaintenanceMessage = "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles.",
+    initialBypassToken
 }: StoreMaintenanceToggleProps) {
     const [isActive, setIsActive] = useState(initialMaintenanceMode)
     const [message, setMessage] = useState(initialMaintenanceMessage)
+    const [bypassToken, setBypassToken] = useState(initialBypassToken || "")
     const [loading, setLoading] = useState(false)
     const [showMessageEditor, setShowMessageEditor] = useState(false)
+    const [generatingToken, setGeneratingToken] = useState(false)
 
 
 
@@ -184,6 +193,60 @@ export function StoreMaintenanceToggle({
                 )}
             </div>
 
+            {/* Bypass Token Section - Only show when maintenance is active */}
+            {isActive && (
+                <div className="rounded-lg border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <Link className="size-4 text-text-light-secondary dark:text-text-dark-secondary" />
+                            <Label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                Enlace de Previsualización
+                            </Label>
+                        </div>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleGenerateToken}
+                            disabled={generatingToken}
+                            className="text-xs"
+                        >
+                            <RefreshCw className={`size-3 mr-1 ${generatingToken ? 'animate-spin' : ''}`} />
+                            {bypassToken ? 'Regenerar' : 'Generar'}
+                        </Button>
+                    </div>
+                    
+                    {bypassToken ? (
+                        <div className="space-y-3">
+                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                                Usa este enlace para ver tu tienda mientras está en mantenimiento:
+                            </p>
+                            <div className="flex gap-2">
+                                <Input
+                                    readOnly
+                                    value={getBypassUrl()}
+                                    className="text-xs font-mono bg-background-light dark:bg-background-dark"
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleCopyBypassUrl}
+                                    className="shrink-0"
+                                >
+                                    <Copy className="size-3" />
+                                </Button>
+                            </div>
+                            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                                ⚠️ No compartas este enlace. Cualquiera con él puede ver tu tienda.
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                            Genera un enlace para previsualizar tu tienda mientras está en mantenimiento.
+                        </p>
+                    )}
+                </div>
+            )}
+
             {/* Info */}
             {isActive && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
@@ -197,7 +260,7 @@ export function StoreMaintenanceToggle({
                             </p>
                             <ul className="text-yellow-700 dark:text-yellow-300 space-y-1">
                                 <li>• Los visitantes verán el mensaje de mantenimiento</li>
-                                <li>• Tú puedes seguir navegando y configurando tu tienda</li>
+                                <li>• Usa el enlace de previsualización para ver tu tienda</li>
                                 <li>• Los pedidos existentes no se ven afectados</li>
                             </ul>
                         </div>
@@ -206,4 +269,48 @@ export function StoreMaintenanceToggle({
             )}
         </div>
     )
+
+    function getBypassUrl() {
+        const domain = customDomain || `${storeSlug}.landingchat.co`
+        return `https://${domain}?bypass=${bypassToken}`
+    }
+
+    async function handleCopyBypassUrl() {
+        try {
+            await navigator.clipboard.writeText(getBypassUrl())
+            toast.success("Enlace copiado", {
+                description: "El enlace de previsualización ha sido copiado al portapapeles."
+            })
+        } catch {
+            toast.error("Error al copiar", {
+                description: "No se pudo copiar el enlace."
+            })
+        }
+    }
+
+    async function handleGenerateToken() {
+        setGeneratingToken(true)
+        try {
+            const res = await fetch("/api/dashboard/maintenance/bypass-token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ organizationId })
+            })
+
+            if (!res.ok) throw new Error("Failed to generate token")
+
+            const data = await res.json()
+            setBypassToken(data.token)
+            
+            toast.success("Token generado", {
+                description: "Se ha generado un nuevo enlace de previsualización."
+            })
+        } catch {
+            toast.error("Error", {
+                description: "No se pudo generar el token."
+            })
+        } finally {
+            setGeneratingToken(false)
+        }
+    }
 }

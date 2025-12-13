@@ -11,26 +11,10 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
 /**
- * Obtiene las opciones de cookie para compartir sesión entre subdominios
- * En producción, las cookies se establecen con domain=.landingchat.co
- * para que sean accesibles desde todos los subdominios (tez.landingchat.co, etc.)
+ * Obtiene las opciones de cookie
+ * Por ahora usamos las opciones por defecto para evitar conflictos de autenticación
  */
 function getCookieOptions(options?: CookieOptions): CookieOptions {
-    const isProduction = process.env.NODE_ENV === 'production'
-    
-    // En producción, establecer el dominio para compartir entre subdominios
-    // El punto inicial (.landingchat.co) permite que la cookie sea accesible
-    // desde www.landingchat.co, tez.landingchat.co, etc.
-    if (isProduction) {
-        return {
-            ...options,
-            domain: '.landingchat.co',
-            secure: true,
-            sameSite: 'lax' as const,
-        }
-    }
-    
-    // En desarrollo, usar las opciones por defecto
     return options || {}
 }
 
