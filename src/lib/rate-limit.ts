@@ -6,22 +6,45 @@
 import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
 
-// Initialize Redis client
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || "redis://localhost:6379",
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || "",
-})
+// Check if Redis is properly configured
+const isRedisConfigured = process.env.UPSTASH_REDIS_REST_URL && 
+                         process.env.UPSTASH_REDIS_REST_TOKEN &&
+                         process.env.UPSTASH_REDIS_REST_URL.startsWith('https')
+
+// Initialize Redis client only if properly configured
+let redis: Redis | null = null
+if (isRedisConfigured) {
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL!,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+  })
+}
+
+// Mock rate limiter for when Redis is not available
+const mockRateLimit = {
+  limit: async () => ({
+    success: true,
+    limit: 10,
+    remaining: 9,
+    reset: Date.now() + 60000,
+    pending: Promise.resolve()
+  })
+}
 
 // AI Chat rate limiter: 10 requests per minute per IP
-export const aiChatRateLimit = new Ratelimit({
+export const aiChatRateLimit = redis ? new Ratelimit({
   redis: redis,
   limiter: Ratelimit.slidingWindow(10, "1 m"),
   analytics: true,
   prefix: "ratelimit:ai-chat",
-})
+}) : mockRateLimit
 
 // Generic rate limiter factory
 export function createRateLimit(requests: number, windowMs: number, prefix: string) {
+  if (!redis) {
+    return mockRateLimit
+  }
+  
   return new Ratelimit({
     redis: redis,
     limiter: Ratelimit.slidingWindow(requests, `${windowMs} ms`),
@@ -31,7 +54,7 @@ export function createRateLimit(requests: number, windowMs: number, prefix: stri
 }
 
 // Rate limit response headers
-export function getRateLimitHeaders(result: Awaited<ReturnType<typeof aiChatRateLimit.limit>>) {
+export function getRateLimitHeaders(result: { limit: number; remaining: number; reset: number }) {
   return {
     'X-RateLimit-Limit': result.limit.toString(),
     'X-RateLimit-Remaining': result.remaining.toString(),
