@@ -156,6 +156,7 @@ export async function middleware(request: NextRequest) {
     
     // Verificar si la tienda está en mantenimiento (solo para rutas públicas)
     if (slug && !pathname.startsWith('/dashboard') && !pathname.startsWith('/admin')) {
+        console.log(`[MIDDLEWARE] Checking maintenance mode for slug: ${slug}`)
         try {
             // Cliente con service role para consultas de DB
             const supabaseService = createServerClient(
@@ -169,31 +170,38 @@ export async function middleware(request: NextRequest) {
                 }
             )
 
-            const { data: org } = await supabaseService
+            const { data: org, error: orgError } = await supabaseService
                 .from("organizations")
                 .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
                 .eq("slug", slug)
                 .single()
 
+            console.log(`[MIDDLEWARE] Maintenance check result:`, { 
+                slug, 
+                maintenance_mode: org?.maintenance_mode, 
+                orgFound: !!org,
+                error: orgError?.message 
+            })
+
             if (org?.maintenance_mode) {
+                console.log(`[MIDDLEWARE] Store ${slug} is in maintenance mode`)
                 let canAccess = false
 
                 // Método 1: Token de bypass en URL (?preview=TOKEN)
-                // Esto permite a los dueños acceder desde cualquier dominio/subdominio
                 const previewToken = request.nextUrl.searchParams.get('preview')
                 if (previewToken && org.maintenance_bypass_token && previewToken === org.maintenance_bypass_token) {
                     canAccess = true
                     console.log(`[MIDDLEWARE] Maintenance bypass via preview token for ${slug}`)
                 }
 
-                // Método 2: Cookie de bypass (se establece después de usar el token una vez)
+                // Método 2: Cookie de bypass
                 const bypassCookie = request.cookies.get(`maintenance_bypass_${slug}`)
                 if (bypassCookie?.value === org.maintenance_bypass_token) {
                     canAccess = true
                     console.log(`[MIDDLEWARE] Maintenance bypass via cookie for ${slug}`)
                 }
 
-                // Método 3: Usuario autenticado (funciona solo si las cookies se comparten)
+                // Método 3: Usuario autenticado (dueño de la tienda o superadmin)
                 if (!canAccess) {
                     const supabaseAuth = createServerClient(
                         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -209,6 +217,7 @@ export async function middleware(request: NextRequest) {
                     )
 
                     const { data: { user } } = await supabaseAuth.auth.getUser()
+                    console.log(`[MIDDLEWARE] Auth check - user found: ${!!user}`)
 
                     if (user) {
                         const { data: profile } = await supabaseService
@@ -217,13 +226,15 @@ export async function middleware(request: NextRequest) {
                             .eq("id", user.id)
                             .single()
 
-                        // Permitir acceso si es superadmin o dueño de la tienda
-                        canAccess = profile?.is_superadmin || profile?.organization_id === org.id
+                        const isOwner = profile?.organization_id === org.id
+                        const isSuperadmin = profile?.is_superadmin
+                        canAccess = isSuperadmin || isOwner
+                        console.log(`[MIDDLEWARE] User access check - isOwner: ${isOwner}, isSuperadmin: ${isSuperadmin}, canAccess: ${canAccess}`)
                     }
                 }
 
                 if (!canAccess) {
-                    // Redirigir a página de mantenimiento con el mensaje personalizado
+                    console.log(`[MIDDLEWARE] Blocking access - showing maintenance page for ${slug}`)
                     const maintenanceUrl = new URL(`/store/${slug}/maintenance`, request.url)
                     return NextResponse.rewrite(maintenanceUrl)
                 }
@@ -235,13 +246,15 @@ export async function middleware(request: NextRequest) {
                         httpOnly: true,
                         secure: true,
                         sameSite: 'lax',
-                        maxAge: 60 * 60 * 24 // 24 horas
+                        maxAge: 60 * 60 * 24
                     })
                     return response
                 }
+                
+                console.log(`[MIDDLEWARE] Access granted for ${slug} - user is authorized`)
             }
         } catch (error) {
-            console.error("Error checking maintenance mode:", error)
+            console.error("[MIDDLEWARE] Error checking maintenance mode:", error)
             // En caso de error, continuar normalmente
         }
     }
