@@ -3,6 +3,7 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
+import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
 
 interface CreateOrderParams {
     slug: string
@@ -172,9 +173,9 @@ export async function createOrder(params: CreateOrderParams) {
         }
 
         // 8. Manual Payment & Success Handler
-        // Notify Store Owner via WhatsApp (Fire and Forget)
+        // Send notifications (Fire and Forget)
         try {
-            // Send notification asynchronously
+            // Send WhatsApp notification to store owner
             console.log("[createOrder] Sending WhatsApp notification for order:", orderNumber)
             await sendSaleNotification(
                 { organizationId: org.id },
@@ -185,8 +186,25 @@ export async function createOrder(params: CreateOrderParams) {
                     items: params.items
                 }
             )
+
+            // Send email confirmation to customer
+            console.log("[createOrder] Sending email confirmation to customer:", params.customerInfo.email)
+            await sendOrderConfirmationEmail({
+                orderNumber: order.order_number || `#${order.id.slice(0, 8)}`,
+                customerName: params.customerInfo.name,
+                customerEmail: params.customerInfo.email,
+                total: params.total,
+                items: params.items,
+                paymentMethod: params.paymentMethod,
+                organizationName: "TEZ", // TODO: Get from organization data
+                storeUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}`
+            })
+
+            // TODO: Send email notification to store owner (optional)
+            // await sendOrderNotificationToOwner({...})
+
         } catch (e) {
-            console.error("Failed to send notification:", e)
+            console.error("Failed to send notifications:", e)
         }
 
         return { success: true, order }

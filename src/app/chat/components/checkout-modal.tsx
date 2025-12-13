@@ -252,8 +252,8 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                                     className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
                                     onClick={() => setPaymentMethod('manual')}
                                 >
-                                    <span className="font-bold">Manual</span>
-                                    <span className="text-xs text-center text-slate-500">Transferencia / Contraentrega</span>
+                                    <span className="font-bold">Transferencia</span>
+                                    <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
                                 </div>
                             </div>
                         </div>

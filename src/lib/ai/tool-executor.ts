@@ -14,6 +14,7 @@ import {
     GetStoreInfoSchema,
     GetOrderStatusSchema,
     GetCustomerHistorySchema,
+    ConfirmShippingDetailsSchema,
     EscalateToHumanSchema
 } from "./tools"
 
@@ -81,6 +82,9 @@ export async function executeTool(
 
             case "get_customer_history":
                 return await getCustomerHistory(supabase, context)
+
+            case "confirm_shipping_details":
+                return await confirmShippingDetails(supabase, input, context)
 
             case "escalate_to_human":
                 return await escalateToHuman(supabase, input, context)
@@ -762,6 +766,48 @@ async function getCustomerHistory(supabase: any, context: ToolContext): Promise<
             })) || [],
             preferences: customer?.metadata || {},
             purchasedCategories: categories.slice(0, 5)
+        }
+    }
+}
+
+async function confirmShippingDetails(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const validatedData = ConfirmShippingDetailsSchema.parse(input)
+
+    // Formatear los datos para mostrar al usuario
+    const confirmation = {
+        customer: {
+            name: validatedData.customer_name,
+            email: validatedData.email,
+            phone: validatedData.phone,
+            documentType: validatedData.document_type,
+            documentNumber: validatedData.document_number,
+            personType: validatedData.person_type,
+            businessName: validatedData.business_name
+        },
+        shipping: {
+            address: validatedData.address,
+            city: validatedData.city
+        }
+    }
+
+    // Guardar los datos en el chat para uso posterior en checkout
+    await supabase
+        .from("chats")
+        .update({
+            metadata: {
+                ...context,
+                shippingDetails: confirmation,
+                confirmedAt: new Date().toISOString()
+            }
+        })
+        .eq("id", context.chatId)
+
+    return {
+        success: true,
+        data: {
+            confirmed: true,
+            details: confirmation,
+            message: "Perfecto, he confirmado todos tus datos. ¿Todo está correcto para proceder con el pago?"
         }
     }
 }

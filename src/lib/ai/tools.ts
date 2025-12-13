@@ -240,6 +240,54 @@ export const tools: Anthropic.Tool[] = [
         }
     },
 
+    // ==================== CONFIRMACIÓN ====================
+    {
+        name: "confirm_shipping_details",
+        description: "Confirma y resume los datos de envío proporcionados por el cliente antes de proceder al checkout. Usar cuando el cliente haya dado toda su información de contacto y envío.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                customer_name: {
+                    type: "string",
+                    description: "Nombre completo del cliente"
+                },
+                email: {
+                    type: "string",
+                    description: "Email del cliente"
+                },
+                phone: {
+                    type: "string",
+                    description: "Teléfono del cliente"
+                },
+                address: {
+                    type: "string",
+                    description: "Dirección completa de envío"
+                },
+                city: {
+                    type: "string",
+                    description: "Ciudad de envío"
+                },
+                document_type: {
+                    type: "string",
+                    description: "Tipo de documento (CC, NIT, etc.)"
+                },
+                document_number: {
+                    type: "string",
+                    description: "Número de documento"
+                },
+                person_type: {
+                    type: "string",
+                    description: "Tipo de persona (Natural o Jurídica)"
+                },
+                business_name: {
+                    type: "string",
+                    description: "Nombre de empresa (si es persona jurídica)"
+                }
+            },
+            required: ["customer_name", "email", "phone", "address", "city", "document_type", "document_number", "person_type"]
+        }
+    },
+
     // ==================== ESCALAMIENTO ====================
     {
         name: "escalate_to_human",
@@ -325,6 +373,18 @@ export const GetOrderStatusSchema = z.object({
 })
 
 export const GetCustomerHistorySchema = z.object({})
+
+export const ConfirmShippingDetailsSchema = z.object({
+    customer_name: z.string(),
+    email: z.string().email(),
+    phone: z.string(),
+    address: z.string(),
+    city: z.string(),
+    document_type: z.string(),
+    document_number: z.string(),
+    person_type: z.string(),
+    business_name: z.string().optional()
+})
 
 export const EscalateToHumanSchema = z.object({
     reason: z.string(),

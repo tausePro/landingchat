@@ -81,9 +81,12 @@ HERRAMIENTAS DISPONIBLES (úsalas cuando sea necesario):
 - add_to_cart: Agregar producto al carrito
 - get_cart: Ver contenido del carrito
 - start_checkout: Iniciar proceso de pago
+- confirm_shipping_details: CONFIRMAR datos de envío cuando el cliente los proporcione (nombre, email, teléfono, dirección, ciudad, documento)
 - escalate_to_human: Transferir a agente humano si es necesario
 
-REGLA CRÍTICA: Si mencionas un producto, usa 'show_product' para que el cliente lo vea visualmente con imagen y botón de agregar.
+REGLAS CRÍTICAS:
+- Si mencionas un producto, usa 'show_product' para que el cliente lo vea visualmente con imagen y botón de agregar
+- CUANDO el cliente proporcione TODOS sus datos de envío (nombre, email, teléfono, dirección, ciudad, documento), usa 'confirm_shipping_details' para confirmarlos antes de proceder al pago
 ---`
     } else {
         // FALLBACK: Use generic prompt for agents without custom instructions
@@ -118,9 +121,12 @@ HERRAMIENTAS:
 - add_to_cart: Agregar al carrito
 - get_cart: Ver carrito
 - start_checkout: Iniciar pago
+- confirm_shipping_details: Confirmar datos de envío completos
 - escalate_to_human: Transferir a humano
 
-IMPORTANTE: Usa 'show_product' para que el cliente vea imagen y botón de compra.`
+IMPORTANTE: 
+- Usa 'show_product' para que el cliente vea imagen y botón de compra
+- Usa 'confirm_shipping_details' cuando tengas TODOS los datos del cliente (nombre, email, teléfono, dirección, ciudad, documento)`
     }
 
     return prompt
