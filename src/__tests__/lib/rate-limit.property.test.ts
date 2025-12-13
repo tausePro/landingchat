@@ -124,10 +124,10 @@ describe('Rate Limiting Property Tests', () => {
   describe('Property 16: Sliding window behavior', () => {
     it('should create rate limiters with correct sliding window configuration', () => {
       const testConfigurations = [
-        { requests: 10, window: '1 m', prefix: 'ai-chat' },
-        { requests: 100, window: '1 h', prefix: 'api-general' },
-        { requests: 5, window: '30 s', prefix: 'auth' },
-        { requests: 1000, window: '1 d', prefix: 'bulk-operations' }
+        { requests: 10, window: 60000, prefix: 'ai-chat' }, // 1 minute
+        { requests: 100, window: 3600000, prefix: 'api-general' }, // 1 hour
+        { requests: 5, window: 30000, prefix: 'auth' }, // 30 seconds
+        { requests: 1000, window: 86400000, prefix: 'bulk-operations' } // 1 day
       ]
 
       for (const { requests, window, prefix } of testConfigurations) {
@@ -182,12 +182,12 @@ describe('Rate Limiting Property Tests', () => {
     it('should handle Redis connection configuration', () => {
       // Test that rate limiters can be created without throwing
       expect(() => {
-        createRateLimit(10, '1 m', 'test')
+        createRateLimit(10, 60000, 'test') // 1 minute in ms
       }).not.toThrow()
     })
 
     it('should handle different window formats', () => {
-      const windowFormats = ['1 s', '30 s', '1 m', '5 m', '1 h', '1 d']
+      const windowFormats = [1000, 30000, 60000, 300000, 3600000, 86400000] // 1s, 30s, 1m, 5m, 1h, 1d in ms
       
       for (const window of windowFormats) {
         expect(() => {
@@ -201,7 +201,7 @@ describe('Rate Limiting Property Tests', () => {
       
       for (const limit of requestLimits) {
         expect(() => {
-          createRateLimit(limit, '1 m', 'test')
+          createRateLimit(limit, 60000, 'test') // 1 minute in ms
         }).not.toThrow()
       }
     })

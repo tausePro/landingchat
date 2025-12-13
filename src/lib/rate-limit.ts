@@ -21,10 +21,10 @@ export const aiChatRateLimit = new Ratelimit({
 })
 
 // Generic rate limiter factory
-export function createRateLimit(requests: number, window: string, prefix: string) {
+export function createRateLimit(requests: number, windowMs: number, prefix: string) {
   return new Ratelimit({
     redis: redis,
-    limiter: Ratelimit.slidingWindow(requests, window),
+    limiter: Ratelimit.slidingWindow(requests, `${windowMs} ms`),
     analytics: true,
     prefix: `ratelimit:${prefix}`,
   })
