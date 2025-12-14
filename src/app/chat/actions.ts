@@ -62,6 +62,46 @@ function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: str
     }))
 }
 
+/**
+ * Get available payment gateways for organization
+ */
+export async function getAvailablePaymentGateways(slug: string) {
+    const supabase = createServiceClient()
+
+    try {
+        // Get organization ID from slug
+        const { data: org, error: orgError } = await supabase
+            .from("organizations")
+            .select("id")
+            .eq("slug", slug)
+            .single()
+
+        if (orgError || !org) {
+            return { success: false, error: "Organización no encontrada", gateways: [] }
+        }
+
+        // Get active payment gateways
+        const { data: gateways, error: gatewaysError } = await supabase
+            .from("payment_gateway_configs")
+            .select("provider, is_active, is_test_mode")
+            .eq("organization_id", org.id)
+            .eq("is_active", true)
+
+        if (gatewaysError) {
+            console.error("[getAvailablePaymentGateways] Error:", gatewaysError)
+            return { success: false, error: "Error al obtener pasarelas", gateways: [] }
+        }
+
+        return { 
+            success: true, 
+            gateways: gateways || []
+        }
+    } catch (error) {
+        console.error("[getAvailablePaymentGateways] Unexpected error:", error)
+        return { success: false, error: "Error inesperado", gateways: [] }
+    }
+}
+
 export async function createOrder(params: CreateOrderParams) {
     // ⚠️ Security: Use service client to bypass RLS restrictions on orders/customers table
     // Since we blocked public anonymity access in production

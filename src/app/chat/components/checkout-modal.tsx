@@ -18,6 +18,7 @@ interface CheckoutModalProps {
 }
 
 import { getStoreSettings } from "../../store/[slug]/actions"
+import { getAvailablePaymentGateways } from "../actions"
 import { useEffect } from "react"
 
 export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
@@ -26,13 +27,31 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     const [loading, setLoading] = useState(false)
     const [configShipping, setConfigShipping] = useState<number>(0)
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
+    const [availableGateways, setAvailableGateways] = useState<Array<{provider: string, is_active: boolean, is_test_mode: boolean}>>([])
+    const [gatewaysLoading, setGatewaysLoading] = useState(true)
 
     useEffect(() => {
         if (isOpen) {
+            // Load store settings
             getStoreSettings(slug).then(settings => {
                 if (settings && typeof settings.shipping_cost === 'number') {
                     setConfigShipping(settings.shipping_cost)
                 }
+            })
+
+            // Load available payment gateways
+            setGatewaysLoading(true)
+            getAvailablePaymentGateways(slug).then(result => {
+                if (result.success) {
+                    setAvailableGateways(result.gateways)
+                    // Set default payment method based on available gateways
+                    if (result.gateways.length > 0) {
+                        setPaymentMethod(result.gateways[0].provider as 'wompi' | 'epayco' | 'manual')
+                    } else {
+                        setPaymentMethod('manual')
+                    }
+                }
+                setGatewaysLoading(false)
             })
         }
     }, [isOpen, slug])
@@ -54,7 +73,7 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
         business_name: ""
     })
 
-    const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'manual'>('manual')
+    const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'epayco' | 'manual'>('manual')
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -240,22 +259,45 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                         {/* Payment Method Selection */}
                         <div className="space-y-3">
                             <Label>Método de Pago</Label>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div
-                                    className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'wompi' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                    onClick={() => setPaymentMethod('wompi')}
-                                >
-                                    <span className="font-bold">Wompi</span>
-                                    <span className="text-xs text-center text-slate-500">Tarjetas, PSE, Nequi</span>
+                            {gatewaysLoading ? (
+                                <div className="text-center py-4 text-slate-500">
+                                    Cargando métodos de pago...
                                 </div>
-                                <div
-                                    className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                    onClick={() => setPaymentMethod('manual')}
-                                >
-                                    <span className="font-bold">Transferencia</span>
-                                    <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Show available payment gateways */}
+                                    {availableGateways.map((gateway) => (
+                                        <div
+                                            key={gateway.provider}
+                                            className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                            onClick={() => setPaymentMethod(gateway.provider as 'wompi' | 'epayco' | 'manual')}
+                                        >
+                                            <span className="font-bold">
+                                                {gateway.provider === 'wompi' && 'Wompi'}
+                                                {gateway.provider === 'epayco' && 'ePayco'}
+                                            </span>
+                                            <span className="text-xs text-center text-slate-500">
+                                                {gateway.provider === 'wompi' && 'Tarjetas, PSE, Nequi'}
+                                                {gateway.provider === 'epayco' && 'Tarjetas, PSE, Nequi'}
+                                            </span>
+                                            {gateway.is_test_mode && (
+                                                <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                                    Pruebas
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    
+                                    {/* Always show manual payment option */}
+                                    <div
+                                        className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                        onClick={() => setPaymentMethod('manual')}
+                                    >
+                                        <span className="font-bold">Transferencia</span>
+                                        <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         <div className="flex gap-3 pt-2">
