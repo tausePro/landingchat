@@ -63,6 +63,57 @@ function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: str
 }
 
 /**
+ * Get shipping configuration for organization
+ */
+export async function getShippingConfig(slug: string) {
+    const supabase = createServiceClient()
+
+    try {
+        // Get organization ID from slug
+        const { data: org, error: orgError } = await supabase
+            .from("organizations")
+            .select("id")
+            .eq("slug", slug)
+            .single()
+
+        if (orgError || !org) {
+            return { success: false, error: "Organización no encontrada", config: null }
+        }
+
+        // Get shipping settings
+        const { data: shippingSettings, error: shippingError } = await supabase
+            .from("shipping_settings")
+            .select("*")
+            .eq("organization_id", org.id)
+            .single()
+
+        if (shippingError) {
+            console.error("[getShippingConfig] Error:", shippingError)
+            // Return default shipping if no config found
+            return { 
+                success: true, 
+                config: {
+                    default_shipping_rate: 5000, // Default 5000 COP
+                    free_shipping_enabled: false,
+                    free_shipping_min_amount: null,
+                    free_shipping_zones: null
+                }
+            }
+        }
+
+        return { 
+            success: true, 
+            config: shippingSettings
+        }
+    } catch (error) {
+        console.error("[getShippingConfig] Unexpected error:", error)
+        return { success: false, error: "Error inesperado", config: null }
+    }
+}
+
+
+
+/**
  * Get available payment gateways for organization
  */
 export async function getAvailablePaymentGateways(slug: string) {

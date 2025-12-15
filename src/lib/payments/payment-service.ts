@@ -6,6 +6,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { WompiGateway } from "./wompi-gateway"
 import { EpaycoGateway } from "./epayco-gateway"
+import { decrypt } from "@/lib/utils/encryption"
 import type { GatewayConfig } from "./types"
 
 // ============================================================================
@@ -106,11 +107,32 @@ export class PaymentService {
       return null
     }
 
+    // Decrypt sensitive fields
+    let privateKey = ""
+    let integritySecret = ""
+    let encryptionKey = ""
+
+    try {
+      if (data.private_key_encrypted) {
+        privateKey = decrypt(data.private_key_encrypted)
+      }
+      if (data.integrity_secret_encrypted) {
+        integritySecret = decrypt(data.integrity_secret_encrypted)
+      }
+      if (data.encryption_key_encrypted) {
+        encryptionKey = decrypt(data.encryption_key_encrypted)
+      }
+    } catch (decryptError) {
+      console.error("[PaymentService] Error decrypting credentials:", decryptError)
+      return null
+    }
+
     return {
       provider: data.provider as "wompi" | "epayco",
       publicKey: data.public_key,
-      privateKey: data.private_key,
-      integritySecret: data.integrity_secret,
+      privateKey,
+      integritySecret,
+      encryptionKey,
       isTestMode: data.is_test_mode,
     }
   }

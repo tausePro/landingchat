@@ -18,24 +18,33 @@ interface CheckoutModalProps {
 }
 
 import { getStoreSettings } from "../../store/[slug]/actions"
-import { getAvailablePaymentGateways } from "../actions"
+import { getAvailablePaymentGateways, getShippingConfig } from "../actions"
+import { calculateShippingCost } from "@/lib/utils/shipping"
 import { useEffect } from "react"
 
 export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     const { items, total, clearCart } = useCartStore()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
-    const [configShipping, setConfigShipping] = useState<number>(0)
+    const [shippingConfig, setShippingConfig] = useState<any>(null)
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
     const [availableGateways, setAvailableGateways] = useState<Array<{provider: string, is_active: boolean, is_test_mode: boolean}>>([])
     const [gatewaysLoading, setGatewaysLoading] = useState(true)
 
     useEffect(() => {
         if (isOpen) {
-            // Load store settings
-            getStoreSettings(slug).then(settings => {
-                if (settings && typeof settings.shipping_cost === 'number') {
-                    setConfigShipping(settings.shipping_cost)
+            // Load shipping configuration
+            getShippingConfig(slug).then(result => {
+                if (result.success && result.config) {
+                    setShippingConfig(result.config)
+                } else {
+                    // Default shipping config
+                    setShippingConfig({
+                        default_shipping_rate: 5000,
+                        free_shipping_enabled: false,
+                        free_shipping_min_amount: null,
+                        free_shipping_zones: null
+                    })
                 }
             })
 
@@ -56,10 +65,6 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
         }
     }, [isOpen, slug])
 
-    const subtotal = total()
-    const shippingCost = configShipping
-    const finalTotal = subtotal + shippingCost
-
     const [formData, setFormData] = useState({
         name: "",
         email: "",
@@ -74,6 +79,10 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     })
 
     const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'epayco' | 'manual'>('manual')
+
+    const subtotal = total()
+    const shippingCost = shippingConfig ? calculateShippingCost(shippingConfig, subtotal, formData.city) : 0
+    const finalTotal = subtotal + shippingCost
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -139,10 +148,10 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     }
 
     const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('es-CO', {
             style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
+            currency: 'COP',
+            minimumFractionDigits: 0
         }).format(price)
     }
 
