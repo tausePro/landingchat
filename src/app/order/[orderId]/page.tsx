@@ -37,7 +37,7 @@ async function getOrderDetailsByDomain(host: string, orderId: string) {
     // 1. Buscar organización por dominio personalizado
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, phone, custom_domain")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain")
         .eq("custom_domain", cleanHost)
         .single()
 
@@ -59,7 +59,20 @@ async function getOrderDetailsByDomain(host: string, orderId: string) {
 
     if (orderError || !order) return null
 
-    return { organization: org, order }
+    // 3. Buscar el número de WhatsApp de la tienda (instancia corporativa conectada)
+    const { data: whatsappInstance } = await supabase
+        .from("whatsapp_instances")
+        .select("phone_number_display")
+        .eq("organization_id", org.id)
+        .eq("instance_type", "corporate")
+        .eq("status", "connected")
+        .single()
+
+    return { 
+        organization: org, 
+        order,
+        storeWhatsapp: whatsappInstance?.phone_number_display || null
+    }
 }
 
 export default async function OrderTrackingPage({ params }: OrderPageProps) {
@@ -71,8 +84,7 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
 
     if (!result) return notFound()
 
-    const { order, organization } = result
-
+    const { order, organization, storeWhatsapp } = result
 
     // Format currency
     const formatCurrency = (amount: number) => {
@@ -117,8 +129,9 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
     const currentStatus = getStatusConfig(order.status)
     const primaryColor = organization.settings?.branding?.primaryColor || "#3b82f6"
 
-    // Construct WhatsApp link for support
-    const whatsappNumber = organization.phone?.replace(/\D/g, '')
+    // Construct WhatsApp link for support (using store's connected WhatsApp)
+    const whatsappNumber = storeWhatsapp?.replace(/\D/g, '') || 
+        (organization.settings as { whatsapp?: string })?.whatsapp?.replace(/\D/g, '')
     const whatsappMessage = `Hola, tengo una consulta sobre mi pedido #${order.order_number}`
     const whatsappLink = whatsappNumber
         ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
