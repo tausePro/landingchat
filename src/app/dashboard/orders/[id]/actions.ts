@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export interface OrderDetail {
     id: string
+    order_number: string
     created_at: string
     updated_at: string
     status: string
@@ -80,6 +81,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
 
     return {
         id: order.id,
+        order_number: order.order_number || `#${order.id.slice(0, 8)}`,
         created_at: order.created_at,
         updated_at: order.updated_at || order.created_at,
         status: order.status,
@@ -161,4 +163,65 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
     console.log("[updateOrderStatus] Successfully updated:", data[0])
 
     return { success: true }
+}
+
+export async function deleteOrder(orderId: string) {
+    const supabase = await createClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    console.log("[deleteOrder] Auth check:", {
+        userId: user?.id,
+        authError: authError?.message
+    })
+
+    if (!user) throw new Error("Unauthorized")
+
+    const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    console.log("[deleteOrder] Profile check:", {
+        userId: user.id,
+        organizationId: profile?.organization_id,
+        profileError: profileError?.message
+    })
+
+    if (!profile?.organization_id) throw new Error("No organization found")
+
+    console.log("[deleteOrder] Attempting delete:", {
+        orderId,
+        userId: user.id,
+        organizationId: profile.organization_id
+    })
+
+    // Verificar que la orden existe y pertenece a la organización
+    const { data: existingOrder, error: checkError } = await supabase
+        .from("orders")
+        .select("id, status, order_number")
+        .eq("id", orderId)
+        .eq("organization_id", profile.organization_id)
+        .single()
+
+    if (checkError || !existingOrder) {
+        console.error("[deleteOrder] Order not found:", checkError?.message)
+        throw new Error("Orden no encontrada o no tienes permisos para eliminarla")
+    }
+
+    // Eliminar la orden
+    const { error: deleteError } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", orderId)
+        .eq("organization_id", profile.organization_id)
+
+    if (deleteError) {
+        console.error("[deleteOrder] Error deleting order:", deleteError)
+        throw new Error("Error al eliminar la orden: " + deleteError.message)
+    }
+
+    console.log("[deleteOrder] Successfully deleted order:", existingOrder.order_number)
+
+    return { success: true, orderNumber: existingOrder.order_number }
 }

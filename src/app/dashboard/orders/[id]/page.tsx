@@ -44,14 +44,14 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                 <span className="material-symbols-outlined">arrow_back</span>
                             </Link>
                             <h1 className="text-text-light-primary dark:text-text-dark-primary text-3xl font-bold tracking-tight">
-                                Pedido #{order.id.slice(0, 8)}
+                                Pedido {order.order_number}
                             </h1>
                         </div>
                         <p className="text-text-light-secondary dark:text-text-dark-secondary text-base font-normal leading-normal">
                             Creado el {format(new Date(order.created_at), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}
                         </p>
                     </div>
-                    <OrderActions orderId={order.id} currentStatus={order.status} />
+                    <OrderActions orderId={order.id} orderNumber={order.order_number} currentStatus={order.status} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
