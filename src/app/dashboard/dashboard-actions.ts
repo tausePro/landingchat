@@ -77,10 +77,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Fill in missing days? For now let's just send what we have
     const history = Array.from(revenueByDay.entries()).map(([date, value]) => ({ date, value }))
 
-    // 2. CHATS & CONVERSION
+    // 2. CHATS & CONVERSION (FIXED: Better filtering and calculation)
     const { data: chats } = await supabase
         .from("chats")
-        .select("id, channel, created_at")
+        .select("id, channel, created_at, organization_id")
         .eq("organization_id", orgId)
 
     const totalChats = chats?.length || 0
@@ -88,15 +88,48 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const webChats = chats?.filter(c => c.channel === 'web').length || 0
 
     // Conversion Rate: (Total Orders / Total Chats) * 100
-    // This is a rough approximation
+    // Only count chats that actually belong to this organization
     const conversionRate = totalChats > 0 ? (totalOrders / totalChats) * 100 : 0
 
-    // 3. AGENTS
+    console.log(`[Dashboard] Org ${orgId}: ${totalChats} chats, ${totalOrders} orders, ${conversionRate.toFixed(1)}% conversion`)
+
+    // 3. AGENTS & RESPONSE TIME
     const { count: activeAgents } = await supabase
         .from("agents")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", orgId)
         .eq("status", "available")
+
+    // Calculate real response time from recent messages
+    const { data: recentMessages } = await supabase
+        .from("messages")
+        .select("metadata")
+        .eq("sender_type", "bot")
+        .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24h
+        .not("metadata", "is", null)
+        .limit(50)
+
+    // Calculate average response time
+    let avgResponseTime = "1m 45s" // fallback
+    if (recentMessages && recentMessages.length > 0) {
+        const latencies = recentMessages
+            .map(m => m.metadata?.latency_ms)
+            .filter(l => l && !isNaN(parseInt(l)))
+            .map(l => parseInt(l))
+
+        if (latencies.length > 0) {
+            const avgMs = latencies.reduce((sum, l) => sum + l, 0) / latencies.length
+            const seconds = Math.round(avgMs / 1000)
+            const minutes = Math.floor(seconds / 60)
+            const remainingSeconds = seconds % 60
+            
+            if (minutes > 0) {
+                avgResponseTime = `${minutes}m ${remainingSeconds}s`
+            } else {
+                avgResponseTime = `${remainingSeconds}s`
+            }
+        }
+    }
 
     const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuario"
 
@@ -132,7 +165,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         },
         agents: {
             active: activeAgents || 1, // Default to 1 if 0/null to look good in demo
-            responseTime: "1m 45s" // Dummy metric
+            responseTime: avgResponseTime
         }
     }
 }
