@@ -26,6 +26,7 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith('/auth') ||       // Callbacks de autenticación
         pathname.startsWith('/onboarding') || // Flujo de onboarding
         pathname.startsWith('/checkout') ||   // Checkout de pagos (ePayco, Wompi)
+        pathname.startsWith('/order') ||      // Página de orden (para dominios personalizados)
         pathname.includes('.')                // Archivos estáticos (favicon, imágenes, etc.)
     ) {
         return handleAuth(request)
