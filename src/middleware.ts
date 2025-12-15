@@ -249,6 +249,17 @@ export async function middleware(request: NextRequest) {
     // Mapea las rutas del subdominio a las rutas internas
     // ============================================
 
+    // RUTAS QUE NO SE REESCRIBEN PARA DOMINIOS PERSONALIZADOS
+    // Estas rutas tienen sus propias páginas que manejan dominios personalizados
+    // y obtienen la organización del header host
+    if (
+        pathname.startsWith('/order') ||     // Página de orden (usa custom_domain del host)
+        pathname.startsWith('/checkout')     // Checkout de pagos (usa custom_domain del host)
+    ) {
+        console.log(`[MIDDLEWARE] Custom domain route bypass: ${pathname} - not rewriting`)
+        return handleAuth(request)
+    }
+
     // Página principal: tienda.landingchat.co/ → /store/tienda
     if (pathname === '/' || pathname === '') {
         const url = new URL(`/store/${slug}`, request.url)
