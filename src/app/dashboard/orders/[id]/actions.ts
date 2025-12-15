@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { revalidatePath } from "next/cache"
 
 export interface OrderDetail {
     id: string
@@ -210,18 +211,36 @@ export async function deleteOrder(orderId: string) {
     }
 
     // Eliminar la orden
-    const { error: deleteError } = await supabase
+    const { data: deletedData, error: deleteError, count } = await supabase
         .from("orders")
         .delete()
         .eq("id", orderId)
         .eq("organization_id", profile.organization_id)
+        .select()
+
+    console.log("[deleteOrder] Delete operation result:", {
+        deletedData,
+        deleteError: deleteError?.message,
+        count,
+        orderId,
+        organizationId: profile.organization_id
+    })
 
     if (deleteError) {
         console.error("[deleteOrder] Error deleting order:", deleteError)
         throw new Error("Error al eliminar la orden: " + deleteError.message)
     }
 
-    console.log("[deleteOrder] Successfully deleted order:", existingOrder.order_number)
+    if (!deletedData || deletedData.length === 0) {
+        console.error("[deleteOrder] No rows were deleted - order may not exist or permission denied")
+        throw new Error("No se pudo eliminar la orden. Verifica que existe y tienes permisos.")
+    }
+
+    console.log("[deleteOrder] Successfully deleted order:", existingOrder.order_number, "Deleted rows:", deletedData.length)
+
+    // Revalidar las páginas de órdenes para actualizar la cache
+    revalidatePath("/dashboard/orders")
+    revalidatePath(`/dashboard/orders/${orderId}`)
 
     return { success: true, orderNumber: existingOrder.order_number }
 }

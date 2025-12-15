@@ -15,6 +15,8 @@ const aiChatSchema = z.object({
 
 export async function POST(request: NextRequest) {
     console.log("API /api/ai-chat called")
+    console.log("[ai-chat] ANTHROPIC_API_KEY configured:", !!process.env.ANTHROPIC_API_KEY)
+    console.log("[ai-chat] SUPABASE_SERVICE_ROLE_KEY configured:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
     
     // Apply rate limiting
     const clientId = getClientIdentifier(request)

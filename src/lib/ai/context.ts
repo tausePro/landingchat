@@ -45,35 +45,38 @@ interface Message {
     content: string
 }
 
-// Build system prompt with all context
-export function buildSystemPrompt(
+// Build system prompt - OPTIMIZED version that only needs product count (not all products)
+export function buildSystemPromptOptimized(
     agent: AgentConfig,
     organizationName: string,
-    products: Product[],
+    productCount: number,
     customer?: Customer,
     currentProduct?: Product
 ): string {
-    // Check if there are custom instructions from dashboard
     const customInstructions = agent.configuration?.personality?.instructions
     const hasCustomPrompt = customInstructions && customInstructions.trim().length > 50
 
-    // Log for debugging
     console.log("[buildSystemPrompt] Custom instructions found:", hasCustomPrompt, customInstructions?.substring(0, 80) + "...")
 
     let prompt = ""
 
     if (hasCustomPrompt) {
-        // USE CUSTOM PROMPT AS PRIMARY - Only add minimal technical context
         prompt = `${customInstructions}
 
 ---
+FORMATO DE RESPUESTA:
+- Escribe respuestas cortas y claras
+- Usa párrafos separados (máximo 2-3 oraciones por párrafo)
+- Deja una línea en blanco entre párrafos para mejor legibilidad
+- No escribas todo en un solo bloque de texto
+
 CONTEXTO TÉCNICO (información adicional para esta conversación):
 
 ${customer ? `CLIENTE: Estás hablando con ${customer.name || 'el cliente'}.` : 'CLIENTE: Nuevo cliente, no identificado aún.'}
 
-CATÁLOGO: Tienes acceso a ${products.length} productos de ${organizationName}.
+CATÁLOGO: Tienes acceso a ${productCount} productos de ${organizationName}. Usa search_products para buscar.
 
-${currentProduct ? `PRODUCTO ACTUAL: El cliente llegó desde la página de "${currentProduct.name}" ($${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).` : ''}
+${currentProduct ? `PRODUCTO ACTUAL: El cliente llegó desde la página de "${currentProduct.name}" (${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).` : ''}
 
 HERRAMIENTAS DISPONIBLES (úsalas cuando sea necesario):
 - search_products: Buscar productos por nombre o categoría
@@ -89,7 +92,6 @@ REGLAS CRÍTICAS:
 - CUANDO el cliente proporcione TODOS sus datos de envío (nombre, email, teléfono, dirección, ciudad, documento), usa 'confirm_shipping_details' para confirmarlos antes de proceder al pago
 ---`
     } else {
-        // FALLBACK: Use generic prompt for agents without custom instructions
         const basePrompt = agent.system_prompt || `Eres ${agent.name}, asistente de ventas de ${organizationName}.`
         const personality = agent.configuration?.personality?.tone || "amigable y profesional"
 
@@ -99,10 +101,16 @@ PERSONALIDAD: Sé ${personality}, natural y conversacional.
 
 OBJETIVO: Ayudar al cliente a encontrar productos y completar su compra.
 
+FORMATO DE RESPUESTA:
+- Escribe respuestas cortas y claras
+- Usa párrafos separados (máximo 2-3 oraciones por párrafo)
+- Deja una línea en blanco entre párrafos para mejor legibilidad
+- No escribas todo en un solo bloque de texto
+
 ${customer ? `CLIENTE: ${customer.name || 'Cliente'}` : 'CLIENTE: Nuevo cliente.'}
 
 ${currentProduct ? `
-CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}" ($${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).
+CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}" (${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).
 Menciona este producto cuando saluden.
 ` : ''}
 
@@ -110,10 +118,10 @@ REGLAS:
 1. Saluda amablemente si es el primer mensaje.
 2. Haz preguntas para entender necesidades.
 3. Muestra máximo 3 productos por respuesta.
-4. NO inventes productos. Usa solo el catálogo.
+4. NO inventes productos. Usa search_products para buscar.
 5. Confirma antes de agregar al carrito.
 
-CATÁLOGO: ${products.length} productos disponibles.
+CATÁLOGO: ${productCount} productos disponibles. Usa search_products para buscar.
 
 HERRAMIENTAS:
 - search_products: Buscar productos
@@ -132,6 +140,17 @@ IMPORTANTE:
     return prompt
 }
 
+// Legacy function - calls optimized version (for backwards compatibility)
+export function buildSystemPrompt(
+    agent: AgentConfig,
+    organizationName: string,
+    products: Product[],
+    customer?: Customer,
+    currentProduct?: Product
+): string {
+    return buildSystemPromptOptimized(agent, organizationName, products.length, customer, currentProduct)
+}
+
 // Format products for context
 export function buildProductContext(products: Product[]): string {
     if (products.length === 0) return "No hay productos disponibles actualmente."
@@ -141,7 +160,7 @@ export function buildProductContext(products: Product[]): string {
         const categories = p.categories?.join(', ') || ''
 
         return `- ${p.name} (ID: ${p.id})
-  Precio: $${p.price.toLocaleString()}
+  Precio: ${p.price.toLocaleString()}
   Stock: ${p.stock} unidades
   ${p.description ? `Descripción: ${p.description}` : ''}
   ${categories ? `Categorías: ${categories}` : ''}
@@ -164,7 +183,7 @@ export function buildCustomerContext(customer?: Customer, orders?: Order[]): str
         context += `\nHISTORIAL DE COMPRAS:\n`
         const lastOrder = orders[0]
         context += `- Última compra: ${new Date(lastOrder.created_at).toLocaleDateString()}\n`
-        context += `- Total: $${lastOrder.total.toLocaleString()}\n`
+        context += `- Total: ${lastOrder.total.toLocaleString()}\n`
         context += `- Estado: ${lastOrder.status}\n`
 
         if (orders.length > 1) {
@@ -179,8 +198,6 @@ export function buildCustomerContext(customer?: Customer, orders?: Order[]): str
 
 // Build conversation history for Claude
 export function buildConversationHistory(messages: Message[]): Array<{ role: 'user' | 'assistant'; content: string }> {
-    // Claude expects alternating user/assistant messages
-    // Filter and format accordingly
     return messages.map(msg => ({
         role: msg.role,
         content: msg.content
@@ -198,11 +215,11 @@ export function buildCartContext(cart?: { items: any[]; total?: number }): strin
         const price = item.price || 0
         const quantity = item.quantity || 0
         const subtotal = price * quantity
-        context += `- ${item.name || 'Producto'} x${quantity} = $${subtotal.toLocaleString()}\n`
+        context += `- ${item.name || 'Producto'} x${quantity} = ${subtotal.toLocaleString()}\n`
     })
 
     const total = cart.total || cart.items.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0)
-    context += `\nTotal: $${total.toLocaleString()}`
+    context += `\nTotal: ${total.toLocaleString()}`
 
     return context
 }

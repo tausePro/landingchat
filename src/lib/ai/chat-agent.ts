@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { createMessage } from "./anthropic"
 import { tools } from "./tools"
-import { buildSystemPrompt, buildProductContext, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
+import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 
@@ -65,10 +65,11 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .eq("id", input.organizationId)
             .single()
 
-        // 3. Load products catalog
-        const { data: products } = await supabase
+        // 3. Get product count only (NOT all products - optimization)
+        // The agent uses search_products tool to find products when needed
+        const { count: productCount } = await supabase
             .from("products")
-            .select("*")
+            .select("*", { count: "exact", head: true })
             .eq("organization_id", input.organizationId)
             .eq("is_active", true)
 
@@ -137,12 +138,12 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .eq("status", "active")
             .single()
 
-        // 7. Build system prompt
+        // 7. Build system prompt (optimized: only pass product count, not all products)
         console.log("[processMessage] Building system prompt with currentProduct:", currentProduct?.name || "NONE")
-        let systemPrompt = buildSystemPrompt(
+        let systemPrompt = buildSystemPromptOptimized(
             agent,
             organization?.name || "la tienda",
-            products || [],
+            productCount || 0,
             customer || undefined,
             currentProduct || undefined
         )
