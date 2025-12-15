@@ -26,22 +26,36 @@ interface OrderPageProps {
 async function getOrderDetailsByDomain(host: string, orderId: string) {
     const supabase = createServiceClient()
 
+    // Limpiar el host (quitar puerto si existe, quitar www)
+    let cleanHost = host.split(':')[0] // Quitar puerto
+    if (cleanHost.startsWith('www.')) {
+        cleanHost = cleanHost.substring(4)
+    }
+
+    console.log(`[OrderPage] Looking for org with custom_domain: ${cleanHost} (original host: ${host})`)
+
     // 1. Buscar organización por dominio personalizado
     const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, phone, custom_domain")
-        .eq("custom_domain", host)
+        .eq("custom_domain", cleanHost)
         .single()
+
+    console.log(`[OrderPage] Org query result:`, { found: !!org, error: orgError?.message, orgSlug: org?.slug })
 
     if (orgError || !org) return null
 
     // 2. Buscar la orden
+    console.log(`[OrderPage] Looking for order: ${orderId} in org: ${org.id}`)
+    
     const { data: order, error: orderError } = await supabase
         .from("orders")
         .select("*")
         .eq("id", orderId)
         .eq("organization_id", org.id)
         .single()
+
+    console.log(`[OrderPage] Order query result:`, { found: !!order, error: orderError?.message })
 
     if (orderError || !order) return null
 
