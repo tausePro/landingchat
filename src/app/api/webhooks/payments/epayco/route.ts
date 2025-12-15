@@ -203,11 +203,21 @@ export async function POST(request: Request) {
                     processingTime: Date.now() - startTime
                 })
             } else {
-                // Crear nueva transacción (caso raro, pero posible)
+                // No hay transacción previa - buscar la orden directamente por el reference (orderId)
+                // El reference es el UUID de la orden que pasamos como invoice/extra1
+                const { data: order } = await supabase
+                    .from("orders")
+                    .select("id, organization_id")
+                    .eq("id", reference)
+                    .eq("organization_id", org.id)
+                    .single()
+
+                // Crear nueva transacción con el order_id si encontramos la orden
                 const { data: newTx } = await supabase
                     .from("store_transactions")
                     .insert({
                         organization_id: org.id,
+                        order_id: order?.id || null, // Vincular con la orden si existe
                         amount: Math.round(parseFloat(payload.x_amount) * 100),
                         currency: payload.x_currency_code,
                         status,
@@ -221,10 +231,16 @@ export async function POST(request: Request) {
                     .select("id")
                     .single()
 
+                // Si encontramos la orden, actualizarla
+                if (order) {
+                    await processOrderUpdate(supabase, order.id, status, org.id)
+                }
+
                 await logWebhook(supabase, org.id, "epayco", "success", payload, { 
                     transactionId: newTx?.id,
+                    orderId: order?.id,
                     status,
-                    note: "New transaction created from webhook",
+                    note: order ? "New transaction created and order updated" : "New transaction created (order not found)",
                     processingTime: Date.now() - startTime
                 })
             }
