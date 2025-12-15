@@ -79,61 +79,31 @@ export class EpaycoGateway implements PaymentGateway {
 
     async createTransaction(input: TransactionInput): Promise<TransactionResult> {
         try {
-            // Usar la API de ePayco para crear un link de pago
-            const headers = await this.getHeaders()
+            // Para ePayco usamos el Checkout Estándar (checkout.js)
+            // No llamamos a ninguna API aquí - solo generamos la URL de nuestra página de checkout
+            // que cargará el script oficial de ePayco
             
-            const body = {
-                // Información de la transacción
-                invoice: input.reference,
-                description: `Pago ${input.reference}`,
-                value: String(input.amount / 100), // ePayco usa valor en pesos, no centavos
-                tax: "0",
-                tax_base: String(input.amount / 100),
-                currency: input.currency,
-                
-                // Información del cliente
-                name: input.customerName,
-                last_name: "", // ePayco requiere apellido
-                email: input.customerEmail,
-                phone: input.customerPhone || "",
-                doc_type: input.customerDocumentType || "CC",
-                doc_number: input.customerDocument || "",
-                
-                // URLs de respuesta
-                url_response: input.redirectUrl,
-                url_confirmation: input.redirectUrl,
-                
-                // Configuración
-                test: this.config.isTestMode,
-                
-                // Método de pago (permitir todos)
-                method_confirmation: "GET"
-            }
-
-            const response = await fetch(`${this.baseUrl}/payment/link/create`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify(body),
-            })
-
-            const data = await response.json()
-
-            if (!data.success) {
-                return {
-                    success: false,
-                    status: "error",
-                    error: data.message || "Error al crear link de pago",
-                    rawResponse: data,
-                }
-            }
+            // La URL de checkout será manejada por el payment-service
+            // que construirá la URL correcta basada en el orderId y slug
+            
+            // Extraer el slug de la URL de respuesta
+            const urlParts = input.redirectUrl?.match(/\/store\/([^/]+)\//)
+            const slug = urlParts?.[1] || ""
+            
+            // Construir URL de nuestra página de checkout de ePayco
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
+            const checkoutUrl = `${baseUrl}/store/${slug}/checkout/epayco/${input.reference}`
 
             return {
                 success: true,
-                transactionId: data.data.ref_payco || input.reference,
-                providerTransactionId: data.data.ref_payco || input.reference,
+                transactionId: input.reference,
+                providerTransactionId: input.reference,
                 status: "pending",
-                redirectUrl: data.data.url_payment, // URL del link de pago
-                rawResponse: data,
+                redirectUrl: checkoutUrl,
+                rawResponse: {
+                    message: "Redirect to ePayco checkout page",
+                    checkoutUrl,
+                },
             }
         } catch (error) {
             console.error("[EpaycoGateway] Error creating transaction:", error)
