@@ -233,6 +233,23 @@ export async function createOrder(params: CreateOrderParams) {
 
         // 7. If payment method is not manual, initiate payment
         if (params.paymentMethod !== 'manual') {
+            // Obtener el dominio personalizado de la organización si existe
+            const { data: orgDetails } = await supabase
+                .from("organizations")
+                .select("custom_domain, slug")
+                .eq("id", org.id)
+                .single()
+            
+            // Construir la URL base: usar dominio personalizado si existe, sino landingchat.co
+            let baseUrl: string
+            if (orgDetails?.custom_domain) {
+                // Dominio personalizado: https://tez.com.co
+                baseUrl = `https://${orgDetails.custom_domain}`
+            } else {
+                // Subdominio de landingchat: https://landingchat.co/store/slug
+                baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}`
+            }
+
             const paymentResult = await paymentService.initiatePayment({
                 orderId: order.id,
                 organizationId: org.id,
@@ -243,7 +260,7 @@ export async function createOrder(params: CreateOrderParams) {
                 customerDocument: params.customerInfo.document_number,
                 customerDocumentType: params.customerInfo.document_type,
                 customerPhone: params.customerInfo.phone,
-                returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}/order/${order.id}`,
+                returnUrl: `${baseUrl}/order/${order.id}`,
                 paymentMethod: params.paymentMethod as "wompi" | "epayco"
             })
 

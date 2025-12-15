@@ -83,16 +83,28 @@ export class EpaycoGateway implements PaymentGateway {
             // No llamamos a ninguna API aquí - solo generamos la URL de nuestra página de checkout
             // que cargará el script oficial de ePayco
             
-            // La URL de checkout será manejada por el payment-service
-            // que construirá la URL correcta basada en el orderId y slug
+            // La URL de checkout se construye basada en la redirectUrl que ya viene
+            // con el dominio correcto (personalizado o landingchat.co)
+            // Ejemplo redirectUrl: https://tez.com.co/order/123 o https://landingchat.co/store/tez/order/123
             
-            // Extraer el slug de la URL de respuesta
-            const urlParts = input.redirectUrl?.match(/\/store\/([^/]+)\//)
-            const slug = urlParts?.[1] || ""
+            // Extraer la base URL de la redirectUrl
+            const redirectUrl = input.redirectUrl || ""
+            let checkoutUrl: string
             
-            // Construir URL de nuestra página de checkout de ePayco
-            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
-            const checkoutUrl = `${baseUrl}/store/${slug}/checkout/epayco/${input.reference}`
+            // Detectar si es dominio personalizado (no contiene /store/)
+            if (redirectUrl.includes("/store/")) {
+                // URL con /store/slug/... → extraer slug y construir URL de checkout
+                const urlParts = redirectUrl.match(/(.+)\/store\/([^/]+)\/order\//)
+                const baseUrl = urlParts?.[1] || process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
+                const slug = urlParts?.[2] || ""
+                checkoutUrl = `${baseUrl}/store/${slug}/checkout/epayco/${input.reference}`
+            } else {
+                // Dominio personalizado: https://tez.com.co/order/123
+                // Extraer base URL y construir checkout URL
+                const urlParts = redirectUrl.match(/(.+)\/order\//)
+                const baseUrl = urlParts?.[1] || ""
+                checkoutUrl = `${baseUrl}/checkout/epayco/${input.reference}`
+            }
 
             return {
                 success: true,
