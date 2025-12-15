@@ -18,6 +18,7 @@ import {
     ArrowLeft,
     MessageCircle
 } from "lucide-react"
+import { CartCleaner } from "./components/cart-cleaner"
 
 interface OrderPageProps {
     params: Promise<{ orderId: string }>
@@ -139,6 +140,9 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
 
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8">
+            {/* Limpiar el carrito al mostrar la página de orden */}
+            <CartCleaner />
+            
             <div className="max-w-3xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
