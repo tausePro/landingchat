@@ -79,65 +79,61 @@ export class EpaycoGateway implements PaymentGateway {
 
     async createTransaction(input: TransactionInput): Promise<TransactionResult> {
         try {
-            // Para ePayco, usamos el checkout estándar que genera una URL de pago
-            // donde el usuario puede ingresar sus datos de tarjeta o usar PSE
+            // Usar la API de ePayco para crear un link de pago
+            const headers = await this.getHeaders()
             
-            const body: Record<string, unknown> = {
-                // Información del comercio
-                p_cust_id_cliente: this.customerId,
-                p_key: this.config.publicKey,
-                
+            const body = {
                 // Información de la transacción
-                p_id_invoice: input.reference,
-                p_description: `Pago ${input.reference}`,
-                p_amount: String(input.amount / 100), // ePayco usa valor en pesos, no centavos
-                p_amount_base: String(input.amount / 100),
-                p_tax: "0",
-                p_currency_code: input.currency,
+                invoice: input.reference,
+                description: `Pago ${input.reference}`,
+                value: String(input.amount / 100), // ePayco usa valor en pesos, no centavos
+                tax: "0",
+                tax_base: String(input.amount / 100),
+                currency: input.currency,
                 
                 // Información del cliente
-                p_cust_name: input.customerName,
-                p_cust_last_name: "", // ePayco requiere apellido, pero lo dejamos vacío
-                p_cust_email: input.customerEmail,
-                p_cust_phone: input.customerPhone || "",
-                p_cust_document: input.customerDocument || "",
-                p_cust_doc_type: input.customerDocumentType || "CC",
+                name: input.customerName,
+                last_name: "", // ePayco requiere apellido
+                email: input.customerEmail,
+                phone: input.customerPhone || "",
+                doc_type: input.customerDocumentType || "CC",
+                doc_number: input.customerDocument || "",
                 
                 // URLs de respuesta
-                p_url_response: input.redirectUrl,
-                p_url_confirmation: input.redirectUrl,
+                url_response: input.redirectUrl,
+                url_confirmation: input.redirectUrl,
                 
                 // Configuración
-                p_test_request: this.config.isTestMode ? "TRUE" : "FALSE",
-                p_split_payco: "NO",
-                p_shipping_customer: "0",
-                p_amount_shipping: "0"
+                test: this.config.isTestMode,
+                
+                // Método de pago (permitir todos)
+                method_confirmation: "GET"
             }
 
-            // Generar firma
-            const signature = this.generateSignature(body)
-            body.p_signature = signature
-
-            // Para ePayco, creamos un formulario HTML que redirige al checkout
-            const checkoutUrl = this.config.isTestMode 
-                ? "https://checkout.epayco.co/checkout.js"
-                : "https://checkout.epayco.co/checkout.js"
-
-            // En lugar de hacer POST a la API, generamos la URL de checkout
-            const formParams = new URLSearchParams()
-            Object.entries(body).forEach(([key, value]) => {
-                formParams.append(key, String(value))
+            const response = await fetch(`${this.baseUrl}/payment/link/create`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(body),
             })
 
-            const redirectUrl = `${this.secureUrl}/checkout?${formParams.toString()}`
+            const data = await response.json()
+
+            if (!data.success) {
+                return {
+                    success: false,
+                    status: "error",
+                    error: data.message || "Error al crear link de pago",
+                    rawResponse: data,
+                }
+            }
 
             return {
                 success: true,
-                transactionId: input.reference, // Usamos la referencia como ID temporal
-                providerTransactionId: input.reference,
+                transactionId: data.data.ref_payco || input.reference,
+                providerTransactionId: data.data.ref_payco || input.reference,
                 status: "pending",
-                redirectUrl: redirectUrl,
-                rawResponse: body,
+                redirectUrl: data.data.url_payment, // URL del link de pago
+                rawResponse: data,
             }
         } catch (error) {
             console.error("[EpaycoGateway] Error creating transaction:", error)
