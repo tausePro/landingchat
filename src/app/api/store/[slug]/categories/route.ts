@@ -6,8 +6,8 @@ export async function GET(
     { params }: { params: Promise<{ slug: string }> }
 ) {
     try {
-        const supabase = createClient()
         const { slug } = await params
+        const supabase = await createClient()
         
         // Get organization by slug
         const { data: org, error: orgError } = await supabase
