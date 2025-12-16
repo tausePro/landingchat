@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { CheckCircle2, ArrowRight, Plus, Check } from "lucide-react"
+import { CheckCircle2, ShoppingBag, Plus, Check } from "lucide-react"
 import { useState } from "react"
 import { useCartStore } from "@/store/cart-store"
 import { toast } from "sonner"
@@ -12,6 +12,9 @@ interface ProductCardProps {
     productUrl: string
     primaryColor: string
     showDescription?: boolean
+    showPrices?: boolean
+    showAddToCart?: boolean
+    showAIRecommended?: boolean
 }
 
 // Helper to strip HTML tags and create clean excerpt for cards
@@ -44,7 +47,15 @@ function createExcerpt(text: string, maxLength: number = 150): string {
         : truncated + '...'
 }
 
-export function ProductCard({ product, productUrl, primaryColor, showDescription = true }: ProductCardProps) {
+export function ProductCard({ 
+    product, 
+    productUrl, 
+    primaryColor, 
+    showDescription = true,
+    showPrices = true,
+    showAddToCart = true,
+    showAIRecommended = false
+}: ProductCardProps) {
     const { items, addItem } = useCartStore()
     const [isAdding, setIsAdding] = useState(false)
     const [justAdded, setJustAdded] = useState(false)
@@ -118,29 +129,38 @@ export function ProductCard({ product, productUrl, primaryColor, showDescription
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none" />
 
                 {/* INSTACART STYLE QUICK ADD BUTTON */}
-                <button
-                    onClick={handleQuickAdd}
-                    className="absolute top-2 right-2 px-3 py-1.5 rounded-full shadow-md transition-all duration-200 z-10 flex items-center gap-1 font-bold text-xs
-                             opacity-100 sm:opacity-0 sm:group-hover:opacity-100 translate-y-0 sm:translate-y-2 sm:group-hover:translate-y-0"
-                    style={{
-                        backgroundColor: justAdded ? '#10b981' : 'white',
-                        color: justAdded ? 'white' : primaryColor,
-                        border: `1px solid ${justAdded ? '#10b981' : primaryColor}`
-                    }}
-                    title="Agregar al carrito"
-                >
-                    {justAdded ? (
-                        <>
-                            <Check className="w-4 h-4" />
-                            <span>Agregado</span>
-                        </>
-                    ) : (
-                        <>
-                            <Plus className="w-4 h-4" />
-                            <span>Agregar</span>
-                        </>
-                    )}
-                </button>
+                {showAddToCart && (
+                    <button
+                        onClick={handleQuickAdd}
+                        className="absolute top-2 right-2 px-3 py-1.5 rounded-full shadow-md transition-all duration-200 z-10 flex items-center gap-1 font-bold text-xs
+                                 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 translate-y-0 sm:translate-y-2 sm:group-hover:translate-y-0"
+                        style={{
+                            backgroundColor: justAdded ? '#10b981' : 'white',
+                            color: justAdded ? 'white' : primaryColor,
+                            border: `1px solid ${justAdded ? '#10b981' : primaryColor}`
+                        }}
+                        title="Agregar al carrito"
+                    >
+                        {justAdded ? (
+                            <>
+                                <Check className="w-4 h-4" />
+                                <span>Agregado</span>
+                            </>
+                        ) : (
+                            <>
+                                <ShoppingBag className="w-4 h-4" />
+                                <span>Agregar</span>
+                            </>
+                        )}
+                    </button>
+                )}
+
+                {/* AI Recommended Badge */}
+                {showAIRecommended && (
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm">
+                        ✨ IA
+                    </div>
+                )}
 
                 {/* Badge for quantity in cart if > 0 */}
                 {quantity > 0 && !justAdded && (
@@ -164,14 +184,23 @@ export function ProductCard({ product, productUrl, primaryColor, showDescription
                 )}
 
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
-                    <span className="font-bold text-lg" style={{ color: primaryColor }}>
-                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
-                    </span>
+                    {showPrices ? (
+                        <span className="font-bold text-lg" style={{ color: primaryColor }}>
+                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
+                        </span>
+                    ) : (
+                        <div></div>
+                    )}
                     <Link
                         href={productUrl}
-                        className="p-2 rounded-full hover:bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors"
+                        className="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors hover:scale-105"
+                        style={{ 
+                            borderColor: primaryColor, 
+                            color: primaryColor,
+                            backgroundColor: 'transparent'
+                        }}
                     >
-                        <ArrowRight className="w-5 h-5" />
+                        ¿Me sirve?
                     </Link>
                 </div>
             </div>

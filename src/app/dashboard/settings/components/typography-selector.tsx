@@ -24,11 +24,21 @@ const FONT_OPTIONS = [
     { value: "Cinzel", label: "Cinzel", className: "font-serif" },
 ]
 
+const TEXT_COLOR_OPTIONS = [
+    { value: "default", label: "Por defecto", color: "#1F2937" },
+    { value: "warm", label: "Cálido", color: "#92400E" },
+    { value: "cool", label: "Frío", color: "#1E40AF" },
+    { value: "elegant", label: "Elegante", color: "#374151" },
+    { value: "modern", label: "Moderno", color: "#111827" },
+    { value: "soft", label: "Suave", color: "#6B7280" },
+]
+
 export function TypographySelector({ organization }: TypographySelectorProps) {
     const router = useRouter()
     const typographySettings = organization.settings?.storefront?.typography || {}
 
     const [fontFamily, setFontFamily] = useState(typographySettings.fontFamily || "Inter")
+    const [textColor, setTextColor] = useState(typographySettings.textColor || "default")
     const [isSaving, setIsSaving] = useState(false)
 
     const handleSave = async () => {
@@ -39,7 +49,8 @@ export function TypographySelector({ organization }: TypographySelectorProps) {
                 storefront: {
                     ...organization.settings?.storefront,
                     typography: {
-                        fontFamily
+                        fontFamily,
+                        textColor
                     }
                 }
             }
@@ -89,14 +100,53 @@ export function TypographySelector({ organization }: TypographySelectorProps) {
                         </div>
                     </div>
 
+                    {/* Text Color */}
+                    <div className="mt-6">
+                        <Label htmlFor="color-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Color de Texto
+                        </Label>
+                        <div className="grid grid-cols-3 gap-3">
+                            {TEXT_COLOR_OPTIONS.map((colorOption) => (
+                                <button
+                                    key={colorOption.value}
+                                    onClick={() => setTextColor(colorOption.value)}
+                                    className={`p-3 rounded-lg border-2 transition-all ${
+                                        textColor === colorOption.value
+                                            ? 'border-primary bg-primary/10'
+                                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div
+                                            className="w-4 h-4 rounded-full border border-gray-300"
+                                            style={{ backgroundColor: colorOption.color }}
+                                        />
+                                        <span className="text-sm font-medium">{colorOption.label}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Preview */}
                     <div className="mt-6 p-6 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Vista Previa</p>
                         <div style={{ fontFamily: fontFamily }}>
-                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                            <h3 
+                                className="text-2xl font-bold mb-2"
+                                style={{ 
+                                    color: TEXT_COLOR_OPTIONS.find(c => c.value === textColor)?.color || "#1F2937"
+                                }}
+                            >
                                 Título de Ejemplo
                             </h3>
-                            <p className="text-base text-gray-600 dark:text-gray-300">
+                            <p 
+                                className="text-base"
+                                style={{ 
+                                    color: TEXT_COLOR_OPTIONS.find(c => c.value === textColor)?.color || "#6B7280",
+                                    opacity: 0.8
+                                }}
+                            >
                                 Este es un texto de ejemplo para que veas cómo se verá la tipografía en tu storefront.
                             </p>
                         </div>

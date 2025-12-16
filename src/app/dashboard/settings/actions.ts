@@ -171,5 +171,6 @@ export async function updateOrganization(data: {
     }
 
     revalidatePath("/dashboard/settings")
+    revalidatePath(`/store/${data.slug}`)
     return { success: true }
 }

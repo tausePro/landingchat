@@ -2,7 +2,7 @@
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
-export async function getStoreData(slug: string, limit: number = 6) {
+export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
 
     // 1. Fetch Organization by Slug
@@ -17,16 +17,28 @@ export async function getStoreData(slug: string, limit: number = 6) {
         return null
     }
 
-    // 2. Fetch Active Products
+    // 2. Get product configuration from organization settings
+    const productConfig = org.settings?.storefront?.products
+    const itemsToShow = limit || productConfig?.itemsToShow || 20 // Default to 20 if no config
+    const orderBy = productConfig?.orderBy || "recent"
+
+    // 3. Fetch Active Products with proper ordering
     let query = supabase
         .from("products")
         .select("*")
         .eq("organization_id", org.id)
-        .order("created_at", { ascending: false })
 
-    if (limit > 0) {
-        query = query.limit(limit)
+    // Apply ordering based on configuration
+    if (orderBy === "price_asc") {
+        query = query.order("price", { ascending: true })
+    } else if (orderBy === "price_desc") {
+        query = query.order("price", { ascending: false })
+    } else {
+        query = query.order("created_at", { ascending: false })
     }
+
+    // Apply limit
+    query = query.limit(itemsToShow)
 
     const { data: products, error: productsError } = await query
 

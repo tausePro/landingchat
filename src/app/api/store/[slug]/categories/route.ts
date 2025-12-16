@@ -23,7 +23,7 @@ export async function GET(
         // Get unique categories from products
         const { data: products, error: productsError } = await supabase
             .from("products")
-            .select("categories, category")
+            .select("categories")
             .eq("organization_id", org.id)
 
         if (productsError) {
@@ -34,15 +34,13 @@ export async function GET(
         const categoriesSet = new Set<string>()
         
         products?.forEach(product => {
-            // Handle both 'categories' (array) and 'category' (string) fields
+            // Handle 'categories' field (can be array or string)
             if (Array.isArray(product.categories)) {
                 product.categories.forEach((cat: string) => {
                     if (cat && cat.trim()) categoriesSet.add(cat.trim())
                 })
             } else if (product.categories && typeof product.categories === 'string') {
                 if (product.categories.trim()) categoriesSet.add(product.categories.trim())
-            } else if (product.category && typeof product.category === 'string') {
-                if (product.category.trim()) categoriesSet.add(product.category.trim())
             }
         })
 

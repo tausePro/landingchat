@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import Link from "next/link"
+
 import Image from "next/image"
 import { ShoppingBag, MessageCircle, Truck, ShieldCheck, Instagram, Facebook } from "lucide-react"
+import { ProductCard } from "@/components/store/product-card"
+import { getStoreLink } from "@/lib/utils/store-urls"
 
 // Custom icons for TikTok and WhatsApp if not in lucide
 const TikTokIcon = ({ className }: { className?: string }) => (
@@ -28,27 +30,20 @@ interface CompleteTemplateProps {
     onStartChat: (productId?: string) => void
 }
 
-// Helper function to clean HTML and create excerpt
-function cleanDescription(html: string | null | undefined, maxLength: number = 150): string {
-    if (!html) return "Producto disponible"
-    
-    const cleaned = html
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&ldquo;/g, '"')
-        .replace(/&rdquo;/g, '"')
-        .replace(/\s+/g, ' ')
-        .trim()
-    
-    return cleaned.length > maxLength 
-        ? cleaned.substring(0, maxLength) + '...'
-        : cleaned
+// Helper function to get text color based on configuration
+function getTextColor(colorType: string): string {
+    const colors = {
+        default: "#1F2937",
+        warm: "#92400E", 
+        cool: "#1E40AF",
+        elegant: "#374151",
+        modern: "#111827",
+        soft: "#6B7280"
+    }
+    return colors[colorType as keyof typeof colors] || colors.default
 }
+
+
 
 // Component for critical image preloading (only hero + logo)
 function CriticalImagePreloader({ heroImage, logoUrl }: { heroImage?: string, logoUrl?: string }) {
@@ -79,8 +74,14 @@ export function CompleteTemplate({
     products,
     primaryColor,
     heroSettings,
-    onStartChat
-}: CompleteTemplateProps) {
+    onStartChat,
+    isSubdomain = false
+}: CompleteTemplateProps & { isSubdomain?: boolean }) {
+    const [mounted, setMounted] = useState(false)
+    
+    useEffect(() => {
+        setMounted(true)
+    }, [])
     const heroTitle = heroSettings.title || "Encuentra tu producto ideal, chateando."
     const heroSubtitle = heroSettings.subtitle || "Sin buscar, sin filtros, solo conversación. Nuestro asistente de IA te ayuda a encontrar exactamente lo que necesitas en segundos."
     const heroBackgroundImage = heroSettings.backgroundImage || ""
@@ -88,14 +89,32 @@ export function CompleteTemplate({
     const chatButtonText = heroSettings.chatButtonText || "Chatear para Comprar"
 
     const templateConfig = organization.settings?.storefront?.templateConfig?.complete || {}
-    const productConfig = organization.settings?.storefront?.products || {
+    
+    // Ensure we have a proper default config and merge with saved settings
+    const defaultProductConfig = {
         showSection: true,
         itemsToShow: 8,
         orderBy: "recent",
         showPrices: true,
         showAddToCart: true,
         showAIRecommended: false,
-        categories: { enabled: true, selected: [] }
+        categories: { enabled: true, selected: [] },
+        sectionTitle: "Tendencias",
+        sectionSubtitle: "Lo más vendido de la semana"
+    }
+    
+    const savedProductConfig = organization.settings?.storefront?.products || {}
+    const productConfig = { ...defaultProductConfig, ...savedProductConfig }
+    
+    // Debug logs - only in development
+    if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 Product config:', productConfig)
+        console.log('🔍 Items to show:', productConfig.itemsToShow)
+        console.log('🔍 Order by:', productConfig.orderBy)
+    }
+    const typographyConfig = organization.settings?.storefront?.typography || {
+        fontFamily: "Inter",
+        textColor: "default"
     }
     const productFeatures = organization.settings?.storefront?.productFeatures || []
     const testimonials = organization.settings?.storefront?.testimonials || []
@@ -117,24 +136,28 @@ export function CompleteTemplate({
         if (selectedCategory) {
             result = result.filter(p => {
                 if (Array.isArray(p.categories)) return p.categories.includes(selectedCategory)
-                return p.categories === selectedCategory || p.category === selectedCategory
+                return p.categories === selectedCategory
             })
         }
 
         // Filter by configured categories (if any selected in settings)
         if (productConfig.categories?.enabled && productConfig.categories?.selected?.length > 0) {
             result = result.filter(p => {
-                const pCats = Array.isArray(p.categories) ? p.categories : [p.categories || p.category].filter(Boolean)
+                const pCats = Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean)
                 return pCats.some((c: string) => productConfig.categories.selected.includes(c))
             })
         }
 
-        // Sort
-        if (productConfig.orderBy === "price_asc") result.sort((a, b) => a.price - b.price)
-        else if (productConfig.orderBy === "price_desc") result.sort((a, b) => b.price - a.price)
-        // recent and best_selling would need backend support or date fields, assuming default order is recent
+        // Sort products based on configuration
+        if (productConfig.orderBy === "price_asc") {
+            result.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))
+        } else if (productConfig.orderBy === "price_desc") {
+            result.sort((a, b) => parseFloat(b.price) - parseFloat(a.price))
+        }
+        // For recent and best_selling, keep original order for now
 
-        return result.slice(0, productConfig.itemsToShow || 8)
+        // Apply limit - this is now handled in the backend
+        return result
     }, [products, selectedCategory, productConfig])
 
     // Get unique categories for filter tabs
@@ -151,10 +174,13 @@ export function CompleteTemplate({
         products.forEach(p => {
             if (Array.isArray(p.categories)) p.categories.forEach((c: string) => cats.add(c))
             else if (p.categories) cats.add(p.categories)
-            else if (p.category) cats.add(p.category)
         })
         return Array.from(cats)
     }, [products, productConfig])
+
+    if (!mounted) {
+        return null
+    }
 
     return (
         <>
@@ -175,7 +201,12 @@ export function CompleteTemplate({
                 }}
             >
                 {heroBackgroundImage && (
-                    <div className="absolute inset-0 bg-black/40" />
+                    <div 
+                        className="absolute inset-0"
+                        style={{
+                            backgroundColor: heroSettings.overlayColor || 'rgba(0, 0, 0, 0.4)'
+                        }}
+                    />
                 )}
                 <div className="container mx-auto px-4 relative z-10">
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -183,10 +214,23 @@ export function CompleteTemplate({
                             <Badge variant="outline" className={`mb-6 px-3 py-1 text-sm ${heroBackgroundImage ? 'border-white/30 bg-white/20 text-white' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
                                 ✨ La nueva forma de comprar
                             </Badge>
-                            <h1 className={`text-4xl font-extrabold tracking-tight sm:text-6xl mb-6 leading-[1.1] ${heroBackgroundImage ? 'text-white' : 'text-gray-900'}`}>
+                            <h1 
+                                className={`text-4xl font-extrabold tracking-tight sm:text-6xl mb-6 leading-[1.1] ${heroBackgroundImage ? 'text-white' : 'text-gray-900'}`}
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: heroBackgroundImage ? 'white' : getTextColor(typographyConfig.textColor)
+                                }}
+                            >
                                 {heroTitle}
                             </h1>
-                            <p className={`text-lg mb-8 leading-relaxed ${heroBackgroundImage ? 'text-white/90' : 'text-slate-600'}`}>
+                            <p 
+                                className={`text-lg mb-8 leading-relaxed ${heroBackgroundImage ? 'text-white/90' : 'text-slate-600'}`}
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: heroBackgroundImage ? 'rgba(255,255,255,0.9)' : getTextColor(typographyConfig.textColor),
+                                    opacity: heroBackgroundImage ? 1 : 0.8
+                                }}
+                            >
                                 {heroSubtitle}
                             </p>
                             {showChatButton && (
@@ -203,27 +247,43 @@ export function CompleteTemplate({
                                         variant="outline"
                                         size="lg"
                                         className={`w-full sm:w-auto text-base h-14 ${heroBackgroundImage ? 'border-white text-white hover:bg-white/10' : ''}`}
+                                        onClick={() => {
+                                            const productsSection = document.getElementById('products')
+                                            if (productsSection) {
+                                                productsSection.scrollIntoView({ behavior: 'smooth' })
+                                            }
+                                        }}
                                     >
                                         Ver Catálogo
                                     </Button>
                                 </div>
                             )}
 
-                            {/* Stats */}
-                            <div className={`mt-10 flex items-center gap-6 text-sm font-medium ${heroBackgroundImage ? 'text-white/80' : 'text-slate-500'}`}>
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
-                                        <Truck className="w-4 h-4" />
-                                    </div>
-                                    <span>Envíos Nacionales</span>
+                            {/* Stats - Configurable */}
+                            {heroSettings.showStats !== false && (
+                                <div 
+                                    className={`mt-10 flex items-center gap-6 text-sm font-medium ${heroBackgroundImage ? 'text-white/80' : 'text-slate-500'}`}
+                                    style={{ 
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: heroBackgroundImage ? 'rgba(255,255,255,0.8)' : getTextColor(typographyConfig.textColor),
+                                        opacity: heroBackgroundImage ? 1 : 0.7
+                                    }}
+                                >
+                                    {(heroSettings.stats || [
+                                        { icon: 'Truck', text: 'Envíos Nacionales' },
+                                        { icon: 'ShieldCheck', text: 'Compra Segura' }
+                                    ]).map((stat: any, index: number) => (
+                                        <div key={index} className="flex items-center gap-2">
+                                            <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
+                                                {stat.icon === 'Truck' && <Truck className="w-4 h-4" />}
+                                                {stat.icon === 'ShieldCheck' && <ShieldCheck className="w-4 h-4" />}
+                                                {stat.icon === 'MessageCircle' && <MessageCircle className="w-4 h-4" />}
+                                            </div>
+                                            <span>{stat.text}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
-                                        <ShieldCheck className="w-4 h-4" />
-                                    </div>
-                                    <span>Compra Segura</span>
-                                </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Hero Image/Illustration (only if no background image) */}
@@ -262,8 +322,25 @@ export function CompleteTemplate({
             <section className="py-20 bg-white">
                 <div className="container mx-auto px-4">
                     <div className="text-center max-w-3xl mx-auto mb-16">
-                        <h2 className="text-3xl font-bold mb-4">Cómo funciona</h2>
-                        <p className="text-gray-600 text-lg">Comprar nunca fue tan fácil. Olvídate de los carritos complicados.</p>
+                        <h2 
+                            className="text-3xl font-bold mb-4"
+                            style={{ 
+                                fontFamily: typographyConfig.fontFamily,
+                                color: getTextColor(typographyConfig.textColor)
+                            }}
+                        >
+                            Cómo funciona
+                        </h2>
+                        <p 
+                            className="text-gray-600 text-lg"
+                            style={{ 
+                                fontFamily: typographyConfig.fontFamily,
+                                color: getTextColor(typographyConfig.textColor),
+                                opacity: 0.7
+                            }}
+                        >
+                            Comprar nunca fue tan fácil. Olvídate de los carritos complicados.
+                        </p>
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-8">
@@ -277,8 +354,25 @@ export function CompleteTemplate({
                                         index === 1 ? <ShoppingBag className="w-8 h-8" /> :
                                             <Truck className="w-8 h-8" />}
                                 </div>
-                                <h3 className="text-xl font-bold mb-3">{step.title}</h3>
-                                <p className="text-gray-600">{step.description}</p>
+                                <h3 
+                                    className="text-xl font-bold mb-3"
+                                    style={{ 
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor)
+                                    }}
+                                >
+                                    {step.title}
+                                </h3>
+                                <p 
+                                    className="text-gray-600"
+                                    style={{ 
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor),
+                                        opacity: 0.7
+                                    }}
+                                >
+                                    {step.description}
+                                </p>
                             </div>
                         ))}
                     </div>
@@ -290,8 +384,25 @@ export function CompleteTemplate({
                 <section className="py-16 bg-gray-50">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-12">
-                            <h2 className="text-2xl font-bold mb-4">¿Por qué elegirnos?</h2>
-                            <p className="text-gray-600">Beneficios que hacen la diferencia</p>
+                            <h2 
+                                className="text-2xl font-bold mb-4"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor)
+                                }}
+                            >
+                                ¿Por qué elegirnos?
+                            </h2>
+                            <p 
+                                className="text-gray-600"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor),
+                                    opacity: 0.7
+                                }}
+                            >
+                                Beneficios que hacen la diferencia
+                            </p>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
                             {productFeatures.filter((feature: any) => feature.enabled).map((feature: any, index: number) => (
@@ -301,7 +412,15 @@ export function CompleteTemplate({
                                             {feature.icon}
                                         </span>
                                     </div>
-                                    <p className="text-sm font-medium text-gray-900">{feature.title}</p>
+                                    <p 
+                                        className="text-sm font-medium text-gray-900"
+                                        style={{ 
+                                            fontFamily: typographyConfig.fontFamily,
+                                            color: getTextColor(typographyConfig.textColor)
+                                        }}
+                                    >
+                                        {feature.title}
+                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -315,8 +434,25 @@ export function CompleteTemplate({
                     <div className="container mx-auto px-4">
                         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
                             <div>
-                                <h2 className="text-3xl font-bold mb-2">Tendencias</h2>
-                                <p className="text-gray-600">Lo más vendido de la semana</p>
+                                <h2 
+                                    className="text-3xl font-bold mb-2"
+                                    style={{ 
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor)
+                                    }}
+                                >
+                                    {productConfig.sectionTitle || "Tendencias"}
+                                </h2>
+                                <p 
+                                    className="text-gray-600"
+                                    style={{ 
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor),
+                                        opacity: 0.7
+                                    }}
+                                >
+                                    {productConfig.sectionSubtitle || "Lo más vendido de la semana"}
+                                </p>
                             </div>
 
                             {/* Category Filter */}
@@ -346,72 +482,20 @@ export function CompleteTemplate({
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                            {filteredProducts.map((product) => (
-                                <div key={product.id} className="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
-                                    <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
-                                        {product.image_url ? (
-                                            <Image
-                                                src={product.image_url}
-                                                alt={product.name}
-                                                fill
-                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                                                className="object-cover group-hover:scale-110 transition-transform duration-500"
-                                                loading="lazy"
-                                                quality={85}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                                <ShoppingBag className="w-12 h-12" />
-                                            </div>
-                                        )}
-                                        {productConfig.showAIRecommended && (
-                                            <div className="absolute top-3 right-3">
-                                                <Badge className="bg-white/90 text-black hover:bg-white backdrop-blur-sm shadow-sm flex items-center gap-1">
-                                                    ✨ IA
-                                                </Badge>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="p-5">
-                                        <h3 className="font-bold text-gray-900 mb-1 truncate">{product.name}</h3>
-                                        <p className="text-sm text-gray-500 mb-4 line-clamp-2">
-                                            {cleanDescription(product.description)}
-                                        </p>
-                                        <div className="flex items-center justify-between">
-                                            {productConfig.showPrices ? (
-                                                <span className="text-lg font-bold" style={{ color: primaryColor }}>
-                                                    {(() => {
-                                                        // Handle products with variants (like gift cards)
-                                                        if (product.price === 0 && product.variants && product.variants.length > 0) {
-                                                            const minPrice = Math.min(...product.variants.map((v: any) => v.price || 0))
-                                                            return minPrice > 0 
-                                                                ? `Desde ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(minPrice)}`
-                                                                : "Elige monto"
-                                                        }
-                                                        // Regular products
-                                                        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)
-                                                    })()}
-                                                </span>
-                                            ) : (
-                                                <span></span>
-                                            )}
-
-                                            {productConfig.showAddToCart && (
-                                                <Button
-                                                    size="sm"
-                                                    className="rounded-full text-xs px-3 py-1 h-8 font-medium"
-                                                    style={{ backgroundColor: primaryColor }}
-                                                    onClick={() => onStartChat(product.id)}
-                                                    title={`Pregunta sobre ${product.name}`}
-                                                >
-                                                    <MessageCircle className="w-4 h-4 mr-1" />
-                                                    ¿Me sirve?
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                            {filteredProducts.map((product) => {
+                                const productUrl = getStoreLink(`/producto/${product.slug || product.id}`, isSubdomain, organization.slug)
+                                return (
+                                    <ProductCard
+                                        key={product.id}
+                                        product={product}
+                                        productUrl={productUrl}
+                                        primaryColor={primaryColor}
+                                        showPrices={productConfig.showPrices}
+                                        showAddToCart={productConfig.showAddToCart}
+                                        showAIRecommended={productConfig.showAIRecommended}
+                                    />
+                                )
+                            })}
                         </div>
                     </div>
                 </section>
@@ -422,8 +506,25 @@ export function CompleteTemplate({
                 <section className="py-20 bg-white">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-16">
-                            <h2 className="text-3xl font-bold mb-4">Lo que dicen nuestros clientes</h2>
-                            <p className="text-gray-600 text-lg">Testimonios reales de personas satisfechas</p>
+                            <h2 
+                                className="text-3xl font-bold mb-4"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor)
+                                }}
+                            >
+                                Lo que dicen nuestros clientes
+                            </h2>
+                            <p 
+                                className="text-gray-600 text-lg"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor),
+                                    opacity: 0.7
+                                }}
+                            >
+                                Testimonios reales de personas satisfechas
+                            </p>
                         </div>
                         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                             {testimonials.filter((testimonial: any) => testimonial.enabled).map((testimonial: any, index: number) => (
@@ -434,7 +535,16 @@ export function CompleteTemplate({
                                                 <span key={i} className="text-yellow-400 text-xl">★</span>
                                             ))}
                                         </div>
-                                        <p className="text-gray-700 italic mb-4">"{testimonial.text}"</p>
+                                        <p 
+                                            className="text-gray-700 italic mb-4"
+                                            style={{ 
+                                                fontFamily: typographyConfig.fontFamily,
+                                                color: getTextColor(typographyConfig.textColor),
+                                                opacity: 0.8
+                                            }}
+                                        >
+                                            "{testimonial.text}"
+                                        </p>
                                     </div>
                                     <div className="flex items-center justify-center gap-3">
                                         {testimonial.avatar && (
@@ -448,9 +558,26 @@ export function CompleteTemplate({
                                             />
                                         )}
                                         <div className="text-left">
-                                            <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                                            <p 
+                                                className="font-semibold text-gray-900"
+                                                style={{ 
+                                                    fontFamily: typographyConfig.fontFamily,
+                                                    color: getTextColor(typographyConfig.textColor)
+                                                }}
+                                            >
+                                                {testimonial.name}
+                                            </p>
                                             {testimonial.role && (
-                                                <p className="text-sm text-gray-500">{testimonial.role}</p>
+                                                <p 
+                                                    className="text-sm text-gray-500"
+                                                    style={{ 
+                                                        fontFamily: typographyConfig.fontFamily,
+                                                        color: getTextColor(typographyConfig.textColor),
+                                                        opacity: 0.6
+                                                    }}
+                                                >
+                                                    {testimonial.role}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
@@ -465,14 +592,31 @@ export function CompleteTemplate({
             <section className="py-20 bg-gray-900 text-white relative overflow-hidden">
                 <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                 <div className="container mx-auto px-4 text-center relative z-10">
-                    <h2 className="text-3xl md:text-5xl font-bold mb-6">¿Listo para empezar?</h2>
-                    <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+                    <h2 
+                        className="text-3xl md:text-5xl font-bold mb-6"
+                        style={{ 
+                            fontFamily: typographyConfig.fontFamily,
+                            color: 'white'
+                        }}
+                    >
+                        ¿Listo para empezar?
+                    </h2>
+                    <p 
+                        className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto"
+                        style={{ 
+                            fontFamily: typographyConfig.fontFamily,
+                            color: '#d1d5db'
+                        }}
+                    >
                         Únete a miles de clientes satisfechos que ya compran de manera inteligente.
                     </p>
                     <Button
                         onClick={() => onStartChat()}
                         size="lg"
-                        style={{ backgroundColor: primaryColor }}
+                        style={{ 
+                            backgroundColor: primaryColor,
+                            fontFamily: typographyConfig.fontFamily
+                        }}
                         className="text-lg px-10 h-16 shadow-2xl hover:scale-105 transition-transform"
                     >
                         {chatButtonText}
@@ -501,9 +645,24 @@ export function CompleteTemplate({
                                         {organization.name.substring(0, 1)}
                                     </div>
                                 )}
-                                <span className="text-xl font-bold">{organization.name}</span>
+                                <span 
+                                    className="text-xl font-bold"
+                                    style={{ 
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor)
+                                    }}
+                                >
+                                    {organization.name}
+                                </span>
                             </div>
-                            <p className="text-gray-500 max-w-xs mb-6">
+                            <p 
+                                className="text-gray-500 max-w-xs mb-6"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor),
+                                    opacity: 0.7
+                                }}
+                            >
                                 La mejor experiencia de compra conversacional. Encuentra lo que buscas, al instante.
                             </p>
 
@@ -532,8 +691,23 @@ export function CompleteTemplate({
                             </div>
                         </div>
                         <div>
-                            <h4 className="font-bold mb-4">Enlaces</h4>
-                            <ul className="space-y-2 text-gray-600">
+                            <h4 
+                                className="font-bold mb-4"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor)
+                                }}
+                            >
+                                Enlaces
+                            </h4>
+                            <ul 
+                                className="space-y-2 text-gray-600"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor),
+                                    opacity: 0.7
+                                }}
+                            >
                                 <li><a href="#" className="hover:text-primary">Inicio</a></li>
                                 <li><a href="#products" className="hover:text-primary">Productos</a></li>
                                 <li><a href="#" className="hover:text-primary">Nosotros</a></li>
@@ -541,8 +715,23 @@ export function CompleteTemplate({
                             </ul>
                         </div>
                         <div>
-                            <h4 className="font-bold mb-4">Legal</h4>
-                            <ul className="space-y-2 text-gray-600">
+                            <h4 
+                                className="font-bold mb-4"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor)
+                                }}
+                            >
+                                Legal
+                            </h4>
+                            <ul 
+                                className="space-y-2 text-gray-600"
+                                style={{ 
+                                    fontFamily: typographyConfig.fontFamily,
+                                    color: getTextColor(typographyConfig.textColor),
+                                    opacity: 0.7
+                                }}
+                            >
                                 <li><a href="#" className="hover:text-primary">Términos</a></li>
                                 <li><a href="#" className="hover:text-primary">Privacidad</a></li>
                                 <li><a href="#" className="hover:text-primary">Envíos</a></li>
@@ -550,7 +739,15 @@ export function CompleteTemplate({
                         </div>
                     </div>
                     <div className="border-t border-gray-100 pt-8 text-center text-gray-400 text-sm">
-                        <p>© {new Date().getFullYear()} {organization.name}. Powered by LandingChat.</p>
+                        <p 
+                            style={{ 
+                                fontFamily: typographyConfig.fontFamily,
+                                color: getTextColor(typographyConfig.textColor),
+                                opacity: 0.5
+                            }}
+                        >
+                            © 2024 {organization.name}. Powered by LandingChat.
+                        </p>
                     </div>
                 </div>
             </footer>

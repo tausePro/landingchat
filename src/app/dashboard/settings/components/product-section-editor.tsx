@@ -30,7 +30,9 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
         categories: {
             enabled: true,
             selected: []
-        }
+        },
+        sectionTitle: "Tendencias",
+        sectionSubtitle: "Lo más vendido de la semana"
     }
 
     const [config, setConfig] = useState(
@@ -113,6 +115,36 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                 </div>
 
                 <div className="h-px bg-gray-200 dark:border-gray-800" />
+
+                {/* Section Title */}
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <Label className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Título de la sección</Label>
+                        <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-1">Personaliza el título que aparece sobre los productos.</p>
+                    </div>
+                    <input
+                        type="text"
+                        value={config.sectionTitle || ""}
+                        onChange={(e) => setConfig({ ...config, sectionTitle: e.target.value })}
+                        className="max-w-[200px] px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
+                        placeholder="Tendencias"
+                    />
+                </div>
+
+                {/* Section Subtitle */}
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <Label className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Subtítulo de la sección</Label>
+                        <p className="text-sm text-[#6B7280] dark:text-gray-400 mt-1">Descripción que aparece debajo del título.</p>
+                    </div>
+                    <input
+                        type="text"
+                        value={config.sectionSubtitle || ""}
+                        onChange={(e) => setConfig({ ...config, sectionSubtitle: e.target.value })}
+                        className="max-w-[200px] px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
+                        placeholder="Lo más vendido de la semana"
+                    />
+                </div>
 
                 {/* Items to Show */}
                 <div className="flex items-start justify-between gap-4">
