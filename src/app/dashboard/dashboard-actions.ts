@@ -55,8 +55,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         .from("orders")
         .select("total, created_at, status")
         .eq("organization_id", orgId)
-        .neq("status", "cancelled")
-        .neq("status", "refunded")
+        .in("status", ["pending", "confirmed", "processing", "shipped", "delivered", "completed"])
         .order("created_at", { ascending: true })
 
     const validOrders = orders || []
