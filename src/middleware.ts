@@ -111,7 +111,7 @@ export async function middleware(request: NextRequest) {
                 const subdomain = parts[0]
 
                 // Ignorar subdominios reservados del sistema
-                const reserved = ['www', 'app', 'api', 'dashboard', 'admin', 'wa']
+                const reserved = ['www', 'app', 'api', 'dashboard', 'wa']
                 if (!reserved.includes(subdomain)) {
                     slug = subdomain
                 }
