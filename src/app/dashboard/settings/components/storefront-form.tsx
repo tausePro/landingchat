@@ -12,6 +12,7 @@ import { ServicesSectionEditor } from "./services-section-editor"
 import { CompleteTemplateEditor } from "./complete-template-editor"
 import { ServicesTemplateEditor } from "./services-template-editor"
 import { SingleProductTemplateEditor } from "./single-product-template-editor"
+import { TestimonialsEditor } from "./testimonials-editor"
 
 interface StorefrontFormProps {
     organization: {
@@ -40,6 +41,7 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
                     <>
                         <CompleteTemplateEditor organization={organization} />
                         <ProductFeaturesEditor organization={organization} />
+                        <TestimonialsEditor organization={organization} />
                         <ProductSectionEditor organization={organization} />
                     </>
                 )}

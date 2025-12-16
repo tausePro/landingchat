@@ -97,6 +97,8 @@ export function CompleteTemplate({
         showAIRecommended: false,
         categories: { enabled: true, selected: [] }
     }
+    const productFeatures = organization.settings?.storefront?.productFeatures || []
+    const testimonials = organization.settings?.storefront?.testimonials || []
     const socialLinks = organization.settings?.storefront?.footer?.social || {}
 
     const steps = templateConfig.steps || [
@@ -132,7 +134,14 @@ export function CompleteTemplate({
         else if (productConfig.orderBy === "price_desc") result.sort((a, b) => b.price - a.price)
         // recent and best_selling would need backend support or date fields, assuming default order is recent
 
-        return result.slice(0, productConfig.itemsToShow || 8)
+        const finalResult = result.slice(0, productConfig.itemsToShow || 8)
+        console.log('Product filtering debug:', {
+            totalProducts: products.length,
+            afterFiltering: result.length,
+            itemsToShow: productConfig.itemsToShow,
+            finalCount: finalResult.length
+        })
+        return finalResult
     }, [products, selectedCategory, productConfig])
 
     // Get unique categories for filter tabs
@@ -283,6 +292,30 @@ export function CompleteTemplate({
                 </div>
             </section>
 
+            {/* Product Features Section */}
+            {productFeatures && productFeatures.length > 0 && (
+                <section className="py-16 bg-gray-50">
+                    <div className="container mx-auto px-4">
+                        <div className="text-center mb-12">
+                            <h2 className="text-2xl font-bold mb-4">¿Por qué elegirnos?</h2>
+                            <p className="text-gray-600">Beneficios que hacen la diferencia</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+                            {productFeatures.filter((feature: any) => feature.enabled).map((feature: any, index: number) => (
+                                <div key={index} className="text-center p-4">
+                                    <div className="w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-full bg-white shadow-sm">
+                                        <span className="material-symbols-outlined text-2xl" style={{ color: primaryColor }}>
+                                            {feature.icon}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-900">{feature.title}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            )}
+
             {/* Featured Products */}
             {productConfig.showSection && (
                 <section id="products" className="py-20 bg-gray-50">
@@ -381,6 +414,50 @@ export function CompleteTemplate({
                                                     <MessageCircle className="w-4 h-4 mr-1" />
                                                     ¿Me sirve?
                                                 </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* Social Proof / Testimonials Section */}
+            {testimonials && testimonials.length > 0 && (
+                <section className="py-20 bg-white">
+                    <div className="container mx-auto px-4">
+                        <div className="text-center mb-16">
+                            <h2 className="text-3xl font-bold mb-4">Lo que dicen nuestros clientes</h2>
+                            <p className="text-gray-600 text-lg">Testimonios reales de personas satisfechas</p>
+                        </div>
+                        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                            {testimonials.filter((testimonial: any) => testimonial.enabled).map((testimonial: any, index: number) => (
+                                <div key={index} className="bg-gray-50 rounded-2xl p-6 text-center">
+                                    <div className="mb-4">
+                                        <div className="flex justify-center mb-3">
+                                            {[...Array(5)].map((_, i) => (
+                                                <span key={i} className="text-yellow-400 text-xl">★</span>
+                                            ))}
+                                        </div>
+                                        <p className="text-gray-700 italic mb-4">"{testimonial.text}"</p>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-3">
+                                        {testimonial.avatar && (
+                                            <Image
+                                                src={testimonial.avatar}
+                                                alt={testimonial.name}
+                                                width={40}
+                                                height={40}
+                                                className="rounded-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        )}
+                                        <div className="text-left">
+                                            <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                                            {testimonial.role && (
+                                                <p className="text-sm text-gray-500">{testimonial.role}</p>
                                             )}
                                         </div>
                                     </div>

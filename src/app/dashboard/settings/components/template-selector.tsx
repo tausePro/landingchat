@@ -28,7 +28,7 @@ const TEMPLATES = [
         name: "Completo",
         description: "Storefront completo con todas las secciones",
         preview: "/templates/complete-preview.png",
-        features: ["Hero", "Productos", "Cómo funciona", "Social proof", "Footer"]
+        features: ["Hero", "Cómo funciona", "Características", "Productos", "Testimonios", "Footer"]
     },
     {
         id: "single-product",
