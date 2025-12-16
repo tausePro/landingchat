@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard: Configuración Pagos</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+:root {
+    --blue-primary: #3B82F6
+    }
+.toggle-checkbox:checked {
+    @apply: right-0 border-blue-600;
+    right: 0;
+    border-color: var(--blue-primary)
+    }
+.toggle-checkbox:checked + .toggle-label {
+    @apply: bg-blue-600;
+    background-color: var(--blue-primary)
+    }
+.form-select {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCqbOO7vrlxMebdoLUGJzsWWcfh9Kn9B56nrjN3xw8Aernb3JQENSiid8TXepeqwCWwxyzx0-30eQ3TwL1p70c-Qu5XQJqCR6qD1YiWfQ9yGpYEYDlidLFauJfZddI-fPOvzkBVbI19vaMAdvemVzVfr3hNFn4Goo6ntyHTE1IGw7ftstkffqLQDIFmeSBfTG6sh-9A0pUscgtpS7fiK2Q_fJ77QFzP8B21-nGRcJ-tysVlCnze2J3AtiNEelcLgz0b_6E-QZpx1dQ)
+    }</style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#3B82F6",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101822",
+            },
+            fontFamily: {
+              "display": ["Manrope", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-gray-900">
+<div class="relative flex min-h-screen w-full">
+<aside class="flex w-64 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-gray-800 p-4">
+<div class="flex h-full flex-col justify-between">
+<div class="flex flex-col gap-4">
+<div class="flex items-center gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Company Logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuByN0j_1fy9G8Mjl18bn1JyW3m79-aTcALppfQumGqpp5YeKFPWKCd7SE_V9cBxtZPAEOkpENWAGJN-Dset1NF7iYitAV8cSc7zHpA8uxUbXJo4OeuxR8duBdfinlD04F3cshkk7Ho-TeO8Eh2S-VWvpZkMAtFRm8k-4i9WbG2cZt_OrBy7lGGDNsZkCID74tH3bR3-xN9Qxj_TtEhMyP5Qlhe3lNujvtFWGoGesjutoQ31TPCOnNdKrFZ6Xhofm3a4GIxeQhZGpw8");'></div>
+<div class="flex flex-col">
+<h1 class="text-slate-900 dark:text-white text-base font-medium leading-normal">LandingChat</h1>
+<p class="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">Plan Pro</p>
+</div>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+<span class="material-symbols-outlined text-slate-900 dark:text-white">dashboard</span>
+<p class="text-sm font-medium leading-normal">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+<span class="material-symbols-outlined text-slate-900 dark:text-white">chat</span>
+<p class="text-sm font-medium leading-normal">Chats</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+<span class="material-symbols-outlined text-slate-900 dark:text-white">shopping_cart</span>
+<p class="text-sm font-medium leading-normal">Productos</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+<span class="material-symbols-outlined text-slate-900 dark:text-white">group</span>
+<p class="text-sm font-medium leading-normal">Clientes</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/50 text-primary" href="#">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">settings</span>
+<p class="text-sm font-medium leading-normal text-primary">Configuración</p>
+</a>
+</nav>
+</div>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+<span class="material-symbols-outlined text-slate-900 dark:text-white">help</span>
+<p class="text-sm font-medium leading-normal">Ayuda</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700" href="#">
+<span class="material-symbols-outlined text-slate-900 dark:text-white">logout</span>
+<p class="text-sm font-medium leading-normal">Cerrar Sesión</p>
+</a>
+</div>
+</div>
+</aside>
+<main class="flex-1 p-8">
+<div class="mx-auto max-w-3xl">
+<div class="flex flex-col gap-2 mb-8">
+<h1 class="text-slate-900 dark:text-white text-3xl font-bold leading-tight tracking-tight">Pasarelas de Pago</h1>
+<p class="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Configura tus pasarelas para recibir pagos de clientes.</p>
+</div>
+<div class="flex flex-col gap-6">
+<div class="bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm p-6">
+<h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-6">Pasarelas de Pago Online</h2>
+<div class="space-y-6">
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" for="payment-provider">Proveedor de Pago</label>
+<select class="form-select block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm" id="payment-provider" name="payment-provider">
+<option>Wompi (Bancolombia)</option>
+<option>ePayco</option>
+<option>Stripe</option>
+</select>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<h3 class="font-medium text-slate-900 dark:text-white">Modo de Pruebas</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">Activa el modo sandbox para pruebas sin cobros reales</p>
+</div>
+<div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+<input class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white dark:bg-slate-400 border-4 appearance-none cursor-pointer" id="toggle-test-mode" name="toggle-test-mode" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 dark:bg-slate-600 cursor-pointer" for="toggle-test-mode"></label>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" for="public-key">Llave Pública</label>
+<div class="relative">
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm pr-10" id="public-key" name="public-key" placeholder="pub_test_xxxxxx o pub_prod_xxxxxx" type="password"/>
+<button class="absolute inset-y-0 right-0 flex items-center pr-3" type="button">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">visibility</span>
+</button>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" for="private-key">Llave Privada</label>
+<div class="relative">
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm pr-10" id="private-key" name="private-key" placeholder="prv_test_xxxxxx o prv_prod_xxxxxx" type="password"/>
+<button class="absolute inset-y-0 right-0 flex items-center pr-3" type="button">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">visibility</span>
+</button>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1" for="integrity-secret">Secreto de Integridad (Opcional)</label>
+<div class="relative">
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm pr-10" id="integrity-secret" name="integrity-secret" placeholder="Secreto para validar webhooks" type="password"/>
+<button class="absolute inset-y-0 right-0 flex items-center pr-3" type="button">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-base">visibility</span>
+</button>
+</div>
+</div>
+<button class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" type="submit">Guardar Configuración de Pasarela</button>
+</div>
+</div>
+<div class="bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm p-6">
+<h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-6">Otros Métodos de Pago Directos</h2>
+<div class="mb-8 border-b border-slate-100 dark:border-slate-700 pb-8 last:border-0 last:pb-0">
+<div class="flex items-center justify-between mb-4">
+<div>
+<h3 class="font-medium text-slate-900 dark:text-white">Transferencia Bancaria</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">Habilita transferencias directas a tu cuenta</p>
+</div>
+<div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white dark:bg-slate-400 border-4 appearance-none cursor-pointer" id="toggle-bank" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 dark:bg-slate-600 cursor-pointer" for="toggle-bank"></label>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre del Banco</label>
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm" placeholder="Ej. Bancolombia" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo de Cuenta</label>
+<select class="form-select block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm">
+<option>Ahorros</option>
+<option>Corriente</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Número de Cuenta</label>
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm" placeholder="000-000000-00" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre del Titular de la Cuenta</label>
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary focus:ring-primary sm:text-sm" type="text"/>
+</div>
+</div>
+<div class="mt-4 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800">
+<p class="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+<span class="material-symbols-outlined text-sm" style="font-size: 16px;">info</span>
+<span>El cliente recibirá estos datos al confirmar su pedido para realizar el pago manual.</span>
+</p>
+</div>
+</div>
+<div class="mb-6">
+<div class="flex items-center justify-between mb-4">
+<div>
+<h3 class="font-medium text-slate-900 dark:text-white">Pago Contra Entrega (Cash on Delivery - COD)</h3>
+<p class="text-sm text-slate-500 dark:text-slate-400">Permite a tus clientes pagar en efectivo al recibir</p>
+</div>
+<div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white dark:bg-slate-400 border-4 appearance-none cursor-pointer" id="toggle-cod" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 dark:bg-slate-600 cursor-pointer" for="toggle-cod"></label>
+</div>
+</div>
+<div class="mt-4">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Costo Adicional por COD (Opcional)</label>
+<div class="relative rounded-md shadow-sm w-full md:w-1/2">
+<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+<span class="text-gray-500 sm:text-sm">$</span>
+</div>
+<input class="block w-full rounded-md border-slate-300 dark:border-slate-600 dark:bg-gray-700 dark:text-white pl-7 pr-12 focus:border-primary focus:ring-primary sm:text-sm" id="cod-price" name="cod-price" placeholder="0.00" type="text"/>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+<span class="text-gray-500 sm:text-sm">COP</span>
+</div>
+</div>
+<p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+Este valor se sumará al total del pedido si el cliente elige este método de pago.
+</p>
+</div>
+</div>
+<button class="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" type="submit">Guardar Otros Métodos</button>
+</div>
+<div class="bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm p-6">
+<h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Verificar Conexión</h2>
+<div class="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center">
+<span class="material-symbols-outlined text-4xl text-slate-400 dark:text-slate-500">wifi</span>
+<p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Configura tus pasarelas para probar la conexión</p>
+</div>
+<button class="mt-6 w-full rounded-lg bg-slate-200 dark:bg-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 cursor-not-allowed" type="button">Probar Conexión</button>
+</div>
+<div class="bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm p-6">
+<h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">Documentación</h2>
+<div class="space-y-3">
+<a class="flex items-center justify-between text-sm text-primary hover:underline" href="#">
+<span>Guía de configuración de pasarelas</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</a>
+<a class="flex items-center justify-between text-sm text-primary hover:underline" href="#">
+<span>Preguntas frecuentes sobre pagos</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+</body></html>

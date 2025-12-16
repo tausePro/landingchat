@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button"
 import { CustomerGateModal } from "@/components/store/customer-gate-modal"
 import { TemplateRenderer } from "@/components/store/templates/template-renderer"
 import { StoreHeader } from "@/components/store/store-header"
+import { EnhancedStoreHeader } from "@/components/store/enhanced-store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
 import { StorePresence } from "@/components/store/store-presence"
 import { CartDrawer } from "@/app/chat/components/cart-drawer"
+
 
 interface StoreLayoutClientProps {
     slug: string
@@ -29,6 +31,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
     const [showGateModal, setShowGateModal] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
+    const [shippingConfig, setShippingConfig] = useState<any>(null)
 
     // Branding settings
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
@@ -43,6 +46,22 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
     // Typography
     const fontFamily = typographySettings.fontFamily || "Inter"
+
+    // Cargar configuración de envío
+    useEffect(() => {
+        const loadShippingConfig = async () => {
+            try {
+                const response = await fetch(`/api/store/${slug}/shipping-config`)
+                if (response.ok) {
+                    const config = await response.json()
+                    setShippingConfig(config)
+                }
+            } catch (error) {
+                console.error('Error loading shipping config:', error)
+            }
+        }
+        loadShippingConfig()
+    }, [slug])
 
     // Detectar action=chat en la URL
     useEffect(() => {
@@ -72,20 +91,23 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
         }
     }, [searchParams, organization.slug, router, isSubdomain])
 
-    const handleStartChat = (productId?: string) => {
+    const handleStartChat = (productId?: string, query?: string) => {
         // Verificar si ya está identificado
         const customerId = localStorage.getItem(`customer_${organization.slug}`)
 
         if (customerId) {
             // Ya identificado, ir al chat
             let chatUrl = getChatUrl(isSubdomain, organization.slug)
-            if (productId) chatUrl += `?product=${productId}`
+            const params = new URLSearchParams()
+            if (productId) params.set('product', productId)
+            if (query) params.set('context', query)
+            if (params.toString()) chatUrl += `?${params.toString()}`
+            
             router.push(chatUrl)
         } else {
-            // Guardar producto pendiente si existe
-            if (productId) {
-                setPendingProductId(productId)
-            }
+            // Guardar producto y contexto pendientes si existen
+            if (productId) setPendingProductId(productId)
+            if (query) setPendingContext(query)
             // Mostrar modal de identificación
             setShowGateModal(true)
         }
@@ -113,13 +135,14 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
         <div className="min-h-screen bg-white text-slate-900" style={{ fontFamily: fontFamily }}>
             {/* --- Header --- */}
             {!hideNavigation && (
-                <StoreHeader
+                <EnhancedStoreHeader
                     slug={slug}
                     organization={organization}
-                    onStartChat={() => handleStartChat()}
+                    onStartChat={handleStartChat}
                     primaryColor={primaryColor}
                     showStoreName={showStoreName}
                     hideOnMobile={hideHeaderOnMobile}
+                    shippingConfig={shippingConfig}
                 />
             )}
 

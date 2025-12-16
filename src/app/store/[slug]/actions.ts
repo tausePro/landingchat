@@ -152,3 +152,38 @@ export async function getStoreSettings(slug: string) {
 
     return org.settings
 }
+
+export async function getShippingConfig(slug: string) {
+    const supabase = await createClient()
+
+    // 1. Obtener la organización
+    const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("slug", slug)
+        .single()
+
+    if (orgError || !org) return null
+
+    // 2. Obtener configuración de envío de la tabla shipping_settings
+    const { data: shippingSettings, error: shippingError } = await supabase
+        .from("shipping_settings")
+        .select("free_shipping_enabled, free_shipping_min_amount, default_shipping_rate")
+        .eq("organization_id", org.id)
+        .single()
+
+    if (shippingError) {
+        // Si no hay configuración específica, devolver valores por defecto
+        return {
+            free_shipping_enabled: false,
+            free_shipping_min_amount: null,
+            default_shipping_rate: 5000
+        }
+    }
+
+    return {
+        free_shipping_enabled: shippingSettings.free_shipping_enabled || false,
+        free_shipping_min_amount: shippingSettings.free_shipping_min_amount,
+        default_shipping_rate: shippingSettings.default_shipping_rate || 5000
+    }
+}
