@@ -3,16 +3,17 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { slug: string } }
+    { params }: { params: Promise<{ slug: string }> }
 ) {
     try {
         const supabase = createClient()
+        const { slug } = await params
         
         // Get organization by slug
         const { data: org, error: orgError } = await supabase
             .from("organizations")
             .select("id")
-            .eq("slug", params.slug)
+            .eq("slug", slug)
             .single()
 
         if (orgError || !org) {
