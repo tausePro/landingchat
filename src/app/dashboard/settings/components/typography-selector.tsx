@@ -21,6 +21,7 @@ const FONT_OPTIONS = [
     { value: "Roboto", label: "Roboto", className: "font-sans" },
     { value: "Montserrat", label: "Montserrat", className: "font-sans" },
     { value: "Playfair Display", label: "Playfair Display", className: "font-serif" },
+    { value: "Cinzel", label: "Cinzel", className: "font-serif" },
 ]
 
 export function TypographySelector({ organization }: TypographySelectorProps) {

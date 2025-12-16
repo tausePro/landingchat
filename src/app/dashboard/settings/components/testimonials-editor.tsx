@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -51,6 +51,31 @@ export function TestimonialsEditor({ organization }: TestimonialsEditorProps) {
     const [testimonials, setTestimonials] = useState<Testimonial[]>(
         organization.settings?.storefront?.testimonials || DEFAULT_TESTIMONIALS
     )
+
+    // Guardar testimonios por defecto si no existen
+    useEffect(() => {
+        const saveDefaultTestimonials = async () => {
+            // Solo guardar si no hay testimonios configurados
+            if (!organization.settings?.storefront?.testimonials) {
+                try {
+                    await updateOrganization({
+                        ...organization,
+                        settings: {
+                            ...organization.settings,
+                            storefront: {
+                                ...organization.settings?.storefront,
+                                testimonials: DEFAULT_TESTIMONIALS
+                            }
+                        }
+                    })
+                } catch (error) {
+                    console.error("Error saving default testimonials:", error)
+                }
+            }
+        }
+
+        saveDefaultTestimonials()
+    }, [organization])
 
     const handleToggle = (index: number) => {
         const updated = [...testimonials]

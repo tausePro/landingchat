@@ -11,6 +11,7 @@ const manrope = Manrope({
 });
 
 const materialSymbols = "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap";
+const googleFonts = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cinzel:wght@400;500;600;700&display=swap";
 
 export const metadata: Metadata = {
   title: "LandingChat - El Futuro de las Compras es una Conversación",
@@ -26,6 +27,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <head>
         <link href={materialSymbols} rel="stylesheet" />
+        <link href={googleFonts} rel="stylesheet" />
       </head>
       <body
         suppressHydrationWarning
