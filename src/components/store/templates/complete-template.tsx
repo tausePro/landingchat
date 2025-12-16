@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import Image from "next/image"
 import { ShoppingBag, MessageCircle, Truck, ShieldCheck, Instagram, Facebook } from "lucide-react"
 
 // Custom icons for TikTok and WhatsApp if not in lucide
@@ -47,6 +48,30 @@ function cleanDescription(html: string | null | undefined, maxLength: number = 1
     return cleaned.length > maxLength 
         ? cleaned.substring(0, maxLength) + '...'
         : cleaned
+}
+
+// Component for critical image preloading (only hero + logo)
+function CriticalImagePreloader({ heroImage, logoUrl }: { heroImage?: string, logoUrl?: string }) {
+    return (
+        <>
+            {heroImage && (
+                <link
+                    rel="preload"
+                    as="image"
+                    href={heroImage}
+                    key="hero-preload"
+                />
+            )}
+            {logoUrl && (
+                <link
+                    rel="preload"
+                    as="image"
+                    href={logoUrl}
+                    key="logo-preload"
+                />
+            )}
+        </>
+    )
 }
 
 export function CompleteTemplate({
@@ -131,6 +156,12 @@ export function CompleteTemplate({
 
     return (
         <>
+            {/* Critical Image Preloader - Only hero + logo */}
+            <CriticalImagePreloader 
+                heroImage={heroBackgroundImage || undefined}
+                logoUrl={organization.logo_url || undefined}
+            />
+            
             {/* Hero Section - Complete */}
             <section
                 className="relative overflow-hidden pt-16 pb-24 lg:pt-32 lg:pb-40"
@@ -293,10 +324,14 @@ export function CompleteTemplate({
                                 <div key={product.id} className="group bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100">
                                     <div className="aspect-[4/3] bg-gray-100 relative overflow-hidden">
                                         {product.image_url ? (
-                                            <img
+                                            <Image
                                                 src={product.image_url}
                                                 alt={product.name}
-                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                                fill
+                                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                                                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                                                loading="lazy"
+                                                quality={85}
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -382,7 +417,15 @@ export function CompleteTemplate({
                         <div className="col-span-1 md:col-span-2">
                             <div className="flex items-center gap-2 mb-4">
                                 {organization.logo_url ? (
-                                    <img src={organization.logo_url} alt={organization.name} className="h-8 w-auto object-contain" />
+                                    <Image 
+                                        src={organization.logo_url} 
+                                        alt={organization.name} 
+                                        width={32}
+                                        height={32}
+                                        className="h-8 w-auto object-contain" 
+                                        loading="lazy"
+                                        quality={90}
+                                    />
                                 ) : (
                                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold">
                                         {organization.name.substring(0, 1)}

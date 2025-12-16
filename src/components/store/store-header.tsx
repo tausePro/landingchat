@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
@@ -48,10 +49,15 @@ export function StoreHeader({
             <div className="container mx-auto flex h-16 items-center justify-between px-4">
                 <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(homeLink)}>
                     {organization.logo_url ? (
-                        <img
+                        <Image
                             src={organization.logo_url}
                             alt={organization.name}
+                            width={150}
+                            height={40}
                             className="h-10 w-auto object-contain max-w-[120px] md:max-w-[150px]"
+                            loading="eager"
+                            quality={90}
+                            priority
                         />
                     ) : (
                         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg" style={{ backgroundColor: primaryColor }}>

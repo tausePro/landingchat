@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { CheckCircle2, ArrowRight, Plus, Check } from "lucide-react"
 import { useState } from "react"
 import { useCartStore } from "@/store/cart-store"
@@ -86,16 +87,24 @@ export function ProductCard({ product, productUrl, primaryColor, showDescription
             <Link href={productUrl} className="block relative aspect-square rounded-xl overflow-hidden bg-slate-50 mb-4">
                 {product.image_url ? (
                     <>
-                        <img
+                        <Image
                             src={product.image_url}
                             alt={product.name}
-                            className={`w-full h-full object-cover transition-opacity duration-300 ${secondaryImage ? 'group-hover:opacity-0' : ''}`}
+                            fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                            className={`object-cover transition-opacity duration-300 ${secondaryImage ? 'group-hover:opacity-0' : ''}`}
+                            loading="lazy"
+                            quality={85}
                         />
                         {secondaryImage && (
-                            <img
+                            <Image
                                 src={secondaryImage}
                                 alt={`${product.name} alternate`}
-                                className="absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                                fill
+                                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                                className="object-cover opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                                loading="lazy"
+                                quality={85}
                             />
                         )}
                     </>
