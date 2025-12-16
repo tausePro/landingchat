@@ -13,6 +13,7 @@ interface CreateOrderParams {
         phone: string
         address: string
         city: string
+        state: string // Departamento
         // Tax/Invoicing fields
         document_type: string
         document_number: string
@@ -185,7 +186,8 @@ export async function createOrder(params: CreateOrderParams) {
                 business_name: params.customerInfo.business_name,
                 metadata: {
                     address: params.customerInfo.address,
-                    city: params.customerInfo.city
+                    city: params.customerInfo.city,
+                    state: params.customerInfo.state
                 }
             }, { onConflict: 'organization_id, email' })
             .select()

@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LandingChat - Asistente de Compras</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#3B82F6",
+                        "primary-dark": "#2563eb",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101822",
+                        "chat-user": "#e9ecef",
+                        "chat-assistant": "#ffffff",
+                        "text-primary": "#212529",
+                        "text-secondary": "#6c757d"
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }.no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }.no-scrollbar {
+            -ms-overflow-style: none;scrollbar-width: none;}
+    </style>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-text-primary dark:text-gray-200">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<div class="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-4 bg-black/60 backdrop-blur-sm transition-opacity">
+<div class="relative w-full md:max-w-2xl bg-white dark:bg-[#0f172a] rounded-t-3xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] transition-transform transform duration-300 ease-out">
+<div class="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0f172a] shrink-0 sticky top-0 z-10">
+<h2 class="text-lg md:text-xl font-bold text-text-primary dark:text-white leading-tight">Información de Pago y Facturación</h2>
+<button class="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+<span class="material-symbols-outlined text-2xl">close</span>
+</button>
+</div>
+<div class="flex-1 p-5 overflow-y-auto no-scrollbar space-y-8">
+<section class="space-y-4">
+<h3 class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-dark mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">person</span> Información de Contacto
+                </h3>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Nombre Completo</label>
+<input autocomplete="name" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4" placeholder="Ej. Juan Pérez" type="text"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email <span class="text-text-secondary text-xs font-normal">(Opcional)</span></label>
+<input autocomplete="email" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4" placeholder="juan@ejemplo.com" type="email"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Teléfono (WhatsApp)</label>
+<div class="flex">
+<button class="inline-flex items-center justify-center px-4 rounded-l-xl border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-base font-medium hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                                    🇨🇴 +57
+                                    <span class="material-symbols-outlined text-sm ml-1">expand_more</span>
+</button>
+<input autocomplete="tel" class="flex-1 w-full rounded-r-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4" inputmode="numeric" placeholder="300 123 4567" type="tel"/>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+<h3 class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-dark mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">receipt_long</span> Facturación
+                </h3>
+<div class="flex flex-col gap-3 mb-4">
+<label class="relative flex items-center p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 cursor-pointer hover:border-primary dark:hover:border-primary transition-all group shadow-sm">
+<input checked="" class="peer form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300" name="personType" type="radio"/>
+<span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">Natural (Persona)</span>
+</label>
+<label class="relative flex items-center p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 cursor-pointer hover:border-primary dark:hover:border-primary transition-all group shadow-sm">
+<input class="peer form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300" name="personType" type="radio"/>
+<span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">Jurídica (Empresa)</span>
+</label>
+</div>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Documento de Identidad</label>
+<div class="flex gap-2">
+<select class="w-1/3 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-sm px-2">
+<option>C.C.</option>
+<option>NIT</option>
+<option>C.E.</option>
+<option>Pas.</option>
+</select>
+<input class="flex-1 w-full rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4" inputmode="numeric" placeholder="Número" type="text"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Ubicación</label>
+<div class="grid grid-cols-2 gap-3">
+<input class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4" placeholder="Ciudad" type="text"/>
+<input class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4" placeholder="Dirección" type="text"/>
+</div>
+</div>
+</div>
+</section>
+<section class="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
+<h3 class="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-dark mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-lg">payments</span> Método de Pago
+                </h3>
+<div class="grid grid-cols-2 gap-3 mb-4">
+<label class="cursor-pointer group relative">
+<input checked="" class="peer sr-only" name="paymentMethod" type="radio"/>
+<div class="h-28 w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 peer-checked:border-primary peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 flex flex-col items-center justify-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-3xl text-gray-400 dark:text-gray-500 peer-checked:text-primary group-hover:text-primary transition-colors">credit_card</span>
+<span class="text-sm font-bold text-gray-600 dark:text-gray-300 peer-checked:text-primary">Tarjeta</span>
+</div>
+<div class="absolute top-2 right-2 opacity-0 peer-checked:opacity-100 text-primary transition-opacity">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+</div>
+</label>
+<label class="cursor-pointer group relative">
+<input class="peer sr-only" name="paymentMethod" type="radio"/>
+<div class="h-28 w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 peer-checked:border-primary peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 flex flex-col items-center justify-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-3xl text-gray-400 dark:text-gray-500 peer-checked:text-primary group-hover:text-primary transition-colors">account_balance</span>
+<span class="text-sm font-bold text-gray-600 dark:text-gray-300 peer-checked:text-primary">PSE</span>
+</div>
+<div class="absolute top-2 right-2 opacity-0 peer-checked:opacity-100 text-primary transition-opacity">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+</div>
+</label>
+<label class="cursor-pointer group relative">
+<input class="peer sr-only" name="paymentMethod" type="radio"/>
+<div class="h-28 w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 peer-checked:border-primary peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 flex flex-col items-center justify-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-3xl text-gray-400 dark:text-gray-500 peer-checked:text-primary group-hover:text-primary transition-colors">smartphone</span>
+<span class="text-sm font-bold text-gray-600 dark:text-gray-300 peer-checked:text-primary">Nequi</span>
+</div>
+<div class="absolute top-2 right-2 opacity-0 peer-checked:opacity-100 text-primary transition-opacity">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+</div>
+</label>
+<label class="cursor-pointer group relative">
+<input class="peer sr-only" name="paymentMethod" type="radio"/>
+<div class="h-28 w-full rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 peer-checked:border-primary peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/20 flex flex-col items-center justify-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-3xl text-gray-400 dark:text-gray-500 peer-checked:text-primary group-hover:text-primary transition-colors">account_balance_wallet</span>
+<span class="text-sm font-bold text-gray-600 dark:text-gray-300 peer-checked:text-primary">Daviplata</span>
+</div>
+<div class="absolute top-2 right-2 opacity-0 peer-checked:opacity-100 text-primary transition-opacity">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+</div>
+</label>
+</div>
+<div class="bg-gray-50/80 dark:bg-gray-800/50 p-4 rounded-2xl space-y-4 border border-gray-200 dark:border-gray-700">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Número de Tarjeta</label>
+<div class="relative">
+<input autocomplete="cc-number" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 pl-11 text-base tracking-wide" inputmode="numeric" placeholder="0000 0000 0000 0000" type="tel"/>
+<span class="material-symbols-outlined absolute left-3.5 top-3.5 text-gray-400">credit_card</span>
+<span class="material-symbols-outlined absolute right-3.5 top-3.5 text-green-500">lock</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Vence</label>
+<input autocomplete="cc-exp" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 text-base px-4 text-center" inputmode="numeric" placeholder="MM/AA" type="tel"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">CVV</label>
+<div class="relative">
+<input autocomplete="cc-csc" class="w-full rounded-xl border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-text-primary dark:text-white focus:ring-primary focus:border-primary shadow-sm h-12 pr-10 pl-4 text-base" inputmode="numeric" placeholder="123" type="tel"/>
+<span class="material-symbols-outlined absolute right-3 top-3.5 text-gray-400 text-lg cursor-help" title="Código de 3 dígitos al reverso">help</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<section class="mt-4 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 flex justify-between items-center shadow-sm">
+<div class="flex flex-col">
+<span class="text-xs font-semibold text-text-secondary dark:text-gray-400 uppercase tracking-wide mb-0.5">Total a Pagar</span>
+<span class="text-2xl font-extrabold text-primary dark:text-white">$291.60</span>
+</div>
+<div class="flex -space-x-3">
+<div class="w-12 h-12 rounded-full border-2 border-white dark:border-gray-800 bg-gray-200 bg-cover bg-center shadow-sm" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDXuAVF7qjlpKBm3E-BKnoEC_Nt4LUuXur3oDN-8MiMllxGoLXtL8LBv-a2nAKu1dCRJtoNdS_pisTMP6UTKLELJnHipGn5WUrXzxIFht-r4lml3Oa11Tf15dGr7goGl25LvULAQsLzg5FSj0vNqIn5drWItB9X5XKS7Ibx36BHfWKb86GkfIC4oqGpiYzUDmdwwoH3aawL5GutmQ1vemiOGqZ5MQ345kMRkU5gOcFy9tpHmj1QfYlkxvPb6T3_t9N_jac-aRmpG7I');"></div>
+<div class="w-12 h-12 rounded-full border-2 border-white dark:border-gray-800 bg-gray-200 bg-cover bg-center shadow-sm" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAhcGMvlXg_wBEzqffenJwdtyVNG8SWMi_QhSRiup5OAsD_b_Ki-8f9a2t4DVzbJRJS4yoLfHpfbFrrQbkEkV-60iKKd5DdWzkOvV2Lwc3C3aYNSw5yDOSjloMwrMigXeZkl1EeuqVI5wQEZjJKcO_0m2U29vVg4hqEYkN0YvhBkGugzuzojSyhCO1tZzqERB6yB5nESmzrGRdPeP9nHZccL_aywraJ_FSjM9sYU8eR_9L15vQtF2tp82XU_kskM0twfBvo2fUUD-o');"></div>
+<div class="w-12 h-12 rounded-full border-2 border-white dark:border-gray-800 bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300 shadow-sm">+2</div>
+</div>
+</section>
+</div>
+<div class="p-5 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-[#0f172a] shrink-0 pb-8 md:pb-5">
+<button class="w-full bg-primary hover:bg-primary-dark text-white font-bold h-14 rounded-xl shadow-lg shadow-blue-500/30 transition-all transform active:scale-[0.98] mb-3 text-lg flex items-center justify-center gap-2">
+<span>Pagar Ahora</span>
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<div class="flex items-center justify-center gap-2 text-text-secondary dark:text-gray-400 opacity-80">
+<span class="material-symbols-outlined text-green-500 text-lg">lock</span>
+<span class="text-xs font-medium">Información segura y encriptada SSL 256-bit.</span>
+</div>
+</div>
+</div>
+</div>
+<header class="flex items-center justify-between whitespace-nowrap border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-background-dark px-6 py-3 shrink-0">
+<div class="flex items-center gap-4">
+<div class="size-6 text-primary">
+<svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-text-primary dark:text-white text-lg font-bold tracking-[-0.015em]">LandingChat</h2>
+</div>
+<div class="flex items-center gap-4">
+<button class="relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-gray-100 dark:bg-gray-800 text-text-primary dark:text-gray-300">
+<span class="material-symbols-outlined text-xl">shopping_cart</span>
+<span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">2</span>
+</button>
+<button class="flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-gray-100 dark:bg-gray-800 text-text-primary dark:text-gray-300">
+<span class="material-symbols-outlined text-xl">notifications</span>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="User avatar with a gradient background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDmmm9RczVmjBXMiKdkm5pvg1NEelwdSnGZI5XTDSWhTKMukD8Sn8PLtiW7E_bI3Bib79WS_BldOGal6XNZNUt71QYQ-qN8UpXenXXe5EN9AL-06-wJbS_qhZNgQnYXoyrfJgWvx-4Ghyfu67NO1jrcQ36On8CoinRere-8phyVBbNeyNAL7xLP1wwLq1FYV78ZHR0-CKQ2e_-I4Ph2p1CrPeMMtuPZNjIcyK9pF1VWbe81S15u9zLsjRPoK7DTFcmkPgMWqlEo0M8");'></div>
+</div>
+</header>
+<main class="flex flex-1 overflow-hidden">
+<div class="flex flex-1">
+<aside class="w-64 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50 shrink-0 hidden md:flex">
+<div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+<h3 class="font-bold text-text-primary dark:text-white">Historial</h3>
+<button class="text-text-secondary dark:text-gray-400 hover:text-primary dark:hover:text-primary">
+<span class="material-symbols-outlined text-xl">search</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-2 space-y-1">
+<div class="p-3 rounded-lg bg-primary/10 dark:bg-primary/20">
+<p class="font-semibold text-sm text-primary dark:text-white truncate">Búsqueda de zapatillas...</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">Hoy, 10:30 AM</p>
+</div>
+<div class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer">
+<p class="font-medium text-sm text-text-primary dark:text-gray-300 truncate">Consulta sobre mi pedido</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">Ayer, 4:15 PM</p>
+</div>
+<div class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer">
+<p class="font-medium text-sm text-text-primary dark:text-gray-300 truncate">Recomendación de regalos</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">24 Mayo 2024, 11:20 AM</p>
+</div>
+<div class="p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/60 cursor-pointer">
+<p class="font-medium text-sm text-text-primary dark:text-gray-300 truncate">Problema con cupón</p>
+<p class="text-xs text-text-secondary dark:text-gray-400">22 Mayo 2024, 09:05 AM</p>
+</div>
+</div>
+<div class="p-2 border-t border-gray-200 dark:border-gray-700">
+<button class="flex w-full items-center justify-center gap-2 rounded-md h-10 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-text-primary dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+<span class="material-symbols-outlined text-lg">add</span>
+<span>Nueva conversación</span>
+</button>
+</div>
+</aside>
+<div class="flex flex-col flex-1 bg-background-light dark:bg-background-dark">
+<div class="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Shopping Assistant Avatar with a blue background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o");'></div>
+<div class="flex flex-col">
+<h1 class="text-base font-medium leading-normal text-text-primary dark:text-white">Asistente de Compras</h1>
+<p class="text-green-500 text-sm font-normal leading-normal">Online</p>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<div class="flex items-end gap-3 justify-end">
+<div class="flex flex-1 flex-col gap-1 items-end">
+<p class="text-text-secondary text-[13px] font-normal leading-normal max-w-full text-right">Tú • 10:32 AM</p>
+<p class="text-base font-normal leading-normal flex max-w-lg rounded-lg rounded-br-none px-4 py-3 bg-primary text-white">Proceder al pago</p>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-10 shrink-0" data-alt="User avatar with a gradient background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBez3Wh3agYQeBwWeASILSTqaBe3tIarckNMJm5uni28U-Z11srs7519cWP45jUQlvdS8FggmImC-hpa8LgZYTE3ddw_g_z3kCP6PmZ82eE5XB3cKus1H45UFA__-6UdPiJ-NyVy2qMGq4RHtS7q0WiOM2_35U0Spgx9E8eI2c6zKEkVct9XymP0Jc33bq5dBbihPgeWUAInDNMwC7GDXkCqoWhsIlFCIQdyCtc3UISdbxxjq2JPQjGPN4XOz0FhLZ8w269JN6Z-dk");'></div>
+</div>
+<div class="flex items-end gap-3">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full w-10 shrink-0" data-alt="Shopping Assistant Avatar with a blue background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuANUbs7QMP-UuEesdAeBn8-dAS0paLvl9fh8hFd7XQ0syzoFqVp9PBwX76XPR6Dd1F0Rz-qKHKGELRXY8yM_67rZ3MMyR9geogbdOx1wxOPFLAY9Pl90UtBf141PqA0kQwv6e_KlOwkVqwPttocD_KEaVhDGHVgOjRKo00KS2ynCfN8CTWBmptoOciWiZgp_FcIcTLdIFpOyhfKfuJiZtDw8_X4Rumcfmf9I24oRKRlvZG4AWfePuuIBoNot8JobtAZmM2CHwrOKW0");'></div>
+<div class="flex flex-1 flex-col gap-1 items-start">
+<p class="text-text-secondary text-[13px] font-normal leading-normal max-w-full">Asistente de Compras • 10:33 AM</p>
+<div class="space-y-2 max-w-lg">
+<p class="text-base font-normal leading-normal flex w-full rounded-lg rounded-bl-none px-4 py-3 bg-chat-assistant dark:bg-gray-700 text-text-primary dark:text-gray-200 shadow-sm">
+                                        ¡Claro! Empecemos con el proceso de pago.
+                                    </p>
+<button class="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-primary text-white gap-2 text-sm font-bold shadow-sm hover:bg-primary-dark transition-colors">
+<span>Continuar al Pago</span>
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/50 shrink-0">
+<div class="flex items-center gap-2 mb-3">
+<button class="px-3 py-1.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-full text-text-secondary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Ver ofertas</button>
+<button class="px-3 py-1.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-full text-text-secondary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Seguir mi pedido</button>
+<button class="px-3 py-1.5 text-sm font-medium border border-gray-300 dark:border-gray-600 rounded-full text-text-secondary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">¿Necesitas ayuda?</button>
+</div>
+<div class="relative">
+<input class="w-full h-12 rounded-lg pl-4 pr-28 bg-gray-100 dark:bg-gray-800 border-transparent focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white" placeholder="Escribe tu mensaje aquí..." type="text"/>
+<div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+<button class="flex items-center justify-center size-9 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 text-text-secondary dark:text-gray-400">
+<span class="material-symbols-outlined text-xl">add</span>
+</button>
+<button class="flex items-center justify-center size-9 rounded-lg bg-primary text-white">
+<span class="material-symbols-outlined text-xl">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div></main>
+</div>
+</body></html>

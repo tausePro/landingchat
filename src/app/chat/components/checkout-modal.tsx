@@ -9,7 +9,8 @@ import { useCartStore } from "@/store/cart-store"
 import { createOrder } from "../actions"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+
+import { COLOMBIA_DEPARTMENTS } from "@/lib/constants/colombia-departments"
 
 interface CheckoutModalProps {
     isOpen: boolean
@@ -17,7 +18,7 @@ interface CheckoutModalProps {
     slug: string
 }
 
-import { getStoreSettings } from "../../store/[slug]/actions"
+
 import { getAvailablePaymentGateways, getShippingConfig } from "../actions"
 import { calculateShippingCost } from "@/lib/utils/shipping"
 import { useEffect } from "react"
@@ -71,6 +72,7 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
         phone: "",
         address: "",
         city: "",
+        state: "", // Departamento
         // Tax/Invoicing fields
         document_type: "CC" as string,
         document_number: "",
@@ -95,9 +97,14 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     const handleSubmitContact = (e: React.FormEvent) => {
         e.preventDefault()
 
-        // Validate tax fields
+        // Validate required fields
         if (!formData.document_type || !formData.document_number || !formData.person_type) {
             toast.error("Por favor completa todos los campos de facturación")
+            return
+        }
+        
+        if (!formData.state) {
+            toast.error("Por favor selecciona tu departamento")
             return
         }
 
@@ -169,80 +176,188 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                 {step === 'contact' && (
                     <form onSubmit={handleSubmitContact} className="space-y-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="name">Nombre Completo</Label>
-                            <Input id="name" name="name" required value={formData.name} onChange={handleInputChange} placeholder="Juan Pérez" />
+                            <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo</Label>
+                            <Input 
+                                id="name" 
+                                name="name" 
+                                required 
+                                value={formData.name} 
+                                onChange={handleInputChange} 
+                                placeholder="Ej. Juan Pérez"
+                                className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                            />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" name="email" type="email" required value={formData.email} onChange={handleInputChange} placeholder="juan@ejemplo.com" />
+                            <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Email <span className="text-gray-400 text-xs font-normal">(Opcional)</span>
+                            </Label>
+                            <Input 
+                                id="email" 
+                                name="email" 
+                                type="email" 
+                                value={formData.email} 
+                                onChange={handleInputChange} 
+                                placeholder="juan@ejemplo.com"
+                                className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                            />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="phone">Teléfono</Label>
-                            <Input id="phone" name="phone" type="tel" required value={formData.phone} onChange={handleInputChange} placeholder="+57 300 123 4567" />
+                            <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono (WhatsApp)</Label>
+                            <div className="flex">
+                                <div className="inline-flex items-center justify-center px-4 rounded-l-xl border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium">
+                                    🇨🇴 +57
+                                </div>
+                                <Input 
+                                    id="phone" 
+                                    name="phone" 
+                                    type="tel" 
+                                    required 
+                                    value={formData.phone} 
+                                    onChange={handleInputChange} 
+                                    placeholder="300 123 4567"
+                                    className="flex-1 h-12 rounded-l-none rounded-r-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                />
+                            </div>
                         </div>
 
                         {/* Tax/Invoicing Fields */}
-                        <div className="border-t pt-4 space-y-4">
-                            <h4 className="font-medium text-sm">Información de Facturación</h4>
+                        <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-4">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-dark mb-2 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-lg">receipt_long</span> Información de Facturación
+                            </h4>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="document_type">Tipo de Documento</Label>
+                            <div>
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Documento de Identidad</Label>
+                                <div className="flex gap-2">
                                     <Select value={formData.document_type} onValueChange={(value) => handleSelectChange('document_type', value)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Selecciona" />
+                                        <SelectTrigger className="w-28 h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm">
+                                            <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="CC">Cédula de Ciudadanía</SelectItem>
-                                            <SelectItem value="NIT">NIT</SelectItem>
-                                            <SelectItem value="CE">Cédula de Extranjería</SelectItem>
-                                            <SelectItem value="Passport">Pasaporte</SelectItem>
-                                            <SelectItem value="TI">Tarjeta de Identidad</SelectItem>
+                                        <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg z-50">
+                                            <SelectItem value="CC" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">C.C.</SelectItem>
+                                            <SelectItem value="NIT" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">NIT</SelectItem>
+                                            <SelectItem value="CE" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">C.E.</SelectItem>
+                                            <SelectItem value="Passport" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Pas.</SelectItem>
+                                            <SelectItem value="TI" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">T.I.</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="document_number">Número de Documento</Label>
-                                    <Input id="document_number" name="document_number" required value={formData.document_number} onChange={handleInputChange} placeholder="123456789" />
+                                    <Input 
+                                        id="document_number" 
+                                        name="document_number" 
+                                        required 
+                                        value={formData.document_number} 
+                                        onChange={handleInputChange} 
+                                        placeholder="Número"
+                                        className="flex-1 h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                    />
                                 </div>
                             </div>
 
-                            <div className="grid gap-2">
-                                <Label>Tipo de Persona</Label>
-                                <RadioGroup value={formData.person_type} onValueChange={(value: string) => handleSelectChange('person_type', value)} className="flex gap-4">
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="Natural" id="natural" />
-                                        <Label htmlFor="natural" className="font-normal cursor-pointer">Natural (Persona)</Label>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="Jurídica" id="juridica" />
-                                        <Label htmlFor="juridica" className="font-normal cursor-pointer">Jurídica (Empresa)</Label>
-                                    </div>
-                                </RadioGroup>
+                            <div className="flex flex-col gap-3">
+                                <label 
+                                    className={`relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary ${
+                                        formData.person_type === 'Natural' 
+                                            ? 'border-primary bg-blue-50 dark:bg-blue-900/20' 
+                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                                    }`}
+                                    onClick={() => handleSelectChange('person_type', 'Natural')}
+                                >
+                                    <input 
+                                        type="radio" 
+                                        name="person_type" 
+                                        checked={formData.person_type === 'Natural'}
+                                        onChange={() => {}}
+                                        className="form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300"
+                                    />
+                                    <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">
+                                        Natural (Persona)
+                                    </span>
+                                </label>
+                                <label 
+                                    className={`relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary ${
+                                        formData.person_type === 'Jurídica' 
+                                            ? 'border-primary bg-blue-50 dark:bg-blue-900/20' 
+                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                                    }`}
+                                    onClick={() => handleSelectChange('person_type', 'Jurídica')}
+                                >
+                                    <input 
+                                        type="radio" 
+                                        name="person_type" 
+                                        checked={formData.person_type === 'Jurídica'}
+                                        onChange={() => {}}
+                                        className="form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300"
+                                    />
+                                    <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">
+                                        Jurídica (Empresa)
+                                    </span>
+                                </label>
                             </div>
 
                             {formData.person_type === "Jurídica" && (
                                 <div className="grid gap-2">
-                                    <Label htmlFor="business_name">Nombre de la Empresa</Label>
-                                    <Input id="business_name" name="business_name" value={formData.business_name} onChange={handleInputChange} placeholder="Mi Empresa S.A.S." />
+                                    <Label htmlFor="business_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la Empresa</Label>
+                                    <Input 
+                                        id="business_name" 
+                                        name="business_name" 
+                                        value={formData.business_name} 
+                                        onChange={handleInputChange} 
+                                        placeholder="Mi Empresa S.A.S."
+                                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                    />
                                 </div>
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="city">Ciudad</Label>
-                                <Input id="city" name="city" required value={formData.city} onChange={handleInputChange} placeholder="Bogotá" />
+                        <div>
+                            <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Ubicación</Label>
+                            <div className="grid grid-cols-2 gap-3 mb-3">
+                                <Select value={formData.state} onValueChange={(value) => handleSelectChange('state', value)}>
+                                    <SelectTrigger className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm">
+                                        <SelectValue placeholder="Departamento" />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-60 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg z-50">
+                                        {COLOMBIA_DEPARTMENTS.map((dept) => (
+                                            <SelectItem 
+                                                key={dept} 
+                                                value={dept} 
+                                                className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800 cursor-pointer px-3 py-2"
+                                            >
+                                                {dept}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Input 
+                                    id="city" 
+                                    name="city" 
+                                    required 
+                                    value={formData.city} 
+                                    onChange={handleInputChange} 
+                                    placeholder="Ciudad"
+                                    className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="address">Dirección</Label>
-                                <Input id="address" name="address" required value={formData.address} onChange={handleInputChange} placeholder="Calle 123 # 45-67" />
-                            </div>
+                            <Input 
+                                id="address" 
+                                name="address" 
+                                required 
+                                value={formData.address} 
+                                onChange={handleInputChange} 
+                                placeholder="Dirección completa"
+                                className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                            />
                         </div>
-                        <div className="flex justify-end pt-4">
-                            <Button type="submit" className="w-full bg-primary text-white hover:bg-primary/90">
+                        <div className="pt-4 space-y-3">
+                            <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold">
                                 Continuar al Pago
                             </Button>
+                            <div className="flex items-center justify-center gap-2 text-slate-400 opacity-80">
+                                <svg className="size-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                <span className="text-xs font-medium">Información segura y encriptada SSL 256-bit.</span>
+                            </div>
                         </div>
                     </form>
                 )}
@@ -309,13 +424,21 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                             )}
                         </div>
 
-                        <div className="flex gap-3 pt-2">
-                            <Button variant="outline" onClick={() => setStep('contact')} className="flex-1">
-                                Atrás
-                            </Button>
-                            <Button onClick={handlePlaceOrder} disabled={loading} className="flex-1 bg-primary text-white hover:bg-primary/90">
-                                {loading ? "Procesando..." : "Confirmar Orden"}
-                            </Button>
+                        <div className="space-y-3 pt-2">
+                            <div className="flex gap-3">
+                                <Button variant="outline" onClick={() => setStep('contact')} className="flex-1">
+                                    Atrás
+                                </Button>
+                                <Button onClick={handlePlaceOrder} disabled={loading} className="flex-1 bg-primary text-white hover:bg-primary/90">
+                                    {loading ? "Procesando..." : "Confirmar Orden"}
+                                </Button>
+                            </div>
+                            <div className="flex items-center justify-center gap-2 text-slate-400 opacity-80">
+                                <svg className="size-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                                <span className="text-xs font-medium">Información segura y encriptada SSL 256-bit.</span>
+                            </div>
                         </div>
                     </div>
                 )}
