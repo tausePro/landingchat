@@ -27,6 +27,28 @@ interface CompleteTemplateProps {
     onStartChat: (productId?: string) => void
 }
 
+// Helper function to clean HTML and create excerpt
+function cleanDescription(html: string | null | undefined, maxLength: number = 150): string {
+    if (!html) return "Producto disponible"
+    
+    const cleaned = html
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&ldquo;/g, '"')
+        .replace(/&rdquo;/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim()
+    
+    return cleaned.length > maxLength 
+        ? cleaned.substring(0, maxLength) + '...'
+        : cleaned
+}
+
 export function CompleteTemplate({
     organization,
     products,
@@ -291,11 +313,23 @@ export function CompleteTemplate({
                                     </div>
                                     <div className="p-5">
                                         <h3 className="font-bold text-gray-900 mb-1 truncate">{product.name}</h3>
-                                        <p className="text-sm text-gray-500 mb-4 line-clamp-2">{product.description}</p>
+                                        <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+                                            {cleanDescription(product.description)}
+                                        </p>
                                         <div className="flex items-center justify-between">
                                             {productConfig.showPrices ? (
                                                 <span className="text-lg font-bold" style={{ color: primaryColor }}>
-                                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
+                                                    {(() => {
+                                                        // Handle products with variants (like gift cards)
+                                                        if (product.price === 0 && product.variants && product.variants.length > 0) {
+                                                            const minPrice = Math.min(...product.variants.map((v: any) => v.price || 0))
+                                                            return minPrice > 0 
+                                                                ? `Desde ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(minPrice)}`
+                                                                : "Elige monto"
+                                                        }
+                                                        // Regular products
+                                                        return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)
+                                                    })()}
                                                 </span>
                                             ) : (
                                                 <span></span>
@@ -304,11 +338,13 @@ export function CompleteTemplate({
                                             {productConfig.showAddToCart && (
                                                 <Button
                                                     size="sm"
-                                                    variant="ghost"
-                                                    className="rounded-full hover:bg-gray-100"
+                                                    className="rounded-full text-xs px-3 py-1 h-8 font-medium"
+                                                    style={{ backgroundColor: primaryColor }}
                                                     onClick={() => onStartChat(product.id)}
+                                                    title={`Pregunta sobre ${product.name}`}
                                                 >
-                                                    <MessageCircle className="w-5 h-5" />
+                                                    <MessageCircle className="w-4 h-4 mr-1" />
+                                                    ¿Me sirve?
                                                 </Button>
                                             )}
                                         </div>

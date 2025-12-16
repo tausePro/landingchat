@@ -13,7 +13,7 @@ interface ProductCardProps {
     showDescription?: boolean
 }
 
-// Helper to strip HTML tags from description (same as we added to the page earlier)
+// Helper to strip HTML tags and create clean excerpt for cards
 function stripHtml(html: string | null | undefined): string {
     if (!html) return ""
     return html
@@ -23,8 +23,24 @@ function stripHtml(html: string | null | undefined): string {
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&ldquo;/g, '"')
+        .replace(/&rdquo;/g, '"')
         .replace(/\s+/g, ' ')
         .trim()
+}
+
+// Create clean excerpt with optimal length for cards
+function createExcerpt(text: string, maxLength: number = 150): string {
+    if (text.length <= maxLength) return text
+    
+    // Find last complete word within limit
+    const truncated = text.substring(0, maxLength)
+    const lastSpace = truncated.lastIndexOf(' ')
+    
+    return lastSpace > 0 
+        ? truncated.substring(0, lastSpace) + '...'
+        : truncated + '...'
 }
 
 export function ProductCard({ product, productUrl, primaryColor, showDescription = true }: ProductCardProps) {
