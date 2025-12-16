@@ -134,14 +134,7 @@ export function CompleteTemplate({
         else if (productConfig.orderBy === "price_desc") result.sort((a, b) => b.price - a.price)
         // recent and best_selling would need backend support or date fields, assuming default order is recent
 
-        const finalResult = result.slice(0, productConfig.itemsToShow || 8)
-        console.log('Product filtering debug:', {
-            totalProducts: products.length,
-            afterFiltering: result.length,
-            itemsToShow: productConfig.itemsToShow,
-            finalCount: finalResult.length
-        })
-        return finalResult
+        return result.slice(0, productConfig.itemsToShow || 8)
     }, [products, selectedCategory, productConfig])
 
     // Get unique categories for filter tabs
