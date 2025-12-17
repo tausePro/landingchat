@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useCartStore } from "@/store/cart-store"
+import { useTracking } from "@/components/analytics/tracking-provider"
 import { createOrder } from "../actions"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -25,6 +26,7 @@ import { useEffect } from "react"
 
 export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     const { items, total, clearCart } = useCartStore()
+    const { trackInitiateCheckout } = useTracking()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
     const [shippingConfig, setShippingConfig] = useState<any>(null)
@@ -34,6 +36,10 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
 
     useEffect(() => {
         if (isOpen) {
+            // Track InitiateCheckout event when modal opens
+            const contentIds = items.map(item => item.id)
+            trackInitiateCheckout(total(), "COP", contentIds)
+
             // Load shipping configuration
             getShippingConfig(slug).then(result => {
                 if (result.success && result.config) {

@@ -5,6 +5,7 @@ import Image from "next/image"
 import { CheckCircle2, ShoppingBag, Plus, Check } from "lucide-react"
 import { useState } from "react"
 import { useCartStore } from "@/store/cart-store"
+import { useTracking } from "@/components/analytics/tracking-provider"
 import { toast } from "sonner"
 
 interface ProductCardProps {
@@ -57,6 +58,7 @@ export function ProductCard({
     showAIRecommended = false
 }: ProductCardProps) {
     const { items, addItem } = useCartStore()
+    const { trackAddToCart } = useTracking()
     const [isAdding, setIsAdding] = useState(false)
     const [justAdded, setJustAdded] = useState(false)
 
@@ -78,6 +80,9 @@ export function ProductCard({
                 price: product.price,
                 image_url: product.image_url
             })
+
+            // Track AddToCart event
+            trackAddToCart(product.id, product.name, product.price, "COP")
 
             setIsAdding(false)
             setJustAdded(true)

@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
+import { useTracking } from "@/components/analytics/tracking-provider"
 
 interface ProductDetailClientProps {
     product: any
@@ -20,6 +21,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
+    const { trackViewContent } = useTracking()
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
 
@@ -34,6 +36,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
     const [currentPrice, setCurrentPrice] = useState(product.price)
     const [activePromotion, setActivePromotion] = useState<any>(null)
+
+    // Track ViewContent event when product loads
+    useEffect(() => {
+        trackViewContent(
+            product.id,
+            product.name,
+            product.price,
+            "COP"
+        )
+    }, [product.id, trackViewContent])
 
     // Initial Image Update (if changed)
     useEffect(() => {

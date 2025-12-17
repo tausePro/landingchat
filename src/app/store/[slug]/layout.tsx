@@ -1,5 +1,7 @@
 import type { Metadata } from "next"
 import { getStoreData } from "./actions"
+import { MetaPixel } from "@/components/analytics/meta-pixel"
+import { TrackingProvider } from "@/components/analytics/tracking-provider"
 
 type Props = {
     params: Promise<{ slug: string }>
@@ -39,10 +41,29 @@ export async function generateMetadata(
     }
 }
 
-export default function StoreLayout({ children }: { children: React.ReactNode }) {
+export default async function StoreLayout({ 
+    params,
+    children 
+}: { 
+    params: Promise<{ slug: string }>
+    children: React.ReactNode 
+}) {
+    const { slug } = await params
+    const data = await getStoreData(slug)
+    
+    // Obtener el Meta Pixel ID de la configuración de tracking
+    const metaPixelId = data?.organization?.tracking_config?.meta_pixel_id
+    const trackingEnabled = !!metaPixelId
+
     return (
         <>
-            {children}
+            {/* Meta Pixel - Solo si está configurado */}
+            {metaPixelId && <MetaPixel pixelId={metaPixelId} />}
+            
+            {/* Tracking Provider para toda la tienda */}
+            <TrackingProvider enabled={trackingEnabled}>
+                {children}
+            </TrackingProvider>
         </>
     )
 }

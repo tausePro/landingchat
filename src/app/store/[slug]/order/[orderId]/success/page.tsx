@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { CheckCircle } from "lucide-react"
+import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 
 interface SuccessPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -41,6 +42,14 @@ export default async function OrderSuccessPage({ params }: SuccessPageProps) {
 
     return (
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center p-4">
+            {/* Track Purchase Event */}
+            <PurchaseTracker
+                orderId={order.id}
+                orderTotal={order.total}
+                orderItems={order.items || []}
+                currency="COP"
+            />
+            
             <div className="max-w-2xl w-full">
                 <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-8 text-center">
                     {/* Success Icon */}
