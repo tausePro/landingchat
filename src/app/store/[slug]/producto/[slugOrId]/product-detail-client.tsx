@@ -148,17 +148,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
                     {/* Left Column: Gallery */}
                     <div className="flex flex-col items-center gap-4">
-                        {/* Mobile Header (Only visible on small screens) */}
-                        <div className="md:hidden w-full flex justify-between items-center mb-4">
-                            <Link href={getStoreLink('/', isSubdomain, slug)} className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white">
-                                <span className="material-symbols-outlined">arrow_back</span>
-                            </Link>
-                            <div className="flex gap-2">
-                                <button className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white">
-                                    <span className="material-symbols-outlined">share</span>
-                                </button>
-                            </div>
-                        </div>
+
 
                         <div className="w-full relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-800">
                             <Image

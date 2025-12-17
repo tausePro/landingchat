@@ -30,7 +30,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             organization={organization}
             products={[]}
             hideNavigation={false}
-            hideHeaderOnMobile={true}
+            hideHeaderOnMobile={false}
             initialIsSubdomain={initialIsSubdomain}
         >
             <ProductDetailClient

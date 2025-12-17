@@ -248,10 +248,8 @@ export function CompleteTemplate({
                                         size="lg"
                                         className={`w-full sm:w-auto text-base h-14 ${heroBackgroundImage ? 'border-white text-white hover:bg-white/10' : ''}`}
                                         onClick={() => {
-                                            const productsSection = document.getElementById('products')
-                                            if (productsSection) {
-                                                productsSection.scrollIntoView({ behavior: 'smooth' })
-                                            }
+                                            const productsUrl = getStoreLink('/productos', isSubdomain, organization.slug)
+                                            window.location.href = productsUrl
                                         }}
                                     >
                                         Ver Catálogo
