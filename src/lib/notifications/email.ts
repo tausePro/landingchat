@@ -167,16 +167,11 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
         ${data.paymentMethod === 'manual' ? `
         <!-- Payment Instructions -->
         <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
-            <h3 style="margin: 0 0 16px 0; color: #92400e;">Información para Transferencia</h3>
+            <h3 style="margin: 0 0 16px 0; color: #92400e;">Instrucciones de Pago</h3>
             <div style="color: #92400e;">
-                <p><strong>Banco:</strong> Bancolombia</p>
-                <p><strong>Tipo de Cuenta:</strong> Ahorros</p>
-                <p><strong>Número de Cuenta:</strong> 60100000000</p>
-                <p><strong>Nequi:</strong> 3001234567</p>
-                <p><strong>Titular:</strong> LANDINGCHAT SAS</p>
+                <p>Por favor contacta al vendedor para obtener los detalles de pago.</p>
                 <div style="background: #fbbf24; padding: 12px; border-radius: 6px; margin-top: 16px;">
-                    <strong>Importante:</strong> Envía el comprobante de pago por WhatsApp al +57 301 234 5678 
-                    con el número de pedido <strong>${data.orderNumber}</strong>
+                    <strong>Importante:</strong> Guarda el número de pedido <strong>${data.orderNumber}</strong> para tu referencia.
                 </div>
             </div>
         </div>
@@ -194,7 +189,7 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
 
         <!-- Footer -->
         <div style="text-align: center; padding-top: 30px; border-top: 1px solid #e5e7eb; color: #6b7280;">
-            <p>¿Tienes preguntas? Contáctanos por WhatsApp: +57 301 234 5678</p>
+            <p>¿Tienes preguntas? Contáctanos directamente desde la tienda.</p>
             <div style="margin: 16px 0 0 0; display: flex; justify-content: center; gap: 16px;">
                 <a href="${data.storeUrl}/profile?email=${encodeURIComponent(data.customerEmail)}" style="color: #3b82f6; text-decoration: none;">Ver Mi Perfil</a>
                 <span style="color: #d1d5db;">|</span>

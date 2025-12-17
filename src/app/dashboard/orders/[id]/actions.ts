@@ -35,19 +35,36 @@ export interface OrderDetail {
 }
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!user) throw new Error("Unauthorized")
+        if (authError) {
+            console.error("[getOrderDetail] Auth error:", authError.message)
+            return null // Retornar null en lugar de throw para evitar crash
+        }
 
-    // Get organization_id
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
+        if (!user) {
+            console.error("[getOrderDetail] No user found")
+            return null
+        }
 
-    if (!profile?.organization_id) throw new Error("No organization found")
+        // Get organization_id
+        const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single()
+
+        if (profileError) {
+            console.error("[getOrderDetail] Profile error:", profileError.message)
+            return null
+        }
+
+        if (!profile?.organization_id) {
+            console.error("[getOrderDetail] No organization found for user")
+            return null
+        }
 
     // Fetch order - don't join customers, use customer_info instead
     const { data: order, error } = await supabase
@@ -106,6 +123,10 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             country: 'Colombia'
         } : null),
         billing_address: null
+    }
+    } catch (error) {
+        console.error("[getOrderDetail] Unexpected error:", error)
+        return null
     }
 }
 

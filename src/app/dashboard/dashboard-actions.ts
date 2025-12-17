@@ -27,19 +27,30 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-    if (!user) throw new Error("Unauthorized")
+        if (authError) {
+            console.error("[getDashboardStats] Auth error:", authError.message)
+            throw new Error("Error de autenticación. Por favor, recarga la página.")
+        }
 
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single()
+        if (!user) throw new Error("Unauthorized")
 
-    if (!profile?.organization_id) throw new Error("No organization found")
-    const orgId = profile.organization_id
+        const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single()
+
+        if (profileError) {
+            console.error("[getDashboardStats] Profile error:", profileError.message)
+            throw new Error("Error al cargar perfil. Por favor, recarga la página.")
+        }
+
+        if (!profile?.organization_id) throw new Error("No organization found")
+        const orgId = profile.organization_id
 
     // Helper for date ranges
     const now = new Date()
@@ -141,30 +152,46 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     const organizationSlug = org?.slug || ""
 
-    return {
-        userName,
-        organizationSlug,
-        revenue: {
-            total: totalRevenue,
-            growth: 12.5, // Dummy growth for now
-            history
-        },
-        orders: {
-            total: totalOrders,
-            growth: 8
-        },
-        chats: {
-            conversionRate: parseFloat(conversionRate.toFixed(1)),
-            growth: -0.5,
-            total: totalChats,
-            byChannel: [
-                { name: 'Web', value: webChats, color: '#3b82f6' }, // blue-500
-                { name: 'WhatsApp', value: whatsappChats, color: '#22c55e' } // green-500
-            ]
-        },
-        agents: {
-            active: activeAgents || 1, // Default to 1 if 0/null to look good in demo
-            responseTime: avgResponseTime
+        return {
+            userName,
+            organizationSlug,
+            revenue: {
+                total: totalRevenue,
+                growth: 12.5, // Dummy growth for now
+                history
+            },
+            orders: {
+                total: totalOrders,
+                growth: 8
+            },
+            chats: {
+                conversionRate: parseFloat(conversionRate.toFixed(1)),
+                growth: -0.5,
+                total: totalChats,
+                byChannel: [
+                    { name: 'Web', value: webChats, color: '#3b82f6' }, // blue-500
+                    { name: 'WhatsApp', value: whatsappChats, color: '#22c55e' } // green-500
+                ]
+            },
+            agents: {
+                active: activeAgents || 1, // Default to 1 if 0/null to look good in demo
+                responseTime: avgResponseTime
+            }
+        }
+    } catch (error) {
+        console.error("[getDashboardStats] Error:", error)
+        // Retornar datos por defecto en caso de error para evitar crash
+        if (error instanceof Error && error.message.includes("Unauthorized")) {
+            throw error // Re-throw auth errors
+        }
+        // Para otros errores, retornar datos vacíos
+        return {
+            userName: "Usuario",
+            organizationSlug: "",
+            revenue: { total: 0, growth: 0, history: [] },
+            orders: { total: 0, growth: 0 },
+            chats: { conversionRate: 0, growth: 0, total: 0, byChannel: [] },
+            agents: { active: 0, responseTime: "N/A" }
         }
     }
 }

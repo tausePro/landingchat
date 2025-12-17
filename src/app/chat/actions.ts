@@ -26,6 +26,7 @@ interface CreateOrderParams {
         price: number
         quantity: number
         image?: string
+        image_url?: string // Support both property names (cart store uses image_url)
     }>
     subtotal: number
     shippingCost: number
@@ -51,7 +52,7 @@ function generateOrderNumber(): string {
  */
 const FALLBACK_IMAGE = 'https://landingchat.co/images/placeholder.png' // Use a valid placeholder
 
-function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: string, price: number, quantity: number, image?: string }>) {
+function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: string, price: number, quantity: number, image?: string, image_url?: string }>) {
     return cartItems.map(item => ({
         product_id: item.id,
         product_name: item.name,
@@ -59,7 +60,8 @@ function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: str
         unit_price: item.price,
         total_price: item.price * item.quantity,
         variant_info: null,
-        image_url: item.image || FALLBACK_IMAGE // Persist image URL
+        // Support both 'image' and 'image_url' property names (cart store uses image_url)
+        image_url: item.image_url || item.image || FALLBACK_IMAGE
     }))
 }
 

@@ -4,11 +4,30 @@ import { getDashboardStats } from "./dashboard-actions"
 import Link from "next/link"
 import { DashboardCharts } from "./components/dashboard-charts"
 import { VisitorsCard } from "./components/visitors-card"
+import { redirect } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-    const stats = await getDashboardStats()
+    let stats
+    try {
+        stats = await getDashboardStats()
+    } catch (error) {
+        console.error("[DashboardPage] Error loading stats:", error)
+        // Si es error de autenticación, redirigir a login
+        if (error instanceof Error && (error.message.includes("Unauthorized") || error.message.includes("autenticación"))) {
+            redirect("/login")
+        }
+        // Para otros errores, usar datos por defecto
+        stats = {
+            userName: "Usuario",
+            organizationSlug: "",
+            revenue: { total: 0, growth: 0, history: [] },
+            orders: { total: 0, growth: 0 },
+            chats: { conversionRate: 0, growth: 0, total: 0, byChannel: [] },
+            agents: { active: 0, responseTime: "N/A" }
+        }
+    }
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {

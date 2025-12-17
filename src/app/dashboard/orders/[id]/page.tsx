@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { getOrderDetail } from "./actions"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -15,7 +15,19 @@ interface OrderDetailPageProps {
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
     const { id } = await params
-    const order = await getOrderDetail(id)
+    
+    let order
+    try {
+        order = await getOrderDetail(id)
+    } catch (error) {
+        console.error("[OrderDetailPage] Error loading order:", error)
+        // Si es error de autenticación, redirigir a login
+        if (error instanceof Error && error.message.includes("Unauthorized")) {
+            redirect("/login")
+        }
+        // Para otros errores, mostrar 404
+        notFound()
+    }
 
     if (!order) {
         notFound()

@@ -19,10 +19,10 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
     const { slug, orderId } = await params
     const supabase = createServiceClient()
 
-    // 1. Obtener la orden
+    // 1. Obtener la orden con datos de la organización incluyendo custom_domain
     const { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("*, organization:organizations(id, name, slug, settings)")
+        .select("*, organization:organizations(id, name, slug, settings, custom_domain)")
         .eq("id", orderId)
         .single()
 
@@ -53,7 +53,21 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
         redirect(`/store/${slug}/order/${orderId}/error?reason=gateway_not_configured`)
     }
 
-    // 5. Preparar datos para el checkout de ePayco
+    // 5. Construir la URL base correcta
+    // Para subdominios de landingchat.co, usar el subdominio
+    // Para dominios personalizados, usar el dominio personalizado
+    const customDomain = (order.organization as { custom_domain?: string })?.custom_domain
+    
+    let baseUrl: string
+    if (customDomain) {
+        // Dominio personalizado: https://tez.com.co
+        baseUrl = `https://${customDomain}`
+    } else {
+        // Subdominio de landingchat.co: https://tez.landingchat.co
+        baseUrl = `https://${slug}.landingchat.co`
+    }
+
+    // 6. Preparar datos para el checkout de ePayco
     const checkoutData = {
         // Llaves de ePayco (solo la pública, nunca la privada)
         publicKey: gatewayConfig.public_key,
@@ -70,8 +84,10 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
         customerName: order.customer_info?.name || "",
         customerEmail: order.customer_info?.email || "",
         
-        // URLs de respuesta
-        responseUrl: `${process.env.NEXT_PUBLIC_APP_URL}/store/${slug}/order/${orderId}`,
+        // URLs de respuesta - usar el dominio correcto de la tienda
+        responseUrl: customDomain 
+            ? `${baseUrl}/order/${orderId}` 
+            : `${baseUrl}/order/${orderId}`,
         confirmationUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payments/epayco?org=${slug}`,
         
         // Información de la tienda
