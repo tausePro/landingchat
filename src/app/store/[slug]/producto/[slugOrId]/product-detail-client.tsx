@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { useTracking } from "@/components/analytics/tracking-provider"
+import { useCartStore } from "@/store/cart-store"
+import { CheckoutModal } from "@/app/chat/components/checkout-modal"
 
 interface ProductDetailClientProps {
     product: any
@@ -21,9 +23,13 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
-    const { trackViewContent } = useTracking()
+    const { trackViewContent, trackAddToCart } = useTracking()
+    const { addItem } = useCartStore()
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
+
+    // Checkout modal state
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false)
 
     // Images
     const images = product.images && product.images.length > 0
@@ -132,6 +138,25 @@ export function ProductDetailClient({ product, organization, badges, promotions,
             const homeUrl = getStoreLink(`/?action=chat&${params.toString()}`, isSubdomain, organization.slug)
             router.push(homeUrl)
         }
+    }
+
+    const handleBuyNow = () => {
+        // Add product to cart with current price and variants
+        const productToAdd = {
+            id: product.id,
+            name: product.name,
+            price: currentPrice,
+            image_url: product.image_url || selectedImage
+        }
+
+        // Track AddToCart event
+        trackAddToCart(product.id, product.name, currentPrice, "COP")
+
+        // Add to cart
+        addItem(productToAdd, 1)
+
+        // Open checkout modal
+        setShowCheckoutModal(true)
     }
 
     // Logic for Brand/Category Label
@@ -316,9 +341,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         {/* Desktop CTA */}
                         <div className="hidden md:flex flex-col gap-4 mt-10">
                             <button
-                                onClick={() => handleChat(product.id)}
+                                onClick={handleBuyNow}
                                 className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-14 rounded-lg transform transition-transform duration-200 hover:scale-[1.02] shadow-lg hover:shadow-xl"
                                 style={{ backgroundColor: primaryColor }}
+                            >
+                                <span className="material-symbols-outlined">shopping_cart</span>
+                                <span>Comprar Ya</span>
+                            </button>
+                            <button
+                                onClick={() => handleChat(product.id)}
+                                className="flex w-full items-center justify-center gap-3 text-slate-700 dark:text-slate-300 text-base font-bold h-14 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 transform transition-transform duration-200 hover:scale-[1.02] hover:border-slate-400 dark:hover:border-slate-500"
                             >
                                 <span className="material-symbols-outlined">chat</span>
                                 <span>{product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}</span>
@@ -394,15 +426,31 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
             {/* Mobile Sticky CTA */}
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-50 md:hidden">
-                <button
-                    onClick={() => handleChat(product.id)}
-                    className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-12 rounded-lg"
-                    style={{ backgroundColor: primaryColor }}
-                >
-                    <span className="material-symbols-outlined">chat</span>
-                    <span>{product.is_configurable ? "Personalizar" : "Chatear para Comprar"}</span>
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={handleBuyNow}
+                        className="flex flex-1 items-center justify-center gap-2 text-white text-sm font-bold h-12 rounded-lg"
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        <span className="material-symbols-outlined text-lg">shopping_cart</span>
+                        <span>Comprar Ya</span>
+                    </button>
+                    <button
+                        onClick={() => handleChat(product.id)}
+                        className="flex flex-1 items-center justify-center gap-2 text-slate-700 dark:text-slate-300 text-sm font-bold h-12 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                    >
+                        <span className="material-symbols-outlined text-lg">chat</span>
+                        <span>Chat</span>
+                    </button>
+                </div>
             </div>
+
+            {/* Checkout Modal */}
+            <CheckoutModal 
+                isOpen={showCheckoutModal}
+                onClose={() => setShowCheckoutModal(false)}
+                slug={slug}
+            />
         </div>
     )
 }
