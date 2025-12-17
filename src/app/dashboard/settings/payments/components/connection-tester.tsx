@@ -8,18 +8,23 @@ import { testConnection } from "../actions"
 
 interface ConnectionTesterProps {
     hasConfig: boolean
+    provider?: string
 }
 
-export function ConnectionTester({ hasConfig }: ConnectionTesterProps) {
+export function ConnectionTester({ hasConfig, provider }: ConnectionTesterProps) {
     const [loading, setLoading] = useState(false)
     const [status, setStatus] = useState<"idle" | "success" | "error">("idle")
 
     const handleTest = async () => {
+        if (!provider) {
+            return
+        }
+        
         setLoading(true)
         setStatus("idle")
 
         try {
-            const result = await testConnection()
+            const result = await testConnection(provider)
 
             if (result.success) {
                 if (result.data?.success) {

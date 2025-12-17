@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CreditCard, ExternalLink, Copy } from "lucide-react"
+import { Copy } from "lucide-react"
 import type { PaymentGatewayConfig } from "@/types"
 import { GatewayConfigForm } from "./gateway-config-form"
 import { ConnectionTester } from "./connection-tester"
@@ -26,7 +26,10 @@ export function PaymentConfigWrapper() {
     }, [])
 
     const handleToggle = async (isActive: boolean) => {
-        const result = await toggleGateway(isActive)
+        if (!config?.provider) {
+            return { success: false, error: "No hay configuración de pasarela" }
+        }
+        const result = await toggleGateway(config.provider, isActive)
         if (result.success) {
             fetchConfig()
         }
@@ -55,28 +58,25 @@ export function PaymentConfigWrapper() {
             )}
 
             {/* Formulario de configuración */}
-            <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-slate-900">
-                <h2 className="mb-4 text-lg font-semibold">
-                    {config ? "Actualizar Configuración" : "Configurar Pasarela"}
-                </h2>
+            <div className="space-y-6">
                 <GatewayConfigForm initialConfig={config} onSaved={fetchConfig} />
             </div>
 
             {/* Probar conexión */}
-            <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-slate-900">
-                <h2 className="mb-4 text-lg font-semibold">Verificar Conexión</h2>
-                <ConnectionTester hasConfig={!!config} />
+            <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Verificar Conexión</h3>
+                <ConnectionTester hasConfig={!!config} provider={config?.provider} />
             </div>
 
             {/* Webhook URL */}
             {config?.webhook_url && (
-                <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-slate-900">
-                    <h2 className="mb-4 text-lg font-semibold">URL de Webhook</h2>
-                    <p className="mb-3 text-sm text-slate-500">
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-6">
+                    <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">URL de Webhook</h3>
+                    <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
                         Configura esta URL en tu panel de {config.provider} para recibir
                         notificaciones de pago:
                     </p>
-                    <div className="flex items-center gap-2 rounded-lg bg-slate-100 p-3 dark:bg-slate-800">
+                    <div className="flex items-center gap-2 rounded-lg bg-slate-100 dark:bg-slate-800 p-3">
                         <code className="flex-1 truncate text-sm">{config.webhook_url}</code>
                         <button
                             type="button"
@@ -88,31 +88,6 @@ export function PaymentConfigWrapper() {
                     </div>
                 </div>
             )}
-
-            {/* Documentación */}
-            <div className="rounded-xl border bg-slate-50 p-6 dark:bg-slate-800/50">
-                <h2 className="mb-3 text-lg font-semibold">Documentación</h2>
-                <div className="space-y-2">
-                    <a
-                        href="https://docs.wompi.co/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                        <ExternalLink className="h-4 w-4" />
-                        Documentación de Wompi
-                    </a>
-                    <a
-                        href="https://docs.epayco.co/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                    >
-                        <ExternalLink className="h-4 w-4" />
-                        Documentación de ePayco
-                    </a>
-                </div>
-            </div>
         </div>
     )
 }

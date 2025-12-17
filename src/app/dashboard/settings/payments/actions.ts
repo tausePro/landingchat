@@ -10,6 +10,9 @@ import {
     type PaymentGatewayConfig,
     PaymentGatewayConfigInputSchema,
     deserializePaymentGatewayConfig,
+    type ManualPaymentMethods,
+    ManualPaymentMethodsInputSchema,
+    deserializeManualPaymentMethods,
 } from "@/types"
 
 /**
@@ -33,11 +36,12 @@ async function getCurrentOrganization() {
 }
 
 /**
- * Obtiene la configuración de pasarela de pago de la organización
+ * Obtiene la configuración de una pasarela de pago específica
+ * @param provider - El proveedor de pago (epayco, wompi, etc.)
  */
-export async function getPaymentConfig(): Promise<
-    ActionResult<PaymentGatewayConfig | null>
-> {
+export async function getPaymentConfig(
+    provider?: string
+): Promise<ActionResult<PaymentGatewayConfig | null>> {
     try {
         const organizationId = await getCurrentOrganization()
         if (!organizationId) {
@@ -45,11 +49,18 @@ export async function getPaymentConfig(): Promise<
         }
 
         const supabase = await createClient()
-        const { data, error } = await supabase
+        
+        let query = supabase
             .from("payment_gateway_configs")
             .select("*")
             .eq("organization_id", organizationId)
-            .single()
+
+        // Si se especifica un provider, filtrar por él
+        if (provider) {
+            query = query.eq("provider", provider)
+        }
+
+        const { data, error } = await query.single()
 
         if (error && error.code !== "PGRST116") {
             // PGRST116 = no rows returned
@@ -75,6 +86,50 @@ export async function getPaymentConfig(): Promise<
     } catch (error) {
         return failure(
             error instanceof Error ? error.message : "Error al obtener configuración"
+        )
+    }
+}
+
+/**
+ * Obtiene todas las configuraciones de pasarelas de pago de la organización
+ */
+export async function getAllPaymentConfigs(): Promise<
+    ActionResult<PaymentGatewayConfig[]>
+> {
+    try {
+        const organizationId = await getCurrentOrganization()
+        if (!organizationId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("payment_gateway_configs")
+            .select("*")
+            .eq("organization_id", organizationId)
+
+        if (error) {
+            return failure(error.message)
+        }
+
+        // No devolver las credenciales encriptadas al cliente
+        const configs = (data || []).map((item) => {
+            const config = deserializePaymentGatewayConfig(item)
+            return {
+                ...config,
+                private_key_encrypted: config.private_key_encrypted ? "***" : null,
+                integrity_secret_encrypted: config.integrity_secret_encrypted
+                    ? "***"
+                    : null,
+                encryption_key_encrypted: config.encryption_key_encrypted
+                    ? "***"
+                    : null,
+            }
+        })
+        return success(configs)
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al obtener configuraciones"
         )
     }
 }
@@ -166,11 +221,12 @@ export async function savePaymentConfig(
 }
 
 /**
- * Prueba la conexión con la pasarela de pago
+ * Prueba la conexión con una pasarela de pago específica
+ * @param provider - El proveedor de pago (epayco, wompi, etc.)
  */
-export async function testConnection(): Promise<
-    ActionResult<{ success: boolean; message: string }>
-> {
+export async function testConnection(
+    provider: string
+): Promise<ActionResult<{ success: boolean; message: string }>> {
     try {
         const organizationId = await getCurrentOrganization()
         if (!organizationId) {
@@ -182,10 +238,11 @@ export async function testConnection(): Promise<
             .from("payment_gateway_configs")
             .select("*")
             .eq("organization_id", organizationId)
+            .eq("provider", provider)
             .single()
 
         if (error || !config) {
-            return failure("No hay configuración de pasarela")
+            return failure("No hay configuración para " + provider)
         }
 
         // Desencriptar credenciales
@@ -229,9 +286,12 @@ export async function testConnection(): Promise<
 }
 
 /**
- * Activa o desactiva la pasarela de pago
+ * Activa o desactiva una pasarela de pago específica
+ * @param provider - El proveedor de pago (epayco, wompi, etc.)
+ * @param isActive - Si la pasarela debe estar activa o no
  */
 export async function toggleGateway(
+    provider: string,
     isActive: boolean
 ): Promise<ActionResult<void>> {
     try {
@@ -245,6 +305,7 @@ export async function toggleGateway(
             .from("payment_gateway_configs")
             .update({ is_active: isActive, updated_at: new Date().toISOString() })
             .eq("organization_id", organizationId)
+            .eq("provider", provider)
 
         if (error) {
             return failure(error.message)
@@ -255,6 +316,101 @@ export async function toggleGateway(
     } catch (error) {
         return failure(
             error instanceof Error ? error.message : "Error al actualizar estado"
+        )
+    }
+}
+
+/**
+ * Obtiene la configuración de métodos de pago manuales
+ */
+export async function getManualPaymentMethods(): Promise<
+    ActionResult<ManualPaymentMethods | null>
+> {
+    try {
+        const organizationId = await getCurrentOrganization()
+        if (!organizationId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("manual_payment_methods")
+            .select("*")
+            .eq("organization_id", organizationId)
+            .single()
+
+        if (error && error.code !== "PGRST116") {
+            // PGRST116 = no rows returned
+            return failure(error.message)
+        }
+
+        if (!data) {
+            return success(null)
+        }
+
+        const config = deserializeManualPaymentMethods(data)
+        return success(config)
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al obtener configuración"
+        )
+    }
+}
+
+/**
+ * Guarda la configuración de métodos de pago manuales
+ */
+export async function saveManualPaymentMethods(
+    input: unknown
+): Promise<ActionResult<ManualPaymentMethods>> {
+    try {
+        const organizationId = await getCurrentOrganization()
+        if (!organizationId) {
+            return failure("No autorizado")
+        }
+
+        // Validar input
+        const validation = ManualPaymentMethodsInputSchema.safeParse(input)
+        if (!validation.success) {
+            return failure(validation.error.issues[0].message)
+        }
+
+        const data = validation.data
+        const supabase = await createClient()
+
+        const configData = {
+            organization_id: organizationId,
+            bank_transfer_enabled: data.bank_transfer_enabled,
+            bank_name: data.bank_name || null,
+            account_type: data.account_type || null,
+            account_number: data.account_number || null,
+            account_holder: data.account_holder || null,
+            nequi_number: data.nequi_number || null,
+            cod_enabled: data.cod_enabled,
+            cod_additional_cost: data.cod_additional_cost,
+            cod_zones: data.cod_zones,
+            updated_at: new Date().toISOString(),
+        }
+
+        const { data: result, error } = await supabase
+            .from("manual_payment_methods")
+            .upsert(configData, {
+                onConflict: "organization_id",
+            })
+            .select()
+            .single()
+
+        if (error) {
+            return failure(error.message)
+        }
+
+        revalidatePath("/dashboard/settings/payments")
+
+        const config = deserializeManualPaymentMethods(result)
+        return success(config)
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al guardar configuración"
         )
     }
 }
