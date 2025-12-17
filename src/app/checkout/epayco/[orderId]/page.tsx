@@ -35,10 +35,16 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
         notFound()
     }
 
-    // 2. Obtener la orden
+    // 2. Obtener la orden con sus items y productos
     const { data: order, error: orderError } = await supabase
         .from("orders")
-        .select("*")
+        .select(`
+            *,
+            order_items(
+                quantity,
+                product:products(name)
+            )
+        `)
         .eq("id", orderId)
         .eq("organization_id", org.id)
         .single()
@@ -69,7 +75,32 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
     // 5. Construir la URL base (dominio personalizado)
     const baseUrl = `https://${org.custom_domain}`
 
-    // 6. Preparar datos para el checkout de ePayco
+    // 6. Generar descripción personalizada con productos
+    const generateOrderDescription = () => {
+        if (!order.order_items || order.order_items.length === 0) {
+            return `Orden ${order.order_number}`
+        }
+
+        // Crear lista de productos con cantidades
+        const productList = order.order_items
+            .map((item: any) => {
+                const productName = item.product?.name || "Producto"
+                return item.quantity > 1 ? `${item.quantity}x ${productName}` : productName
+            })
+            .slice(0, 3) // Máximo 3 productos para no hacer la descripción muy larga
+
+        let description = productList.join(", ")
+        
+        // Si hay más de 3 productos, agregar "y más"
+        if (order.order_items.length > 3) {
+            description += ` y ${order.order_items.length - 3} más`
+        }
+
+        // Agregar nombre de la tienda para identificación
+        return `${description} - ${org.name}`
+    }
+
+    // 7. Preparar datos para el checkout de ePayco
     const checkoutData = {
         // Llaves de ePayco (solo la pública, nunca la privada)
         publicKey: gatewayConfig.public_key,
@@ -80,7 +111,7 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
         orderNumber: order.order_number,
         amount: Math.round(order.total), // ePayco usa pesos, no centavos
         currency: "COP",
-        description: `Orden ${order.order_number}`,
+        description: generateOrderDescription(),
         
         // Datos del cliente (solo los necesarios para ePayco)
         customerName: order.customer_info?.name || "",

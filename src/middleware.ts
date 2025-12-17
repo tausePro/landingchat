@@ -40,6 +40,20 @@ export async function middleware(request: NextRequest) {
     }
 
     // ============================================
+    // REDIRECTS PARA COMPATIBILIDAD CON CAMPAÑAS
+    // Mantener URLs de campañas activas funcionando
+    // ============================================
+    
+    // Redirect: /tienda/[producto] → /producto/[producto]
+    // Para campañas de Meta que usan el formato anterior
+    if (pathname.startsWith('/tienda/') && pathname !== '/tienda' && pathname !== '/tienda/') {
+        const productSlug = pathname.replace('/tienda/', '')
+        const newPath = `/producto/${productSlug}`
+        console.log(`[MIDDLEWARE] Campaign URL redirect: ${pathname} → ${newPath}`)
+        return NextResponse.redirect(new URL(newPath, request.url), 301) // 301 = Permanent redirect
+    }
+
+    // ============================================
     // DETECTAR SLUG DE LA TIENDA
     // El slug identifica qué tienda mostrar
     // ============================================
