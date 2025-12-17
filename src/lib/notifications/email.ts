@@ -16,6 +16,13 @@ interface OrderEmailData {
     paymentMethod: string
     organizationName: string
     storeUrl: string
+    bankInfo?: {
+        bank_name?: string
+        account_type?: string
+        account_number?: string
+        account_holder?: string
+        nequi_number?: string
+    }
 }
 
 /**
@@ -166,11 +173,11 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
         <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
             <h3 style="margin: 0 0 16px 0; color: #92400e;">Información para Transferencia</h3>
             <div style="color: #92400e;">
-                <p><strong>Banco:</strong> Bancolombia</p>
-                <p><strong>Tipo de Cuenta:</strong> Ahorros</p>
-                <p><strong>Número de Cuenta:</strong> 60100000000</p>
-                <p><strong>Nequi:</strong> 3001234567</p>
-                <p><strong>Titular:</strong> LANDINGCHAT SAS</p>
+                <p><strong>Banco:</strong> ${data.bankInfo?.bank_name || 'Bancolombia'}</p>
+                <p><strong>Tipo de Cuenta:</strong> ${data.bankInfo?.account_type || 'Ahorros'}</p>
+                <p><strong>Número de Cuenta:</strong> ${data.bankInfo?.account_number || '60100000000'}</p>
+                ${data.bankInfo?.nequi_number ? `<p><strong>Nequi:</strong> ${data.bankInfo.nequi_number}</p>` : '<p><strong>Nequi:</strong> 3001234567</p>'}
+                <p><strong>Titular:</strong> ${data.bankInfo?.account_holder || 'LANDINGCHAT SAS'}</p>
                 <div style="background: #fbbf24; padding: 12px; border-radius: 6px; margin-top: 16px;">
                     <strong>Importante:</strong> Envía el comprobante de pago por WhatsApp al +57 301 234 5678 
                     con el número de pedido <strong>${data.orderNumber}</strong>
