@@ -8,7 +8,6 @@ import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { useCartStore } from "@/store/cart-store"
-import { CheckoutModal } from "@/app/chat/components/checkout-modal"
 
 interface ProductDetailClientProps {
     product: any
@@ -28,8 +27,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
 
-    // Checkout modal state
-    const [showCheckoutModal, setShowCheckoutModal] = useState(false)
+
 
     // Images
     const images = product.images && product.images.length > 0
@@ -152,11 +150,11 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         // Track AddToCart event
         trackAddToCart(product.id, product.name, currentPrice, "COP")
 
-        // Add to cart
+        // Add to cart (this will automatically open the cart sidebar)
         addItem(productToAdd, 1)
 
-        // Open checkout modal
-        setShowCheckoutModal(true)
+        // Don't open checkout modal automatically - let user continue shopping
+        // They can access checkout from the cart sidebar when ready
     }
 
     // Logic for Brand/Category Label
@@ -445,12 +443,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                 </div>
             </div>
 
-            {/* Checkout Modal */}
-            <CheckoutModal 
-                isOpen={showCheckoutModal}
-                onClose={() => setShowCheckoutModal(false)}
-                slug={slug}
-            />
+
         </div>
     )
 }

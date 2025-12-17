@@ -3,6 +3,11 @@
  * Uses Resend API for sending transactional emails
  */
 
+import { Resend } from 'resend'
+
+// Initialize Resend client
+const resend = new Resend(process.env.RESEND_API_KEY)
+
 interface OrderEmailData {
     orderNumber: string
     customerName: string
@@ -23,39 +28,37 @@ interface OrderEmailData {
  */
 export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<boolean> {
     try {
-        // For now, we'll use a simple fetch to a webhook or email service
-        // In production, you would integrate with Resend, SendGrid, or similar
+        // Skip email sending if no API key is configured
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping email to ${data.customerEmail}`)
+            return true
+        }
+
+        // Skip if customer email is empty
+        if (!data.customerEmail || data.customerEmail.trim() === '') {
+            console.log(`[EMAIL] Customer email is empty, skipping email notification`)
+            return true
+        }
         
         const emailContent = generateOrderEmailHTML(data)
         
-        // TODO: Replace with actual email service integration
-        console.log(`[EMAIL] Order confirmation for ${data.customerEmail}:`, {
+        console.log(`[EMAIL] Sending order confirmation to ${data.customerEmail} for order ${data.orderNumber}`)
+
+        const response = await resend.emails.send({
+            from: `${data.organizationName} <noreply@landingchat.co>`,
             to: data.customerEmail,
             subject: `Confirmación de Pedido ${data.orderNumber} - ${data.organizationName}`,
-            html: emailContent
+            html: emailContent,
         })
 
-        // For MVP, we'll just log the email content
-        // In production, integrate with your preferred email service:
-        /*
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                from: `${data.organizationName} <noreply@landingchat.co>`,
-                to: data.customerEmail,
-                subject: `Confirmación de Pedido ${data.orderNumber}`,
-                html: emailContent,
-            }),
-        })
+        if (response.error) {
+            console.error('[EMAIL] Resend error:', response.error)
+            return false
+        }
+
+        console.log(`[EMAIL] Order confirmation sent successfully to ${data.customerEmail}, ID: ${response.data?.id}`)
+        return true
         
-        return response.ok
-        */
-        
-        return true // For MVP, always return success
     } catch (error) {
         console.error('[EMAIL] Error sending order confirmation:', error)
         return false
@@ -217,16 +220,37 @@ export async function sendOrderNotificationToOwner(data: {
     organizationName: string
 }): Promise<boolean> {
     try {
+        // Skip email sending if no API key is configured
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping owner notification`)
+            return true
+        }
+
+        // Skip if owner email is empty
+        if (!data.ownerEmail || data.ownerEmail.trim() === '') {
+            console.log(`[EMAIL] Owner email is empty, skipping owner notification`)
+            return true
+        }
+
         const emailContent = generateOwnerNotificationHTML(data)
         
-        console.log(`[EMAIL] New order notification for ${data.ownerEmail}:`, {
+        console.log(`[EMAIL] Sending new order notification to owner ${data.ownerEmail} for order ${data.orderNumber}`)
+
+        const response = await resend.emails.send({
+            from: `LandingChat <noreply@landingchat.co>`,
             to: data.ownerEmail,
             subject: `🛒 Nuevo Pedido ${data.orderNumber} - ${data.organizationName}`,
-            html: emailContent
+            html: emailContent,
         })
 
-        // TODO: Integrate with actual email service
+        if (response.error) {
+            console.error('[EMAIL] Resend error for owner notification:', response.error)
+            return false
+        }
+
+        console.log(`[EMAIL] Owner notification sent successfully to ${data.ownerEmail}, ID: ${response.data?.id}`)
         return true
+        
     } catch (error) {
         console.error('[EMAIL] Error sending owner notification:', error)
         return false

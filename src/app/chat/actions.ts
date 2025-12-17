@@ -285,6 +285,16 @@ export async function createOrder(params: CreateOrderParams) {
         // 8. Manual Payment & Success Handler
         // Send notifications (Fire and Forget)
         try {
+            // Get organization details for notifications
+            const { data: orgDetails } = await supabase
+                .from("organizations")
+                .select("name, contact_email")
+                .eq("id", org.id)
+                .single()
+
+            const organizationName = orgDetails?.name || "Tu Tienda"
+            const ownerEmail = orgDetails?.contact_email
+
             // Send WhatsApp notification to store owner
             console.log("[createOrder] Sending WhatsApp notification for order:", orderNumber)
             await sendSaleNotification(
@@ -306,12 +316,25 @@ export async function createOrder(params: CreateOrderParams) {
                 total: params.total,
                 items: params.items,
                 paymentMethod: params.paymentMethod,
-                organizationName: "TEZ", // TODO: Get from organization data
+                organizationName: organizationName,
                 storeUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}`
             })
 
-            // TODO: Send email notification to store owner (optional)
-            // await sendOrderNotificationToOwner({...})
+            // Send email notification to store owner
+            if (ownerEmail) {
+                console.log("[createOrder] Sending email notification to owner:", ownerEmail)
+                await sendOrderNotificationToOwner({
+                    orderNumber: order.order_number || `#${order.id.slice(0, 8)}`,
+                    customerName: params.customerInfo.name,
+                    customerEmail: params.customerInfo.email,
+                    total: params.total,
+                    items: params.items,
+                    ownerEmail: ownerEmail,
+                    organizationName: organizationName
+                })
+            } else {
+                console.log("[createOrder] No owner email configured, skipping owner notification")
+            }
 
         } catch (e) {
             console.error("Failed to send notifications:", e)
