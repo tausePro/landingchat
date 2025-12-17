@@ -151,6 +151,48 @@ export interface Bank {
 }
 
 // ============================================
+// Métodos de Pago Manuales
+// ============================================
+
+export const ManualPaymentMethodsSchema = z.object({
+    id: z.string().uuid(),
+    organization_id: z.string().uuid(),
+    // Bank Transfer
+    bank_transfer_enabled: z.boolean().default(false),
+    bank_name: z.string().nullable().optional(),
+    account_type: z.enum(["ahorros", "corriente"]).nullable().optional(),
+    account_number: z.string().nullable().optional(),
+    account_holder: z.string().nullable().optional(),
+    nequi_number: z.string().nullable().optional(),
+    // Cash on Delivery
+    cod_enabled: z.boolean().default(false),
+    cod_additional_cost: z.number().int().min(0).default(0),
+    cod_zones: z.array(z.string()).default([]),
+    // Metadata
+    created_at: z.string(),
+    updated_at: z.string(),
+})
+
+export type ManualPaymentMethods = z.infer<typeof ManualPaymentMethodsSchema>
+
+// Input para crear/actualizar métodos manuales
+export const ManualPaymentMethodsInputSchema = z.object({
+    // Bank Transfer
+    bank_transfer_enabled: z.boolean().default(false),
+    bank_name: z.string().optional(),
+    account_type: z.enum(["ahorros", "corriente"]).optional(),
+    account_number: z.string().optional(),
+    account_holder: z.string().optional(),
+    nequi_number: z.string().optional(),
+    // Cash on Delivery
+    cod_enabled: z.boolean().default(false),
+    cod_additional_cost: z.number().int().min(0).default(0),
+    cod_zones: z.array(z.string()).default([]),
+})
+
+export type ManualPaymentMethodsInput = z.infer<typeof ManualPaymentMethodsInputSchema>
+
+// ============================================
 // Deserializadores
 // ============================================
 
@@ -194,5 +236,25 @@ export function deserializeStoreTransaction(
         created_at: data.created_at,
         updated_at: data.updated_at,
         completed_at: data.completed_at,
+    })
+}
+
+export function deserializeManualPaymentMethods(
+    data: Record<string, unknown>
+): ManualPaymentMethods {
+    return ManualPaymentMethodsSchema.parse({
+        id: data.id,
+        organization_id: data.organization_id,
+        bank_transfer_enabled: data.bank_transfer_enabled ?? false,
+        bank_name: data.bank_name,
+        account_type: data.account_type,
+        account_number: data.account_number,
+        account_holder: data.account_holder,
+        nequi_number: data.nequi_number,
+        cod_enabled: data.cod_enabled ?? false,
+        cod_additional_cost: data.cod_additional_cost ?? 0,
+        cod_zones: data.cod_zones ?? [],
+        created_at: data.created_at,
+        updated_at: data.updated_at,
     })
 }
