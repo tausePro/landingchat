@@ -3,7 +3,7 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
-import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
+import { sendOrderConfirmationEmailWithTemplates, sendOrderNotificationToOwnerWithTemplates } from "@/lib/email-templates"
 
 interface CreateOrderParams {
     slug: string
@@ -311,7 +311,8 @@ export async function createOrder(params: CreateOrderParams) {
 
             // Send email confirmation to customer
             console.log("[createOrder] Sending email confirmation to customer:", params.customerInfo.email)
-            await sendOrderConfirmationEmail({
+            await sendOrderConfirmationEmailWithTemplates({
+                organizationId: org.id,
                 orderNumber: order.order_number || `#${order.id.slice(0, 8)}`,
                 customerName: params.customerInfo.name,
                 customerEmail: params.customerInfo.email,
@@ -325,14 +326,16 @@ export async function createOrder(params: CreateOrderParams) {
             // Send email notification to store owner
             if (ownerEmail) {
                 console.log("[createOrder] Sending email notification to owner:", ownerEmail)
-                await sendOrderNotificationToOwner({
+                await sendOrderNotificationToOwnerWithTemplates({
+                    organizationId: org.id,
                     orderNumber: order.order_number || `#${order.id.slice(0, 8)}`,
                     customerName: params.customerInfo.name,
                     customerEmail: params.customerInfo.email,
                     total: params.total,
                     items: params.items,
                     ownerEmail: ownerEmail,
-                    organizationName: organizationName
+                    organizationName: organizationName,
+                    paymentMethod: params.paymentMethod
                 })
             } else {
                 console.log("[createOrder] No owner email configured, skipping owner notification")

@@ -208,7 +208,7 @@ This implementation plan breaks down the e-commerce checkout flow into discrete,
   - Test that orders are only accessible for correct organization
   - Test that invalid organization returns null
 
-- [ ]* 10.3 Write unit tests for order tracking
+- [ ] 10.3 Write unit tests for order tracking
   - Test order status display for each status
   - Test timeline rendering
   - Test 404 for invalid order ID

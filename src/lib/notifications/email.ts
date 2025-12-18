@@ -68,7 +68,7 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
 /**
  * Generate HTML email template for order confirmation
  */
-function generateOrderEmailHTML(data: OrderEmailData): string {
+export function generateOrderEmailHTML(data: OrderEmailData): string {
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', {
             style: 'currency',
@@ -252,7 +252,7 @@ export async function sendOrderNotificationToOwner(data: {
     }
 }
 
-function generateOwnerNotificationHTML(data: {
+export function generateOwnerNotificationHTML(data: {
     orderNumber: string
     customerName: string
     customerEmail: string
