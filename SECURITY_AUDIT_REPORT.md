@@ -1,9 +1,9 @@
 # 🔒 LandingChat Project Security & Code Audit Report
 
 ## Executive Summary
-**Status**: ⚠️ **CRITICAL ISSUES IDENTIFIED**
+**Status**: ⚠️ **PARTIALLY REMEDIATED (Production Hotfix Applied 2025-12-18)**
 
-The LandingChat project has significant security vulnerabilities that need immediate attention, along with extensive code quality issues. This audit identified **324 linting problems** (226 errors, 98 warnings) and **multiple critical security flaws**.
+The LandingChat project had significant security vulnerabilities that required immediate attention, along with extensive code quality issues. A production hotfix was applied on **2025-12-18** to mitigate the most severe RLS exposures (secrets leakage and cross-tenant access). Critical residual risks remain and must be addressed next.
 
 ---
 
@@ -12,7 +12,7 @@ The LandingChat project has significant security vulnerabilities that need immed
 ### 1. **Database Row Level Security (RLS) Misconfiguration**
 **Risk Level**: 🔴 **CRITICAL**
 
-**Problem**: Multiple database tables have overly permissive RLS policies allowing public access:
+**Problem**: Multiple database tables had overly permissive RLS policies allowing public access (including cross-tenant access and secrets exposure). Some high-impact mitigations were applied in production, but other critical permissive policies remain.
 ```sql
 -- DANGEROUS: These policies allow ANYONE to access data
 CREATE POLICY "Public can read customers" ON customers FOR SELECT USING (true);
@@ -32,7 +32,32 @@ CREATE POLICY "Public can view orders" ON orders FOR SELECT USING (true);
 - `update_schema_phase8_v2.sql`
 - `fix_agents_table.sql`
 
-**✅ FIX PROVIDED**: `fix_security_policies.sql` - Replace all permissive policies with org-scoped policies
+**✅ Production Hotfix Applied (2025-12-18)**
+
+- `system_settings` was locked down to **superadmin-only** access, with **public read allowed only** for `maintenance_mode`.
+- Removed public INSERT policies for `orders` and `store_transactions`.
+- Removed public ALL policy for `carts` (table has no public policies now).
+
+**⚠️ Critical Residual Risk (Still Open)**
+
+- `chats` has `Public can access chats` with `FOR ALL USING (true) WITH CHECK (true)`.
+- `messages` has `Public can access messages` with `FOR ALL USING (true) WITH CHECK (true)`.
+
+This remains a cross-tenant read/write risk and should be treated as the next immediate remediation.
+
+**Evidence (Production RLS Snapshot 2025-12-18)**
+
+Key relevant policy outcomes verified via `pg_policies`:
+
+- `system_settings`
+  - `Only superadmins can modify system settings` (roles: `{authenticated}`)
+  - `Public can read maintenance_mode` (roles: `{anon}`)
+- `orders`
+  - No public INSERT policy present (only org-scoped admin policies remain)
+- `store_transactions`
+  - No public INSERT/UPDATE policies present (only org-scoped SELECT remains)
+- `carts`
+  - No policies present (RLS effectively blocks public access)
 
 ### 2. **Missing Environment Variable Validation**
 **Risk Level**: 🟡 **MEDIUM**
@@ -131,9 +156,12 @@ useEffect(() => {
 ## 🎯 RECOMMENDED ACTION PLAN
 
 ### Phase 1: Immediate Security Fixes (Day 1)
-1. **Deploy `fix_security_policies.sql`** to production database
-2. **Add environment variable validation** to all API routes
-3. **Audit authentication flows** for bypass vulnerabilities
+1. **(DONE 2025-12-18)** Lock down `system_settings` to prevent secrets leakage
+2. **(DONE 2025-12-18)** Remove public INSERT policies for `orders` and `store_transactions`
+3. **(DONE 2025-12-18)** Remove public ALL policy for `carts`
+4. **(NEXT)** Fix `chats` / `messages` permissive RLS policies (remove `ALL true/true` and implement org-scoped + token-based access)
+5. **(NEXT)** Add environment variable validation to all API routes
+6. **(NEXT)** Audit webhook signature validation + ensure no sensitive data logging
 
 ### Phase 2: Critical Code Quality (Week 1)
 1. **Fix TypeScript `any` types** in core AI components
@@ -182,6 +210,9 @@ useEffect(() => {
 
 ## ⚠️ DEPLOYMENT RECOMMENDATION
 
-**DO NOT DEPLOY** current code to production without addressing the critical security issues first. The RLS policy vulnerabilities pose an immediate data breach risk.
+**Deployments may proceed with caution** after the production hotfix applied on **2025-12-18**, but the system is **not fully secure yet**.
 
-**Recommended**: Freeze deployments until Phase 1 security fixes are complete and tested.
+**Recommended**:
+- Continue shipping only low-risk changes.
+- Prioritize remediation of `chats` / `messages` permissive RLS policies.
+- Stand up a staging environment (separate Supabase project + Vercel envs) before further schema/RLS work.
