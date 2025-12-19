@@ -31,9 +31,11 @@ vi.mock("@/lib/utils/encryption", () => ({
 }))
 
 vi.mock("@/lib/payments/wompi-gateway", () => ({
-    WompiGateway: vi.fn().mockImplementation(() => ({
-        validateWebhookSignature: vi.fn().mockReturnValue(true),
-    })),
+    WompiGateway: vi.fn().mockImplementation(function () {
+        return {
+            validateWebhookSignature: vi.fn().mockReturnValue(true),
+        }
+    }),
 }))
 
 // Mock de notificaciones WhatsApp
@@ -123,10 +125,10 @@ describe("Transaction Status Handling - Property Tests", () => {
 
                     // Verificar que se llamó a update para la orden
                     const updateCalls = mockSupabase.mocks.update.mock.calls
-                    const orderUpdateCall = updateCalls.find(call => 
-                        call[0].payment_status === "paid"
-                    )
-                    expect(orderUpdateCall).toBeDefined()
+                    const orderUpdateCall = updateCalls.find(call => call[0].payment_status === "paid")
+                    if (!orderUpdateCall) {
+                        throw new Error("Expected order update call for paid payment_status")
+                    }
                     expect(orderUpdateCall[0]).toMatchObject({
                         payment_status: "paid",
                         status: "confirmed",
@@ -204,7 +206,9 @@ describe("Transaction Status Handling - Property Tests", () => {
                     const orderUpdateCall = updateCalls.find(call => 
                         call[0].payment_status === "failed"
                     )
-                    expect(orderUpdateCall).toBeDefined()
+                    if (!orderUpdateCall) {
+                        throw new Error("Expected order update call for failed payment_status")
+                    }
                     expect(orderUpdateCall[0]).toMatchObject({
                         payment_status: "failed",
                         status: "cancelled",
@@ -339,10 +343,12 @@ describe("Transaction Status Handling - Property Tests", () => {
 
                     // Verificar que se llamó a update para la orden
                     const updateCalls = mockSupabase.mocks.update.mock.calls
-                    const orderUpdateCall = updateCalls.find(call => 
-                        call[0].payment_status === "refunded"
+                    const orderUpdateCall = updateCalls.find(
+                        call => call[0].payment_status === "refunded"
                     )
-                    expect(orderUpdateCall).toBeDefined()
+                    if (!orderUpdateCall) {
+                        throw new Error("Expected order update call for refunded payment_status")
+                    }
                     expect(orderUpdateCall[0]).toMatchObject({
                         payment_status: "refunded",
                         updated_at: expect.any(String),

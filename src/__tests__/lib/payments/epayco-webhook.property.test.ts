@@ -25,6 +25,8 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/utils/encryption", () => ({
     decrypt: vi.fn((encrypted: string) => {
         if (encrypted === "encrypted_private_key") return "test_private_key"
+        if (encrypted === "encrypted_integrity_secret") return "test_customer_id"
+        if (encrypted === "encrypted_encryption_key") return "test_encryption_key"
         return encrypted
     }),
 }))
@@ -71,8 +73,8 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         codResponse,
-                        TEST_EPAYCO_CONFIG.public_key,
-                        "test_private_key"
+                        "test_customer_id",
+                        "test_encryption_key"
                     )
 
                     const request = createWebhookRequest(
@@ -118,8 +120,8 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         codResponse,
-                        TEST_EPAYCO_CONFIG.public_key,
-                        "test_private_key"
+                        "test_customer_id",
+                        "test_encryption_key"
                     )
                     // Corromper la firma
                     payload.x_signature = generateInvalidSignature()
@@ -175,8 +177,8 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         codResponse,
-                        TEST_EPAYCO_CONFIG.public_key,
-                        "test_private_key"
+                        "test_customer_id",
+                        "test_encryption_key"
                     )
 
                     const request = createWebhookRequest(
@@ -252,8 +254,8 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         "1", // Código 1 = APPROVED
-                        TEST_EPAYCO_CONFIG.public_key,
-                        "test_private_key"
+                        "test_customer_id",
+                        "test_encryption_key"
                     )
 
                     const request = createWebhookRequest(
@@ -281,7 +283,9 @@ describe("ePayco Webhook - Property Tests", () => {
                     const orderUpdateCall = updateCalls.find(call => 
                         call[0].payment_status === "paid"
                     )
-                    expect(orderUpdateCall).toBeDefined()
+                    if (!orderUpdateCall) {
+                        throw new Error("Expected order update call for paid payment_status")
+                    }
                     expect(orderUpdateCall[0]).toMatchObject({
                         payment_status: "paid",
                         status: "confirmed",
@@ -334,8 +338,8 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         "2", // Código 2 = DECLINED
-                        TEST_EPAYCO_CONFIG.public_key,
-                        "test_private_key"
+                        "test_customer_id",
+                        "test_encryption_key"
                     )
 
                     const request = createWebhookRequest(
@@ -363,7 +367,9 @@ describe("ePayco Webhook - Property Tests", () => {
                     const orderUpdateCall = updateCalls.find(call => 
                         call[0].payment_status === "failed"
                     )
-                    expect(orderUpdateCall).toBeDefined()
+                    if (!orderUpdateCall) {
+                        throw new Error("Expected order update call for failed payment_status")
+                    }
                     expect(orderUpdateCall[0]).toMatchObject({
                         payment_status: "failed",
                         status: "cancelled",
@@ -404,8 +410,8 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         "1",
-                        TEST_EPAYCO_CONFIG.public_key,
-                        "test_private_key"
+                        "test_customer_id",
+                        "test_encryption_key"
                     )
 
                     const request = createWebhookRequest(

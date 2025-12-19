@@ -33,12 +33,14 @@ vi.mock("@/lib/utils/encryption", () => ({
 // Mock simple de WompiGateway
 const mockValidateWebhookSignature = vi.fn()
 vi.mock("@/lib/payments/wompi-gateway", () => ({
-    WompiGateway: vi.fn().mockImplementation(() => ({
-        validateWebhookSignature: mockValidateWebhookSignature,
-    })),
+    WompiGateway: vi.fn().mockImplementation(function () {
+        return {
+            validateWebhookSignature: mockValidateWebhookSignature,
+        }
+    }),
 }))
 
-let mockSupabase: any
+let mockSupabase: ReturnType<typeof createMockSupabase>
 
 beforeEach(() => {
     vi.clearAllMocks()

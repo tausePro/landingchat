@@ -30,9 +30,11 @@ vi.mock("@/lib/utils/encryption", () => ({
 }))
 
 vi.mock("@/lib/payments/wompi-gateway", () => ({
-    WompiGateway: vi.fn().mockImplementation(() => ({
-        validateWebhookSignature: vi.fn().mockReturnValue(true),
-    })),
+    WompiGateway: vi.fn().mockImplementation(function () {
+        return {
+            validateWebhookSignature: vi.fn().mockReturnValue(true),
+        }
+    }),
 }))
 
 let mockSupabase: ReturnType<typeof createMockSupabase>

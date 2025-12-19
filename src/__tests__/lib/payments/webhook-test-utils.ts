@@ -204,27 +204,47 @@ export function createMockSupabase() {
     const mockInsert = vi.fn()
     const mockUpdate = vi.fn()
 
-    // Configurar cadena de métodos para queries
-    const createQueryChain = () => ({
+    // Cadenas "chainable" para emular el query builder de Supabase.
+    // Nota: las funciones *deben* ser estables (misma referencia) para que
+    // mockResolvedValueOnce() se consuma en el orden esperado por los tests.
+    const queryChain: {
+        select: typeof mockSelect
+        eq: typeof mockEq
+        single: typeof mockSingle
+        insert: typeof mockInsert
+        update: typeof mockUpdate
+    } = {
         select: mockSelect,
         eq: mockEq,
         single: mockSingle,
-    })
+        insert: mockInsert,
+        update: mockUpdate,
+    }
 
-    const createInsertChain = () => ({
+    const insertChain: {
+        select: typeof mockSelect
+        single: typeof mockSingle
+    } = {
         select: mockSelect,
         single: mockSingle,
-    })
+    }
 
-    const createUpdateChain = () => ({
+    const updateChain: {
+        eq: typeof mockEq
+    } = {
         eq: mockEq,
-    })
+    }
 
-    mockFrom.mockReturnValue(createQueryChain())
-    mockSelect.mockReturnValue(createQueryChain())
-    mockEq.mockReturnValue(createQueryChain())
-    mockInsert.mockReturnValue(createInsertChain())
-    mockUpdate.mockReturnValue(createUpdateChain())
+    mockFrom.mockReturnValue(queryChain)
+
+    // select/eq siguen devolviendo un chain para permitir .select().eq().single()
+    mockSelect.mockReturnValue(queryChain)
+    mockEq.mockReturnValue(queryChain)
+
+    // insert/update devuelven sus cadenas específicas
+    mockInsert.mockReturnValue(insertChain)
+    mockUpdate.mockReturnValue(updateChain)
+
     mockSingle.mockResolvedValue({ data: null, error: null })
 
     return {
@@ -264,6 +284,8 @@ export const TEST_EPAYCO_CONFIG = {
     provider: "epayco",
     public_key: "test_public_key",
     private_key_encrypted: "encrypted_private_key",
+    integrity_secret_encrypted: "encrypted_integrity_secret",
+    encryption_key_encrypted: "encrypted_encryption_key",
     is_test_mode: true,
 }
 
@@ -292,7 +314,7 @@ export function createWebhookRequest(
 ): Request {
     const body = contentType === "application/json" 
         ? JSON.stringify(payload)
-        : new URLSearchParams(payload as Record<string, string>).toString()
+        : new URLSearchParams(payload as unknown as Record<string, string>).toString()
 
     return new Request(url, {
         method: "POST",
