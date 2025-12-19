@@ -4,6 +4,7 @@ import { tools } from "./tools"
 import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/utils/logger"
 
 interface ProcessMessageInput {
     message: string
@@ -18,7 +19,7 @@ interface ProcessMessageOutput {
     response: string
     actions: Array<{
         type: string
-        data: any
+        data: unknown
     }>
     metadata: {
         model: string
@@ -34,10 +35,14 @@ interface ProcessMessageOutput {
 export async function processMessage(input: ProcessMessageInput): Promise<ProcessMessageOutput> {
     const startTime = Date.now()
     const toolsUsed: string[] = []
-    const actions: Array<{ type: string; data: any }> = []
+    const actions: Array<{ type: string; data: unknown }> = []
 
     try {
-        console.log("[processMessage] Starting with input:", { chatId: input.chatId, agentId: input.agentId, currentProductId: input.currentProductId })
+        logger.debug("[processMessage] Starting", {
+            chatId: input.chatId,
+            agentId: input.agentId,
+            currentProductId: input.currentProductId,
+        })
         const supabase = createServiceClient()
 
         // 1. Load agent configuration
@@ -50,7 +55,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         if (!agent) throw new Error("Agent not found")
 
         // Debug: Log agent configuration to verify custom prompt is loaded
-        console.log("[processMessage] Agent loaded:", {
+        logger.debug("[processMessage] Agent loaded", {
             name: agent.name,
             hasSystemPrompt: !!agent.system_prompt,
             hasConfig: !!agent.configuration,
@@ -76,7 +81,10 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         // 3.1 Load current product context if available
         let currentProduct = null
         if (input.currentProductId) {
-            console.log("[processMessage] Loading current product:", input.currentProductId, "for org:", input.organizationId)
+            logger.debug("[processMessage] Loading current product", {
+                currentProductId: input.currentProductId,
+                organizationId: input.organizationId,
+            })
             const { data: product, error: productError } = await supabase
                 .from("products")
                 .select("*")
@@ -85,13 +93,17 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
                 .single()
 
             if (productError) {
-                console.error("[processMessage] Error loading current product:", productError)
+                logger.error("[processMessage] Error loading current product", {
+                    message: productError.message,
+                })
             } else {
-                console.log("[processMessage] Current product loaded:", product?.name, "| Price:", product?.price)
+                logger.debug("[processMessage] Current product loaded", {
+                    productName: product?.name,
+                })
                 currentProduct = product
             }
         } else {
-            console.log("[processMessage] No currentProductId provided")
+            logger.debug("[processMessage] No currentProductId provided")
         }
 
         // 4. Load conversation history
@@ -139,7 +151,9 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 7. Build system prompt (optimized: only pass product count, not all products)
-        console.log("[processMessage] Building system prompt with currentProduct:", currentProduct?.name || "NONE")
+        logger.debug("[processMessage] Building system prompt", {
+            hasCurrentProduct: !!currentProduct,
+        })
         let systemPrompt = buildSystemPromptOptimized(
             agent,
             organization?.name || "la tienda",
@@ -172,7 +186,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
         }
 
         // 8. Prepare message history
-        let currentMessages: Anthropic.MessageParam[] = [
+        const currentMessages: Anthropic.MessageParam[] = [
             ...conversationHistory,
             { role: 'user' as const, content: input.message }
         ]
@@ -184,14 +198,14 @@ REGLAS CRÍTICAS DE INVENTARIO:
         // 9. Main Loop
         while (loopCount < MAX_LOOPS) {
             loopCount++
-            console.log(`[processMessage] Loop ${loopCount}, calling Claude...`)
+            logger.debug("[processMessage] Calling model", { loopCount })
 
             const response = await createMessage({
                 model: "claude-sonnet-4-20250514",
                 max_tokens: 1024,
                 system: fullSystemPrompt,
                 messages: currentMessages,
-                tools: tools as any
+                tools
             })
 
             // Add assistant response to history
@@ -201,11 +215,15 @@ REGLAS CRÍTICAS DE INVENTARIO:
             })
 
             // Check if we have tool calls
-            const toolUseBlocks = response.content.filter(block => block.type === "tool_use")
-            const textBlocks = response.content.filter(block => block.type === "text")
+            const toolUseBlocks = response.content.filter(
+                (block): block is Anthropic.ToolUseBlock => block.type === "tool_use"
+            )
+            const textBlocks = response.content.filter(
+                (block): block is Anthropic.TextBlock => block.type === "text"
+            )
 
             if (textBlocks.length > 0) {
-                finalResponseText += textBlocks.map(b => (b as any).text).join("\n")
+                finalResponseText += textBlocks.map(b => b.text).join("\n")
             }
 
             if (toolUseBlocks.length === 0) {
@@ -216,10 +234,9 @@ REGLAS CRÍTICAS DE INVENTARIO:
             // Process tool calls
             const toolResults: Anthropic.ToolResultBlockParam[] = []
 
-            for (const toolBlock of toolUseBlocks) {
-                const toolUse = toolBlock as Anthropic.ToolUseBlock
+            for (const toolUse of toolUseBlocks) {
                 toolsUsed.push(toolUse.name)
-                console.log(`[processMessage] Executing tool: ${toolUse.name}`)
+                logger.debug("[processMessage] Executing tool", { toolName: toolUse.name })
 
                 const toolResult = await executeTool(
                     toolUse.name,
@@ -294,13 +311,13 @@ REGLAS CRÍTICAS DE INVENTARIO:
             }
         }
 
-    } catch (error: any) {
-        console.error("[processMessage] ========== ERROR DETAILS ==========")
-        console.error("[processMessage] Error name:", error.name)
-        console.error("[processMessage] Error message:", error.message)
-        console.error("[processMessage] Error stack:", error.stack)
-        console.error("[processMessage] Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
-        console.error("[processMessage] =====================================")
+    } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error))
+        logger.error("[processMessage] Error", {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+        })
 
         return {
             response: "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",

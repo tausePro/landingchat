@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/utils/logger"
 import { z } from "zod"
 import crypto from "crypto"
 
@@ -47,6 +48,10 @@ const ConnectionUpdateSchema = z.object({
     state: z.enum(["open", "close", "connecting"]),
     statusReason: z.number().optional(),
 })
+
+void WebhookPayloadSchema
+void IncomingMessageSchema
+void ConnectionUpdateSchema
 
 /**
  * Valida la firma del webhook usando HMAC-SHA256
@@ -105,14 +110,14 @@ export async function POST(request: NextRequest) {
                 )
 
                 if (!isValid) {
-                    console.error("[WhatsApp Webhook] Invalid signature")
+                    logger.warn("[WhatsApp Webhook] Invalid signature")
                     return NextResponse.json(
                         { error: "Invalid signature" },
                         { status: 401 }
                     )
                 }
             } else {
-                console.warn("[WhatsApp Webhook] webhookSecret configured but no signature received")
+                logger.warn("[WhatsApp Webhook] webhookSecret configured but no signature received")
             }
         }
         
@@ -123,28 +128,41 @@ export async function POST(request: NextRequest) {
         // Ejemplo: /api/webhooks/whatsapp/connection-update
         const eventFromPath = pathSegments[pathSegments.length - 1]
         
-        // Log completo del payload para debugging
-        console.log("[WhatsApp Webhook] Raw payload:", JSON.stringify(body, null, 2))
-        console.log("[WhatsApp Webhook] Path:", url.pathname)
-        console.log("[WhatsApp Webhook] Event from path:", eventFromPath)
+        logger.debug("[WhatsApp Webhook] Received webhook", {
+            path: url.pathname,
+            eventFromPath,
+            bodyKeys: typeof body === "object" && body ? Object.keys(body as Record<string, unknown>) : [],
+        })
         
         // Guardar log en DB para debugging en producción (no bloquear si falla)
         try {
-            const headers: Record<string, string> = {}
-            request.headers.forEach((value, key) => {
-                headers[key] = value
-            })
-            
+            const headers: Record<string, string> = {
+                "content-type": request.headers.get("content-type") || "",
+                "user-agent": request.headers.get("user-agent") || "",
+            }
+
+            const bodyRecord: Record<string, unknown> =
+                typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {}
+
+            const safePayload: Record<string, unknown> = {
+                event: (typeof bodyRecord.event === "string" ? bodyRecord.event : undefined) || eventFromPath,
+                instance:
+                    (typeof bodyRecord.instance === "string" ? bodyRecord.instance : undefined) ||
+                    (typeof bodyRecord.instanceName === "string" ? bodyRecord.instanceName : undefined),
+            }
+             
             await supabase.from("webhook_logs").insert({
                 webhook_type: "whatsapp",
                 event_type: body.event || eventFromPath,
                 instance_name: body.instance || body.instanceName,
-                payload: body,
+                payload: safePayload,
                 headers,
                 processing_result: "processing",
             })
         } catch (logError) {
-            console.error("Failed to log webhook (non-blocking):", logError)
+            logger.error("Failed to log webhook (non-blocking)", {
+                message: logError instanceof Error ? logError.message : String(logError),
+            })
         }
         
         // Determinar el evento (puede venir en el body o en la ruta)
@@ -169,10 +187,10 @@ export async function POST(request: NextRequest) {
         const instance = body.instance || body.instanceName
         const data = body.data || body
         
-        console.log(`[WhatsApp Webhook] Normalized Event: ${event}, Instance: ${instance}`)
+        logger.info("[WhatsApp Webhook] Normalized webhook", { event, instance })
         
         if (!instance) {
-            console.error("[WhatsApp Webhook] No instance found in payload")
+            logger.error("[WhatsApp Webhook] No instance found in payload")
             return NextResponse.json({ error: "Instance required" }, { status: 400 })
         }
 
@@ -184,7 +202,7 @@ export async function POST(request: NextRequest) {
             .single()
 
         if (instanceError || !whatsappInstance) {
-            console.error(`[WhatsApp Webhook] Instance not found: ${instance}`)
+            logger.warn("[WhatsApp Webhook] Instance not found", { instance })
             // Retornar 200 para evitar reintentos de Evolution API
             return NextResponse.json({ received: true, warning: "Instance not found" })
         }
@@ -205,18 +223,20 @@ export async function POST(request: NextRequest) {
 
                 case "qrcode.updated":
                     // Los QR codes se manejan via polling desde el frontend
-                    console.log(`[WhatsApp Webhook] QR updated for ${instance}`)
+                    logger.info("[WhatsApp Webhook] QR updated", { instance })
                     break
 
                 default:
-                    console.log(`[WhatsApp Webhook] Unhandled event: ${event}`)
+                    logger.warn("[WhatsApp Webhook] Unhandled event", { event })
                     processingResult = "warning"
                     errorMessage = `Unhandled event type: ${event}`
             }
         } catch (processingError) {
             processingResult = "error"
             errorMessage = processingError instanceof Error ? processingError.message : String(processingError)
-            console.error("[WhatsApp Webhook] Processing error:", processingError)
+            logger.error("[WhatsApp Webhook] Processing error", {
+                message: processingError instanceof Error ? processingError.message : String(processingError),
+            })
         }
         
         // Actualizar log con resultado (no bloquear si falla)
@@ -232,12 +252,16 @@ export async function POST(request: NextRequest) {
                 .order("created_at", { ascending: false })
                 .limit(1)
         } catch (logError) {
-            console.error("Failed to update webhook log (non-blocking):", logError)
+            logger.error("Failed to update webhook log (non-blocking)", {
+                message: logError instanceof Error ? logError.message : String(logError),
+            })
         }
 
         return NextResponse.json({ received: true, status: processingResult })
     } catch (error) {
-        console.error("[WhatsApp Webhook] Error:", error)
+        logger.error("[WhatsApp Webhook] Error", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }
@@ -265,7 +289,9 @@ async function handleIncomingMessage(
 ) {
     const validation = IncomingMessageSchema.safeParse(data)
     if (!validation.success) {
-        console.error("[WhatsApp Webhook] Invalid message format:", validation.error)
+        logger.error("[WhatsApp Webhook] Invalid message format", {
+            message: validation.error.message,
+        })
         return
     }
 
@@ -285,19 +311,26 @@ async function handleIncomingMessage(
                        ""
 
     if (!messageText) {
-        console.log("[WhatsApp Webhook] Message without text, skipping")
+        logger.info("[WhatsApp Webhook] Message without text, skipping")
         return
     }
 
-    console.log(`[WhatsApp Webhook] Message from ${phoneNumber}: ${messageText.substring(0, 50)}...`)
+    const phoneLast4 = phoneNumber.replace(/\D/g, "").slice(-4)
+    logger.info("[WhatsApp Webhook] Incoming message", {
+        messageId: message.key.id,
+        phoneLast4: phoneLast4 || undefined,
+        messageLength: messageText.length,
+    })
 
     // Buscar o crear cliente por número de teléfono
-    let customer = await findOrCreateCustomer(supabase, instance.organization_id, phoneNumber, message.pushName)
+    const customer = await findOrCreateCustomer(supabase, instance.organization_id, phoneNumber, message.pushName)
 
     // Verificar límite de conversaciones del plan
     const canContinue = await checkConversationLimit(supabase, instance.organization_id)
     if (!canContinue) {
-        console.log(`[WhatsApp Webhook] Organization ${instance.organization_id} reached conversation limit`)
+        logger.warn("[WhatsApp Webhook] Organization reached conversation limit", {
+            organizationId: instance.organization_id,
+        })
         // TODO: Enviar mensaje de límite alcanzado
         return
     }
@@ -318,7 +351,7 @@ async function handleIncomingMessage(
     })
 
     // Procesar mensaje con el agente IA
-    console.log(`[WhatsApp Webhook] Processing message with AI agent for chat ${chat.id}`)
+    logger.info("[WhatsApp Webhook] Processing message with AI agent", { chatId: chat.id })
     const { processIncomingMessage } = await import("@/lib/messaging/unified")
     const result = await processIncomingMessage({
         channel: "whatsapp",
@@ -332,9 +365,11 @@ async function handleIncomingMessage(
     })
     
     if (result.success) {
-        console.log(`[WhatsApp Webhook] AI response sent successfully`)
+        logger.info("[WhatsApp Webhook] AI response sent successfully")
     } else {
-        console.error(`[WhatsApp Webhook] AI processing failed:`, result.error)
+        logger.error("[WhatsApp Webhook] AI processing failed", {
+            error: result.error,
+        })
     }
 }
 
@@ -346,7 +381,7 @@ async function handleConnectionUpdate(
     instance: WhatsAppInstanceRecord,
     data: Record<string, unknown>
 ) {
-    console.log("[WhatsApp Webhook] Connection update data:", JSON.stringify(data, null, 2))
+    logger.debug("[WhatsApp Webhook] Connection update received")
     
     // Evolution API v2.x puede enviar el estado en diferentes formatos
     let state: string | undefined
@@ -361,11 +396,11 @@ async function handleConnectionUpdate(
     }
     
     if (!state) {
-        console.error("[WhatsApp Webhook] Could not extract state from connection update")
+        logger.error("[WhatsApp Webhook] Could not extract state from connection update")
         return
     }
 
-    console.log(`[WhatsApp Webhook] Connection state for ${instance.id}: ${state}`)
+    logger.info("[WhatsApp Webhook] Connection state", { instanceId: instance.id, state })
 
     // Mapear estado de Evolution a nuestro estado
     const statusMap: Record<string, string> = {
@@ -376,7 +411,7 @@ async function handleConnectionUpdate(
     }
 
     const newStatus = statusMap[state.toLowerCase()] || "disconnected"
-    console.log(`[WhatsApp Webhook] Updating instance ${instance.id} to status: ${newStatus}`)
+    logger.info("[WhatsApp Webhook] Updating instance status", { instanceId: instance.id, newStatus })
 
     // Intentar extraer número de teléfono si está conectado
     let phoneNumber: string | null = null
@@ -384,12 +419,17 @@ async function handleConnectionUpdate(
     
     if (newStatus === "connected") {
         // Evolution API puede enviar el número en diferentes ubicaciones
+        const connectionRecord: Record<string, unknown> =
+            typeof (data as Record<string, unknown>).connection === "object" &&
+            (data as Record<string, unknown>).connection !== null
+                ? ((data as Record<string, unknown>).connection as Record<string, unknown>)
+                : {}
         const possiblePhoneFields = [
             data.instance,
             data.phoneNumber,
             data.phone,
-            (data.connection as any)?.phoneNumber,
-            (data.connection as any)?.phone,
+            connectionRecord.phoneNumber,
+            connectionRecord.phone,
         ]
         
         for (const field of possiblePhoneFields) {
@@ -398,7 +438,7 @@ async function handleConnectionUpdate(
                 phoneNumber = field.replace("@s.whatsapp.net", "").replace(/\D/g, "")
                 if (phoneNumber.length >= 4) {
                     phoneNumberDisplay = phoneNumber.slice(-4)
-                    console.log(`[WhatsApp Webhook] Extracted phone number: ***${phoneNumberDisplay}`)
+                    logger.debug("[WhatsApp Webhook] Extracted phone number", { phoneLast4: phoneNumberDisplay })
                     break
                 }
             }
@@ -406,7 +446,14 @@ async function handleConnectionUpdate(
     }
 
     // Actualizar estado en la base de datos
-    const updateData: Record<string, any> = {
+    const updateData: {
+        status: string
+        updated_at: string
+        connected_at?: string
+        disconnected_at?: string
+        phone_number?: string
+        phone_number_display?: string | null
+    } = {
         status: newStatus,
         updated_at: new Date().toISOString(),
     }
@@ -427,9 +474,11 @@ async function handleConnectionUpdate(
         .eq("id", instance.id)
     
     if (error) {
-        console.error("[WhatsApp Webhook] Error updating instance status:", error)
+        logger.error("[WhatsApp Webhook] Error updating instance status", {
+            message: error.message,
+        })
     } else {
-        console.log(`[WhatsApp Webhook] Successfully updated instance ${instance.id} to ${newStatus}`)
+        logger.info("[WhatsApp Webhook] Successfully updated instance status", { instanceId: instance.id, newStatus })
     }
 }
 
@@ -474,7 +523,7 @@ async function findOrCreateCustomer(
         .single()
 
     if (error) {
-        console.error("[WhatsApp Webhook] Error creating customer:", error)
+        logger.error("[WhatsApp Webhook] Error creating customer", { message: error.message })
         throw error
     }
 
@@ -528,7 +577,7 @@ async function findOrCreateChat(
         .single()
 
     if (error) {
-        console.error("[WhatsApp Webhook] Error creating chat:", error)
+        logger.error("[WhatsApp Webhook] Error creating chat", { message: error.message })
         throw error
     }
 
@@ -553,7 +602,7 @@ async function checkConversationLimit(
         .single()
 
     if (orgError || !org) {
-        console.error("[WhatsApp Webhook] Error fetching org:", orgError)
+        logger.error("[WhatsApp Webhook] Error fetching org", { message: orgError?.message })
         return false
     }
 
@@ -581,7 +630,11 @@ async function checkConversationLimit(
     
     const used = org.whatsapp_conversations_used || 0
 
-    console.log(`[WhatsApp Webhook] Conversation limit: used=${used}, limit=${limit}, hasSubscription=${!!subscription}`)
+    logger.info("[WhatsApp Webhook] Conversation limit", {
+        used,
+        limit,
+        hasSubscription: !!subscription,
+    })
     
     return used < limit
 }

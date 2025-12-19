@@ -8,6 +8,7 @@
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { EvolutionClient } from "@/lib/evolution"
+import { logger } from "@/lib/utils/logger"
 
 interface IncomingMessage {
     channel: "web" | "whatsapp"
@@ -86,7 +87,9 @@ export async function processIncomingMessage(
             response: result.response,
         }
     } catch (error) {
-        console.error("[Unified Messaging] Error processing message:", error)
+        logger.error("[Unified Messaging] Error processing message", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         return {
             success: false,
             error: error instanceof Error ? error.message : "Error desconocido",
@@ -115,7 +118,7 @@ async function sendWhatsAppResponse(
             .single()
 
         if (!instance) {
-            console.error("[Unified Messaging] No WhatsApp instance found for org:", organizationId)
+            logger.warn("[Unified Messaging] No WhatsApp instance found for org", { organizationId })
             return
         }
 
@@ -129,11 +132,16 @@ async function sendWhatsAppResponse(
         const phoneNumber = chat?.phone_number || chat?.whatsapp_chat_id
         
         if (!phoneNumber) {
-            console.error("[Unified Messaging] No phone number in chat:", chatId)
+            logger.warn("[Unified Messaging] No phone number in chat", { chatId })
             return
         }
 
-        console.log("[Unified Messaging] Sending WhatsApp message to:", phoneNumber)
+        const phoneLast4 = String(phoneNumber).replace(/\D/g, "").slice(-4)
+        logger.info("[Unified Messaging] Sending WhatsApp message", {
+            organizationId,
+            chatId,
+            phoneLast4: phoneLast4 || undefined,
+        })
 
         // Obtener configuración de Evolution API
         const { data: settings } = await supabase
@@ -143,7 +151,7 @@ async function sendWhatsAppResponse(
             .single()
 
         if (!settings?.value) {
-            console.error("[Unified Messaging] Evolution API not configured")
+            logger.error("[Unified Messaging] Evolution API not configured")
             return
         }
 
@@ -159,9 +167,15 @@ async function sendWhatsAppResponse(
             text: response,
         })
 
-        console.log("[Unified Messaging] WhatsApp message sent successfully to:", phoneNumber)
+        logger.info("[Unified Messaging] WhatsApp message sent successfully", {
+            organizationId,
+            chatId,
+            phoneLast4: phoneLast4 || undefined,
+        })
     } catch (error) {
-        console.error("[Unified Messaging] Error sending WhatsApp response:", error)
+        logger.error("[Unified Messaging] Error sending WhatsApp response", {
+            message: error instanceof Error ? error.message : String(error),
+        })
     }
 }
 
@@ -220,13 +234,17 @@ export async function identifyCustomer(
             .single()
 
         if (error) {
-            console.error("[Unified Messaging] Error creating customer:", error)
+            logger.error("[Unified Messaging] Error creating customer", {
+                message: error.message,
+            })
             return null
         }
 
         return { id: newCustomer.id, isNew: true }
     } catch (error) {
-        console.error("[Unified Messaging] Error identifying customer:", error)
+        logger.error("[Unified Messaging] Error identifying customer", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         return null
     }
 }
@@ -266,7 +284,9 @@ export async function sendResponse(
 
         return true
     } catch (error) {
-        console.error("[Unified Messaging] Error sending response:", error)
+        logger.error("[Unified Messaging] Error sending response", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         return false
     }
 }

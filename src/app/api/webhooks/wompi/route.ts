@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/utils/logger"
 import { WompiClient } from "@/lib/wompi/client"
 import { type WompiWebhookPayload, type WompiConfig, WOMPI_STATUS_MAP } from "@/lib/wompi/types"
 
@@ -23,6 +24,7 @@ async function getWompiConfig(): Promise<WompiConfig | null> {
         .single()
 
     if (error || !data) {
+        logger.error("[Wompi Webhook] Config not found")
         return null
     }
 
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest) {
     try {
         const payload: WompiWebhookPayload = await request.json()
 
-        console.log("Wompi webhook received:", payload.event)
+        logger.info("[Wompi Webhook] Received", { event: payload.event })
 
         // Solo procesar eventos de transacción
         if (payload.event !== "transaction.updated") {
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
         // Obtener configuración de Wompi
         const config = await getWompiConfig()
         if (!config) {
-            console.error("Wompi config not found")
+            logger.error("[Wompi Webhook] Config not found")
             return NextResponse.json(
                 { error: "Wompi not configured" },
                 { status: 500 }
@@ -64,7 +66,7 @@ export async function POST(request: NextRequest) {
         const isValid = client.validateWebhookSignature(payload)
 
         if (!isValid) {
-            console.error("Invalid webhook signature")
+            logger.warn("[Wompi Webhook] Invalid signature")
             return NextResponse.json(
                 { error: "Invalid signature" },
                 { status: 401 }
@@ -90,7 +92,9 @@ export async function POST(request: NextRequest) {
             })
 
         if (txError) {
-            console.error("Error saving transaction:", txError)
+            logger.error("[Wompi Webhook] Error saving transaction", {
+                message: txError.message,
+            })
         }
 
         // Extraer subscription_id de la referencia
@@ -136,16 +140,23 @@ export async function POST(request: NextRequest) {
                     .eq("id", subscriptionId)
 
                 if (subError) {
-                    console.error("Error updating subscription:", subError)
+                    logger.error("[Wompi Webhook] Error updating subscription", {
+                        message: subError.message,
+                    })
                 } else {
-                    console.log(`Subscription ${subscriptionId} updated to ${newStatus}`)
+                    logger.info("[Wompi Webhook] Subscription updated", {
+                        subscriptionId,
+                        newStatus,
+                    })
                 }
             }
         }
 
         return NextResponse.json({ received: true })
     } catch (error) {
-        console.error("Webhook error:", error)
+        logger.error("[Wompi Webhook] Error", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         return NextResponse.json(
             { error: "Internal server error" },
             { status: 500 }

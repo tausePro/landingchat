@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/utils/logger"
 import { decrypt } from "@/lib/utils/encryption"
 import { WompiGateway } from "@/lib/payments/wompi-gateway"
 
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
 
             const isValid = gateway.validateWebhookSignature(payload, "", "")
             if (!isValid) {
-                console.error("[Wompi Webhook] Invalid signature")
+                logger.warn("[Wompi Webhook] Invalid signature")
                 await logWebhook(supabase, org.id, "wompi", "error", payload, { error: "Invalid signature" })
                 return NextResponse.json(
                     { error: "Invalid signature" },
@@ -118,7 +119,10 @@ export async function POST(request: Request) {
         if (existingTx) {
             // Idempotencia: si el estado ya es el mismo, no hacer nada
             if (existingTx.status === status) {
-                console.log(`[Wompi Webhook] Duplicate webhook for transaction ${transaction.id}, status already ${status}`)
+                logger.info("[Wompi Webhook] Duplicate webhook", {
+                    transactionId: transaction.id,
+                    status,
+                })
                 await logWebhook(supabase, org.id, "wompi", "duplicate", payload, { 
                     message: "Duplicate webhook, no action taken",
                     transactionId: existingTx.id 
@@ -210,7 +214,9 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ received: true })
     } catch (error) {
-        console.error("[Wompi Webhook] Error:", error)
+        logger.error("[Wompi Webhook] Error", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         await logWebhook(supabase, null, "wompi", "error", null, { 
             error: error instanceof Error ? error.message : "Unknown error",
             processingTime: Date.now() - startTime
@@ -273,10 +279,11 @@ async function processOrderUpdate(
 
             if (order) {
                 const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const customer = order.customers as any
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const orderItems = order.order_items as any[]
+                const customer = order.customers as unknown as { name?: string | null } | null
+                const orderItems = order.order_items as unknown as Array<{
+                    quantity: number
+                    products?: { name?: string | null } | null
+                }> | null
                 
                 await sendSaleNotification(
                     { organizationId },
@@ -284,16 +291,20 @@ async function processOrderUpdate(
                         id: order.order_number || order.id,
                         total: order.total,
                         customerName: customer?.name || "Cliente",
-                        items: orderItems?.map((item: any) => ({
+                        items: orderItems?.map(item => ({
                             name: item.products?.name || "Producto",
                             quantity: item.quantity,
                         })) || [],
                     }
                 )
-                console.log(`[Wompi Webhook] Sale notification sent for order ${order.order_number}`)
+                logger.info("[Wompi Webhook] Sale notification sent", {
+                    orderNumber: order.order_number,
+                })
             }
         } catch (notifError) {
-            console.error("[Wompi Webhook] Error sending sale notification:", notifError)
+            logger.error("[Wompi Webhook] Error sending sale notification", {
+                message: notifError instanceof Error ? notifError.message : String(notifError),
+            })
             // No fallar el webhook si la notificación falla
         }
     }
@@ -321,7 +332,9 @@ async function logWebhook(
             created_at: new Date().toISOString(),
         })
     } catch (error) {
-        console.error("[Wompi Webhook] Error logging webhook:", error)
+        logger.error("[Wompi Webhook] Error logging webhook", {
+            message: error instanceof Error ? error.message : String(error),
+        })
         // No fallar el webhook si el logging falla
     }
 }

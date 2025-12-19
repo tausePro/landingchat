@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { logger } from "@/lib/utils/logger"
 import { z } from "zod"
 
 const aiChatSchema = z.object({
@@ -14,17 +15,19 @@ const aiChatSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-    console.log("API /api/ai-chat called")
-    console.log("[ai-chat] ANTHROPIC_API_KEY configured:", !!process.env.ANTHROPIC_API_KEY)
-    console.log("[ai-chat] SUPABASE_SERVICE_ROLE_KEY configured:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
-    
+    logger.debug("API /api/ai-chat called")
+    logger.debug("[ai-chat] env configured", {
+        hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+        hasSupabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    })
+
     // Apply rate limiting
     const clientId = getClientIdentifier(request)
     const rateLimitResult = await aiChatRateLimit.limit(clientId)
-    
+
     // Add rate limit headers to all responses
     const headers = getRateLimitHeaders(rateLimitResult)
-    
+
     if (!rateLimitResult.success) {
         return NextResponse.json(
             { 
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
             }
         )
     }
-    
+
     try {
         const body = await request.json()
 
@@ -101,7 +104,10 @@ export async function POST(request: NextRequest) {
                 .single()
 
             if (chatError || !newChat) {
-                console.error("Chat creation error:", chatError)
+                logger.error("Chat creation error", {
+                    message: chatError?.message,
+                    code: (chatError as unknown as { code?: string })?.code,
+                })
                 return NextResponse.json(
                     { error: "Failed to create chat", details: chatError?.message },
                     { status: 500, headers }
@@ -120,7 +126,10 @@ export async function POST(request: NextRequest) {
                 .single()
 
             if (chatQueryError || !chat) {
-                console.error("Chat query error:", chatQueryError)
+                logger.error("Chat query error", {
+                    message: chatQueryError?.message,
+                    code: (chatQueryError as unknown as { code?: string })?.code,
+                })
                 return NextResponse.json(
                     { error: "Chat not found", details: chatQueryError?.message },
                     { status: 404, headers }
@@ -149,11 +158,15 @@ export async function POST(request: NextRequest) {
             metadata: result.metadata
         }, { headers })
 
-    } catch (error: any) {
-        console.error("Error in chat API:", error)
-        console.error("Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)))
+    } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error))
+        logger.error("Error in chat API", {
+            message: err.message,
+            name: err.name,
+            stack: err.stack,
+        })
         return NextResponse.json(
-            { error: "Internal server error", details: error.message },
+            { error: "Internal server error", details: err.message },
             { status: 500, headers }
         )
     }
