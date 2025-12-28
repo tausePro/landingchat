@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { updateOrganization } from "../actions"
 import { LogoUploader } from "@/components/onboarding/logo-uploader"
+import type { OrganizationSettingsOverrides, OrganizationTrackingConfig } from "@/types"
 
 interface OrganizationFormProps {
     organization: {
@@ -23,9 +24,22 @@ interface OrganizationFormProps {
         seo_title: string | null
         seo_description: string | null
         seo_keywords: string | null
-        tracking_config: any
-        settings?: any
+        tracking_config: OrganizationTrackingConfig | null
+        settings?: OrganizationSettingsOverrides | null
     }
+}
+
+const fallbackTrackingConfig: OrganizationTrackingConfig = {
+    meta_pixel_id: "",
+    google_analytics_id: "",
+    tiktok_pixel_id: "",
+    posthog_enabled: false,
+}
+
+const fallbackSettings: OrganizationSettingsOverrides = {
+    branding: {
+        primaryColor: "#2b7cee",
+    },
 }
 
 export function OrganizationForm({ organization }: OrganizationFormProps) {
@@ -40,24 +54,15 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         seo_title: organization.seo_title || "",
         seo_description: organization.seo_description || "",
         seo_keywords: organization.seo_keywords || "",
-        tracking_config: organization.tracking_config || {
-            meta_pixel_id: "",
-            google_analytics_id: "",
-            tiktok_pixel_id: ""
-        },
-        settings: organization.settings || {
-            branding: {
-                primaryColor: "#2b7cee"
-            }
-        }
+        tracking_config: (organization.tracking_config as OrganizationTrackingConfig) || fallbackTrackingConfig,
+        settings: (organization.settings as OrganizationSettingsOverrides) || fallbackSettings,
     })
 
-    // Ensure nested objects exist even if settings object exists but is partial
-    const safeSettings = {
+    const safeSettings = useMemo(() => ({
         branding: {
-            primaryColor: formData.settings?.branding?.primaryColor ?? "#2b7cee"
-        }
-    }
+            primaryColor: formData.settings?.branding?.primaryColor ?? "#2b7cee",
+        },
+    }), [formData.settings])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -73,22 +78,22 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         }
     }
 
-    const updateSettings = (section: string, key: string, value: any) => {
+    const updateSettings = (section: keyof OrganizationSettingsOverrides, key: string, value: unknown) => {
         setFormData(prev => ({
             ...prev,
             settings: {
-                ...prev.settings,
+                ...(prev.settings ?? {}),
                 [section]: {
-                    ...prev.settings[section],
-                    [key]: value
-                }
-            }
+                    ...((prev.settings?.[section] as Record<string, unknown> | undefined) ?? {}),
+                    [key]: value,
+                },
+            } as OrganizationSettingsOverrides,
         }))
     }
 
 
 
-    const updateTrackingConfig = (key: string, value: string) => {
+    const updateTrackingConfig = (key: keyof OrganizationTrackingConfig, value: string | boolean) => {
         setFormData(prev => ({
             ...prev,
             tracking_config: {
@@ -268,15 +273,34 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                     />
                                 </div>
 
-                                <div className="pt-4 border-t">
-                                    <h3 className="text-lg font-semibold mb-4">Tracking & Analítica</h3>
+                                <div className="pt-4 border-t space-y-6">
+                                    <div className="flex flex-col gap-2">
+                                        <h3 className="text-lg font-semibold">Tracking & Analítica</h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Controla los píxeles por dominio. PostHog permite análisis multi-tenant y métricas en tiempo real sin exponer PII.
+                                        </p>
+                                        <div className="flex items-center justify-between rounded-md border border-border-light dark:border-border-dark px-4 py-3">
+                                            <div className="space-y-1">
+                                                <Label htmlFor="posthogEnabled">PostHog Analytics</Label>
+                                                <p className="text-xs text-muted-foreground max-w-[32rem]">
+                                                    Habilita la captura de pageviews y eventos de tienda/chat con sanitización automática.
+                                                </p>
+                                            </div>
+                                            <Switch
+                                                id="posthogEnabled"
+                                                checked={Boolean(formData.tracking_config.posthog_enabled)}
+                                                onCheckedChange={(checked) => updateTrackingConfig("posthog_enabled", checked)}
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="metaPixel">Meta Pixel ID (Facebook)</Label>
                                             <Input
                                                 id="metaPixel"
                                                 value={formData.tracking_config.meta_pixel_id}
-                                                onChange={(e) => updateTrackingConfig('meta_pixel_id', e.target.value)}
+                                                onChange={(e) => updateTrackingConfig("meta_pixel_id", e.target.value)}
                                                 placeholder="Ej: 123456789012345"
                                             />
                                         </div>
@@ -285,7 +309,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                             <Input
                                                 id="ga4"
                                                 value={formData.tracking_config.google_analytics_id}
-                                                onChange={(e) => updateTrackingConfig('google_analytics_id', e.target.value)}
+                                                onChange={(e) => updateTrackingConfig("google_analytics_id", e.target.value)}
                                                 placeholder="Ej: G-XXXXXXXXXX"
                                             />
                                         </div>
@@ -294,7 +318,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                             <Input
                                                 id="tiktokPixel"
                                                 value={formData.tracking_config.tiktok_pixel_id}
-                                                onChange={(e) => updateTrackingConfig('tiktok_pixel_id', e.target.value)}
+                                                onChange={(e) => updateTrackingConfig("tiktok_pixel_id", e.target.value)}
                                                 placeholder="Ej: CXXXXXXXXXX"
                                             />
                                         </div>

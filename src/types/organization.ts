@@ -94,3 +94,29 @@ export interface OrganizationSettings {
   customer_gate_enabled: boolean
   customer_gate_fields: string[]
 }
+
+// ============================================================================
+// Dashboard Tracking & Settings Helpers
+// ============================================================================
+
+export interface OrganizationTrackingConfig {
+  meta_pixel_id?: string
+  google_analytics_id?: string
+  tiktok_pixel_id?: string
+  posthog_enabled?: boolean
+  [key: string]: unknown
+}
+
+export interface OrganizationBrandingSettings {
+  primaryColor?: string
+  [key: string]: unknown
+}
+
+export interface OrganizationSettingsOverrides {
+  branding?: OrganizationBrandingSettings
+  shipping?: {
+    free_shipping_threshold?: number
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}

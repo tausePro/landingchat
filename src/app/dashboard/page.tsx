@@ -2,9 +2,10 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getDashboardStats } from "./dashboard-actions"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { DashboardCharts } from "./components/dashboard-charts"
 import { VisitorsCard } from "./components/visitors-card"
-import { redirect } from "next/navigation"
+import { StatWidget } from "./components/stat-widget"
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,13 @@ export default async function DashboardPage() {
             revenue: { total: 0, growth: 0, history: [] },
             orders: { total: 0, growth: 0 },
             chats: { conversionRate: 0, growth: 0, total: 0, byChannel: [] },
-            agents: { active: 0, responseTime: "N/A" }
+            agents: { active: 0, responseTime: "N/A" },
+            insights: {
+                averageOrderValue: 0,
+                pendingOrders: 0,
+                newCustomers: 0,
+                repeatPurchaseRate: 0,
+            },
         }
     }
 
@@ -118,6 +125,41 @@ export default async function DashboardPage() {
                             </p>
                         </CardContent>
                     </Card>
+                </div>
+
+                {/* Insight Widgets */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatWidget
+                        title="Ticket Promedio"
+                        value={formatCurrency(stats.insights.averageOrderValue)}
+                        helper="Promedio de orden en los últimos 30 días"
+                        icon="shoppingmode"
+                        trendLabel={stats.revenue.growth ? `${stats.revenue.growth}%` : undefined}
+                        trendDirection={stats.revenue.growth >= 0 ? "up" : "down"}
+                    />
+                    <StatWidget
+                        title="Órdenes pendientes"
+                        value={stats.insights.pendingOrders.toString()}
+                        helper="Pendientes por gestión"
+                        icon="pending_actions"
+                        accentColor="text-amber-500"
+                    />
+                    <StatWidget
+                        title="Clientes nuevos"
+                        value={stats.insights.newCustomers.toString()}
+                        helper="En los últimos 30 días"
+                        icon="group_add"
+                        trendLabel="Nuevas cuentas"
+                        trendDirection="neutral"
+                    />
+                    <StatWidget
+                        title="Repeat Purchase"
+                        value={`${stats.insights.repeatPurchaseRate}%`}
+                        helper="Clientes que compraron 2+ veces"
+                        icon="loyalty"
+                        trendDirection={stats.insights.repeatPurchaseRate >= 30 ? "up" : "neutral"}
+                        trendLabel={stats.insights.repeatPurchaseRate >= 30 ? "Saludable" : "Oportunidad"}
+                    />
                 </div>
 
                 {/* Charts Section */}

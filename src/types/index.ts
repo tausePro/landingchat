@@ -72,6 +72,8 @@ export {
   type UpdateOrganizationInput,
   type Organization,
   type OrganizationSettings,
+  type OrganizationTrackingConfig,
+  type OrganizationSettingsOverrides,
 } from "./organization"
 
 // Plan domain types

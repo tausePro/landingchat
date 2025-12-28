@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import type { OrganizationSettingsOverrides, OrganizationTrackingConfig } from "@/types"
 
 export interface SettingsData {
     profile: {
@@ -21,8 +22,8 @@ export interface SettingsData {
         seo_title: string | null
         seo_description: string | null
         seo_keywords: string | null
-        tracking_config: any
-        settings: any
+        tracking_config: OrganizationTrackingConfig | null
+        settings: OrganizationSettingsOverrides | null
         custom_domain: string | null
         maintenance_mode: boolean | null
         maintenance_message: string | null
@@ -91,8 +92,8 @@ export async function getSettingsData(): Promise<SettingsData> {
             seo_title: organization.seo_title,
             seo_description: organization.seo_description,
             seo_keywords: organization.seo_keywords,
-            tracking_config: organization.tracking_config || {},
-            settings: organization.settings || {},
+            tracking_config: (organization.tracking_config as OrganizationTrackingConfig) || {},
+            settings: (organization.settings as OrganizationSettingsOverrides) || {},
             custom_domain: organization.custom_domain || null,
             maintenance_mode: organization.maintenance_mode || false,
             maintenance_message: organization.maintenance_message || "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles.",
@@ -121,7 +122,7 @@ export async function updateProfile(fullName: string) {
     return { success: true }
 }
 
-export async function updateOrganization(data: {
+interface UpdateOrganizationInput {
     name: string
     slug: string
     contact_email?: string
@@ -131,9 +132,11 @@ export async function updateOrganization(data: {
     seo_title?: string
     seo_description?: string
     seo_keywords?: string
-    tracking_config?: any
-    settings?: any
-}) {
+    tracking_config?: OrganizationTrackingConfig
+    settings?: OrganizationSettingsOverrides
+}
+
+export async function updateOrganization(data: UpdateOrganizationInput) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
