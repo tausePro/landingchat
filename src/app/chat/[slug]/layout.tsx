@@ -40,9 +40,10 @@ export default async function ChatLayout({
     const { slug } = await params
     const data = await getStoreData(slug)
     
-    // Obtener el Meta Pixel ID de la configuración de tracking
-    const metaPixelId = data?.organization?.tracking_config?.meta_pixel_id
-    const trackingEnabled = !!metaPixelId
+    const organization = data?.organization
+    const trackingConfig = organization?.tracking_config ?? {}
+    const metaPixelId = trackingConfig.meta_pixel_id as string | undefined
+    const posthogEnabled = Boolean(trackingConfig.posthog_enabled)
 
     return (
         <>
@@ -50,7 +51,13 @@ export default async function ChatLayout({
             {metaPixelId && <MetaPixel pixelId={metaPixelId} />}
             
             {/* Tracking Provider para todo el chat */}
-            <TrackingProvider enabled={trackingEnabled}>
+            <TrackingProvider
+                metaPixelId={metaPixelId}
+                organizationId={organization?.id}
+                organizationSlug={organization?.slug}
+                organizationName={organization?.name}
+                posthogEnabled={posthogEnabled}
+            >
                 {children}
             </TrackingProvider>
         </>

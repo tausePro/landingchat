@@ -24,6 +24,12 @@ export interface DashboardStats {
         active: number
         responseTime: string
     }
+    insights: {
+        averageOrderValue: number
+        pendingOrders: number
+        newCustomers: number
+        repeatPurchaseRate: number
+    }
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -64,7 +70,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Ideally we should aggregate in SQL but for MVP we fetch and process
     const { data: orders } = await supabase
         .from("orders")
-        .select("total, created_at, status")
+        .select("total, created_at, status, customer_id")
         .eq("organization_id", orgId)
         .in("status", ["pending", "confirmed", "processing", "shipped", "delivered", "completed"])
         .order("created_at", { ascending: true })
@@ -74,6 +80,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Total Revenue
     const totalRevenue = validOrders.reduce((sum, order) => sum + (order.total || 0), 0)
     const totalOrders = validOrders.length
+    const pendingStatuses = new Set(["pending", "processing"])
+    const pendingOrders = validOrders.filter(order => pendingStatuses.has(order.status || "")).length
 
     // Revenue History (Last 30 days)
     const revenueByDay = new Map<string, number>()
@@ -102,6 +110,27 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const conversionRate = totalChats > 0 ? (totalOrders / totalChats) * 100 : 0
 
     console.log(`[Dashboard] Org ${orgId}: ${totalChats} chats, ${totalOrders} orders, ${conversionRate.toFixed(1)}% conversion`)
+
+    // 3. CUSTOMERS INSIGHTS
+    const { count: newCustomersCount } = await supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .gte("created_at", thirtyDaysAgo)
+
+    const customerOrderCounts = new Map<string, number>()
+    validOrders.forEach(order => {
+        const customerId = order.customer_id
+        if (customerId) {
+            customerOrderCounts.set(customerId, (customerOrderCounts.get(customerId) || 0) + 1)
+        }
+    })
+
+    const totalCustomersWithOrders = customerOrderCounts.size
+    const repeatCustomers = Array.from(customerOrderCounts.values()).filter(count => count > 1).length
+    const repeatPurchaseRate = totalCustomersWithOrders > 0 ? (repeatCustomers / totalCustomersWithOrders) * 100 : 0
+
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
     // 3. AGENTS & RESPONSE TIME
     const { count: activeAgents } = await supabase
@@ -176,6 +205,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             agents: {
                 active: activeAgents || 1, // Default to 1 if 0/null to look good in demo
                 responseTime: avgResponseTime
+            },
+            insights: {
+                averageOrderValue,
+                pendingOrders,
+                newCustomers: newCustomersCount || 0,
+                repeatPurchaseRate: parseFloat(repeatPurchaseRate.toFixed(1)),
             }
         }
     } catch (error) {
@@ -191,7 +226,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             revenue: { total: 0, growth: 0, history: [] },
             orders: { total: 0, growth: 0 },
             chats: { conversionRate: 0, growth: 0, total: 0, byChannel: [] },
-            agents: { active: 0, responseTime: "N/A" }
+            agents: { active: 0, responseTime: "N/A" },
+            insights: {
+                averageOrderValue: 0,
+                pendingOrders: 0,
+                newCustomers: 0,
+                repeatPurchaseRate: 0,
+            }
         }
     }
 }

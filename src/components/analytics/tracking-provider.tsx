@@ -1,31 +1,100 @@
 "use client"
 
-import { createContext, useContext, ReactNode } from "react"
+import { createContext, useContext, ReactNode, useMemo, useEffect } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
 import { useMetaPixel } from "./meta-pixel"
+import { usePosthogTracking } from "./use-posthog-tracking"
 
-interface TrackingContextType {
+export interface TrackingContextType {
     trackViewContent: (contentId: string, contentName: string, value?: number, currency?: string) => void
     trackAddToCart: (contentId: string, contentName: string, value: number, currency?: string) => void
     trackInitiateCheckout: (value: number, currency?: string, contentIds?: string[]) => void
     trackPurchase: (value: number, currency?: string, contentIds?: string[], orderId?: string) => void
+    trackPageView: (path?: string, props?: Record<string, unknown>) => void
+}
+
+const noopTracking: TrackingContextType = {
+    trackViewContent: () => {},
+    trackAddToCart: () => {},
+    trackInitiateCheckout: () => {},
+    trackPurchase: () => {},
+    trackPageView: () => {},
 }
 
 const TrackingContext = createContext<TrackingContextType | null>(null)
 
 interface TrackingProviderProps {
     children: ReactNode
-    enabled?: boolean
+    metaPixelId?: string
+    organizationId?: string
+    organizationSlug?: string
+    organizationName?: string | null
+    posthogEnabled?: boolean
 }
 
-export function TrackingProvider({ children, enabled = true }: TrackingProviderProps) {
+export function TrackingProvider({
+    children,
+    metaPixelId,
+    organizationId,
+    organizationSlug,
+    organizationName,
+    posthogEnabled = false,
+}: TrackingProviderProps) {
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
     const metaPixel = useMetaPixel()
+    const metaPixelEnabled = Boolean(metaPixelId)
 
-    const trackingMethods = enabled ? metaPixel : {
-        trackViewContent: () => {},
-        trackAddToCart: () => {},
-        trackInitiateCheckout: () => {},
-        trackPurchase: () => {},
-    }
+    const posthogTracking = usePosthogTracking({
+        enabled: posthogEnabled,
+        organizationId: organizationId ?? "",
+        organizationSlug: organizationSlug ?? "",
+        organizationName,
+    })
+
+    const trackingMethods = useMemo<TrackingContextType>(() => {
+        if (!metaPixelEnabled && !posthogEnabled) {
+            return noopTracking
+        }
+
+        return {
+            trackViewContent: (contentId, contentName, value, currency) => {
+                if (metaPixelEnabled) {
+                    metaPixel.trackViewContent(contentId, contentName, value, currency)
+                }
+                posthogTracking.trackViewContent(contentId, contentName, value, currency)
+            },
+            trackAddToCart: (contentId, contentName, value, currency) => {
+                if (metaPixelEnabled) {
+                    metaPixel.trackAddToCart(contentId, contentName, value, currency)
+                }
+                posthogTracking.trackAddToCart(contentId, contentName, value, currency)
+            },
+            trackInitiateCheckout: (value, currency, contentIds) => {
+                if (metaPixelEnabled) {
+                    metaPixel.trackInitiateCheckout(value, currency, contentIds)
+                }
+                posthogTracking.trackInitiateCheckout(value, currency, contentIds)
+            },
+            trackPurchase: (value, currency, contentIds, orderId) => {
+                if (metaPixelEnabled) {
+                    metaPixel.trackPurchase(value, currency, contentIds, orderId)
+                }
+                posthogTracking.trackPurchase(value, currency, contentIds, orderId)
+            },
+            trackPageView: (path, props) => {
+                posthogTracking.trackPageView(path, props)
+            },
+        }
+    }, [metaPixelEnabled, metaPixel, posthogTracking, posthogEnabled])
+
+    useEffect(() => {
+        if (!posthogEnabled) return
+
+        const search = searchParams?.toString()
+        const fullPath = search ? `${pathname}?${search}` : pathname
+        posthogTracking.trackPageView(fullPath)
+    }, [pathname, searchParams, posthogEnabled, posthogTracking])
 
     return (
         <TrackingContext.Provider value={trackingMethods}>
@@ -34,16 +103,10 @@ export function TrackingProvider({ children, enabled = true }: TrackingProviderP
     )
 }
 
-export function useTracking() {
+export function useTracking(): TrackingContextType {
     const context = useContext(TrackingContext)
     if (!context) {
-        // Devolver métodos vacíos si no hay provider
-        return {
-            trackViewContent: () => {},
-            trackAddToCart: () => {},
-            trackInitiateCheckout: () => {},
-            trackPurchase: () => {},
-        }
+        return noopTracking
     }
     return context
 }
