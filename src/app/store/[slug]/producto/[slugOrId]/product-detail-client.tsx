@@ -14,11 +14,12 @@ interface ProductDetailClientProps {
     organization: any
     badges: any[]
     promotions: any[]
+    relatedProducts?: any[]
     slug: string
     initialIsSubdomain?: boolean
 }
 
-export function ProductDetailClient({ product, organization, badges, promotions, slug, initialIsSubdomain = false }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -284,7 +285,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         {/* Description */}
                         {product.description ? (
                             <div
-                                className="mt-6 text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none line-clamp-4 hover:line-clamp-none transition-all cursor-pointer"
+                                className="mt-6 text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none"
                                 dangerouslySetInnerHTML={{ __html: product.description }}
                             />
                         ) : (
@@ -413,13 +414,43 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                     </div>
                 </div>
 
-                {/* Customers Also Bought (Placeholder Layout) */}
-                <div className="mt-16 border-t border-slate-200 dark:border-slate-800 pt-12">
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Clientes también compraron</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                        {/* Placeholder */}
+                {/* Customers Also Bought */}
+                {relatedProducts.length > 0 && (
+                    <div className="mt-16 border-t border-slate-200 dark:border-slate-800 pt-12">
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Clientes también compraron</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            {relatedProducts.map((relatedProduct) => {
+                                const productImage = relatedProduct.images?.[0] || relatedProduct.image_url || '/placeholder-product.png'
+                                const productLink = getStoreLink(`/producto/${relatedProduct.slug || relatedProduct.id}`, isSubdomain, slug)
+                                
+                                return (
+                                    <Link
+                                        key={relatedProduct.id}
+                                        href={productLink}
+                                        className="group flex flex-col gap-3 bg-white dark:bg-slate-800 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 hover:shadow-lg transition-shadow"
+                                    >
+                                        <div className="relative aspect-square bg-slate-100 dark:bg-slate-700">
+                                            <Image
+                                                src={productImage}
+                                                alt={relatedProduct.name}
+                                                fill
+                                                className="object-cover group-hover:scale-105 transition-transform"
+                                            />
+                                        </div>
+                                        <div className="p-3 flex flex-col gap-1">
+                                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-2">
+                                                {relatedProduct.name}
+                                            </h3>
+                                            <p className="text-lg font-bold" style={{ color: primaryColor }}>
+                                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(relatedProduct.price)}
+                                            </p>
+                                        </div>
+                                    </Link>
+                                )
+                            })}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* Mobile Sticky CTA */}

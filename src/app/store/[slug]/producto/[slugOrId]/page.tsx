@@ -22,7 +22,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     if (!data) notFound()
 
-    const { organization, product, badges, promotions } = data
+    const { organization, product, badges, promotions, relatedProducts } = data
 
     return (
         <StoreLayoutClient
@@ -38,6 +38,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 organization={organization}
                 badges={badges}
                 promotions={promotions}
+                relatedProducts={relatedProducts}
                 slug={organization.slug}
                 initialIsSubdomain={initialIsSubdomain}
             />

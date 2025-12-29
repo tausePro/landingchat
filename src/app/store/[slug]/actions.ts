@@ -100,11 +100,28 @@ export async function getProductDetails(slug: string, slugOrId: string) {
         .or(`start_date.is.null,start_date.lte.${now}`)
         .or(`end_date.is.null,end_date.gte.${now}`)
 
+    // 5. Fetch Related Products (same category or random)
+    let relatedProductsQuery = supabase
+        .from("products")
+        .select("id, name, slug, price, image_url, images")
+        .eq("organization_id", org.id)
+        .eq("is_active", true)
+        .neq("id", product.id)
+        .limit(4)
+
+    // Try to get products from the same category first
+    if (product.category) {
+        relatedProductsQuery = relatedProductsQuery.eq("category", product.category)
+    }
+
+    const { data: relatedProducts } = await relatedProductsQuery
+
     return {
         organization: org,
         product,
         badges: badges || [],
-        promotions: promotions || []
+        promotions: promotions || [],
+        relatedProducts: relatedProducts || []
     }
 }
 
