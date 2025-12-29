@@ -285,7 +285,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         {/* Description */}
                         {product.description ? (
                             <div
-                                className="mt-6 text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none"
+                                className="mt-6 text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none md:line-clamp-4 md:hover:line-clamp-none md:transition-all md:cursor-pointer"
                                 dangerouslySetInnerHTML={{ __html: product.description }}
                             />
                         ) : (
