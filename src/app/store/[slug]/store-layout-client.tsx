@@ -98,8 +98,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
         if (customerId) {
             // Ya identificado, ir al chat
-            // Limpiar chatId anterior para forzar nueva conversación
-            localStorage.removeItem(`chatId_${organization.slug}`)
+            // Se mantiene el chatId anterior para continuar la conversación
             
             let chatUrl = getChatUrl(isSubdomain, organization.slug)
             const params = new URLSearchParams()
@@ -132,9 +131,8 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
             })
         }
 
-        // Limpiar chatId anterior para forzar nueva conversación
-        localStorage.removeItem(`chatId_${organization.slug}`)
-
+        // Se mantiene el chatId anterior si existe para continuar la conversación
+        
         // Cerrar modal e ir al chat
         setShowGateModal(false)
 

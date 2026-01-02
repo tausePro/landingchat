@@ -111,40 +111,59 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     }, [customerId, slug])
 
     const initializeChat = async (custId: string, existingChatId: string | null, loadedProducts: any[]) => {
+        let currentChatId: string | null = null;
+
         // Si hay un ID de chat existente, intentar retomarlo
         if (existingChatId) {
-            setChatId(existingChatId)
             const historyLoaded = await fetchHistory(existingChatId)
             
             if (historyLoaded) {
                 // Chat retomado exitosamente
-                setIsInitializing(false)
-                return
+                setChatId(existingChatId)
+                currentChatId = existingChatId
+                
+                // Verificar si hay contexto de producto nuevo para inyectar en la conversación existente
+                const urlParams = new URLSearchParams(window.location.search)
+                const productId = urlParams.get('product')
+                
+                if (!productId) {
+                    setIsInitializing(false)
+                    return
+                }
+                // Si hay producto, continuamos para procesarlo abajo...
+            } else {
+                // Si falló cargar el historial (ej: chat eliminado), continuar para crear uno nuevo
+                console.log("Chat existente no válido, creando uno nuevo...")
+                setChatId(null) // Reset chatId state
+                localStorage.removeItem(`chatId_${slug}`)
             }
-            // Si falló cargar el historial (ej: chat eliminado), continuar para crear uno nuevo
-            console.log("Chat existente no válido, creando uno nuevo...")
         }
 
         try {
-            const response = await fetch(`/api/store/${slug}/chat/init`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ customerId: custId })
-            })
+            if (!currentChatId) {
+                const response = await fetch(`/api/store/${slug}/chat/init`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ customerId: custId })
+                })
 
-            const data = await response.json()
+                const data = await response.json()
 
-            if (data.chatId) {
-                setChatId(data.chatId)
-                localStorage.setItem(`chatId_${slug}`, data.chatId)
+                if (data.chatId) {
+                    currentChatId = data.chatId
+                    setChatId(data.chatId)
+                    localStorage.setItem(`chatId_${slug}`, data.chatId)
 
-                if (data.agent) {
-                    setAgent((prev: any) => ({ ...prev, ...data.agent }))
+                    if (data.agent) {
+                        setAgent((prev: any) => ({ ...prev, ...data.agent }))
+                    }
+
+                    // Cargar historial de mensajes (incluyendo el saludo inicial)
+                    await fetchHistory(data.chatId)
                 }
+            }
 
-                // Cargar historial de mensajes (incluyendo el saludo inicial)
-                await fetchHistory(data.chatId)
-
+            if (currentChatId) {
                 // Si hay un producto en la URL, mostrar ese producto con contexto
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
@@ -158,7 +177,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 message: context ? `Hola, me interesa este producto con: ${decodeURIComponent(context)}` : 'Hola, me interesa este producto',
-                                chatId: data.chatId,
+                                chatId: currentChatId,
                                 slug,
                                 customerId: custId,
                                 currentProductId: productId,
