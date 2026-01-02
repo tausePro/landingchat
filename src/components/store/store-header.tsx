@@ -18,6 +18,8 @@ interface StoreHeaderProps {
     showStoreName?: boolean
     className?: string
     hideChatButton?: boolean
+    isChatMode?: boolean
+    onCloseChat?: () => void
 }
 
 export function StoreHeader({
@@ -28,7 +30,9 @@ export function StoreHeader({
     primaryColor,
     showStoreName = true,
     className = "",
-    hideChatButton = false
+    hideChatButton = false,
+    isChatMode = false,
+    onCloseChat
 }: StoreHeaderProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
@@ -97,14 +101,25 @@ export function StoreHeader({
                         )}
                     </button>
 
-                    {!hideChatButton && (
-                        <Button
-                            onClick={onStartChat}
-                            style={{ backgroundColor: primaryColor }}
-                            className="font-bold shadow-lg shadow-blue-500/20 text-sm md:text-base px-4 md:px-6"
+                    {isChatMode ? (
+                         <Button
+                            onClick={onCloseChat}
+                            variant="outline"
+                            className="font-bold border-gray-200 text-gray-700 hover:bg-gray-100 text-sm md:text-base px-4 md:px-6 gap-2"
                         >
-                            Iniciar Chat
+                            <span className="material-symbols-outlined text-lg">close</span>
+                            <span className="hidden md:inline">Cerrar Chat</span>
                         </Button>
+                    ) : (
+                        !hideChatButton && (
+                            <Button
+                                onClick={onStartChat}
+                                style={{ backgroundColor: primaryColor }}
+                                className="font-bold shadow-lg shadow-blue-500/20 text-sm md:text-base px-4 md:px-6"
+                            >
+                                Iniciar Chat
+                            </Button>
+                        )
                     )}
                 </div>
             </div>

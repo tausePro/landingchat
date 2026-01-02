@@ -187,7 +187,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
             console.log(`[processMessage] Loop ${loopCount}, calling Claude...`)
 
             const response = await createMessage({
-                model: "claude-sonnet-4-20250514",
+                model: "claude-3-5-haiku-latest",
                 max_tokens: 1024,
                 system: fullSystemPrompt,
                 messages: currentMessages,
@@ -260,7 +260,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
             sender_type: "bot",
             content: finalResponseText,
             metadata: {
-                model: "claude-sonnet-4-20250514",
+                model: "claude-3-5-haiku-latest",
                 tools_used: toolsUsed,
                 latency_ms: Date.now() - startTime
             }
@@ -306,7 +306,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
             response: "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",
             actions: [],
             metadata: {
-                model: "claude-sonnet-4-20250514",
+                model: "claude-3-5-haiku-latest",
                 latency_ms: Date.now() - startTime,
                 tools_used: toolsUsed
             }

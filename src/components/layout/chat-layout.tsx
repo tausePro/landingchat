@@ -24,6 +24,8 @@ interface ChatLayoutProps {
     onNewConversation?: () => void
     onCartClick?: () => void
     onDeleteChat?: (chatId: string) => void
+    customHeader?: React.ReactNode
+    activeProducts?: any[]
 }
 
 export function ChatLayout({
@@ -37,7 +39,9 @@ export function ChatLayout({
     onChatSelect,
     onNewConversation,
     onCartClick,
-    onDeleteChat
+    onDeleteChat,
+    customHeader,
+    activeProducts = []
 }: ChatLayoutProps) {
     const [activeTab, setActiveTab] = React.useState<'para-ti' | 'historial'>('para-ti')
 
@@ -59,48 +63,50 @@ export function ChatLayout({
     return (
         <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark">
             {/* Header */}
-            <header className="flex items-center justify-between whitespace-nowrap border-b border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-6 py-3 shrink-0">
-                <div className="flex items-center gap-4">
-                    <div className="size-8 rounded overflow-hidden">
-                        {logoUrl ? (
-                            <img src={logoUrl} alt={organizationName} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full bg-primary flex items-center justify-center text-white">
-                                <svg fill="none" viewBox="0 0 48 48" className="size-5" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        clipRule="evenodd"
-                                        d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z"
-                                        fill="currentColor"
-                                        fillRule="evenodd"
-                                    ></path>
-                                </svg>
-                            </div>
-                        )}
+            {customHeader ? customHeader : (
+                <header className="flex items-center justify-between whitespace-nowrap border-b border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-6 py-3 shrink-0">
+                    <div className="flex items-center gap-4">
+                        <div className="size-8 rounded overflow-hidden">
+                            {logoUrl ? (
+                                <img src={logoUrl} alt={organizationName} className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full bg-primary flex items-center justify-center text-white">
+                                    <svg fill="none" viewBox="0 0 48 48" className="size-5" xmlns="http://www.w3.org/2000/svg">
+                                        <path
+                                            clipRule="evenodd"
+                                            d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z"
+                                            fill="currentColor"
+                                            fillRule="evenodd"
+                                        ></path>
+                                    </svg>
+                                </div>
+                            )}
+                        </div>
+                        <h2 className="text-text-light-primary dark:text-text-dark-primary text-lg font-bold tracking-[-0.015em]">
+                            {organizationName}
+                        </h2>
                     </div>
-                    <h2 className="text-text-light-primary dark:text-text-dark-primary text-lg font-bold tracking-[-0.015em]">
-                        {organizationName}
-                    </h2>
-                </div>
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={onCartClick}
-                        className="relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-slate-800 text-text-light-primary dark:text-text-dark-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
-                        <span className="material-symbols-outlined text-xl">shopping_cart</span>
-                        {cartItemCount > 0 && (
-                            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
-                                {cartItemCount > 9 ? '9+' : cartItemCount}
-                            </span>
-                        )}
-                    </button>
-                    <button className="flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-slate-800 text-text-light-primary dark:text-text-dark-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                        <span className="material-symbols-outlined text-xl">notifications</span>
-                    </button>
-                    <div
-                        className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 bg-gray-200"
-                    ></div>
-                </div>
-            </header>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={onCartClick}
+                            className="relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-slate-800 text-text-light-primary dark:text-text-dark-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                        >
+                            <span className="material-symbols-outlined text-xl">shopping_cart</span>
+                            {cartItemCount > 0 && (
+                                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                                    {cartItemCount > 9 ? '9+' : cartItemCount}
+                                </span>
+                            )}
+                        </button>
+                        <button className="flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-slate-800 text-text-light-primary dark:text-text-dark-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                            <span className="material-symbols-outlined text-xl">notifications</span>
+                        </button>
+                        <div
+                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 bg-gray-200"
+                        ></div>
+                    </div>
+                </header>
+            )}
 
             <main className="flex flex-1 overflow-hidden">
                 {/* Sidebar Left (Tabs: Para ti / Historial) */}
@@ -144,6 +150,34 @@ export function ChatLayout({
                         <div className="flex-1 overflow-y-auto p-4 space-y-6">
                             {activeTab === 'para-ti' ? (
                                 <>
+                                    {/* Active Context Products - Living Sidebar */}
+                                    {activeProducts.length > 0 && (
+                                        <section>
+                                            <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3 flex items-center gap-2">
+                                                <span className="size-2 rounded-full bg-green-500 animate-pulse"></span>
+                                                En conversación
+                                            </h4>
+                                            <div className="space-y-3">
+                                                {activeProducts.map((prod) => (
+                                                    <div key={prod.id} className="flex gap-3 p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                                                        <div 
+                                                            className="size-12 rounded-md bg-cover bg-center shrink-0 border border-slate-200 dark:border-slate-700"
+                                                            style={{ backgroundImage: `url("${prod.image_url}")` }}
+                                                        />
+                                                        <div className="flex flex-col justify-center min-w-0">
+                                                            <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                                                                {prod.name}
+                                                            </p>
+                                                            <p className="text-xs text-primary font-bold">
+                                                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(prod.price)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    )}
+
                                     {/* Agent Recommendations */}
                                     <section>
                                         <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Recomendaciones del Agente</h4>

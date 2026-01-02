@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cart-store"
 import { getStoreProducts } from "./actions"
 import { StoreHeader } from "@/components/store/store-header"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Product {
     id: string
@@ -365,6 +367,14 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }).format(price)
     }
 
+    // Calcular productos activos en la conversación para el Living Sidebar
+    const activeProducts = messages
+        .filter(m => m.product || (m.products && m.products.length > 0))
+        .flatMap(m => m.products || (m.product ? [m.product] : []))
+        .reduce((unique: any[], item) => {
+            return unique.some(u => u.id === item.id) ? unique : [...unique, item]
+        }, [])
+
     if (isInitializing || !organization) {
         return (
             <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
@@ -414,6 +424,21 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             chatHistory={customerChats}
             currentChatId={chatId || undefined}
             cartItemCount={items.length}
+            activeProducts={activeProducts} // Living Sidebar Data
+            customHeader={
+                <StoreHeader 
+                    slug={slug}
+                    organization={organization}
+                    onStartChat={() => {}} // No-op in chat
+                    primaryColor={primaryColor}
+                    showStoreName={showStoreName}
+                    isChatMode={true}
+                    onCloseChat={() => {
+                        const storeUrl = getStoreLink('/', isSubdomain, slug)
+                        router.push(storeUrl)
+                    }}
+                />
+            }
             onChatSelect={(selectedChatId) => {
                 // Navigate to selected chat or reload messages
                 if (selectedChatId !== chatId) {
@@ -502,7 +527,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                 ? 'rounded-2xl rounded-br-none bg-primary text-white'
                                                 : 'rounded-2xl rounded-bl-none bg-white dark:bg-gray-800 text-slate-800 dark:text-gray-200 border border-slate-200 dark:border-gray-700'
                                                 }`}>
-                                                {msg.content}
+                                                {msg.role === 'user' ? (
+                                                    msg.content
+                                                ) : (
+                                                    <ReactMarkdown 
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                                            a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium hover:opacity-80" {...props} />,
+                                                            ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                                                            ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                                                            li: ({node, ...props}) => <li className="" {...props} />,
+                                                            strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
+                                                            em: ({node, ...props}) => <em className="italic" {...props} />,
+                                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-primary/30 pl-3 italic text-gray-500 dark:text-gray-400 my-2" {...props} />,
+                                                        }}
+                                                    >
+                                                        {msg.content}
+                                                    </ReactMarkdown>
+                                                )}
                                             </div>
                                         )}
 
