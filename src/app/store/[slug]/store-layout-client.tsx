@@ -11,6 +11,7 @@ import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
 import { StorePresence } from "@/components/store/store-presence"
 import { CartDrawer } from "@/app/chat/components/cart-drawer"
+import { ensurePosthog } from "@/lib/analytics/posthog-client"
 
 
 interface StoreLayoutClientProps {
@@ -97,6 +98,9 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
         if (customerId) {
             // Ya identificado, ir al chat
+            // Limpiar chatId anterior para forzar nueva conversación
+            localStorage.removeItem(`chatId_${organization.slug}`)
+            
             let chatUrl = getChatUrl(isSubdomain, organization.slug)
             const params = new URLSearchParams()
             if (productId) params.set('product', productId)
@@ -117,6 +121,19 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
         // Guardar en localStorage
         localStorage.setItem(`customer_${organization.slug}`, customer.id)
         localStorage.setItem(`customer_name_${organization.slug}`, customer.full_name)
+
+        // Identificar en PostHog
+        const posthog = ensurePosthog()
+        if (posthog) {
+            posthog.identify(customer.id, {
+                email: customer.email,
+                name: customer.full_name,
+                phone: customer.phone
+            })
+        }
+
+        // Limpiar chatId anterior para forzar nueva conversación
+        localStorage.removeItem(`chatId_${organization.slug}`)
 
         // Cerrar modal e ir al chat
         setShowGateModal(false)

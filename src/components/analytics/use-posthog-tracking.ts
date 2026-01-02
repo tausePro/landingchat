@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { ensurePosthog } from "@/lib/analytics/posthog-client"
+import { useScrollDepthTracking } from "./use-scroll-depth"
 
 type TrackFn = (
     contentId: string,
@@ -64,6 +65,12 @@ export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogT
         }
     }, [canTrack, posthog, organizationId, organizationSlug, organizationName])
 
+    // Enable scroll depth tracking
+    useScrollDepthTracking({
+        capture: (event, props) => capture && capture(event, props),
+        enabled: Boolean(capture)
+    })
+
     return useMemo(() => {
         if (!capture) {
             return noopTracking
@@ -84,8 +91,8 @@ export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogT
                 ? `${window.location.pathname}${window.location.search}`
                 : undefined
 
-            capture("page_view", {
-                path: path ?? defaultPath,
+            capture("$pageview", {
+                $current_url: path ?? defaultPath,
                 ...props,
             })
         }

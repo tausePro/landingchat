@@ -62,6 +62,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         // Verificar que el usuario esté identificado
         const storedCustomerId = localStorage.getItem(`customer_${slug}`)
         const storedCustomerName = localStorage.getItem(`customer_name_${slug}`)
+        // Si no hay chatId en localStorage, será null, lo que forzará crear uno nuevo
         const storedChatId = localStorage.getItem(`chatId_${slug}`)
 
         if (!storedCustomerId) {
@@ -110,6 +111,20 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     }, [customerId, slug])
 
     const initializeChat = async (custId: string, existingChatId: string | null, loadedProducts: any[]) => {
+        // Si hay un ID de chat existente, intentar retomarlo
+        if (existingChatId) {
+            setChatId(existingChatId)
+            const historyLoaded = await fetchHistory(existingChatId)
+            
+            if (historyLoaded) {
+                // Chat retomado exitosamente
+                setIsInitializing(false)
+                return
+            }
+            // Si falló cargar el historial (ej: chat eliminado), continuar para crear uno nuevo
+            console.log("Chat existente no válido, creando uno nuevo...")
+        }
+
         try {
             const response = await fetch(`/api/store/${slug}/chat/init`, {
                 method: "POST",
@@ -127,7 +142,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     setAgent((prev: any) => ({ ...prev, ...data.agent }))
                 }
 
-                // Cargar historial de mensajes
+                // Cargar historial de mensajes (incluyendo el saludo inicial)
                 await fetchHistory(data.chatId)
 
                 // Si hay un producto en la URL, mostrar ese producto con contexto
@@ -198,9 +213,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }
     }
 
-    const fetchHistory = async (id: string) => {
+    const fetchHistory = async (id: string): Promise<boolean> => {
         try {
             const res = await fetch(`/api/store/${slug}/chat/${id}/messages`)
+            if (!res.ok) return false
+            
             const historyData = await res.json()
             if (historyData.messages) {
                 const parsedMessages = historyData.messages.map((m: any) => ({
@@ -208,9 +225,12 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     timestamp: new Date(m.timestamp)
                 }))
                 setMessages(parsedMessages)
+                return true
             }
+            return false
         } catch (e) {
             console.error("Error fetching history:", e)
+            return false
         }
     }
 

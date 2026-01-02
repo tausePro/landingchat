@@ -20,7 +20,8 @@ export function ensurePosthog() {
     if (initialized) return posthog
 
     posthog.init(POSTHOG_KEY, {
-        api_host: POSTHOG_HOST,
+        api_host: `${typeof window !== 'undefined' ? window.location.origin : ''}/ingest`,
+        ui_host: 'https://app.posthog.com',
         capture_pageview: false,
         capture_pageleave: true,
         autocapture: false,
