@@ -98,22 +98,32 @@ export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogT
         }
 
         return {
-            trackViewContent: (contentId: string, contentName: string, value?: number, currency?: string) =>
-                trackContentEvent(contentId, contentName, value, currency, { event: "view_content" }),
-            trackAddToCart: (contentId: string, contentName: string, value: number, currency?: string) =>
-                trackContentEvent(contentId, contentName, value, currency, { event: "add_to_cart" }),
+            trackViewContent: (contentId: string, contentName: string, value?: number, currency = "COP") =>
+                capture("view_content", {
+                    content_ids: [contentId],
+                    content_name: contentName,
+                    value,
+                    currency
+                }),
+            trackAddToCart: (contentId: string, contentName: string, value: number, currency = "COP") =>
+                capture("add_to_cart", {
+                    content_ids: [contentId],
+                    content_name: contentName,
+                    value,
+                    currency
+                }),
             trackInitiateCheckout: (value: number, currency = "COP", contentIds?: string[]) =>
-                capture("checkout_initiated", {
+                capture("initiate_checkout", {
                     value,
                     currency,
-                    contentIds,
+                    content_ids: contentIds,
                 }),
             trackPurchase: (value: number, currency = "COP", contentIds?: string[], orderId?: string) =>
-                capture("purchase_completed", {
+                capture("purchase", {
                     value,
                     currency,
-                    contentIds,
-                    orderId,
+                    content_ids: contentIds,
+                    order_id: orderId,
                 }),
             trackPageView,
         }
