@@ -45,6 +45,15 @@ export function ChatLayout({
 }: ChatLayoutProps) {
     const [activeTab, setActiveTab] = React.useState<'para-ti' | 'historial'>('para-ti')
 
+    // Payment methods logos (can be made dynamic later)
+    const paymentMethods = [
+        { name: "Wompi", url: "https://raw.githubusercontent.com/tause-pro/assets/main/payments/wompi-logo.png" },
+        { name: "Visa", url: "https://raw.githubusercontent.com/tause-pro/assets/main/payments/visa.png" },
+        { name: "Mastercard", url: "https://raw.githubusercontent.com/tause-pro/assets/main/payments/mastercard.png" },
+        { name: "PSE", url: "https://raw.githubusercontent.com/tause-pro/assets/main/payments/pse.png" },
+        { name: "Bancolombia", url: "https://raw.githubusercontent.com/tause-pro/assets/main/payments/bancolombia.png" }
+    ]
+
     const formatDate = (dateString: string) => {
         const date = new Date(dateString)
         const now = new Date()
@@ -178,11 +187,10 @@ export function ChatLayout({
                                         </section>
                                     )}
 
-                                    {/* Agent Recommendations */}
-                                    <section>
+                                    {/* Agent Recommendations - Hidden until dynamic logic is implemented */}
+                                    {/* <section>
                                         <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Recomendaciones del Agente</h4>
                                         <div className="flex space-x-3 overflow-x-auto pb-2 -mx-4 px-4">
-                                            {/* Placeholder recommendations - will be dynamic later */}
                                             <div className="flex-shrink-0 w-32">
                                                 <div className="bg-gray-100 dark:bg-gray-800 aspect-square rounded-lg flex items-center justify-center">
                                                     <span className="material-symbols-outlined text-3xl text-gray-400">inventory_2</span>
@@ -194,7 +202,7 @@ export function ChatLayout({
                                                 </div>
                                             </div>
                                         </div>
-                                    </section>
+                                    </section> */}
 
                                     {/* Active Offers */}
                                     <section>
@@ -225,6 +233,20 @@ export function ChatLayout({
                                                 </button>
                                             </li>
                                         </ul>
+                                    </section>
+
+                                    {/* Payment Methods */}
+                                    <section className="pt-4 border-t border-border-light dark:border-border-dark mt-4">
+                                        <h4 className="text-xs font-bold text-text-light-secondary dark:text-text-dark-secondary mb-3 uppercase tracking-wider">Medios de Pago Aceptados</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {paymentMethods.map((pm) => (
+                                                <div key={pm.name} className="h-8 w-12 bg-white rounded border border-gray-200 flex items-center justify-center p-1" title={pm.name}>
+                                                    {/* Using text fallback for now if images fail, but structure is ready for images */}
+                                                    <span className="text-[8px] font-bold text-gray-500">{pm.name}</span>
+                                                    {/* <img src={pm.url} alt={pm.name} className="max-h-full max-w-full object-contain" /> */}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </section>
                                 </>
                             ) : (

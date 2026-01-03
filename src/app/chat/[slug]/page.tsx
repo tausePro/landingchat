@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cart-store"
 import { getStoreProducts } from "./actions"
 import { StoreHeader } from "@/components/store/store-header"
+import { ChatProductCard } from "@/components/chat/chat-product-card"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -166,27 +167,30 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             }
 
             if (currentChatId) {
-                // Si hay un producto en la URL, mostrar ese producto con contexto
+                setIsInitializing(false) // Desbloquear UI inmediatamente
+
+                // Si hay un producto en la URL, mostrar ese producto con contexto en background
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
                 const context = urlParams.get('context')
 
                 if (productId) {
-                    // Llamar al AI con el contexto del producto para obtener respuesta con tarjeta
-                    try {
-                        const aiResponse = await fetch('/api/ai-chat', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                message: context ? `Hola, me interesa este producto con: ${decodeURIComponent(context)}` : 'Hola, me interesa este producto',
-                                chatId: currentChatId,
-                                slug,
-                                customerId: custId,
-                                currentProductId: productId,
-                                context: context ? decodeURIComponent(context) : undefined
-                            })
+                    // Activar indicador de "escribiendo"
+                    setIsLoading(true)
+                    
+                    // Llamada no bloqueante (Background processing)
+                    fetch('/api/ai-chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            message: context ? `Hola, me interesa este producto con: ${decodeURIComponent(context)}` : 'Hola, me interesa este producto',
+                            chatId: currentChatId,
+                            slug,
+                            customerId: custId,
+                            currentProductId: productId,
+                            context: context ? decodeURIComponent(context) : undefined
                         })
-
+                    }).then(async (aiResponse) => {
                         if (aiResponse.ok) {
                             const aiData = await aiResponse.json()
 
@@ -221,13 +225,15 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                 setMessages(prev => [...prev, aiMsg])
                             }
                         }
-                    } catch (err) {
+                    }).catch(err => {
                         console.error("Error calling AI with product context:", err)
-                    }
+                    }).finally(() => {
+                        setIsLoading(false)
+                    })
                 }
+            } else {
+                 setIsInitializing(false)
             }
-
-            setIsInitializing(false)
         } catch (error) {
             console.error("Error initializing chat:", error)
             setIsInitializing(false)
@@ -550,41 +556,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                         )}
 
                                         {msg.product && (
-                                            <div className="flex flex-col gap-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 w-64 shadow-md relative overflow-hidden group">
-                                                <div className="bg-center bg-no-repeat aspect-[4/3] bg-cover rounded-lg w-full relative" style={{ backgroundImage: `url("${msg.product.image_url}")` }}>
-                                                    {/* Badges */}
-                                                    <div className="absolute top-2 left-2 flex flex-col gap-1">
-                                                        {(msg.product.stock > 0 && msg.product.stock < 10) && (
-                                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white">
-                                                                ¡Últimas unidades!
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col gap-1 px-1">
-                                                    <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">{msg.product.name}</h3>
-                                                    <p className="text-xs text-slate-500 dark:text-gray-400 line-clamp-2">{msg.product.description}</p>
-                                                    <div className="flex items-baseline gap-2 mt-1">
-                                                        <p className="text-lg font-bold text-slate-900 dark:text-white">
-                                                            {formatPrice(msg.product.price)}
-                                                        </p>
-                                                        {msg.product.stock <= 0 && <span className="text-xs text-red-500 font-bold">Agotado</span>}
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    onClick={() => addItem({
-                                                        id: msg.product!.id,
-                                                        name: msg.product!.name,
-                                                        price: msg.product!.price,
-                                                        image_url: msg.product!.image_url
-                                                    })}
-                                                    disabled={msg.product.stock <= 0}
-                                                    className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 bg-primary text-white gap-2 text-sm font-bold hover:bg-blue-600 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                                                >
-                                                    <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
-                                                    <span>Agregar</span>
-                                                </button>
-                                            </div>
+                                            <ChatProductCard 
+                                                product={msg.product}
+                                                formatPrice={formatPrice}
+                                            />
                                         )}
 
                                         {/* Carousel for multiple products - Stitch 34 style */}
