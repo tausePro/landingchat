@@ -90,7 +90,7 @@ export function StoreHeader({
                     {/* Cart Button */}
                     <button
                         onClick={() => toggleCart()}
-                        className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                        className={`relative p-2 text-slate-600 hover:text-slate-900 transition-colors ${isChatMode ? 'md:hidden' : ''}`}
                         aria-label="Ver carrito"
                     >
                         <ShoppingBag className="w-6 h-6" />
@@ -104,11 +104,12 @@ export function StoreHeader({
                     {isChatMode ? (
                          <Button
                             onClick={onCloseChat}
-                            variant="outline"
-                            className="font-bold border-gray-200 text-gray-700 hover:bg-gray-100 text-sm md:text-base px-4 md:px-6 gap-2"
+                            variant="ghost"
+                            size="sm"
+                            className="font-bold border border-gray-200 text-gray-700 hover:bg-gray-100 h-9 px-3 gap-1"
                         >
                             <span className="material-symbols-outlined text-lg">close</span>
-                            <span className="hidden md:inline">Cerrar Chat</span>
+                            <span className="hidden sm:inline text-xs">Cerrar</span>
                         </Button>
                     ) : (
                         !hideChatButton && (

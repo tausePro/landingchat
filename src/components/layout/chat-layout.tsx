@@ -26,6 +26,9 @@ interface ChatLayoutProps {
     onDeleteChat?: (chatId: string) => void
     customHeader?: React.ReactNode
     activeProducts?: any[]
+    recommendedProducts?: any[]
+    rightSidebar?: React.ReactNode
+    primaryColor?: string
 }
 
 export function ChatLayout({
@@ -41,7 +44,10 @@ export function ChatLayout({
     onCartClick,
     onDeleteChat,
     customHeader,
-    activeProducts = []
+    activeProducts = [],
+    recommendedProducts = [],
+    rightSidebar,
+    primaryColor = "#3B82F6"
 }: ChatLayoutProps) {
     const [activeTab, setActiveTab] = React.useState<'para-ti' | 'historial'>('para-ti')
 
@@ -98,11 +104,14 @@ export function ChatLayout({
                     <div className="flex items-center gap-4">
                         <button
                             onClick={onCartClick}
-                            className="relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-slate-800 text-text-light-primary dark:text-text-dark-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            className={cn(
+                                "relative flex cursor-pointer items-center justify-center rounded-full h-10 w-10 bg-slate-100 dark:bg-slate-800 text-text-light-primary dark:text-text-dark-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors",
+                                rightSidebar && "lg:hidden"
+                            )}
                         >
                             <span className="material-symbols-outlined text-xl">shopping_cart</span>
                             {cartItemCount > 0 && (
-                                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-white" style={{ backgroundColor: primaryColor }}>
                                     {cartItemCount > 9 ? '9+' : cartItemCount}
                                 </span>
                             )}
@@ -132,10 +141,11 @@ export function ChatLayout({
                                     className={cn(
                                         "flex items-center justify-center size-8 rounded-lg transition-colors",
                                         activeTab === 'para-ti'
-                                            ? "bg-primary/20 text-primary"
+                                            ? "bg-primary/20"
                                             : "text-text-light-secondary dark:text-text-dark-secondary hover:bg-slate-100 dark:hover:bg-slate-800"
                                     )}
                                     title="Para ti"
+                                    style={activeTab === 'para-ti' ? { color: primaryColor, backgroundColor: `${primaryColor}20` } : {}}
                                 >
                                     <span className="material-symbols-outlined text-xl" style={activeTab === 'para-ti' ? { fontVariationSettings: "'FILL' 1" } : {}}>lightbulb</span>
                                 </button>
@@ -145,10 +155,11 @@ export function ChatLayout({
                                     className={cn(
                                         "flex items-center justify-center size-8 rounded-lg transition-colors",
                                         activeTab === 'historial'
-                                            ? "bg-primary/20 text-primary"
+                                            ? "bg-primary/20"
                                             : "text-text-light-secondary dark:text-text-dark-secondary hover:bg-slate-100 dark:hover:bg-slate-800"
                                     )}
                                     title="Historial"
+                                    style={activeTab === 'historial' ? { color: primaryColor, backgroundColor: `${primaryColor}20` } : {}}
                                 >
                                     <span className="material-symbols-outlined text-xl" style={activeTab === 'historial' ? { fontVariationSettings: "'FILL' 1" } : {}}>history</span>
                                 </button>
@@ -177,7 +188,7 @@ export function ChatLayout({
                                                             <p className="text-xs font-semibold text-slate-900 dark:text-white truncate">
                                                                 {prod.name}
                                                             </p>
-                                                            <p className="text-xs text-primary font-bold">
+                                                            <p className="text-xs font-bold" style={{ color: primaryColor }}>
                                                                 {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(prod.price)}
                                                             </p>
                                                         </div>
@@ -187,28 +198,36 @@ export function ChatLayout({
                                         </section>
                                     )}
 
-                                    {/* Agent Recommendations - Hidden until dynamic logic is implemented */}
-                                    {/* <section>
-                                        <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Recomendaciones del Agente</h4>
-                                        <div className="flex space-x-3 overflow-x-auto pb-2 -mx-4 px-4">
-                                            <div className="flex-shrink-0 w-32">
-                                                <div className="bg-gray-100 dark:bg-gray-800 aspect-square rounded-lg flex items-center justify-center">
-                                                    <span className="material-symbols-outlined text-3xl text-gray-400">inventory_2</span>
-                                                </div>
-                                                <div className="mt-2">
-                                                    <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
-                                                        Pregunta por productos y te haré recomendaciones personalizadas
-                                                    </p>
-                                                </div>
+                                    {/* Agent Recommendations */}
+                                    {recommendedProducts.length > 0 && (
+                                        <section>
+                                            <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Recomendaciones del Agente</h4>
+                                            <div className="flex space-x-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+                                                {recommendedProducts.map((prod) => (
+                                                    <div key={prod.id} className="flex-shrink-0 w-32 flex flex-col gap-2">
+                                                        <div 
+                                                            className="aspect-square bg-cover bg-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100"
+                                                            style={{ backgroundImage: `url("${prod.image_url}")` }}
+                                                        />
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <p className="text-xs font-medium text-slate-900 dark:text-white line-clamp-2 leading-tight">
+                                                                {prod.name}
+                                                            </p>
+                                                            <p className="text-xs font-bold" style={{ color: primaryColor }}>
+                                                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(prod.price)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        </div>
-                                    </section> */}
+                                        </section>
+                                    )}
 
                                     {/* Active Offers */}
                                     <section>
                                         <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Ofertas Activas</h4>
                                         <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
-                                            <p className="text-sm font-semibold text-primary">¡Envío gratis en pedidos superiores a $120.000!</p>
+                                            <p className="text-sm font-semibold" style={{ color: primaryColor }}>¡Envío gratis en pedidos superiores a $120.000!</p>
                                             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Aplica automáticamente en tu carrito.</p>
                                         </div>
                                     </section>
@@ -218,17 +237,17 @@ export function ChatLayout({
                                         <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Preguntas Frecuentes</h4>
                                         <ul className="space-y-2 text-sm">
                                             <li>
-                                                <button className="text-left text-text-light-secondary dark:text-text-dark-secondary hover:text-primary dark:hover:text-white hover:underline">
+                                                <button className="text-left text-text-light-secondary dark:text-text-dark-secondary hover:underline" style={{ '--hover-color': primaryColor } as any} onMouseEnter={(e) => e.currentTarget.style.color = primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = ''}>
                                                     ¿Cuánto tarda el envío?
                                                 </button>
                                             </li>
                                             <li>
-                                                <button className="text-left text-text-light-secondary dark:text-text-dark-secondary hover:text-primary dark:hover:text-white hover:underline">
+                                                <button className="text-left text-text-light-secondary dark:text-text-dark-secondary hover:underline" style={{ '--hover-color': primaryColor } as any} onMouseEnter={(e) => e.currentTarget.style.color = primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = ''}>
                                                     ¿Cuál es su política de devoluciones?
                                                 </button>
                                             </li>
                                             <li>
-                                                <button className="text-left text-text-light-secondary dark:text-text-dark-secondary hover:text-primary dark:hover:text-white hover:underline">
+                                                <button className="text-left text-text-light-secondary dark:text-text-dark-secondary hover:underline" style={{ '--hover-color': primaryColor } as any} onMouseEnter={(e) => e.currentTarget.style.color = primaryColor} onMouseLeave={(e) => e.currentTarget.style.color = ''}>
                                                     ¿Cómo uso los productos?
                                                 </button>
                                             </li>
@@ -240,9 +259,9 @@ export function ChatLayout({
                                         <h4 className="text-xs font-bold text-text-light-secondary dark:text-text-dark-secondary mb-3 uppercase tracking-wider">Medios de Pago Aceptados</h4>
                                         <div className="flex flex-wrap gap-2">
                                             {paymentMethods.map((pm) => (
-                                                <div key={pm.name} className="h-8 w-12 bg-white rounded border border-gray-200 flex items-center justify-center p-1" title={pm.name}>
+                                                <div key={pm.name} className="h-10 w-16 bg-white rounded border border-gray-200 flex items-center justify-center p-1" title={pm.name}>
                                                     {/* Using text fallback for now if images fail, but structure is ready for images */}
-                                                    <span className="text-[8px] font-bold text-gray-500">{pm.name}</span>
+                                                    <span className="text-[10px] font-bold text-gray-500">{pm.name}</span>
                                                     {/* <img src={pm.url} alt={pm.name} className="max-h-full max-w-full object-contain" /> */}
                                                 </div>
                                             ))}
@@ -267,14 +286,17 @@ export function ChatLayout({
                                                             ? "bg-primary/10 dark:bg-primary/20"
                                                             : "hover:bg-slate-100 dark:hover:bg-slate-800/60"
                                                     )}
+                                                    style={chat.id === currentChatId ? { backgroundColor: `${primaryColor}15` } : {}}
                                                 >
                                                     <div onClick={() => onChatSelect?.(chat.id)}>
                                                         <p className={cn(
                                                             "text-sm truncate pr-6",
                                                             chat.id === currentChatId
-                                                                ? "font-semibold text-primary dark:text-white"
+                                                                ? "font-semibold"
                                                                 : "font-medium text-text-light-primary dark:text-text-dark-primary"
-                                                        )}>
+                                                        )}
+                                                        style={chat.id === currentChatId ? { color: primaryColor } : {}}
+                                                        >
                                                             {chat.title}
                                                         </p>
                                                         <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
@@ -319,6 +341,13 @@ export function ChatLayout({
                 <div className="flex flex-col flex-1 bg-background-light dark:bg-background-dark relative min-w-0">
                     {children}
                 </div>
+
+                {/* Right Sidebar (Cart) - Desktop Only (3-column layout) */}
+                {rightSidebar && (
+                    <aside className="hidden lg:flex flex-col w-[30%] xl:w-[25%] border-l border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shrink-0 z-20 h-full">
+                        {rightSidebar}
+                    </aside>
+                )}
             </main>
         </div>
     )

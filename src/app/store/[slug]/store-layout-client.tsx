@@ -184,7 +184,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 onIdentified={handleCustomerIdentified}
             />
 
-            <CartDrawer slug={slug} />
+            <CartDrawer slug={slug} primaryColor={primaryColor} />
 
             {/* Presence Tracking */}
             <StorePresence slug={organization.slug} />
