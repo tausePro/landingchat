@@ -238,8 +238,8 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                         </div>
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                             <span>Envío estimado</span>
-                            <span className={cn("font-medium", remainingForFreeShipping <= 0 ? "text-green-600" : "text-gray-900 dark:text-white")}>
-                                {remainingForFreeShipping <= 0 ? "Gratis" : "Calculado al pagar"}
+                            <span className={cn("font-medium", freeShippingEnabled && remainingForFreeShipping <= 0 ? "text-green-600" : "text-gray-900 dark:text-white")}>
+                                {freeShippingEnabled && remainingForFreeShipping <= 0 ? "Gratis" : "Calculado al pagar"}
                             </span>
                         </div>
                         <div className="pt-3 mt-1 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-end">
