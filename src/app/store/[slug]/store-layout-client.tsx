@@ -11,6 +11,9 @@ import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
 import { StorePresence } from "@/components/store/store-presence"
 import { CartDrawer } from "@/app/chat/components/cart-drawer"
+import { ensurePosthog } from "@/lib/analytics/posthog-client"
+import { CheckoutModal } from "@/app/chat/components/checkout-modal"
+import { useCartStore } from "@/store/cart-store"
 
 
 interface StoreLayoutClientProps {
@@ -29,9 +32,11 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
     const [showGateModal, setShowGateModal] = useState(false)
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
     const [shippingConfig, setShippingConfig] = useState<any>(null)
+    const { setIsOpen: setCartOpen } = useCartStore()
 
     // Branding settings
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
@@ -97,6 +102,8 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
 
         if (customerId) {
             // Ya identificado, ir al chat
+            // Se mantiene el chatId anterior para continuar la conversación
+            
             let chatUrl = getChatUrl(isSubdomain, organization.slug)
             const params = new URLSearchParams()
             if (productId) params.set('product', productId)
@@ -118,6 +125,18 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
         localStorage.setItem(`customer_${organization.slug}`, customer.id)
         localStorage.setItem(`customer_name_${organization.slug}`, customer.full_name)
 
+        // Identificar en PostHog
+        const posthog = ensurePosthog()
+        if (posthog) {
+            posthog.identify(customer.id, {
+                email: customer.email,
+                name: customer.full_name,
+                phone: customer.phone
+            })
+        }
+
+        // Se mantiene el chatId anterior si existe para continuar la conversación
+        
         // Cerrar modal e ir al chat
         setShowGateModal(false)
 
@@ -169,11 +188,25 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 onIdentified={handleCustomerIdentified}
             />
 
-            <CartDrawer slug={slug} />
+            <CartDrawer 
+                slug={slug} 
+                primaryColor={primaryColor} 
+                onCheckout={() => {
+                    setCartOpen(false)
+                    setIsCheckoutOpen(true)
+                }}
+            />
+            
+            {isCheckoutOpen && (
+                <CheckoutModal
+                    isOpen={isCheckoutOpen}
+                    onClose={() => setIsCheckoutOpen(false)}
+                    slug={slug}
+                />
+            )}
 
             {/* Presence Tracking */}
             <StorePresence slug={organization.slug} />
         </div>
     )
 }
-

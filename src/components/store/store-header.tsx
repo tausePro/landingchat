@@ -18,6 +18,8 @@ interface StoreHeaderProps {
     showStoreName?: boolean
     className?: string
     hideChatButton?: boolean
+    isChatMode?: boolean
+    onCloseChat?: () => void
 }
 
 export function StoreHeader({
@@ -28,7 +30,9 @@ export function StoreHeader({
     primaryColor,
     showStoreName = true,
     className = "",
-    hideChatButton = false
+    hideChatButton = false,
+    isChatMode = false,
+    onCloseChat
 }: StoreHeaderProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
@@ -86,7 +90,7 @@ export function StoreHeader({
                     {/* Cart Button */}
                     <button
                         onClick={() => toggleCart()}
-                        className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                        className={`relative p-2 text-slate-600 hover:text-slate-900 transition-colors ${isChatMode ? 'md:hidden' : ''}`}
                         aria-label="Ver carrito"
                     >
                         <ShoppingBag className="w-6 h-6" />
@@ -97,14 +101,26 @@ export function StoreHeader({
                         )}
                     </button>
 
-                    {!hideChatButton && (
-                        <Button
-                            onClick={onStartChat}
-                            style={{ backgroundColor: primaryColor }}
-                            className="font-bold shadow-lg shadow-blue-500/20 text-sm md:text-base px-4 md:px-6"
+                    {isChatMode ? (
+                         <Button
+                            onClick={onCloseChat}
+                            variant="ghost"
+                            size="sm"
+                            className="font-bold border border-gray-200 text-gray-700 hover:bg-gray-100 h-9 px-3 gap-1"
                         >
-                            Iniciar Chat
+                            <span className="material-symbols-outlined text-lg">close</span>
+                            <span className="hidden sm:inline text-xs">Cerrar</span>
                         </Button>
+                    ) : (
+                        !hideChatButton && (
+                            <Button
+                                onClick={onStartChat}
+                                style={{ backgroundColor: primaryColor }}
+                                className="font-bold shadow-lg shadow-blue-500/20 text-sm md:text-base px-4 md:px-6"
+                            >
+                                Iniciar Chat
+                            </Button>
+                        )
                     )}
                 </div>
             </div>
