@@ -191,6 +191,7 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
             <CartDrawer 
                 slug={slug} 
                 primaryColor={primaryColor} 
+                shippingConfig={shippingConfig}
                 onCheckout={() => {
                     setCartOpen(false)
                     setIsCheckoutOpen(true)

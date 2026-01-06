@@ -53,6 +53,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [promotions, setPromotions] = useState<any[]>([])
     const [messages, setMessages] = useState<Message[]>([])
     const [customerChats, setCustomerChats] = useState<Array<{ id: string; title: string; created_at: string; updated_at?: string }>>([])
+    const [shippingConfig, setShippingConfig] = useState<any>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -91,13 +92,24 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         setCustomerName(storedCustomerName)
 
         // Cargar productos, agente y organización
-        getStoreProducts(slug).then((data) => {
+        getStoreProducts(slug).then(async (data) => {
             if (data && data.organization) {
                 setProducts(data.products)
                 setOrganization(data.organization)
                 setBadges(data.badges)
                 setPromotions(data.promotions)
                 if (!agent) setAgent(data.agent)
+
+                // Cargar configuración de envío
+                try {
+                    const shippingRes = await fetch(`/api/store/${slug}/shipping-config`)
+                    if (shippingRes.ok) {
+                        const config = await shippingRes.json()
+                        setShippingConfig(config)
+                    }
+                } catch (e) {
+                    console.error("Error loading shipping config:", e)
+                }
 
                 // Inicializar chat con los productos cargados
                 initializeChat(storedCustomerId, storedChatId, data.products)
@@ -557,6 +569,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     primaryColor={primaryColor} 
                     recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)} 
                     onCheckout={() => setIsCheckoutOpen(true)}
+                    shippingConfig={shippingConfig}
                 />
             }
             primaryColor={primaryColor}
@@ -813,6 +826,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 primaryColor={primaryColor}
                 recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
                 onlyMobile={true}
+                shippingConfig={shippingConfig}
                 onCheckout={() => {
                     setCartOpen(false)
                     setIsCheckoutOpen(true)

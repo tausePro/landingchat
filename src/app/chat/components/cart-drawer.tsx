@@ -5,15 +5,22 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
+interface ShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    default_shipping_rate: number
+}
+
 interface CartDrawerProps {
     slug: string
     primaryColor?: string
     recommendations?: any[]
     onlyMobile?: boolean
     onCheckout?: () => void
+    shippingConfig?: ShippingConfig | null
 }
 
-export function CartDrawer({ slug, primaryColor, recommendations, onlyMobile = false, onCheckout }: CartDrawerProps) {
+export function CartDrawer({ slug, primaryColor, recommendations, onlyMobile = false, onCheckout, shippingConfig }: CartDrawerProps) {
     const { isOpen, setIsOpen } = useCartStore()
     const isDesktop = useMediaQuery("(min-width: 1024px)")
 
@@ -30,6 +37,7 @@ export function CartDrawer({ slug, primaryColor, recommendations, onlyMobile = f
                     recommendations={recommendations}
                     onClose={() => setIsOpen(false)}
                     onCheckout={onCheckout}
+                    shippingConfig={shippingConfig}
                 />
             </SheetContent>
         </Sheet>
