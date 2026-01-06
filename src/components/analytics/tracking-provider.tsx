@@ -11,6 +11,8 @@ export interface TrackingContextType {
     trackInitiateCheckout: (value: number, currency?: string, contentIds?: string[]) => void
     trackPurchase: (value: number, currency?: string, contentIds?: string[], orderId?: string) => void
     trackPageView: (path?: string, props?: Record<string, unknown>) => void
+    trackViewCategory: (categoryId: string, categoryName: string) => void
+    trackSearch: (searchQuery: string, contentIds?: string[]) => void
 }
 
 const noopTracking: TrackingContextType = {
@@ -19,6 +21,8 @@ const noopTracking: TrackingContextType = {
     trackInitiateCheckout: () => {},
     trackPurchase: () => {},
     trackPageView: () => {},
+    trackViewCategory: () => {},
+    trackSearch: () => {},
 }
 
 const TrackingContext = createContext<TrackingContextType | null>(null)
@@ -84,6 +88,16 @@ export function TrackingProvider({
             },
             trackPageView: (path, props) => {
                 posthogTracking.trackPageView(path, props)
+            },
+            trackViewCategory: (categoryId, categoryName) => {
+                if (metaPixelEnabled) {
+                    metaPixel.trackViewCategory(categoryId, categoryName)
+                }
+            },
+            trackSearch: (searchQuery, contentIds) => {
+                if (metaPixelEnabled) {
+                    metaPixel.trackSearch(searchQuery, contentIds)
+                }
             },
         }
     }, [metaPixelEnabled, metaPixel, posthogTracking, posthogEnabled])

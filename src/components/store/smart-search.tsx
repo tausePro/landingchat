@@ -8,6 +8,7 @@ import { ProductCard } from "@/components/store/product-card"
 import { useDebounce } from "use-debounce"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { useTracking } from "@/components/analytics/tracking-provider"
 
 interface SmartSearchProps {
     slug: string
@@ -32,6 +33,7 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
     const [showResults, setShowResults] = useState(false)
     const searchRef = useRef<HTMLDivElement>(null)
     const isSubdomain = useIsSubdomain()
+    const { trackSearch } = useTracking()
 
     // Buscar productos cuando cambie la query
     useEffect(() => {
@@ -61,8 +63,13 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
             const response = await fetch(`/api/store/${slug}/products?search=${encodeURIComponent(searchQuery)}&limit=6`)
             if (response.ok) {
                 const data = await response.json()
-                setResults(data.products || [])
+                const products = data.products || []
+                setResults(products)
                 setShowResults(true)
+                
+                // Track Search event en Meta Pixel
+                const contentIds = products.map((p: Product) => p.id)
+                trackSearch(searchQuery, contentIds)
             }
         } catch (error) {
             console.error('Error searching products:', error)
