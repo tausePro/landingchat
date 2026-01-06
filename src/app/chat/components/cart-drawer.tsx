@@ -10,9 +10,10 @@ interface CartDrawerProps {
     primaryColor?: string
     recommendations?: any[]
     onlyMobile?: boolean
+    onCheckout?: () => void
 }
 
-export function CartDrawer({ slug, primaryColor, recommendations, onlyMobile = false }: CartDrawerProps) {
+export function CartDrawer({ slug, primaryColor, recommendations, onlyMobile = false, onCheckout }: CartDrawerProps) {
     const { isOpen, setIsOpen } = useCartStore()
     const isDesktop = useMediaQuery("(min-width: 1024px)")
 
@@ -28,6 +29,7 @@ export function CartDrawer({ slug, primaryColor, recommendations, onlyMobile = f
                     primaryColor={primaryColor} 
                     recommendations={recommendations}
                     onClose={() => setIsOpen(false)}
+                    onCheckout={onCheckout}
                 />
             </SheetContent>
         </Sheet>

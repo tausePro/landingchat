@@ -12,6 +12,8 @@ import { getChatUrl } from "@/lib/utils/store-urls"
 import { StorePresence } from "@/components/store/store-presence"
 import { CartDrawer } from "@/app/chat/components/cart-drawer"
 import { ensurePosthog } from "@/lib/analytics/posthog-client"
+import { CheckoutModal } from "@/app/chat/components/checkout-modal"
+import { useCartStore } from "@/store/cart-store"
 
 
 interface StoreLayoutClientProps {
@@ -30,9 +32,11 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
     const [showGateModal, setShowGateModal] = useState(false)
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
     const [shippingConfig, setShippingConfig] = useState<any>(null)
+    const { setIsOpen: setCartOpen } = useCartStore()
 
     // Branding settings
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
@@ -184,11 +188,25 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
                 onIdentified={handleCustomerIdentified}
             />
 
-            <CartDrawer slug={slug} primaryColor={primaryColor} />
+            <CartDrawer 
+                slug={slug} 
+                primaryColor={primaryColor} 
+                onCheckout={() => {
+                    setCartOpen(false)
+                    setIsCheckoutOpen(true)
+                }}
+            />
+            
+            {isCheckoutOpen && (
+                <CheckoutModal
+                    isOpen={isCheckoutOpen}
+                    onClose={() => setIsCheckoutOpen(false)}
+                    slug={slug}
+                />
+            )}
 
             {/* Presence Tracking */}
             <StorePresence slug={organization.slug} />
         </div>
     )
 }
-

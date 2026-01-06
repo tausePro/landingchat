@@ -3,7 +3,6 @@
 import { useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { CheckoutModal } from "@/app/chat/components/checkout-modal"
 
 interface CartSidebarProps {
     slug: string
@@ -11,11 +10,11 @@ interface CartSidebarProps {
     primaryColor?: string
     recommendations?: any[]
     onClose?: () => void
+    onCheckout?: () => void
 }
 
-export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "#3B82F6", recommendations = [], onClose }: CartSidebarProps) {
+export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "#3B82F6", recommendations = [], onClose, onCheckout }: CartSidebarProps) {
     const { items, removeItem, updateQuantity, total, addItem } = useCartStore()
-    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [showCouponInput, setShowCouponInput] = useState(false)
     const [couponCode, setCouponCode] = useState("")
 
@@ -237,7 +236,7 @@ export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "
                         </div>
                     </div>
                     <button 
-                        onClick={() => setIsCheckoutOpen(true)}
+                        onClick={onCheckout}
                         disabled={items.length === 0}
                         className="w-full py-3 text-white font-bold rounded-xl shadow-lg shadow-gray-900/10 dark:shadow-none transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{ backgroundColor: '#111827' }} // Black button for checkout as in design, or could be primaryColor
@@ -247,12 +246,6 @@ export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "
                     </button>
                 </div>
             </div>
-
-            <CheckoutModal
-                isOpen={isCheckoutOpen}
-                onClose={() => setIsCheckoutOpen(false)}
-                slug={slug}
-            />
         </>
     )
 }

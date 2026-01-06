@@ -12,6 +12,7 @@ import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
+import { CheckoutModal } from "../components/checkout-modal"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -53,8 +54,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [messages, setMessages] = useState<Message[]>([])
     const [customerChats, setCustomerChats] = useState<Array<{ id: string; title: string; created_at: string; updated_at?: string }>>([])
     const [isLoading, setIsLoading] = useState(false)
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { addItem, items, removeItem, updateQuantity, clearCart, toggleCart, total: cartTotal } = useCartStore()
+    const { addItem, items, removeItem, updateQuantity, clearCart, toggleCart, setIsOpen: setCartOpen, total: cartTotal } = useCartStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
     const processedProductIdRef = useRef<string | null>(null)
@@ -554,6 +556,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     slug={slug} 
                     primaryColor={primaryColor} 
                     recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)} 
+                    onCheckout={() => setIsCheckoutOpen(true)}
                 />
             }
             primaryColor={primaryColor}
@@ -810,6 +813,16 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 primaryColor={primaryColor}
                 recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
                 onlyMobile={true}
+                onCheckout={() => {
+                    setCartOpen(false)
+                    setIsCheckoutOpen(true)
+                }}
+            />
+
+            <CheckoutModal
+                isOpen={isCheckoutOpen}
+                onClose={() => setIsCheckoutOpen(false)}
+                slug={slug}
             />
         </ChatLayout>
     )
