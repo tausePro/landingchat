@@ -4,23 +4,33 @@ import { useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
 
+interface ShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    default_shipping_rate: number
+}
+
 interface CartSidebarProps {
     slug: string
-    shippingThreshold?: number
+    shippingConfig?: ShippingConfig | null
     primaryColor?: string
     recommendations?: any[]
     onClose?: () => void
     onCheckout?: () => void
 }
 
-export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "#3B82F6", recommendations = [], onClose, onCheckout }: CartSidebarProps) {
+export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", recommendations = [], onClose, onCheckout }: CartSidebarProps) {
     const { items, removeItem, updateQuantity, total, addItem } = useCartStore()
     const [showCouponInput, setShowCouponInput] = useState(false)
     const [couponCode, setCouponCode] = useState("")
 
     const currentTotal = total()
-    const progress = Math.min((currentTotal / shippingThreshold) * 100, 100)
-    const remainingForFreeShipping = Math.max(shippingThreshold - currentTotal, 0)
+    
+    // Calcular envío gratis solo si está habilitado y tiene un monto mínimo
+    const freeShippingEnabled = shippingConfig?.free_shipping_enabled && shippingConfig?.free_shipping_min_amount
+    const shippingThreshold = shippingConfig?.free_shipping_min_amount || 0
+    const progress = freeShippingEnabled ? Math.min((currentTotal / shippingThreshold) * 100, 100) : 0
+    const remainingForFreeShipping = freeShippingEnabled ? Math.max(shippingThreshold - currentTotal, 0) : 0
 
     const formatPrice = (price: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -72,26 +82,28 @@ export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "
                     )}
                 </div>
 
-                {/* Free Shipping Progress */}
-                <div className="bg-white dark:bg-gray-800 p-4 border-b border-gray-100 dark:border-gray-700">
-                    <div className="flex justify-between items-end mb-1">
-                        <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Envío Gratis</span>
-                        <span className="text-[10px] font-bold" style={{ color: primaryColor }}>
-                            {remainingForFreeShipping > 0 
-                                ? `${formatPrice(remainingForFreeShipping)} más`
-                                : "¡Conseguido!"}
-                        </span>
+                {/* Free Shipping Progress - Solo mostrar si está habilitado */}
+                {freeShippingEnabled && (
+                    <div className="bg-white dark:bg-gray-800 p-4 border-b border-gray-100 dark:border-gray-700">
+                        <div className="flex justify-between items-end mb-1">
+                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Envío Gratis</span>
+                            <span className="text-[10px] font-bold" style={{ color: primaryColor }}>
+                                {remainingForFreeShipping > 0 
+                                    ? `${formatPrice(remainingForFreeShipping)} más`
+                                    : "¡Conseguido!"}
+                            </span>
+                        </div>
+                        <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                                className="h-1.5 rounded-full transition-all duration-500 ease-out" 
+                                style={{ width: `${progress}%`, backgroundColor: primaryColor }}
+                            ></div>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1 text-right">
+                            {remainingForFreeShipping > 0 ? "¡Casi lo tienes!" : "¡Envío gratis activado!"}
+                        </p>
                     </div>
-                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                        <div 
-                            className="h-1.5 rounded-full transition-all duration-500 ease-out" 
-                            style={{ width: `${progress}%`, backgroundColor: primaryColor }}
-                        ></div>
-                    </div>
-                    <p className="text-[10px] text-gray-400 mt-1 text-right">
-                        {remainingForFreeShipping > 0 ? "¡Casi lo tienes!" : "¡Envío gratis activado!"}
-                    </p>
-                </div>
+                )}
 
                 {/* Cart Items */}
                 <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
@@ -226,8 +238,8 @@ export function CartSidebar({ slug, shippingThreshold = 120000, primaryColor = "
                         </div>
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                             <span>Envío estimado</span>
-                            <span className={cn("font-medium", remainingForFreeShipping <= 0 ? "text-green-600" : "text-gray-900 dark:text-white")}>
-                                {remainingForFreeShipping <= 0 ? "Gratis" : "Calculado al pagar"}
+                            <span className={cn("font-medium", freeShippingEnabled && remainingForFreeShipping <= 0 ? "text-green-600" : "text-gray-900 dark:text-white")}>
+                                {freeShippingEnabled && remainingForFreeShipping <= 0 ? "Gratis" : "Calculado al pagar"}
                             </span>
                         </div>
                         <div className="pt-3 mt-1 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-end">
