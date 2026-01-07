@@ -31,6 +31,7 @@ interface OrganizationFormProps {
 
 const fallbackTrackingConfig: OrganizationTrackingConfig = {
     meta_pixel_id: "",
+    meta_access_token: "",
     google_analytics_id: "",
     tiktok_pixel_id: "",
     posthog_enabled: false,
@@ -303,6 +304,19 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                                 onChange={(e) => updateTrackingConfig("meta_pixel_id", e.target.value)}
                                                 placeholder="Ej: 123456789012345"
                                             />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="metaAccessToken">Meta Conversions API Token</Label>
+                                            <Input
+                                                id="metaAccessToken"
+                                                type="password"
+                                                value={formData.tracking_config.meta_access_token || ""}
+                                                onChange={(e) => updateTrackingConfig("meta_access_token", e.target.value)}
+                                                placeholder="EAAxxxxxxx..."
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Token para tracking server-side de compras. Obtener en Meta Business Suite → Events Manager.
+                                            </p>
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="ga4">Google Analytics 4 ID</Label>
