@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { headers } from "next/headers"
 import { isSubdomain, getStoreLink } from "@/lib/utils/store-urls"
 import { ProductCard } from "@/components/store/product-card"
+import { CategoryTracker } from "@/components/analytics/category-tracker"
 
 export default async function ProductsPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params
@@ -31,6 +32,9 @@ export default async function ProductsPage({ params }: { params: Promise<{ slug:
 
     return (
         <StoreLayoutClient slug={slug} organization={organization} products={products}>
+            {/* Track ViewCategory event */}
+            <CategoryTracker categoryId="all-products" categoryName="Catálogo Completo" />
+            
             <div className="container mx-auto px-4 py-12 min-h-[60vh]">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                     <div>

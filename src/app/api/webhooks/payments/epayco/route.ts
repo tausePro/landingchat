@@ -291,37 +291,45 @@ async function processOrderUpdate(
         })
         .eq("id", orderId)
 
-    // Enviar notificación de venta si el pago fue aprobado
+    // Enviar notificación de venta y tracking si el pago fue aprobado
     if (status === "approved") {
-        try {
-            const { data: order } = await supabase
-                .from("orders")
-                .select(`
-                    id,
-                    order_number,
-                    total,
-                    customers!inner(name),
-                    order_items(
-                        quantity,
-                        products!inner(name)
-                    )
-                `)
-                .eq("id", orderId)
-                .single()
+        // Obtener datos completos de la orden para notificación y tracking
+        const { data: order } = await supabase
+            .from("orders")
+            .select(`
+                id,
+                order_number,
+                total,
+                customer_info,
+                items,
+                customers!inner(name, email, phone),
+                order_items(
+                    quantity,
+                    product_id,
+                    products!inner(name)
+                )
+            `)
+            .eq("id", orderId)
+            .single()
 
-            if (order) {
+        if (order) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const customer = order.customers as any
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const orderItems = order.order_items as any[]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const customerInfo = order.customer_info as any
+
+            // 1. Enviar notificación de venta por WhatsApp
+            try {
                 const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const customer = order.customers as any
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const orderItems = order.order_items as any[]
                 
                 await sendSaleNotification(
                     { organizationId },
                     {
                         id: order.order_number || order.id,
                         total: order.total,
-                        customerName: customer?.name || "Cliente",
+                        customerName: customer?.name || customerInfo?.name || "Cliente",
                         items: orderItems?.map((item: any) => ({
                             name: item.products?.name || "Producto",
                             quantity: item.quantity,
@@ -329,10 +337,36 @@ async function processOrderUpdate(
                     }
                 )
                 console.log(`[ePayco Webhook] Sale notification sent for order ${order.order_number}`)
+            } catch (notifError) {
+                console.error("[ePayco Webhook] Error sending sale notification:", notifError)
             }
-        } catch (notifError) {
-            console.error("[ePayco Webhook] Error sending sale notification:", notifError)
-            // No fallar el webhook si la notificación falla
+
+            // 2. Enviar evento Purchase a Meta Conversions API (server-side tracking)
+            try {
+                const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
+                
+                await trackServerPurchase(
+                    organizationId,
+                    {
+                        id: order.id,
+                        orderNumber: order.order_number,
+                        total: order.total,
+                        currency: "COP",
+                        items: orderItems?.map((item: any) => ({
+                            productId: item.product_id,
+                            quantity: item.quantity,
+                        })),
+                        customerEmail: customer?.email || customerInfo?.email,
+                        customerPhone: customer?.phone || customerInfo?.phone,
+                        customerName: customer?.name || customerInfo?.name,
+                        customerCity: customerInfo?.city,
+                    },
+                    supabase
+                )
+                console.log(`[ePayco Webhook] Meta CAPI Purchase event sent for order ${order.order_number}`)
+            } catch (capiError) {
+                console.error("[ePayco Webhook] Error sending Meta CAPI event:", capiError)
+            }
         }
     }
 }

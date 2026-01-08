@@ -6,7 +6,8 @@
 import { Resend } from 'resend'
 
 // Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Use a fallback key to prevent crash during module evaluation if env var is missing
+const resend = new Resend(process.env.RESEND_API_KEY || 're_missing_key')
 
 interface OrderEmailData {
     orderNumber: string

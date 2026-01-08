@@ -114,5 +114,19 @@ export function useMetaPixel() {
                 order_id: orderId,
             })
         },
+        trackViewCategory: (categoryId: string, categoryName: string) => {
+            trackEvent("ViewCategory", {
+                content_category: categoryName,
+                content_ids: [categoryId],
+                content_type: "product_group",
+            })
+        },
+        trackSearch: (searchQuery: string, contentIds?: string[]) => {
+            trackEvent("Search", {
+                search_string: searchQuery,
+                content_ids: contentIds,
+                content_type: "product",
+            })
+        },
     }
 }
