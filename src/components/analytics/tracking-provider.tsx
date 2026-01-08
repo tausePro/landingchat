@@ -1,7 +1,6 @@
 "use client"
 
-import { createContext, useContext, ReactNode, useMemo, useEffect } from "react"
-import { usePathname, useSearchParams } from "next/navigation"
+import { createContext, useContext, ReactNode, useMemo } from "react"
 import { useMetaPixel } from "./meta-pixel"
 import { usePosthogTracking } from "./use-posthog-tracking"
 
@@ -44,8 +43,6 @@ export function TrackingProvider({
     organizationName,
     posthogEnabled = false,
 }: TrackingProviderProps) {
-    const pathname = usePathname()
-    const searchParams = useSearchParams()
     const metaPixel = useMetaPixel()
     const metaPixelEnabled = Boolean(metaPixelId)
 
@@ -102,13 +99,6 @@ export function TrackingProvider({
         }
     }, [metaPixelEnabled, metaPixel, posthogTracking, posthogEnabled])
 
-    useEffect(() => {
-        if (!posthogEnabled) return
-
-        const search = searchParams?.toString()
-        const fullPath = search ? `${pathname}?${search}` : pathname
-        posthogTracking.trackPageView(fullPath)
-    }, [pathname, searchParams, posthogEnabled, posthogTracking])
 
     return (
         <TrackingContext.Provider value={trackingMethods}>

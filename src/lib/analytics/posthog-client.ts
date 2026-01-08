@@ -21,10 +21,11 @@ export function ensurePosthog() {
 
     posthog.init(POSTHOG_KEY, {
         api_host: `${typeof window !== 'undefined' ? window.location.origin : ''}/ingest`,
-        ui_host: 'https://app.posthog.com',
-        capture_pageview: false,
+        ui_host: 'https://us.posthog.com',
+        capture_pageview: true,
         capture_pageleave: true,
         autocapture: false,
+        scroll_root_selector: ['#main-content', 'main', 'body'],
         session_recording: {
             maskAllInputs: true,
             maskNetworkRequestFn: () => null,
