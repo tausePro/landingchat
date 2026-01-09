@@ -63,6 +63,12 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     // AI Enhancement state
     const [isEnhancing, setIsEnhancing] = useState(false)
 
+    // SEO state
+    const [metaTitle, setMetaTitle] = useState(initialData?.meta_title || "")
+    const [metaDescription, setMetaDescription] = useState(initialData?.meta_description || "")
+    const [keywords, setKeywords] = useState<string[]>(initialData?.keywords || [])
+    const [showSeoSection, setShowSeoSection] = useState(false)
+
     // Load badges
     useEffect(() => {
         async function loadBadges() {
@@ -112,6 +118,10 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 bundle_items: isBundle ? bundleItems : [],
                 bundle_discount_type: isBundle ? bundleDiscountType : undefined,
                 bundle_discount_value: isBundle ? bundleDiscountValue : 0,
+                // SEO fields
+                meta_title: metaTitle.trim() || undefined,
+                meta_description: metaDescription.trim() || undefined,
+                keywords: keywords.length > 0 ? keywords : undefined,
             }
 
             let result
@@ -205,9 +215,17 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                                 price: parseFloat(price) || 0
                                             })
                                             if (result.success) {
-                                                setDescription(result.data.description)
-                                                // Could also set meta fields if you have them
-                                                alert(`✨ Descripción mejorada!\n\nSugerencias SEO:\n• Título: ${result.data.meta_title}\n• Meta: ${result.data.meta_description}\n• Keywords: ${result.data.keywords.join(', ')}`)
+                                                // Solo actualizar descripción si la IA generó una nueva
+                                                // (cuando la descripción original era corta o inexistente)
+                                                if (result.data.description) {
+                                                    setDescription(result.data.description)
+                                                }
+                                                // Rellenar campos SEO automáticamente
+                                                setMetaTitle(result.data.meta_title)
+                                                setMetaDescription(result.data.meta_description)
+                                                setKeywords(result.data.keywords)
+                                                // Mostrar sección SEO para que el usuario vea los campos
+                                                setShowSeoSection(true)
                                             } else {
                                                 alert(`Error: ${result.error}`)
                                             }
@@ -470,6 +488,125 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         <div className="mt-6">
                             <VariantsEditor variants={variants} onChange={setVariants} />
                         </div>
+                    </div>
+
+                    {/* SEO Section - Collapsible */}
+                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                        <button
+                            type="button"
+                            onClick={() => setShowSeoSection(!showSeoSection)}
+                            className="w-full flex items-center justify-between"
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary">search</span>
+                                <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">SEO y Posicionamiento</h2>
+                                {(metaTitle || metaDescription || keywords.length > 0) && (
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                                        Configurado
+                                    </span>
+                                )}
+                            </div>
+                            <span className={`material-symbols-outlined text-text-light-secondary transition-transform ${showSeoSection ? 'rotate-180' : ''}`}>
+                                expand_more
+                            </span>
+                        </button>
+                        
+                        {showSeoSection && (
+                            <div className="mt-6 flex flex-col gap-6">
+                                <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                                    Optimiza cómo aparece tu producto en buscadores y redes sociales. Usa "Mejorar con IA" para generar automáticamente.
+                                </p>
+                                
+                                <div>
+                                    <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="meta-title">
+                                        Título SEO
+                                        <span className="ml-2 text-xs text-text-light-secondary">({metaTitle.length}/70)</span>
+                                    </label>
+                                    <input
+                                        className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                        id="meta-title"
+                                        placeholder="Título optimizado para buscadores (máx 70 caracteres)"
+                                        type="text"
+                                        maxLength={70}
+                                        value={metaTitle}
+                                        onChange={e => setMetaTitle(e.target.value)}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="meta-description">
+                                        Meta Descripción
+                                        <span className="ml-2 text-xs text-text-light-secondary">({metaDescription.length}/160)</span>
+                                    </label>
+                                    <textarea
+                                        className="form-textarea mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary resize-none"
+                                        id="meta-description"
+                                        placeholder="Descripción que aparecerá en resultados de búsqueda (máx 160 caracteres)"
+                                        rows={3}
+                                        maxLength={160}
+                                        value={metaDescription}
+                                        onChange={e => setMetaDescription(e.target.value)}
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                        Keywords
+                                    </label>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        {keywords.map((keyword, idx) => (
+                                            <span
+                                                key={idx}
+                                                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm"
+                                            >
+                                                {keyword}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setKeywords(keywords.filter((_, i) => i !== idx))}
+                                                    className="hover:text-red-500"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">close</span>
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <input
+                                        className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                        placeholder="Escribe y presiona Enter para agregar"
+                                        type="text"
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault()
+                                                const input = e.currentTarget
+                                                const value = input.value.trim()
+                                                if (value && !keywords.includes(value)) {
+                                                    setKeywords([...keywords, value])
+                                                    input.value = ''
+                                                }
+                                            }
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Preview */}
+                                {(metaTitle || metaDescription) && (
+                                    <div className="p-4 bg-background-light dark:bg-background-dark rounded-lg border border-border-light dark:border-border-dark">
+                                        <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mb-2">Vista previa en Google:</p>
+                                        <div className="space-y-1">
+                                            <p className="text-blue-600 dark:text-blue-400 text-lg font-medium truncate">
+                                                {metaTitle || name || 'Título del producto'}
+                                            </p>
+                                            <p className="text-green-700 dark:text-green-500 text-sm">
+                                                tutienda.com › producto
+                                            </p>
+                                            <p className="text-text-light-secondary dark:text-text-dark-secondary text-sm line-clamp-2">
+                                                {metaDescription || 'La meta descripción aparecerá aquí...'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

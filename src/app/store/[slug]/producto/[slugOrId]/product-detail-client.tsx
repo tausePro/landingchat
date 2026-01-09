@@ -177,7 +177,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         <div className="w-full relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-800">
                             <Image
                                 src={selectedImage}
-                                alt={product.name}
+                                alt={`${product.name}${product.brand ? ` - ${product.brand}` : ''} | ${organization.name}`}
                                 fill
                                 className="object-cover"
                                 priority
@@ -216,7 +216,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                         onClick={() => setSelectedImage(img)}
                                         className={`w-full relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${selectedImage === img ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
                                     >
-                                        <Image src={img} alt={`View ${idx}`} fill className="object-cover" />
+                                        <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
                                     </button>
                                 ))}
                             </div>

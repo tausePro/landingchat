@@ -1,7 +1,9 @@
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { getStoreData } from "./actions"
 import { MetaPixel } from "@/components/analytics/meta-pixel"
 import { TrackingProvider } from "@/components/analytics/tracking-provider"
+import { OrganizationJsonLd } from "@/components/seo/organization-json-ld"
 
 type Props = {
     params: Promise<{ slug: string }>
@@ -56,8 +58,24 @@ export default async function StoreLayout({
     const metaPixelId = trackingConfig.meta_pixel_id as string | undefined
     const posthogEnabled = Boolean(trackingConfig.posthog_enabled)
 
+    // Construir URL base de la tienda
+    const headersList = await headers()
+    const host = headersList.get("host") || ""
+    const protocol = host.includes("localhost") ? "http" : "https"
+    const storeUrl = organization?.custom_domain
+        ? `https://${organization.custom_domain}`
+        : `${protocol}://${host}`
+
     return (
         <>
+            {/* Schema.org Organization - SEO */}
+            {organization && (
+                <OrganizationJsonLd
+                    organization={organization}
+                    url={storeUrl}
+                />
+            )}
+            
             {/* Meta Pixel - Solo si está configurado */}
             {metaPixelId && <MetaPixel pixelId={metaPixelId} />}
             

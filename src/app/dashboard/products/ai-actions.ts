@@ -10,24 +10,48 @@ interface EnhanceDescriptionInput {
 }
 
 interface EnhanceDescriptionResult {
-    description: string
+    description: string | null
     meta_title: string
     meta_description: string
     keywords: string[]
 }
 
 /**
- * Mejora la descripción de un producto usando IA
- * @param input - Datos del producto para mejorar
- * @returns Descripción mejorada y metadatos SEO
+ * Genera metadatos SEO para un producto usando IA
+ * Si la descripción ya existe y es buena (>100 chars), solo genera SEO sin modificarla
+ * Si no hay descripción o es muy corta, genera una nueva
+ * @param input - Datos del producto
+ * @returns Metadatos SEO y opcionalmente descripción mejorada
  */
 export async function enhanceProductDescription(
     input: EnhanceDescriptionInput
 ): Promise<{ success: true; data: EnhanceDescriptionResult } | { success: false; error: string }> {
     try {
-        const prompt = `Eres un experto en copywriting para e-commerce en Latinoamérica.
+        const hasGoodDescription = input.description && input.description.length > 100
+        
+        const prompt = hasGoodDescription 
+            ? `Eres un experto en SEO para e-commerce en Latinoamérica.
 
-Tu tarea es mejorar la descripción de un producto para que sea MÁS ATRACTIVA, PERSUASIVA y OPTIMIZADA PARA SEO.
+PRODUCTO:
+- Nombre: ${input.name}
+- Descripción existente: ${input.description}
+- Categoría: ${input.category || "General"}
+- Precio: $${input.price.toLocaleString()} COP
+
+TAREA: Genera SOLO los metadatos SEO basándote en la descripción existente. NO modifiques la descripción.
+
+INSTRUCCIONES:
+1. Genera un meta_title SEO (máximo 60 caracteres) - debe ser atractivo para clics
+2. Genera una meta_description SEO (máximo 155 caracteres) - resumen persuasivo
+3. Sugiere 3-5 keywords relevantes en español basadas en el contenido
+
+RESPONDE ÚNICAMENTE con JSON válido (sin markdown, sin backticks):
+{
+  "meta_title": "título SEO aquí",
+  "meta_description": "meta descripción aquí", 
+  "keywords": ["keyword1", "keyword2", "keyword3"]
+}`
+            : `Eres un experto en copywriting para e-commerce en Latinoamérica.
 
 PRODUCTO:
 - Nombre: ${input.name}
@@ -35,8 +59,10 @@ PRODUCTO:
 - Categoría: ${input.category || "General"}
 - Precio: $${input.price.toLocaleString()} COP
 
+TAREA: Crea una descripción atractiva Y los metadatos SEO.
+
 INSTRUCCIONES:
-1. Crea una descripción CORTA (máximo 300 caracteres) que destaque beneficios, no solo características
+1. Crea una descripción persuasiva (200-400 caracteres) que destaque beneficios
 2. Usa un tono amigable y profesional
 3. Incluye un llamado a la acción sutil
 4. Genera un meta_title SEO (máximo 60 caracteres)
@@ -45,7 +71,7 @@ INSTRUCCIONES:
 
 RESPONDE ÚNICAMENTE con JSON válido (sin markdown, sin backticks):
 {
-  "description": "descripción mejorada aquí",
+  "description": "descripción aquí",
   "meta_title": "título SEO aquí",
   "meta_description": "meta descripción aquí", 
   "keywords": ["keyword1", "keyword2", "keyword3"]
@@ -83,10 +109,11 @@ RESPONDE ÚNICAMENTE con JSON válido (sin markdown, sin backticks):
         }
 
         // Validate and trim results
+        // Si había buena descripción, no la reemplazamos (description será null)
         return {
             success: true,
             data: {
-                description: result.description?.slice(0, 500) || "",
+                description: hasGoodDescription ? null : (result.description?.slice(0, 500) || null),
                 meta_title: result.meta_title?.slice(0, 70) || "",
                 meta_description: result.meta_description?.slice(0, 160) || "",
                 keywords: Array.isArray(result.keywords) ? result.keywords.slice(0, 5) : []
