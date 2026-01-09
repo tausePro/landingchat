@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation"
+import { Metadata } from "next"
 import { StoreLayoutClient } from "../../store-layout-client"
 import { getProductDetails } from "../../actions"
 import { ProductDetailClient } from "./product-detail-client"
+import { ProductJsonLd } from "@/components/seo/product-json-ld"
 import { headers } from "next/headers"
 import { isSubdomain } from "@/lib/utils/store-urls"
 
@@ -9,14 +11,54 @@ interface ProductDetailPageProps {
     params: Promise<{ slug: string; slugOrId: string }>
 }
 
+// Genera metadata dinámica para SEO
+export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
+    const { slug, slugOrId } = await params
+    const data = await getProductDetails(slug, slugOrId)
+
+    if (!data) {
+        return {
+            title: "Producto no encontrado",
+            description: "El producto que buscas no existe."
+        }
+    }
+
+    const { product, organization } = data
+    const title = product.meta_title || `${product.name} | ${organization.name}`
+    const description = product.meta_description || product.description || `Compra ${product.name} en ${organization.name}. Precio: $${product.price.toLocaleString('es-CO')} COP`
+    const images = product.images?.length ? product.images : product.image_url ? [product.image_url] : []
+
+    return {
+        title,
+        description,
+        keywords: product.keywords?.join(", ") || product.categories?.join(", "),
+        openGraph: {
+            title,
+            description,
+            images: images.map((img: string) => ({ url: img })),
+            type: "website",
+            siteName: organization.name,
+        },
+        twitter: {
+            card: "summary_large_image",
+            title,
+            description,
+            images,
+        },
+        robots: {
+            index: true,
+            follow: true,
+        }
+    }
+}
+
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
     const { slug, slugOrId } = await params
-    console.log('ProductDetailPage Server Debug:', { slug, slugOrId })
 
     const headersList = await headers()
     const host = headersList.get("host") || ""
+    const protocol = host.includes("localhost") ? "http" : "https"
     const initialIsSubdomain = isSubdomain(host)
-    console.log('ProductDetailPage Server Subdomain Debug:', { host, initialIsSubdomain })
 
     const data = await getProductDetails(slug, slugOrId)
 
@@ -24,24 +66,36 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     const { organization, product, badges, promotions, relatedProducts } = data
 
+    // Construir URL canónica del producto
+    const productUrl = organization.custom_domain
+        ? `https://${organization.custom_domain}/producto/${product.slug || product.id}`
+        : `${protocol}://${host}/producto/${product.slug || product.id}`
+
     return (
-        <StoreLayoutClient
-            slug={organization.slug}
-            organization={organization}
-            products={[]}
-            hideNavigation={false}
-            hideHeaderOnMobile={false}
-            initialIsSubdomain={initialIsSubdomain}
-        >
-            <ProductDetailClient
+        <>
+            <ProductJsonLd
                 product={product}
                 organization={organization}
-                badges={badges}
-                promotions={promotions}
-                relatedProducts={relatedProducts}
-                slug={organization.slug}
-                initialIsSubdomain={initialIsSubdomain}
+                url={productUrl}
             />
-        </StoreLayoutClient>
+            <StoreLayoutClient
+                slug={organization.slug}
+                organization={organization}
+                products={[]}
+                hideNavigation={false}
+                hideHeaderOnMobile={false}
+                initialIsSubdomain={initialIsSubdomain}
+            >
+                <ProductDetailClient
+                    product={product}
+                    organization={organization}
+                    badges={badges}
+                    promotions={promotions}
+                    relatedProducts={relatedProducts}
+                    slug={organization.slug}
+                    initialIsSubdomain={initialIsSubdomain}
+                />
+            </StoreLayoutClient>
+        </>
     )
 }
