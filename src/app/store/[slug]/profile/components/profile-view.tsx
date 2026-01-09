@@ -130,7 +130,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
             {/* Header - Consistente con el resto del sitio */}
             <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
                 <div className="container mx-auto flex h-16 items-center justify-between px-4">
-                    <Link href={`/store/${organization.slug}`} className="flex items-center gap-3 cursor-pointer">
+                    <Link href="/" className="flex items-center gap-3 cursor-pointer">
                         {organization.logo_url ? (
                             <img
                                 src={organization.logo_url}
@@ -148,13 +148,13 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         <span className="text-lg md:text-xl font-bold tracking-tight">{organization.name}</span>
                     </Link>
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-                        <Link href={`/store/${organization.slug}`} className="hover:text-primary transition-colors">Inicio</Link>
-                        <Link href={`/store/${organization.slug}/productos`} className="hover:text-primary transition-colors">Productos</Link>
+                        <Link href="/" className="hover:text-primary transition-colors">Inicio</Link>
+                        <Link href="/productos" className="hover:text-primary transition-colors">Productos</Link>
                         <span className="text-primary font-semibold">Mi Cuenta</span>
                     </nav>
                     <div className="flex items-center gap-4">
                         <Link 
-                            href={`/store/${organization.slug}`} 
+                            href="/" 
                             className="text-sm font-medium text-slate-500 hover:text-slate-700"
                         >
                             Volver a la Tienda
@@ -258,7 +258,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                 </p>
                                             </div>
                                             <Link
-                                                href={`/store/${organization.slug}/order/${order.id}`}
+                                                href={`/order/${order.id}`}
                                                 className="flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-900/5 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
                                             >
                                                 <span className="material-symbols-outlined text-lg">local_shipping</span>
@@ -325,7 +325,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                             </td>
                                                             <td className="whitespace-nowrap px-6 py-4 text-right">
                                                                 <Link
-                                                                    href={`/store/${organization.slug}/order/${order.id}`}
+                                                                    href={`/order/${order.id}`}
                                                                     className="text-primary hover:text-primary-dark font-medium text-sm"
                                                                 >
                                                                     Ver Detalles
@@ -369,7 +369,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                         Chatea con nuestro asistente para obtener ayuda con tus pedidos o encontrar productos.
                                     </p>
                                     <Link
-                                        href={`/chat/${organization.slug}`}
+                                        href="/chat"
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
                                     >
                                         <span className="material-symbols-outlined text-lg">chat</span>
@@ -450,7 +450,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chats Recientes</h3>
                                 {chats.length > 0 && (
-                                    <Link href={`/chat/${organization.slug}`} className="text-xs font-medium text-primary hover:underline">
+                                    <Link href="/chat" className="text-xs font-medium text-primary hover:underline">
                                         Ver todos
                                     </Link>
                                 )}
@@ -460,7 +460,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                     chats.slice(0, 3).map((chat) => (
                                         <Link
                                             key={chat.id}
-                                            href={`/chat/${organization.slug}`}
+                                            href="/chat"
                                             className="group flex cursor-pointer items-start gap-3 rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                                         >
                                             <div className="flex-shrink-0">
@@ -502,7 +502,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                             </div>
                             <div className="border-t border-slate-100 p-4 dark:border-slate-800">
                                 <Link
-                                    href={`/chat/${organization.slug}`}
+                                    href="/chat"
                                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                                 >
                                     <span className="material-symbols-outlined text-lg">chat</span>
@@ -516,19 +516,19 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                             <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white">¿Necesitas ayuda?</h3>
                             <ul className="space-y-3">
                                 <li>
-                                    <Link href={`/chat/${organization.slug}?context=devoluciones`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
+                                    <Link href="/chat?context=devoluciones" className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">undo</span>
                                         Política de devoluciones
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href={`/chat/${organization.slug}?context=envios`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
+                                    <Link href="/chat?context=envios" className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">local_shipping</span>
                                         Información de envíos
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href={`/chat/${organization.slug}?context=preguntas`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
+                                    <Link href="/chat?context=preguntas" className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">question_answer</span>
                                         Preguntas frecuentes
                                     </Link>
@@ -555,7 +555,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                     </a>
                 ) : (
                     <Link
-                        href={`/chat/${organization.slug}`}
+                        href="/chat"
                         className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300"
                         aria-label="Iniciar chat"
                     >

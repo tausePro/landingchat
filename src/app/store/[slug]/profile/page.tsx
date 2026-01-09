@@ -53,7 +53,7 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
                                 Ingresa tu número de WhatsApp para ver tu información y pedidos
                             </p>
                         </div>
-                        <form action={`/store/${slug}/profile`} method="get" className="space-y-4">
+                        <form action="" method="get" className="space-y-4">
                             <div>
                                 <label htmlFor="phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                     Número de WhatsApp
@@ -87,7 +87,7 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
                         </form>
                         <div className="mt-6 text-center">
                             <Link
-                                href={`/store/${slug}`}
+                                href="/"
                                 className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
                             >
                                 ← Volver a la tienda
@@ -126,20 +126,20 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
                         </p>
                         <div className="space-y-3">
                             <Link
-                                href={`/store/${slug}/profile`}
+                                href="/profile"
                                 className="inline-block w-full bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary-dark transition-colors font-medium"
                             >
                                 Intentar con otro número
                             </Link>
                             <Link
-                                href={`/chat/${slug}`}
+                                href="/chat"
                                 className="inline-flex items-center justify-center gap-2 w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-lg transition-colors font-medium"
                             >
                                 <span className="material-symbols-outlined text-lg">chat</span>
                                 Chatear para comprar
                             </Link>
                             <Link
-                                href={`/store/${slug}`}
+                                href="/"
                                 className="inline-block w-full text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 py-2"
                             >
                                 Volver a la Tienda
