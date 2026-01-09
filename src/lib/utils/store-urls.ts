@@ -41,7 +41,8 @@ export function getChatUrl(isSubdomain: boolean, storeSlug: string): string {
 }
 
 /**
- * Detecta si estamos en un subdominio (server-side)
+ * Detecta si estamos en un subdominio o dominio personalizado (server-side)
+ * Retorna true si las URLs deben ser relativas (sin /store/slug)
  */
 export function isSubdomain(hostname: string): boolean {
     if (!hostname) return false
@@ -56,6 +57,12 @@ export function isSubdomain(hostname: string): boolean {
     const parts = hostWithoutPort.split('.')
     if (parts.length === 2 && parts[1] === 'localhost') {
         return true // Es un subdominio local como qp.localhost
+    }
+
+    // Dominio personalizado: tez.com.co, mitienda.com, etc.
+    // Si NO es landingchat.co, es un dominio personalizado y debe usar URLs relativas
+    if (!hostWithoutPort.includes('landingchat.co')) {
+        return true // Dominio personalizado - usar URLs relativas
     }
 
     // En producción: tienda.landingchat.co (3 partes)
