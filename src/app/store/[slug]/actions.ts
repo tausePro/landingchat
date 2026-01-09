@@ -46,8 +46,36 @@ export async function getStoreData(slug: string, limit?: number) {
         console.error("Error fetching products:", productsError)
     }
 
+    // 4. Get WhatsApp phone from connected instance if not in settings
+    let whatsappPhone = org.settings?.whatsapp?.phone || org.settings?.contact?.phone
+    if (!whatsappPhone) {
+        const { data: whatsappInstance } = await supabase
+            .from("whatsapp_instances")
+            .select("phone_number")
+            .eq("organization_id", org.id)
+            .eq("instance_type", "corporate")
+            .eq("status", "connected")
+            .single()
+        
+        if (whatsappInstance?.phone_number) {
+            whatsappPhone = whatsappInstance.phone_number
+        }
+    }
+
+    // Enrich organization with whatsapp phone
+    const enrichedOrg = {
+        ...org,
+        settings: {
+            ...org.settings,
+            whatsapp: {
+                ...org.settings?.whatsapp,
+                phone: whatsappPhone
+            }
+        }
+    }
+
     return {
-        organization: org,
+        organization: enrichedOrg,
         products: products || []
     }
 }
