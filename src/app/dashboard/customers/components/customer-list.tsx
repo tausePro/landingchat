@@ -1,7 +1,6 @@
 "use client"
 
-import { Customer } from "../actions"
-import { Badge } from "@/components/ui/badge"
+import { Customer, deleteCustomer } from "../actions"
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -11,10 +10,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Checkbox } from "@/components/ui/checkbox"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { toast } from "sonner"
 
 interface CustomerListProps {
     customers: Customer[]
@@ -22,6 +22,35 @@ interface CustomerListProps {
 }
 
 export function CustomerList({ customers, isLoading }: CustomerListProps) {
+    const router = useRouter()
+    const [deletingId, setDeletingId] = useState<string | null>(null)
+
+    const handleWhatsApp = (phone: string | null) => {
+        if (!phone) return
+        const cleanPhone = phone.replace(/\D/g, '')
+        window.open(`https://wa.me/${cleanPhone}`, '_blank')
+    }
+
+    const handleEmail = (email: string | null) => {
+        if (!email) return
+        window.open(`mailto:${email}`, '_blank')
+    }
+
+    const handleDelete = async (customerId: string, customerName: string) => {
+        if (!confirm(`¿Estás seguro de eliminar a ${customerName}? Esta acción no se puede deshacer.`)) {
+            return
+        }
+        setDeletingId(customerId)
+        const result = await deleteCustomer(customerId)
+        if (result.success) {
+            toast.success('Cliente eliminado correctamente')
+            router.refresh()
+        } else {
+            toast.error(result.error || 'Error al eliminar cliente')
+        }
+        setDeletingId(null)
+    }
+
     if (isLoading) {
         return <div className="p-8 text-center">Cargando clientes...</div>
     }
@@ -45,114 +74,127 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
     }
 
     return (
-        <div className="rounded-md border">
-            <div className="relative w-full overflow-auto">
-                <table className="w-full caption-bottom text-sm">
-                    <thead className="[&_tr]:border-b">
-                        <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[50px]">
-                                <Checkbox />
-                            </th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Cliente</th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Contacto</th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Ubicación</th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Categoría</th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Canal</th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Compras</th>
-                            <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Última Actividad</th>
-                            <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acciones</th>
+        <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-hidden">
+            <div className="w-full overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                    <thead className="text-xs text-text-light-secondary dark:text-text-dark-secondary uppercase bg-background-light dark:bg-background-dark">
+                        <tr>
+                            <th className="px-6 py-3" scope="col">Cliente</th>
+                            <th className="px-6 py-3" scope="col">Contacto</th>
+                            <th className="px-6 py-3" scope="col">Ubicación</th>
+                            <th className="px-6 py-3" scope="col">Categoría</th>
+                            <th className="px-6 py-3" scope="col">Compras</th>
+                            <th className="px-6 py-3" scope="col">Última Actividad</th>
+                            <th className="px-6 py-3 text-right" scope="col">Acciones</th>
                         </tr>
                     </thead>
-                    <tbody className="[&_tr:last-child]:border-0">
+                    <tbody>
                         {customers.map((customer) => (
-                            <tr key={customer.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                                <td className="p-4 align-middle">
-                                    <Checkbox />
-                                </td>
-                                <td className="p-4 align-middle">
+                            <tr key={customer.id} className="border-b border-border-light dark:border-border-dark hover:bg-background-light/50 dark:hover:bg-background-dark/50">
+                                <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <Avatar>
-                                            <AvatarFallback>{customer.full_name?.substring(0, 2).toUpperCase() || "CL"}</AvatarFallback>
-                                        </Avatar>
+                                        <div className="bg-primary/20 rounded-full size-10 flex items-center justify-center shrink-0">
+                                            <span className="text-primary font-bold text-sm">
+                                                {customer.full_name?.substring(0, 2).toUpperCase() || "CL"}
+                                            </span>
+                                        </div>
                                         <div className="flex flex-col">
-                                            <span className="font-medium">{customer.full_name || "Cliente Sin Nombre"}</span>
-                                            <span className="text-xs text-muted-foreground">ID: {customer.id.substring(0, 8)}...</span>
+                                            <span className="font-medium text-text-light-primary dark:text-text-dark-primary">{customer.full_name || "Cliente Sin Nombre"}</span>
+                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">ID: {customer.id.substring(0, 8)}</span>
                                         </div>
                                     </div>
                                 </td>
-                                <td className="p-4 align-middle">
+                                <td className="px-6 py-4">
                                     <div className="flex flex-col gap-1">
                                         {customer.phone && (
-                                            <div className="flex items-center gap-1 text-xs cursor-pointer hover:underline" onClick={() => window.open(`https://wa.me/${customer.phone?.replace(/\D/g, '') || ''}`, '_blank')}>
-                                                <span className="material-symbols-outlined text-[14px] text-green-600">call</span>
+                                            <div 
+                                                className="flex items-center gap-1.5 text-xs cursor-pointer hover:underline text-green-600" 
+                                                onClick={() => handleWhatsApp(customer.phone)}
+                                            >
+                                                <span className="material-symbols-outlined text-[14px]">call</span>
                                                 {customer.phone}
                                             </div>
                                         )}
                                         {customer.email && (
-                                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <div 
+                                                className="flex items-center gap-1.5 text-xs text-text-light-secondary dark:text-text-dark-secondary cursor-pointer hover:underline"
+                                                onClick={() => handleEmail(customer.email)}
+                                            >
                                                 <span className="material-symbols-outlined text-[14px]">mail</span>
                                                 {customer.email}
                                             </div>
                                         )}
+                                        {!customer.phone && !customer.email && (
+                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">-</span>
+                                        )}
                                     </div>
                                 </td>
-                                <td className="p-4 align-middle">
+                                <td className="px-6 py-4">
                                     <div className="flex flex-col">
-                                        <span className="text-sm">{customer.address?.city || "Sin ciudad"}</span>
-                                        <span className="text-xs text-muted-foreground">{customer.address?.neighborhood || "-"}</span>
+                                        <span className="text-sm text-text-light-primary dark:text-text-dark-primary">{customer.address?.city || "-"}</span>
+                                        {customer.address?.neighborhood && (
+                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">{customer.address.neighborhood}</span>
+                                        )}
                                     </div>
                                 </td>
-                                <td className="p-4 align-middle">
+                                <td className="px-6 py-4">
                                     {customer.category ? (
-                                        <Badge variant="secondary" className={getCategoryColor(customer.category)}>
-                                            {customer.category}
-                                        </Badge>
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getCategoryColor(customer.category)}`}>
+                                            {getCategoryLabel(customer.category)}
+                                        </span>
                                     ) : (
-                                        <span className="text-muted-foreground text-xs">-</span>
+                                        <span className="text-text-light-secondary dark:text-text-dark-secondary text-xs">-</span>
                                     )}
                                 </td>
-                                <td className="p-4 align-middle">
-                                    {customer.acquisition_channel && (
-                                        <div className="flex items-center gap-1">
-                                            {getChannelIcon(customer.acquisition_channel)}
-                                            <span className="text-xs capitalize">{customer.acquisition_channel}</span>
-                                        </div>
-                                    )}
-                                </td>
-                                <td className="p-4 align-middle">
+                                <td className="px-6 py-4">
                                     <div className="flex flex-col">
-                                        <span className="font-medium">
+                                        <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">
                                             {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(customer.total_spent || 0)}
                                         </span>
-                                        <span className="text-xs text-muted-foreground">{customer.total_orders || 0} órdenes</span>
+                                        <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">{customer.total_orders || 0} órdenes</span>
                                     </div>
                                 </td>
-                                <td className="p-4 align-middle">
-                                    <span className="text-sm text-muted-foreground">
-                                        {customer.last_interaction_at
-                                            ? formatDistanceToNow(new Date(customer.last_interaction_at), { addSuffix: true, locale: es })
-                                            : formatDistanceToNow(new Date(customer.created_at), { addSuffix: true, locale: es })
-                                        }
-                                    </span>
+                                <td className="px-6 py-4 text-text-light-secondary dark:text-text-dark-secondary">
+                                    {customer.last_interaction_at
+                                        ? formatDistanceToNow(new Date(customer.last_interaction_at), { addSuffix: true, locale: es })
+                                        : formatDistanceToNow(new Date(customer.created_at), { addSuffix: true, locale: es })
+                                    }
                                 </td>
-                                <td className="p-4 align-middle text-right">
+                                <td className="px-6 py-4 text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={deletingId === customer.id}>
                                                 <span className="sr-only">Abrir menú</span>
-                                                <span className="material-symbols-outlined">more_vert</span>
+                                                <span className="material-symbols-outlined">{deletingId === customer.id ? 'hourglass_empty' : 'more_vert'}</span>
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                                             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(customer.id)}>
+                                                <span className="material-symbols-outlined text-[16px] mr-2">content_copy</span>
                                                 Copiar ID
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem>Ver perfil</DropdownMenuItem>
-                                            <DropdownMenuItem>Enviar mensaje</DropdownMenuItem>
-                                            <DropdownMenuItem>Editar detalles</DropdownMenuItem>
-                                            <DropdownMenuItem className="text-red-600">Eliminar</DropdownMenuItem>
+                                            {customer.phone && (
+                                                <DropdownMenuItem onClick={() => handleWhatsApp(customer.phone)}>
+                                                    <span className="material-symbols-outlined text-[16px] mr-2 text-green-600">chat</span>
+                                                    WhatsApp
+                                                </DropdownMenuItem>
+                                            )}
+                                            {customer.email && (
+                                                <DropdownMenuItem onClick={() => handleEmail(customer.email)}>
+                                                    <span className="material-symbols-outlined text-[16px] mr-2">mail</span>
+                                                    Enviar Email
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem 
+                                                className="text-red-600"
+                                                onClick={() => handleDelete(customer.id, customer.full_name || 'este cliente')}
+                                            >
+                                                <span className="material-symbols-outlined text-[16px] mr-2">delete</span>
+                                                Eliminar
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </td>
@@ -167,19 +209,24 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
 
 function getCategoryColor(category: string) {
     const cat = category?.toLowerCase() || ''
-    if (cat.includes('fieles 4') || cat === 'vip') return 'bg-green-800 text-green-100'
-    if (cat.includes('fieles 3')) return 'bg-green-600 text-green-100'
-    if (cat.includes('fieles 2')) return 'bg-blue-600 text-blue-100'
-    if (cat.includes('fieles 1')) return 'bg-slate-500 text-slate-100'
-    if (cat.includes('recuperar') || cat === 'riesgo') return 'bg-orange-500 text-white'
-    if (cat === 'nuevo') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100'
-    return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100'
+    if (cat.includes('vip') || cat.includes('fieles 4')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+    if (cat.includes('fieles 3')) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300'
+    if (cat.includes('fieles 2') || cat === 'recurrente') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+    if (cat.includes('fieles 1')) return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+    if (cat.includes('recuperar') || cat === 'riesgo' || cat === 'inactivo') return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
+    if (cat === 'nuevo') return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
+    return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
 }
 
-function getChannelIcon(channel: string) {
-    const ch = channel?.toLowerCase() || ''
-    if (ch.includes('whatsapp')) return <span className="text-green-500 text-xs font-bold">WA</span>
-    if (ch.includes('instagram')) return <span className="text-pink-500 text-xs font-bold">IG</span>
-    if (ch.includes('web')) return <span className="text-blue-500 text-xs font-bold">WEB</span>
-    return <span className="material-symbols-outlined text-[14px]">link</span>
+function getCategoryLabel(category: string) {
+    const cat = category?.toLowerCase() || ''
+    if (cat.includes('vip') || cat.includes('fieles 4')) return 'VIP'
+    if (cat.includes('fieles 3')) return 'Fieles 3'
+    if (cat.includes('fieles 2')) return 'Fieles 2'
+    if (cat.includes('fieles 1')) return 'Fieles 1'
+    if (cat === 'recurrente') return 'Recurrente'
+    if (cat.includes('recuperar') || cat === 'riesgo') return 'A Recuperar'
+    if (cat === 'inactivo') return 'Inactivo'
+    if (cat === 'nuevo') return 'Nuevo'
+    return category.charAt(0).toUpperCase() + category.slice(1)
 }

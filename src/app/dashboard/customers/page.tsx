@@ -50,10 +50,10 @@ export default async function CustomersPage({ searchParams }: CustomersPageProps
 
     return (
         <DashboardLayout>
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-6 p-8">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Clientes ({total})</h1>
-                    <p className="text-muted-foreground">
+                    <h1 className="text-text-light-primary dark:text-text-dark-primary text-3xl font-bold tracking-tight">Clientes ({total})</h1>
+                    <p className="text-text-light-secondary dark:text-text-dark-secondary text-base font-normal leading-normal mt-1">
                         Gestiona tu base de clientes, segmenta y realiza acciones de marketing.
                     </p>
                 </div>

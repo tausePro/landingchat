@@ -117,6 +117,7 @@ export default async function OrdersPage({
                             Gestiona y haz seguimiento de todos los pedidos de tu tienda.
                         </p>
                     </div>
+                    {/* Botones deshabilitados temporalmente
                     <div className="flex items-center gap-2">
                         <button className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-4 text-text-light-primary dark:text-text-dark-primary text-sm font-medium shadow-sm hover:bg-background-light dark:hover:bg-background-dark">
                             <span className="material-symbols-outlined text-lg">download</span>
@@ -127,6 +128,7 @@ export default async function OrdersPage({
                             <span className="truncate">Nuevo Pedido</span>
                         </button>
                     </div>
+                    */}
                 </div>
 
                 <div className="mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-hidden">
