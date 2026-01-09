@@ -102,6 +102,7 @@ export interface OrganizationSettings {
 export interface OrganizationTrackingConfig {
   meta_pixel_id?: string
   meta_access_token?: string
+  meta_ad_account_id?: string
   google_analytics_id?: string
   tiktok_pixel_id?: string
   posthog_enabled?: boolean

@@ -61,7 +61,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     const navItems = [
         { icon: "dashboard", label: "Dashboard", href: "/dashboard" },
-        { icon: "trending_up", label: "Ventas", href: "/dashboard/sales" },
+        { icon: "analytics", label: "Analytics", href: "/dashboard/analytics" },
         { icon: "chat", label: "Chats", href: "/dashboard/chats" },
         { icon: "inventory_2", label: "Productos", href: "/dashboard/products" },
         { icon: "receipt_long", label: "Pedidos", href: "/dashboard/orders" },

@@ -103,7 +103,7 @@ export async function sendPurchaseEvent(
         return { success: false, error: "Missing configuration" }
     }
 
-    const url = `https://graph.facebook.com/v18.0/${pixelId}/events`
+    const url = `https://graph.facebook.com/v22.0/${pixelId}/events`
 
     const payload = {
         data: [

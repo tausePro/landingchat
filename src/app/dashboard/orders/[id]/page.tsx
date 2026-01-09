@@ -6,6 +6,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { OrderStatusBadge } from "./order-status-badge"
 import { OrderActions } from "./order-actions"
+import { CustomerJourney } from "./customer-journey"
 
 export const dynamic = 'force-dynamic'
 
@@ -231,6 +232,13 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                 </div>
                             </div>
                         )}
+
+                        {/* Customer Journey */}
+                        <CustomerJourney 
+                            sourceChannel={order.source_channel}
+                            chatId={order.chat_id}
+                            utmData={order.utm_data}
+                        />
                     </div>
                 </div>
             </div>

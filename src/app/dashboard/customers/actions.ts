@@ -54,7 +54,7 @@ export async function getCustomers({
 
     let query = supabase
       .from("customers")
-      .select("*, orders(count)", { count: "exact" })
+      .select("*, orders(id, total, status)", { count: "exact" })
       .eq("organization_id", profile.organization_id)
 
     // Search
@@ -91,10 +91,24 @@ export async function getCustomers({
       return { success: false, error: `Failed to fetch customers: ${error.message}` }
     }
 
+    // Procesar datos para calcular total_spent y total_orders
+    const customersWithTotals = (data || []).map((customer: any) => {
+      const orders = customer.orders || []
+      const completedOrders = orders.filter((o: any) => 
+        o.status && !['cancelled', 'cancelado', 'refunded', 'reembolsado'].includes(o.status.toLowerCase())
+      )
+      return {
+        ...customer,
+        total_orders: completedOrders.length,
+        total_spent: completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0),
+        orders: undefined // Remover el array de orders del resultado
+      }
+    })
+
     return {
       success: true,
       data: {
-        customers: data as Customer[],
+        customers: customersWithTotals as Customer[],
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit)
       }

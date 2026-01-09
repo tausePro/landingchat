@@ -37,9 +37,11 @@ export default async function DashboardPage() {
     }
 
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat('es-CO', {
             style: 'currency',
-            currency: 'USD',
+            currency: 'COP',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
         }).format(amount)
     }
 
@@ -70,9 +72,9 @@ export default async function DashboardPage() {
                         <CardContent>
                             <div className="text-2xl font-bold">{formatCurrency(stats.revenue.total)}</div>
                             <div className="flex items-center text-xs mt-1">
-                                <span className="text-green-500 font-medium flex items-center">
-                                    <span className="material-symbols-outlined text-[16px] mr-1">trending_up</span>
-                                    +{stats.revenue.growth}%
+                                <span className={`${stats.revenue.growth >= 0 ? 'text-green-500' : 'text-red-500'} font-medium flex items-center`}>
+                                    <span className="material-symbols-outlined text-[16px] mr-1">{stats.revenue.growth >= 0 ? 'trending_up' : 'trending_down'}</span>
+                                    {stats.revenue.growth >= 0 ? '+' : ''}{stats.revenue.growth}%
                                 </span>
                                 <span className="text-text-light-secondary dark:text-text-dark-secondary ml-2">
                                     vs mes anterior
@@ -97,9 +99,9 @@ export default async function DashboardPage() {
                         <CardContent>
                             <div className="text-2xl font-bold">{stats.chats.conversionRate}%</div>
                             <div className="flex items-center text-xs mt-1">
-                                <span className="text-red-500 font-medium flex items-center">
-                                    <span className="material-symbols-outlined text-[16px] mr-1">trending_down</span>
-                                    {stats.chats.growth}%
+                                <span className={`${stats.chats.growth >= 0 ? 'text-green-500' : 'text-red-500'} font-medium flex items-center`}>
+                                    <span className="material-symbols-outlined text-[16px] mr-1">{stats.chats.growth >= 0 ? 'trending_up' : 'trending_down'}</span>
+                                    {stats.chats.growth >= 0 ? '+' : ''}{stats.chats.growth}%
                                 </span>
                                 <span className="text-text-light-secondary dark:text-text-dark-secondary ml-2">
                                     vs semana anterior

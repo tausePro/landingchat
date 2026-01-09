@@ -50,10 +50,12 @@ export default async function ProductsPage() {
                                     defaultValue={search}
                                 />
                             </label>
+                            {/* Filtro deshabilitado temporalmente
                             <button className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-4 text-text-light-secondary dark:text-text-dark-secondary text-sm font-medium hover:bg-background-light dark:hover:bg-background-dark">
                                 <span className="material-symbols-outlined text-lg">filter_list</span>
                                 <span className="truncate">Filtrar</span>
                             </button>
+                            */}
                         </div>
                     </div>
                     <div className="w-full overflow-x-auto">

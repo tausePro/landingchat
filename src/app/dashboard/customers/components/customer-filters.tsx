@@ -152,10 +152,12 @@ export function CustomerFilters() {
                         <span className="material-symbols-outlined mr-2">upload</span>
                         {isImporting ? "Importando..." : "Importar"}
                     </Button>
+                    {/* Exportar deshabilitado temporalmente
                     <Button variant="outline">
                         <span className="material-symbols-outlined mr-2">download</span>
                         Exportar
                     </Button>
+                    */}
                     <Button onClick={() => setShowNewCustomerModal(true)}>
                         <span className="material-symbols-outlined mr-2">add</span>
                         Nuevo Cliente
