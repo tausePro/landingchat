@@ -131,11 +131,14 @@ export async function getOrderDetails(slug: string, orderId: string) {
     // 1. Fetch Organization
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, phone")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email")
         .eq("slug", slug)
         .single()
 
-    if (orgError || !org) return null
+    if (orgError || !org) {
+        console.error("[getOrderDetails] Organization error:", orgError)
+        return null
+    }
 
     // 2. Fetch Order
     const { data: order, error: orderError } = await supabase
@@ -145,7 +148,10 @@ export async function getOrderDetails(slug: string, orderId: string) {
         .eq("organization_id", org.id)
         .single()
 
-    if (orderError || !order) return null
+    if (orderError || !order) {
+        console.error("[getOrderDetails] Order error:", orderError)
+        return null
+    }
 
     // 3. (Optional) Fetch Items details if needed, but they are stored in JSONB 'items' column usually.
     // The current schema stores items in the JSONB column, so we might not need a join.

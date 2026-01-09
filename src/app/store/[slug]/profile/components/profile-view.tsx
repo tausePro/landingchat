@@ -7,13 +7,18 @@ import { formatCurrency } from "@/lib/utils"
 interface Customer {
     id: string
     full_name: string
-    email: string
+    email?: string
     phone?: string
     document_type?: string
     document_number?: string
     person_type?: string
     business_name?: string
     created_at: string
+    address?: {
+        city?: string
+        neighborhood?: string
+        address?: string
+    }
 }
 
 interface Order {
@@ -30,15 +35,31 @@ interface Organization {
     id: string
     name: string
     slug: string
+    phone?: string
+    logo_url?: string
+    settings?: {
+        branding?: {
+            primaryColor?: string
+        }
+    }
+}
+
+interface Chat {
+    id: string
+    status: string
+    created_at: string
+    updated_at?: string
+    last_message?: string
 }
 
 interface ProfileViewProps {
     customer: Customer
     orders: Order[]
     organization: Organization
+    chats?: Chat[]
 }
 
-export function ProfileView({ customer, orders, organization }: ProfileViewProps) {
+export function ProfileView({ customer, orders, organization, chats = [] }: ProfileViewProps) {
     const [activeTab, setActiveTab] = useState<'orders' | 'conversations' | 'tracking'>('orders')
     const [searchTerm, setSearchTerm] = useState('')
 
@@ -106,35 +127,38 @@ export function ProfileView({ customer, orders, organization }: ProfileViewProps
 
     return (
         <div className="bg-background-light dark:bg-background-dark font-display text-slate-800 dark:text-slate-200 min-h-screen flex flex-col">
-            {/* Header */}
-            <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
-                <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center gap-2">
-                        <Link href={`/store/${organization.slug}`} className="flex items-center gap-2">
-                            <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-white">
-                                <span className="material-symbols-outlined">chat_bubble</span>
+            {/* Header - Consistente con el resto del sitio */}
+            <header className="sticky top-0 z-50 w-full border-b bg-white/80 backdrop-blur-md">
+                <div className="container mx-auto flex h-16 items-center justify-between px-4">
+                    <Link href={`/store/${organization.slug}`} className="flex items-center gap-3 cursor-pointer">
+                        {organization.logo_url ? (
+                            <img
+                                src={organization.logo_url}
+                                alt={organization.name}
+                                className="h-10 w-auto object-contain max-w-[120px] md:max-w-[150px]"
+                            />
+                        ) : (
+                            <div 
+                                className="flex h-10 w-10 items-center justify-center rounded-lg text-white font-bold text-lg" 
+                                style={{ backgroundColor: organization.settings?.branding?.primaryColor || '#3B82F6' }}
+                            >
+                                {organization.name.substring(0, 1)}
                             </div>
-                            <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                                {organization.name} <span className="text-slate-400 font-normal text-sm">| Store</span>
-                            </span>
-                        </Link>
-                    </div>
-                    <nav className="hidden md:flex items-center gap-8">
-                        <span className="text-sm font-semibold text-primary">Mi Cuenta</span>
-                        <Link href={`/store/${organization.slug}/profile?email=${customer.email}#orders`} className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-                            Pedidos
-                        </Link>
-                        <Link href={`/store/${organization.slug}`} className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-                            Ayuda
-                        </Link>
+                        )}
+                        <span className="text-lg md:text-xl font-bold tracking-tight">{organization.name}</span>
+                    </Link>
+                    <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+                        <Link href={`/store/${organization.slug}`} className="hover:text-primary transition-colors">Inicio</Link>
+                        <Link href={`/store/${organization.slug}/productos`} className="hover:text-primary transition-colors">Productos</Link>
+                        <span className="text-primary font-semibold">Mi Cuenta</span>
                     </nav>
                     <div className="flex items-center gap-4">
-                        <Link href={`/store/${organization.slug}`} className="hidden md:flex text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+                        <Link 
+                            href={`/store/${organization.slug}`} 
+                            className="text-sm font-medium text-slate-500 hover:text-slate-700"
+                        >
                             Volver a la Tienda
                         </Link>
-                        <div className="md:hidden">
-                            <span className="material-symbols-outlined icon-light">menu</span>
-                        </div>
                     </div>
                 </div>
             </header>
@@ -163,15 +187,17 @@ export function ProfileView({ customer, orders, organization }: ProfileViewProps
                                     </p>
                                     <div className="mt-3 flex items-center gap-3 flex-wrap">
                                         {customer.phone && (
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-300">
                                                 <span className="material-symbols-outlined text-sm">smartphone</span>
                                                 {customer.phone}
                                             </span>
                                         )}
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                            <span className="material-symbols-outlined text-sm">mail</span>
-                                            {customer.email}
-                                        </span>
+                                        {customer.email && (
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                <span className="material-symbols-outlined text-sm">mail</span>
+                                                {customer.email}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -343,7 +369,7 @@ export function ProfileView({ customer, orders, organization }: ProfileViewProps
                                         Chatea con nuestro asistente para obtener ayuda con tus pedidos o encontrar productos.
                                     </p>
                                     <Link
-                                        href={`/store/${organization.slug}/chat`}
+                                        href={`/chat/${organization.slug}`}
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
                                     >
                                         <span className="material-symbols-outlined text-lg">chat</span>
@@ -419,30 +445,69 @@ export function ProfileView({ customer, orders, organization }: ProfileViewProps
 
                     {/* Sidebar */}
                     <div className="lg:col-span-4 flex flex-col gap-6">
-                        {/* Chat Section */}
+                        {/* Chats Recientes */}
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Asistente Virtual</h3>
-                            </div>
-                            <div className="p-6">
-                                <div className="text-center">
-                                    <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary mx-auto mb-4">
-                                        <span className="material-symbols-outlined text-2xl">smart_toy</span>
-                                    </div>
-                                    <h4 className="text-base font-semibold text-slate-900 dark:text-white mb-2">
-                                        ¿Necesitas ayuda?
-                                    </h4>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                        Nuestro asistente está disponible 24/7 para ayudarte con tus pedidos y preguntas.
-                                    </p>
-                                    <Link
-                                        href={`/store/${organization.slug}/chat`}
-                                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
-                                    >
-                                        <span className="material-symbols-outlined text-lg">chat</span>
-                                        Iniciar Chat
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chats Recientes</h3>
+                                {chats.length > 0 && (
+                                    <Link href={`/chat/${organization.slug}`} className="text-xs font-medium text-primary hover:underline">
+                                        Ver todos
                                     </Link>
-                                </div>
+                                )}
+                            </div>
+                            <div className="p-4 flex flex-col gap-3">
+                                {chats.length > 0 ? (
+                                    chats.slice(0, 3).map((chat) => (
+                                        <Link
+                                            key={chat.id}
+                                            href={`/chat/${organization.slug}`}
+                                            className="group flex cursor-pointer items-start gap-3 rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                                        >
+                                            <div className="flex-shrink-0">
+                                                <div className={`flex size-10 items-center justify-center rounded-full ${
+                                                    chat.status === 'active' 
+                                                        ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+                                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                                }`}>
+                                                    <span className="material-symbols-outlined text-xl">
+                                                        {chat.status === 'active' ? 'support_agent' : 'smart_toy'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                                        {chat.status === 'active' ? 'Conversación Activa' : 'Bot Asistente'}
+                                                    </p>
+                                                    <span className="text-xs text-slate-400">
+                                                        {formatDate(chat.updated_at || chat.created_at)}
+                                                    </span>
+                                                </div>
+                                                <p className="truncate text-sm text-slate-500 dark:text-slate-400">
+                                                    {chat.status === 'active' ? 'Haz clic para continuar...' : '¿En qué más puedo ayudarte?'}
+                                                </p>
+                                            </div>
+                                        </Link>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-4">
+                                        <div className="flex size-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 mx-auto mb-3">
+                                            <span className="material-symbols-outlined">chat_bubble</span>
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            Aún no tienes conversaciones
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+                                <Link
+                                    href={`/chat/${organization.slug}`}
+                                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                >
+                                    <span className="material-symbols-outlined text-lg">chat</span>
+                                    {chats.length > 0 ? 'Continuar Chat' : 'Iniciar Chat'}
+                                </Link>
                             </div>
                         </div>
 
@@ -451,19 +516,19 @@ export function ProfileView({ customer, orders, organization }: ProfileViewProps
                             <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white">¿Necesitas ayuda?</h3>
                             <ul className="space-y-3">
                                 <li>
-                                    <Link href={`/store/${organization.slug}/chat`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
+                                    <Link href={`/chat/${organization.slug}?context=devoluciones`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">undo</span>
                                         Política de devoluciones
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href={`/store/${organization.slug}/chat`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
+                                    <Link href={`/chat/${organization.slug}?context=envios`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">local_shipping</span>
                                         Información de envíos
                                     </Link>
                                 </li>
                                 <li>
-                                    <Link href={`/store/${organization.slug}/chat`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
+                                    <Link href={`/chat/${organization.slug}?context=preguntas`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">question_answer</span>
                                         Preguntas frecuentes
                                     </Link>
@@ -474,14 +539,29 @@ export function ProfileView({ customer, orders, organization }: ProfileViewProps
                 </div>
             </main>
 
-            {/* Floating Chat Button */}
+            {/* Floating WhatsApp/Chat Button */}
             <div className="fixed bottom-6 right-6 z-50">
-                <Link
-                    href={`/store/${organization.slug}/chat`}
-                    className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:shadow-blue-900/50"
-                >
-                    <span className="material-symbols-outlined text-3xl">forum</span>
-                </Link>
+                {organization.phone ? (
+                    <a
+                        href={`https://wa.me/${organization.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, tengo una consulta sobre mi pedido`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-green-300"
+                        aria-label="Contactar por WhatsApp"
+                    >
+                        <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                    </a>
+                ) : (
+                    <Link
+                        href={`/chat/${organization.slug}`}
+                        className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                        aria-label="Iniciar chat"
+                    >
+                        <span className="material-symbols-outlined text-3xl">chat</span>
+                    </Link>
+                )}
             </div>
         </div>
     )
