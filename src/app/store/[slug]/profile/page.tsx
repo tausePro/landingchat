@@ -10,7 +10,11 @@ interface ProfilePageProps {
 
 export default async function ProfilePage({ params, searchParams }: ProfilePageProps) {
     const { slug } = await params
-    const { phone } = await searchParams
+    const resolvedSearchParams = await searchParams
+    const phone = resolvedSearchParams?.phone
+    
+    console.log("[Profile] Params:", { slug, phone, searchParams: resolvedSearchParams })
+    
     const supabase = createServiceClient()
 
     // Get organization
