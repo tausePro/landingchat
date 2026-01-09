@@ -69,8 +69,9 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
     const currentStatus = getStatusConfig(order.status)
     const primaryColor = organization.settings?.branding?.primaryColor || "#3b82f6"
 
-    // Construct WhatsApp link for support
-    const whatsappNumber = organization.phone?.replace(/\D/g, '')
+    // Construct WhatsApp link for support (get phone from settings)
+    const orgPhone = organization.settings?.whatsapp?.phone || organization.settings?.contact?.phone
+    const whatsappNumber = orgPhone?.replace(/\D/g, '')
     const whatsappMessage = `Hola, tengo una consulta sobre mi pedido #${order.order_number}`
     const whatsappLink = whatsappNumber
         ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
