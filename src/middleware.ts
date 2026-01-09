@@ -296,12 +296,21 @@ export async function middleware(request: NextRequest) {
 
     // Productos por ID corto: tienda.landingchat.co/p/123 → /store/tienda/p/123
     if (pathname.startsWith('/p/')) {
-        return NextResponse.rewrite(new URL(`/store/${slug}${pathname}`, request.url))
+        const url = new URL(`/store/${slug}${pathname}`, request.url)
+        request.nextUrl.searchParams.forEach((value, key) => {
+            if (key !== 'store') url.searchParams.set(key, value)
+        })
+        return NextResponse.rewrite(url)
     }
 
     // Cualquier otra ruta bajo el subdominio
     // Ejemplo: tienda.landingchat.co/productos → /store/tienda/productos
-    return NextResponse.rewrite(new URL(`/store/${slug}${pathname}`, request.url))
+    // Ejemplo: tez.com.co/profile?phone=123 → /store/tez/profile?phone=123
+    const url = new URL(`/store/${slug}${pathname}`, request.url)
+    request.nextUrl.searchParams.forEach((value, key) => {
+        if (key !== 'store') url.searchParams.set(key, value)
+    })
+    return NextResponse.rewrite(url)
 }
 
 // ============================================
