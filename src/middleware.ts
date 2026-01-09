@@ -159,9 +159,10 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
     }
 
-    // Limpiar URLs redundantes en subdominios (no aplica para dominios personalizados)
+    // Limpiar URLs redundantes en subdominios Y dominios personalizados
     // Ejemplo: qp.landingchat.co/store/qp/producto/123 → qp.landingchat.co/producto/123
-    if (isProductionDomain && !isCustomDomain && pathname.startsWith(`/store/${slug}/`)) {
+    // Ejemplo: tez.com.co/store/tez/profile → tez.com.co/profile
+    if (isProductionDomain && pathname.startsWith(`/store/${slug}/`)) {
         const cleanPath = pathname.replace(`/store/${slug}`, '')
         return NextResponse.redirect(new URL(cleanPath, request.url))
     }
