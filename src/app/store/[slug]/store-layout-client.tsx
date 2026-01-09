@@ -14,6 +14,7 @@ import { CartDrawer } from "@/app/chat/components/cart-drawer"
 import { ensurePosthog } from "@/lib/analytics/posthog-client"
 import { CheckoutModal } from "@/app/chat/components/checkout-modal"
 import { useCartStore } from "@/store/cart-store"
+import { useTrackingParams } from "@/hooks/use-tracking-params"
 
 
 interface StoreLayoutClientProps {
@@ -37,6 +38,9 @@ export function StoreLayoutClient({ slug, organization, products, children, hide
     const [pendingContext, setPendingContext] = useState<string | null>(null)
     const [shippingConfig, setShippingConfig] = useState<any>(null)
     const { setIsOpen: setCartOpen } = useCartStore()
+    
+    // Capturar UTM params al entrar a la tienda
+    useTrackingParams(slug)
 
     // Branding settings
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"

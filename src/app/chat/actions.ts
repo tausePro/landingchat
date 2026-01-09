@@ -32,6 +32,17 @@ interface CreateOrderParams {
     shippingCost: number
     total: number
     paymentMethod: string
+    // Tracking fields
+    sourceChannel?: "web" | "chat" | "whatsapp"
+    chatId?: string
+    utmData?: {
+        utm_source?: string
+        utm_medium?: string
+        utm_campaign?: string
+        utm_content?: string
+        utm_term?: string
+        referrer?: string
+    }
 }
 
 /**
@@ -226,6 +237,10 @@ export async function createOrder(params: CreateOrderParams) {
                 status: 'pending',
                 payment_status: 'pending',
                 payment_method: params.paymentMethod,
+                // Tracking fields
+                source_channel: params.sourceChannel || 'web',
+                chat_id: params.chatId || null,
+                utm_data: params.utmData || {},
             })
             .select()
             .single()

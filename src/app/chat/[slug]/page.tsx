@@ -837,6 +837,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 isOpen={isCheckoutOpen}
                 onClose={() => setIsCheckoutOpen(false)}
                 slug={slug}
+                sourceChannel="chat"
+                chatId={chatId || undefined}
             />
         </ChatLayout>
     )

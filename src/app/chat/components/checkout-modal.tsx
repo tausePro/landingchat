@@ -10,6 +10,7 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { createOrder } from "../actions"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getTrackingParams } from "@/hooks/use-tracking-params"
 
 import { COLOMBIA_DEPARTMENTS } from "@/lib/constants/colombia-departments"
 
@@ -17,6 +18,8 @@ interface CheckoutModalProps {
     isOpen: boolean
     onClose: () => void
     slug: string
+    sourceChannel?: "web" | "chat" | "whatsapp"
+    chatId?: string
 }
 
 
@@ -24,7 +27,7 @@ import { getAvailablePaymentGateways, getShippingConfig } from "../actions"
 import { calculateShippingCost } from "@/lib/utils/shipping"
 import { useEffect } from "react"
 
-export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
     const { items, total, clearCart } = useCartStore()
     const { trackInitiateCheckout } = useTracking()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
@@ -125,6 +128,9 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
     const handlePlaceOrder = async () => {
         setLoading(true)
         try {
+            // Obtener tracking params (UTM, referrer, etc.)
+            const trackingParams = getTrackingParams(slug)
+            
             const result = await createOrder({
                 slug,
                 customerInfo: formData,
@@ -132,7 +138,18 @@ export function CheckoutModal({ isOpen, onClose, slug }: CheckoutModalProps) {
                 subtotal,
                 shippingCost,
                 total: finalTotal,
-                paymentMethod
+                paymentMethod,
+                // Tracking fields
+                sourceChannel: sourceChannel || trackingParams.source_channel,
+                chatId: chatId,
+                utmData: {
+                    utm_source: trackingParams.utm_source,
+                    utm_medium: trackingParams.utm_medium,
+                    utm_campaign: trackingParams.utm_campaign,
+                    utm_content: trackingParams.utm_content,
+                    utm_term: trackingParams.utm_term,
+                    referrer: trackingParams.referrer,
+                }
             })
 
             if (result.success) {

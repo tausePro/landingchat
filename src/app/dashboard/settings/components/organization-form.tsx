@@ -32,6 +32,7 @@ interface OrganizationFormProps {
 const fallbackTrackingConfig: OrganizationTrackingConfig = {
     meta_pixel_id: "",
     meta_access_token: "",
+    meta_ad_account_id: "",
     google_analytics_id: "",
     tiktok_pixel_id: "",
     posthog_enabled: false,
@@ -316,6 +317,18 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                             />
                                             <p className="text-xs text-muted-foreground">
                                                 Token para tracking server-side de compras. Obtener en Meta Business Suite → Events Manager.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="metaAdAccountId">Meta Ad Account ID</Label>
+                                            <Input
+                                                id="metaAdAccountId"
+                                                value={formData.tracking_config.meta_ad_account_id || ""}
+                                                onChange={(e) => updateTrackingConfig("meta_ad_account_id", e.target.value)}
+                                                placeholder="act_123456789"
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                ID de cuenta publicitaria para ver métricas de campañas. Formato: act_XXXXXXXXX
                                             </p>
                                         </div>
                                         <div className="space-y-2">

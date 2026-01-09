@@ -32,6 +32,17 @@ export interface OrderDetail {
     }>
     shipping_address: any
     billing_address: any
+    // Tracking fields
+    source_channel?: string
+    chat_id?: string
+    utm_data?: {
+        utm_source?: string
+        utm_medium?: string
+        utm_campaign?: string
+        utm_content?: string
+        utm_term?: string
+        referrer?: string
+    }
 }
 
 export async function getOrderDetail(orderId: string): Promise<OrderDetail | null> {
@@ -122,7 +133,11 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             postal_code: '',
             country: 'Colombia'
         } : null),
-        billing_address: null
+        billing_address: null,
+        // Tracking fields
+        source_channel: order.source_channel || 'web',
+        chat_id: order.chat_id || undefined,
+        utm_data: order.utm_data || undefined,
     }
     } catch (error) {
         console.error("[getOrderDetail] Unexpected error:", error)
