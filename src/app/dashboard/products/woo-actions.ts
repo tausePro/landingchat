@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 
@@ -14,7 +14,26 @@ const importSchema = z.object({
 interface ImportResult {
     success: boolean
     imported: number
+    skipped: number
+    total: number
     errors: string[]
+}
+
+interface WooProduct {
+    id: number
+    name: string
+    slug?: string
+    sku?: string
+    status: string
+    description?: string
+    short_description?: string
+    price?: string
+    regular_price?: string
+    sale_price?: string
+    stock_quantity?: number | null
+    images?: Array<{ src: string }>
+    categories?: Array<{ name: string }>
+    attributes?: Array<{ name: string; options: string[] }>
 }
 
 export async function importWooCommerceProducts(formData: FormData): Promise<ImportResult> {
@@ -27,18 +46,15 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
     // 1. Validate Input
     const validated = importSchema.safeParse(rawData)
     if (!validated.success) {
-        return { success: false, imported: 0, errors: [validated.error.issues[0]?.message || "Datos inválidos"] }
+        return { success: false, imported: 0, skipped: 0, total: 0, errors: [validated.error.issues[0]?.message || "Datos inválidos"] }
     }
 
     const { url, consumerKey, consumerSecret } = validated.data
-
-    console.log("🚀 Starting Import with:", { url, keyPattern: consumerKey.substring(0, 5) + "..." })
 
     // 2. Auth Check
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-        console.error("❌ Unauthorized user")
         throw new Error("Unauthorized")
     }
 
@@ -50,148 +66,184 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
         .single()
 
     if (!profile?.organization_id) {
-        console.error("❌ No organization found for user", user.id)
         throw new Error("No organization found")
     }
     const organizationId = profile.organization_id
-    console.log("✅ Organization found:", organizationId)
 
-    // 3. Connect to WooCommerce using native Fetch (Basic Auth)
-    // The SDK was causing conflicts with Supabase Auth fetch
-    // Basic Auth over HTTPS is supported by WooCommerce
+    // 3. Fetch ALL products with pagination
+    const baseUrl = url.endsWith('/') ? url : `${url}/`
+    const credentials = btoa(`${consumerKey}:${consumerSecret}`)
 
-    let importedCount = 0
+    let allProducts: WooProduct[] = []
+    let page = 1
+    let hasMore = true
     const errors: string[] = []
 
     try {
-        console.log("⏳ Fetching products from WooCommerce via native fetch...")
+        // Fetch all pages of products
+        while (hasMore) {
+            const response = await fetch(
+                `${baseUrl}wp-json/wc/v3/products?per_page=100&page=${page}&status=publish`,
+                {
+                    headers: {
+                        'Authorization': `Basic ${credentials}`,
+                        'Content-Type': 'application/json'
+                    },
+                    cache: 'no-store'
+                }
+            )
 
-        // Construct URL
-        const baseUrl = url.endsWith('/') ? url : `${url}/`
-        // Also try Basic Auth header as backup/primary if query params fail, 
-        // but query params are often easier for quick implementation if HTTPS.
-        // Let's stick to query params first as per WC docs over HTTPS it's simplest, 
-        // OR better: Authorization header "Basic " + btoa(ck:cs)
+            if (!response.ok) {
+                const text = await response.text()
+                return {
+                    success: false,
+                    imported: 0,
+                    skipped: 0,
+                    total: 0,
+                    errors: [`Error ${response.status}: ${response.statusText}. ${text.substring(0, 100)}`]
+                }
+            }
 
-        const credentials = btoa(`${consumerKey}:${consumerSecret}`)
+            const wcProducts = await response.json()
 
-        const response = await fetch(`${baseUrl}wp-json/wc/v3/products?per_page=100&status=publish`, {
-            headers: {
-                'Authorization': `Basic ${credentials}`,
-                'Content-Type': 'application/json'
-            },
-            cache: 'no-store'
-        })
+            if (!Array.isArray(wcProducts)) {
+                return { success: false, imported: 0, skipped: 0, total: 0, errors: ["Formato de respuesta inválido de WooCommerce"] }
+            }
 
-        console.log(`📡 Response Status: ${response.status} ${response.statusText}`)
+            allProducts = [...allProducts, ...wcProducts]
 
-        if (!response.ok) {
-            const text = await response.text()
-            console.error("❌ WooCommerce Error Response:", text)
-            return { success: false, imported: 0, errors: [`Error ${response.status}: ${response.statusText}`] }
+            // Check if there are more pages
+            hasMore = wcProducts.length === 100
+            page++
+
+            // Safety limit: max 10 pages (1000 products)
+            if (page > 10) {
+                errors.push("Se alcanzó el límite de 1000 productos. Algunos productos no fueron importados.")
+                break
+            }
         }
 
-        const wcProducts = await response.json()
-        console.log(`📦 Body parsed, type: ${Array.isArray(wcProducts) ? 'Array' : typeof wcProducts}`)
-        console.log(`🔢 Products found: ${wcProducts?.length}`)
-
-        if (!Array.isArray(wcProducts)) {
-            console.error("❌ Invalid response format (not array):", wcProducts)
-            return { success: false, imported: 0, errors: ["Formato de respuesta inválido de WooCommerce"] }
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+        return {
+            success: false,
+            imported: 0,
+            skipped: 0,
+            total: 0,
+            errors: [`Error de conexión: ${errorMessage}`]
         }
+    }
 
-        for (const p of wcProducts) {
-            console.log(`Processing ${p.name} (SKU: ${p.sku})`)
-            try {
-                // Check if product already exists
-                const { data: existing } = await supabase
+    // 4. Process products
+    let importedCount = 0
+    let skippedCount = 0
+
+    for (const p of allProducts) {
+        try {
+            // Check if product already exists by NAME or SKU
+            let existing = null
+
+            // First check by SKU if available
+            if (p.sku) {
+                const { data } = await supabase
+                    .from("products")
+                    .select("id")
+                    .eq("organization_id", organizationId)
+                    .eq("sku", p.sku)
+                    .maybeSingle()
+                existing = data
+            }
+
+            // If not found by SKU, check by name
+            if (!existing) {
+                const { data } = await supabase
                     .from("products")
                     .select("id")
                     .eq("organization_id", organizationId)
                     .eq("name", p.name)
-                    .single()
-
-                if (existing) {
-                    console.log(`⏩ Skipping existing product: ${p.name}`)
-                    continue
-                }
-
-                // Generate Slug
-                const slugBase = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-                const slug = p.slug || `${slugBase}-${Math.random().toString(36).substring(7)}`
-
-                // Map Images & Upload
-                const imagePromises = (p.images || []).map(async (img: any, index: number) => {
-                    try {
-                        return await uploadImageToSupabase(img.src, organizationId, slug)
-                    } catch (e) {
-                        console.error(`Failed to upload image ${index} for ${p.name}:`, e)
-                        return img.src
-                    }
-                })
-
-                const processedImages = await Promise.all(imagePromises)
-                const validImages = processedImages.filter(Boolean) as string[]
-
-                // Map Variants
-                const variants = p.attributes?.map((attr: any) => ({
-                    type: attr.name,
-                    values: attr.options,
-                    hasPriceAdjustment: false,
-                    priceAdjustments: {}
-                })) || []
-
-                // Map Price
-                const price = parseFloat(p.regular_price || p.price || "0")
-                const salePrice = p.sale_price ? parseFloat(p.sale_price) : undefined
-
-                // Create Product
-                const { error: insertError } = await supabase.from("products").insert({
-                    organization_id: organizationId,
-                    name: p.name,
-                    slug: slug,
-                    description: p.description || p.short_description || "",
-                    price: price,
-                    sale_price: salePrice,
-                    stock: p.stock_quantity ?? 999,
-                    image_url: validImages[0] || null,
-                    images: validImages,
-                    categories: [p.categories?.[0]?.name || "General"],
-                    variants: variants,
-                    is_active: p.status === 'publish',
-                    options: [],
-                    sku: p.sku || undefined
-                })
-
-                if (insertError) {
-                    console.error(`❌ Error inserting ${p.name}:`, insertError)
-                    errors.push(`Error al importar ${p.name}: ${insertError.message} (${insertError.details || ''})`)
-                } else {
-                    console.log(`✅ Imported: ${p.name}`)
-                    importedCount++
-                }
-
-            } catch (err) {
-                console.error(`❌ Error processing product ${p.id}:`, err)
+                    .maybeSingle()
+                existing = data
             }
-        }
 
-    } catch (error: any) {
-        console.error("❌ Fetch Fatal Error:", error)
-        return {
-            success: false,
-            imported: importedCount,
-            errors: [`Error de conexión: ${error.message}`]
+            if (existing) {
+                skippedCount++
+                continue
+            }
+
+            // Generate Slug
+            const slugBase = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+            const slug = `${slugBase}-${Math.random().toString(36).substring(7)}`
+
+            // Map Images & Upload
+            const imagePromises = (p.images || []).slice(0, 5).map(async (img, index) => {
+                try {
+                    return await uploadImageToSupabase(img.src, organizationId, slug)
+                } catch {
+                    // Fallback to original URL if upload fails
+                    return img.src
+                }
+            })
+
+            const processedImages = await Promise.all(imagePromises)
+            const validImages = processedImages.filter(Boolean) as string[]
+
+            // Map Variants
+            const variants = p.attributes?.map((attr) => ({
+                type: attr.name,
+                values: attr.options,
+                hasPriceAdjustment: false,
+                priceAdjustments: {}
+            })) || []
+
+            // Map Price
+            const price = parseFloat(p.regular_price || p.price || "0")
+            const salePrice = p.sale_price ? parseFloat(p.sale_price) : undefined
+
+            // Map ALL categories (not just the first one)
+            const categories = p.categories?.map(c => c.name) || ["General"]
+
+            // Create Product with stock=0 if not defined (safer default)
+            const { error: insertError } = await supabase.from("products").insert({
+                organization_id: organizationId,
+                name: p.name,
+                slug: slug,
+                description: p.description || p.short_description || "",
+                price: price,
+                sale_price: salePrice,
+                stock: p.stock_quantity ?? 0, // Changed from 999 to 0 for safety
+                image_url: validImages[0] || null,
+                images: validImages,
+                categories: categories,
+                variants: variants,
+                is_active: p.status === 'publish',
+                options: [],
+                sku: p.sku || undefined
+            })
+
+            if (insertError) {
+                errors.push(`${p.name}: ${insertError.message}`)
+            } else {
+                importedCount++
+            }
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+            errors.push(`${p.name}: ${errorMessage}`)
         }
     }
 
     revalidatePath("/dashboard/products")
-    return { success: true, imported: importedCount, errors }
+
+    return {
+        success: true,
+        imported: importedCount,
+        skipped: skippedCount,
+        total: allProducts.length,
+        errors
+    }
 }
 
-// Helper to upload image (outside the main function)
-import { createServiceClient } from "@/lib/supabase/server"
-
+// Helper to upload image to Supabase Storage
 async function uploadImageToSupabase(url: string, orgId: string, productSlug: string): Promise<string | null> {
     if (!url) return null
 
@@ -204,35 +256,32 @@ async function uploadImageToSupabase(url: string, orgId: string, productSlug: st
         const buffer = Buffer.from(arrayBuffer)
 
         // Generate a unique path
-        // products/{orgId}/{productSlug}-{random}.jpg
         const ext = url.split('.').pop()?.split('?')[0] || 'jpg'
         const fileName = `${productSlug}-${Math.random().toString(36).substring(7)}.${ext}`
         const filePath = `${orgId}/${fileName}`
 
         const supabaseAdmin = createServiceClient()
 
+        // Use product-images bucket (consistent with rest of the app)
         const { error: uploadError } = await supabaseAdmin
             .storage
-            .from('products')
+            .from('product-images')
             .upload(filePath, buffer, {
                 contentType: response.headers.get('content-type') || 'image/jpeg',
                 upsert: true
             })
 
         if (uploadError) {
-            console.error("Storage upload error:", uploadError)
-            // Falls back to throwing so we catch it above and return original URL
             throw uploadError
         }
 
         const { data: { publicUrl } } = supabaseAdmin
             .storage
-            .from('products')
+            .from('product-images')
             .getPublicUrl(filePath)
 
         return publicUrl
     } catch (error) {
-        console.error("Image upload helper error:", error)
         throw error
     }
 }

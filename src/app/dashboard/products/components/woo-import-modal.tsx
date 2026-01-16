@@ -30,10 +30,14 @@ export function WooImportModal() {
             const result = await importWooCommerceProducts(formData)
 
             if (result.success) {
-                toast.success(`Importación completada: ${result.imported} productos creados`)
+                const message = result.skipped > 0
+                    ? `✅ ${result.imported} productos importados, ${result.skipped} omitidos (duplicados)`
+                    : `✅ ${result.imported} productos importados de ${result.total} encontrados`
+
+                toast.success(message)
+
                 if (result.errors.length > 0) {
-                    toast.warning(`Fallaron ${result.errors.length}. Ejemplo: ${result.errors[0]}`)
-                    // Log all errors to console for debugging
+                    toast.warning(`⚠️ ${result.errors.length} errores. Ver consola para detalles.`)
                     console.error("Import errors:", result.errors)
                 }
                 setIsOpen(false)
