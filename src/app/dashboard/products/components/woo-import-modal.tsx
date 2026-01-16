@@ -14,11 +14,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { importWooCommerceProducts } from "../woo-actions"
+import { importWooCommerceProducts, migrateExternalImages } from "../woo-actions"
 
 export function WooImportModal() {
     const [isOpen, setIsOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [isMigrating, setIsMigrating] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -48,6 +49,29 @@ export function WooImportModal() {
             toast.error("Ocurrió un error inesperado")
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const handleMigrate = async () => {
+        setIsMigrating(true)
+        try {
+            const result = await migrateExternalImages()
+
+            if (result.total === 0) {
+                toast.info("No hay imágenes externas para migrar")
+            } else if (result.success) {
+                toast.success(`✅ ${result.migrated} productos migrados de ${result.total}`)
+                if (result.failed > 0) {
+                    toast.warning(`⚠️ ${result.failed} productos fallaron`)
+                    console.error("Migration errors:", result.errors)
+                }
+            } else {
+                toast.error(result.errors[0] || "Error en la migración")
+            }
+        } catch (error) {
+            toast.error("Ocurrió un error inesperado")
+        } finally {
+            setIsMigrating(false)
         }
     }
 
@@ -81,8 +105,27 @@ export function WooImportModal() {
                         <Input id="consumerSecret" name="consumerSecret" type="password" placeholder="cs_xxxxxxxxxxxx" required />
                     </div>
 
-                    <DialogFooter>
-                        <Button type="submit" disabled={isLoading} className="bg-[#96588a] hover:bg-[#7a4670] text-white">
+                    <DialogFooter className="flex-col gap-2 sm:flex-row">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isMigrating || isLoading}
+                            onClick={handleMigrate}
+                            className="gap-2"
+                        >
+                            {isMigrating ? (
+                                <>
+                                    <span className="animate-spin material-symbols-outlined text-sm">progress_activity</span>
+                                    Migrando...
+                                </>
+                            ) : (
+                                <>
+                                    <span className="material-symbols-outlined text-sm">cloud_upload</span>
+                                    Migrar imágenes
+                                </>
+                            )}
+                        </Button>
+                        <Button type="submit" disabled={isLoading || isMigrating} className="bg-[#96588a] hover:bg-[#7a4670] text-white">
                             {isLoading ? (
                                 <div className="flex items-center gap-2">
                                     <span className="animate-spin material-symbols-outlined text-sm">progress_activity</span>

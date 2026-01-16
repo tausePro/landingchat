@@ -285,3 +285,122 @@ async function uploadImageToSupabase(url: string, orgId: string, productSlug: st
         throw error
     }
 }
+
+// ============================================================
+// MIGRATE EXTERNAL IMAGES TO SUPABASE
+// For products that were imported before the fix
+// ============================================================
+
+interface MigrateResult {
+    success: boolean
+    migrated: number
+    failed: number
+    total: number
+    errors: string[]
+}
+
+export async function migrateExternalImages(): Promise<MigrateResult> {
+    // 1. Auth Check
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        throw new Error("Unauthorized")
+    }
+
+    // Get Organization ID
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.organization_id) {
+        throw new Error("No organization found")
+    }
+    const organizationId = profile.organization_id
+
+    // 2. Get products with external images (not from supabase.co)
+    const { data: products, error: fetchError } = await supabase
+        .from("products")
+        .select("id, name, slug, image_url, images")
+        .eq("organization_id", organizationId)
+        .not("image_url", "is", null)
+
+    if (fetchError) {
+        return { success: false, migrated: 0, failed: 0, total: 0, errors: [fetchError.message] }
+    }
+
+    // Filter products with external images (not supabase)
+    const productsWithExternalImages = products?.filter(p => {
+        const hasExternalPrimary = p.image_url && !p.image_url.includes('supabase.co')
+        const hasExternalImages = p.images?.some((img: string) => !img.includes('supabase.co'))
+        return hasExternalPrimary || hasExternalImages
+    }) || []
+
+    if (productsWithExternalImages.length === 0) {
+        return { success: true, migrated: 0, failed: 0, total: 0, errors: [] }
+    }
+
+    // 3. Migrate each product's images
+    let migrated = 0
+    let failed = 0
+    const errors: string[] = []
+
+    for (const product of productsWithExternalImages) {
+        try {
+            const slug = product.slug || product.id
+            const newImages: string[] = []
+
+            // Migrate all images
+            for (const imgUrl of (product.images || [])) {
+                if (imgUrl.includes('supabase.co')) {
+                    // Already in supabase, keep it
+                    newImages.push(imgUrl)
+                } else {
+                    // Upload to supabase
+                    try {
+                        const newUrl = await uploadImageToSupabase(imgUrl, organizationId, slug)
+                        if (newUrl) {
+                            newImages.push(newUrl)
+                        }
+                    } catch {
+                        // Keep original if upload fails
+                        newImages.push(imgUrl)
+                        errors.push(`${product.name}: Failed to migrate image`)
+                    }
+                }
+            }
+
+            // Update product
+            const { error: updateError } = await supabase
+                .from("products")
+                .update({
+                    image_url: newImages[0] || null,
+                    images: newImages
+                })
+                .eq("id", product.id)
+
+            if (updateError) {
+                errors.push(`${product.name}: ${updateError.message}`)
+                failed++
+            } else {
+                migrated++
+            }
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+            errors.push(`${product.name}: ${errorMessage}`)
+            failed++
+        }
+    }
+
+    revalidatePath("/dashboard/products")
+
+    return {
+        success: true,
+        migrated,
+        failed,
+        total: productsWithExternalImages.length,
+        errors
+    }
+}
