@@ -28,6 +28,12 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
     const description = product.meta_description || product.description || `Compra ${product.name} en ${organization.name}. Precio: $${product.price.toLocaleString('es-CO')} COP`
     const images = product.images?.length ? product.images : product.image_url ? [product.image_url] : []
 
+    // Construir URL canónica del producto
+    const baseUrl = organization.custom_domain
+        ? `https://${organization.custom_domain}`
+        : `https://${organization.slug}.landingchat.co`
+    const productUrl = `${baseUrl}/producto/${product.slug || slugOrId}`
+
     return {
         title,
         description,
@@ -35,7 +41,12 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
         openGraph: {
             title,
             description,
-            images: images.map((img: string) => ({ url: img })),
+            url: productUrl,
+            images: images.map((img: string) => ({
+                url: img,
+                width: 1200,
+                height: 630,
+            })),
             type: "website",
             siteName: organization.name,
         },
