@@ -12,9 +12,9 @@ export const dynamic = 'force-dynamic'
 
 async function getAnalyticsData() {
     const supabase = await createClient()
-    
+
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
+
     if (authError || !user) {
         redirect("/login")
     }
@@ -31,36 +31,41 @@ async function getAnalyticsData() {
 
     const orgId = profile.organization_id
 
-    const { data: org } = await supabase
-        .from("organizations")
-        .select("id, name, slug, tracking_config")
-        .eq("id", orgId)
-        .single()
-
-    if (!org) {
-        redirect("/onboarding")
-    }
-    
     // Get orders data for conversion metrics
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
     // Filtrar por status válidos (mismo criterio que dashboard-actions.ts)
     const validStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "completed"]
-    
-    const { data: orders } = await supabase
-        .from("orders")
-        .select("id, total, created_at, status, payment_status, source_channel, chat_id, utm_data")
-        .eq("organization_id", org.id)
-        .in("status", validStatuses)
-        .gte("created_at", thirtyDaysAgo.toISOString())
-        .order("created_at", { ascending: true })
 
-    const { data: chats } = await supabase
-        .from("chats")
-        .select("id, created_at, channel")
-        .eq("organization_id", org.id)
-        .gte("created_at", thirtyDaysAgo.toISOString())
+    // Fetch org, orders, and chats in parallel (async-parallel optimization)
+    const [orgResult, ordersResult, chatsResult] = await Promise.all([
+        supabase
+            .from("organizations")
+            .select("id, name, slug, tracking_config")
+            .eq("id", orgId)
+            .single(),
+        supabase
+            .from("orders")
+            .select("id, total, created_at, status, payment_status, source_channel, chat_id, utm_data")
+            .eq("organization_id", orgId)
+            .in("status", validStatuses)
+            .gte("created_at", thirtyDaysAgo.toISOString())
+            .order("created_at", { ascending: true }),
+        supabase
+            .from("chats")
+            .select("id, created_at, channel")
+            .eq("organization_id", orgId)
+            .gte("created_at", thirtyDaysAgo.toISOString())
+    ])
+
+    const org = orgResult.data
+    const orders = ordersResult.data
+    const chats = chatsResult.data
+
+    if (!org) {
+        redirect("/onboarding")
+    }
 
     // Calculate metrics (misma lógica que dashboard-actions.ts)
     const totalOrders = orders?.length || 0
@@ -92,7 +97,7 @@ async function getAnalyticsData() {
     // Origen de ventas real (basado en source_channel y utm_data)
     const ordersBySource = orders?.reduce((acc, order) => {
         let source = 'direct' // Por defecto: venta directa
-        
+
         if (order.source_channel === 'chat' || order.chat_id) {
             source = 'chat'
         } else if (order.utm_data && typeof order.utm_data === 'object') {
@@ -108,14 +113,14 @@ async function getAnalyticsData() {
         } else if (order.source_channel === 'whatsapp') {
             source = 'whatsapp'
         }
-        
+
         acc[source] = (acc[source] || 0) + 1
         return acc
     }, {} as Record<string, number>) || {}
 
     // Órdenes que realmente vinieron del chat
     const ordersFromChat = orders?.filter(o => o.source_channel === 'chat' || o.chat_id)?.length || 0
-    
+
     // Conversión real del chat (solo órdenes que vinieron del chat / total chats)
     const chatConversionRate = totalChats > 0 ? ((ordersFromChat / totalChats) * 100).toFixed(1) : "0"
 
@@ -169,27 +174,24 @@ export default async function AnalyticsPage() {
 
                 {/* Tracking Status */}
                 <div className="flex gap-2 flex-wrap">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        data.trackingEnabled.posthog 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${data.trackingEnabled.posthog
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
+                        }`}>
                         <span className={`w-2 h-2 rounded-full mr-2 ${data.trackingEnabled.posthog ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                         PostHog {data.trackingEnabled.posthog ? 'Activo' : 'Inactivo'}
                     </span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        data.trackingEnabled.metaPixel 
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' 
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${data.trackingEnabled.metaPixel
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
+                        }`}>
                         <span className={`w-2 h-2 rounded-full mr-2 ${data.trackingEnabled.metaPixel ? 'bg-blue-500' : 'bg-gray-400'}`}></span>
                         Meta Pixel {data.trackingEnabled.metaPixel ? 'Activo' : 'Inactivo'}
                     </span>
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        data.trackingEnabled.metaCapi 
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' 
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${data.trackingEnabled.metaCapi
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
                             : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                    }`}>
+                        }`}>
                         <span className={`w-2 h-2 rounded-full mr-2 ${data.trackingEnabled.metaCapi ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
                         Meta CAPI {data.trackingEnabled.metaCapi ? 'Activo' : 'Inactivo'}
                     </span>
@@ -252,7 +254,7 @@ export default async function AnalyticsPage() {
 
                 {/* Charts */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <AnalyticsCharts 
+                    <AnalyticsCharts
                         ordersByDay={data.charts.ordersByDay}
                         revenueByDay={data.charts.revenueByDay}
                     />
@@ -261,12 +263,12 @@ export default async function AnalyticsPage() {
 
                 {/* Conversion Funnel + Sales Sources */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <ConversionFunnel 
+                    <ConversionFunnel
                         totalChats={data.metrics.totalChats}
                         ordersFromChat={data.metrics.ordersFromChat}
                         chatConversionRate={data.metrics.chatConversionRate}
                     />
-                    <SalesSources 
+                    <SalesSources
                         ordersBySource={data.ordersBySource}
                         totalOrders={data.metrics.totalOrders}
                     />

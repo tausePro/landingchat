@@ -12,12 +12,12 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
     const { slug } = await params
     const resolvedSearchParams = await searchParams
     const phone = resolvedSearchParams?.phone
-    
+
     console.log("[Profile] Params:", { slug, phone, searchParams: resolvedSearchParams })
-    
+
     const supabase = createServiceClient()
 
-    // Get organization
+    // Get organization first (required for other queries)
     const { data: org, error: orgError } = await supabase
         .from("organizations")
         .select("id, name, slug, logo_url, settings")
@@ -28,7 +28,7 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
         console.error("[Profile] Organization not found:", slug, orgError)
         notFound()
     }
-    
+
     // Get WhatsApp phone from whatsapp_instances table (corporate instance)
     const { data: whatsappInstance } = await supabase
         .from("whatsapp_instances")
@@ -37,7 +37,7 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
         .eq("instance_type", "corporate")
         .eq("status", "connected")
         .single()
-    
+
     const orgPhone = whatsappInstance?.phone_number || org.settings?.contact?.phone || null
 
     // If no phone provided, show login form (WhatsApp-first)
@@ -105,7 +105,7 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
 
     // Normalize phone number (remove spaces, dashes, etc.)
     const normalizedPhone = phone.replace(/\D/g, '')
-    
+
     // Get customer data by phone
     const { data: customer } = await supabase
         .from("customers")
@@ -155,22 +155,25 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
         )
     }
 
-    // Get customer orders
-    const { data: orders } = await supabase
-        .from("orders")
-        .select("id, order_number, total, status, payment_status, created_at, items")
-        .eq("organization_id", org.id)
-        .eq("customer_id", customer.id)
-        .order("created_at", { ascending: false })
+    // Get customer orders and chats in parallel (async-parallel optimization)
+    const [ordersResult, chatsResult] = await Promise.all([
+        supabase
+            .from("orders")
+            .select("id, order_number, total, status, payment_status, created_at, items")
+            .eq("organization_id", org.id)
+            .eq("customer_id", customer.id)
+            .order("created_at", { ascending: false }),
+        supabase
+            .from("chats")
+            .select("id, status, created_at, updated_at")
+            .eq("organization_id", org.id)
+            .eq("customer_id", customer.id)
+            .order("updated_at", { ascending: false })
+            .limit(5)
+    ])
 
-    // Get customer chats
-    const { data: chats } = await supabase
-        .from("chats")
-        .select("id, status, created_at, updated_at")
-        .eq("organization_id", org.id)
-        .eq("customer_id", customer.id)
-        .order("updated_at", { ascending: false })
-        .limit(5)
+    const orders = ordersResult.data
+    const chats = chatsResult.data
 
     // Enrich organization with phone for WhatsApp button
     const enrichedOrg = {
@@ -179,7 +182,7 @@ export default async function ProfilePage({ params, searchParams }: ProfilePageP
     }
 
     return (
-        <ProfileView 
+        <ProfileView
             customer={customer}
             orders={orders || []}
             organization={enrichedOrg}
