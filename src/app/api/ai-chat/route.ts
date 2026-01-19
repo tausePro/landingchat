@@ -17,27 +17,27 @@ export async function POST(request: NextRequest) {
     console.log("API /api/ai-chat called")
     console.log("[ai-chat] ANTHROPIC_API_KEY configured:", !!process.env.ANTHROPIC_API_KEY)
     console.log("[ai-chat] SUPABASE_SERVICE_ROLE_KEY configured:", !!process.env.SUPABASE_SERVICE_ROLE_KEY)
-    
+
     // Apply rate limiting
     const clientId = getClientIdentifier(request)
     const rateLimitResult = await aiChatRateLimit.limit(clientId)
-    
+
     // Add rate limit headers to all responses
     const headers = getRateLimitHeaders(rateLimitResult)
-    
+
     if (!rateLimitResult.success) {
         return NextResponse.json(
-            { 
+            {
                 error: "Rate limit exceeded. Please wait before sending another message.",
                 retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000)
             },
-            { 
+            {
                 status: 429,
                 headers
             }
         )
     }
-    
+
     try {
         const body = await request.json()
 
@@ -112,17 +112,18 @@ export async function POST(request: NextRequest) {
             agentId = agent.id
             customerId = undefined
         } else {
-            // Get agent ID from existing chat
+            // Get agent ID from existing chat - SECURITY: validate ownership
             const { data: chat, error: chatQueryError } = await supabase
                 .from("chats")
-                .select("assigned_agent_id, customer_id")
+                .select("assigned_agent_id, customer_id, organization_id")
                 .eq("id", currentChatId)
+                .eq("organization_id", organization.id) // Security: validate chat belongs to this org
                 .single()
 
             if (chatQueryError || !chat) {
                 console.error("Chat query error:", chatQueryError)
                 return NextResponse.json(
-                    { error: "Chat not found", details: chatQueryError?.message },
+                    { error: "Chat not found" },
                     { status: 404, headers }
                 )
             }

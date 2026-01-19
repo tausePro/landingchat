@@ -19,7 +19,19 @@ export async function GET(
         return NextResponse.json({ error: "Organization not found" }, { status: 404 })
     }
 
-    // Fetch messages
+    // Security: Verify chat belongs to this organization
+    const { data: chat } = await supabase
+        .from("chats")
+        .select("id")
+        .eq("id", chatId)
+        .eq("organization_id", organization.id)
+        .single()
+
+    if (!chat) {
+        return NextResponse.json({ error: "Chat not found" }, { status: 404 })
+    }
+
+    // Fetch messages (now secure - chat ownership verified)
     const { data: messages, error } = await supabase
         .from("messages")
         .select("*")
