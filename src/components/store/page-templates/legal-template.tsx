@@ -32,13 +32,10 @@ export function LegalTemplate({ content, organizationSlug, primaryColor = '#2563
                             {content.sections.map((section, index) => (
                                 <a
                                     key={section.id || index}
-                                    href={`#section-${section.number}`}
+                                    href={`#section-${index + 1}`}
                                     className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                                 >
-                                    {section.icon && (
-                                        <span className="material-symbols-outlined text-lg">{section.icon}</span>
-                                    )}
-                                    {section.number}. {section.title}
+                                    {index + 1}. {section.title}
                                 </a>
                             ))}
 
@@ -93,12 +90,12 @@ export function LegalTemplate({ content, organizationSlug, primaryColor = '#2563
                             {content.sections.map((section, index) => (
                                 <section
                                     key={section.id || index}
-                                    id={`section-${section.number}`}
+                                    id={`section-${index + 1}`}
                                     className="scroll-mt-28 mb-12"
                                 >
                                     <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-3">
                                         <span className="flex items-center justify-center size-8 bg-slate-100 dark:bg-slate-800 rounded text-slate-900 dark:text-white text-sm">
-                                            {section.number}
+                                            {index + 1}
                                         </span>
                                         {section.title}
                                     </h3>
@@ -143,13 +140,7 @@ export function LegalTemplate({ content, organizationSlug, primaryColor = '#2563
                     </div>
 
                     {/* Secondary Info */}
-                    {content.footerNote && (
-                        <div className="mt-16 text-center max-w-2xl mx-auto px-4">
-                            <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">
-                                {content.footerNote}
-                            </p>
-                        </div>
-                    )}
+                    {/* footerNote removed - not in type definition */}
                 </div>
             </div>
         </main>

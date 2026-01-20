@@ -71,11 +71,13 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
         })
     }
 
-    const updateValue = (index: number, updates: Partial<AboutContent['values']>[0]) => {
+
+    const updateValue = (index: number, updates: Partial<{ icon: string; title: string; description: string }>) => {
         const newValues = [...(localContent.values || [])]
         newValues[index] = { ...newValues[index], ...updates }
         updateContent({ values: newValues })
     }
+
 
     const removeValue = (index: number) => {
         updateContent({
@@ -93,7 +95,7 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
         })
     }
 
-    const updateStat = (index: number, updates: Partial<AboutContent['stats']>[0]) => {
+    const updateStat = (index: number, updates: Partial<{ value: string; label: string }>) => {
         const newStats = [...(localContent.stats || [])]
         newStats[index] = { ...newStats[index], ...updates }
         updateContent({ stats: newStats })
@@ -115,7 +117,7 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
         })
     }
 
-    const updateTeamMember = (index: number, updates: Partial<AboutContent['team']>[0]) => {
+    const updateTeamMember = (index: number, updates: Partial<{ name: string; role: string; image?: string; email?: string }>) => {
         const newTeam = [...(localContent.team || [])]
         newTeam[index] = { ...newTeam[index], ...updates }
         updateContent({ team: newTeam })
@@ -239,7 +241,7 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
                                     <Button
                                         type="button"
                                         size="sm"
-                                        variant="destructive"
+                                        variant="outline"
                                         onClick={() => removeParagraph(index)}
                                     >
                                         ✕
@@ -283,7 +285,7 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
                                 <Button
                                     type="button"
                                     size="sm"
-                                    variant="destructive"
+                                    variant="outline"
                                     onClick={() => removeValue(index)}
                                 >
                                     Eliminar
@@ -333,7 +335,7 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
                                 <Button
                                     type="button"
                                     size="sm"
-                                    variant="destructive"
+                                    variant="outline"
                                     onClick={() => removeStat(index)}
                                 >
                                     ✕
@@ -377,7 +379,7 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
                                 <Button
                                     type="button"
                                     size="sm"
-                                    variant="destructive"
+                                    variant="outline"
                                     onClick={() => removeTeamMember(index)}
                                 >
                                     Eliminar
