@@ -7,6 +7,7 @@ interface TemplateRendererProps {
     template: string
     organization: any
     products: any[]
+    pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
     onStartChat: (productId?: string) => void
@@ -17,6 +18,7 @@ export function TemplateRenderer({
     template,
     organization,
     products,
+    pages = [],
     primaryColor,
     heroSettings,
     onStartChat,
@@ -25,6 +27,7 @@ export function TemplateRenderer({
     const templateProps = {
         organization,
         products,
+        pages,
         primaryColor,
         heroSettings,
         onStartChat,

@@ -46,7 +46,15 @@ export async function getStoreData(slug: string, limit?: number) {
         console.error("Error fetching products:", productsError)
     }
 
-    // 4. Get WhatsApp phone from connected instance if not in settings
+    // 4. Fetch Published Pages for footer/navigation
+    const { data: pages } = await supabase
+        .from("store_pages")
+        .select("id, slug, title")
+        .eq("organization_id", org.id)
+        .eq("is_published", true)
+        .order("title", { ascending: true })
+
+    // 5. Get WhatsApp phone from connected instance if not in settings
     let whatsappPhone = org.settings?.whatsapp?.phone || org.settings?.contact?.phone
     if (!whatsappPhone) {
         const { data: whatsappInstance } = await supabase
@@ -56,7 +64,7 @@ export async function getStoreData(slug: string, limit?: number) {
             .eq("instance_type", "corporate")
             .eq("status", "connected")
             .single()
-        
+
         if (whatsappInstance?.phone_number) {
             whatsappPhone = whatsappInstance.phone_number
         }
@@ -76,7 +84,8 @@ export async function getStoreData(slug: string, limit?: number) {
 
     return {
         organization: enrichedOrg,
-        products: products || []
+        products: products || [],
+        pages: pages || []
     }
 }
 

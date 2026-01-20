@@ -25,6 +25,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 interface CompleteTemplateProps {
     organization: any
     products: any[]
+    pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
     onStartChat: (productId?: string) => void
@@ -34,7 +35,7 @@ interface CompleteTemplateProps {
 function getTextColor(colorType: string): string {
     const colors = {
         default: "#1F2937",
-        warm: "#92400E", 
+        warm: "#92400E",
         cool: "#1E40AF",
         elegant: "#374151",
         modern: "#111827",
@@ -42,8 +43,6 @@ function getTextColor(colorType: string): string {
     }
     return colors[colorType as keyof typeof colors] || colors.default
 }
-
-
 
 // Component for critical image preloading (only hero + logo)
 function CriticalImagePreloader({ heroImage, logoUrl }: { heroImage?: string, logoUrl?: string }) {
@@ -72,13 +71,14 @@ function CriticalImagePreloader({ heroImage, logoUrl }: { heroImage?: string, lo
 export function CompleteTemplate({
     organization,
     products,
+    pages = [],
     primaryColor,
     heroSettings,
     onStartChat,
     isSubdomain = false
 }: CompleteTemplateProps & { isSubdomain?: boolean }) {
     const [mounted, setMounted] = useState(false)
-    
+
     useEffect(() => {
         setMounted(true)
     }, [])
@@ -89,7 +89,7 @@ export function CompleteTemplate({
     const chatButtonText = heroSettings.chatButtonText || "Chatear para Comprar"
 
     const templateConfig = organization.settings?.storefront?.templateConfig?.complete || {}
-    
+
     // Ensure we have a proper default config and merge with saved settings
     const defaultProductConfig = {
         showSection: true,
@@ -102,10 +102,10 @@ export function CompleteTemplate({
         sectionTitle: "Tendencias",
         sectionSubtitle: "Lo más vendido de la semana"
     }
-    
+
     const savedProductConfig = organization.settings?.storefront?.products || {}
     const productConfig = { ...defaultProductConfig, ...savedProductConfig }
-    
+
     // Debug logs - only in development
     if (process.env.NODE_ENV === 'development') {
         console.log('🔍 Product config:', productConfig)
@@ -185,11 +185,11 @@ export function CompleteTemplate({
     return (
         <>
             {/* Critical Image Preloader - Only hero + logo */}
-            <CriticalImagePreloader 
+            <CriticalImagePreloader
                 heroImage={heroBackgroundImage || undefined}
                 logoUrl={organization.logo_url || undefined}
             />
-            
+
             {/* Hero Section - Complete */}
             <section
                 className="relative overflow-hidden pt-16 pb-24 lg:pt-32 lg:pb-40"
@@ -201,7 +201,7 @@ export function CompleteTemplate({
                 }}
             >
                 {heroBackgroundImage && (
-                    <div 
+                    <div
                         className="absolute inset-0"
                         style={{
                             backgroundColor: heroSettings.overlayColor || 'rgba(0, 0, 0, 0.4)'
@@ -214,18 +214,18 @@ export function CompleteTemplate({
                             <Badge variant="outline" className={`mb-6 px-3 py-1 text-sm ${heroBackgroundImage ? 'border-white/30 bg-white/20 text-white' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
                                 ✨ La nueva forma de comprar
                             </Badge>
-                            <h1 
+                            <h1
                                 className={`text-4xl font-extrabold tracking-tight sm:text-6xl mb-6 leading-[1.1] ${heroBackgroundImage ? 'text-white' : 'text-gray-900'}`}
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: heroBackgroundImage ? 'white' : getTextColor(typographyConfig.textColor)
                                 }}
                             >
                                 {heroTitle}
                             </h1>
-                            <p 
+                            <p
                                 className={`text-lg mb-8 leading-relaxed ${heroBackgroundImage ? 'text-white/90' : 'text-slate-600'}`}
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: heroBackgroundImage ? 'rgba(255,255,255,0.9)' : getTextColor(typographyConfig.textColor),
                                     opacity: heroBackgroundImage ? 1 : 0.8
@@ -259,9 +259,9 @@ export function CompleteTemplate({
 
                             {/* Stats - Configurable */}
                             {heroSettings.showStats !== false && (
-                                <div 
+                                <div
                                     className={`mt-10 flex items-center gap-6 text-sm font-medium ${heroBackgroundImage ? 'text-white/80' : 'text-slate-500'}`}
-                                    style={{ 
+                                    style={{
                                         fontFamily: typographyConfig.fontFamily,
                                         color: heroBackgroundImage ? 'rgba(255,255,255,0.8)' : getTextColor(typographyConfig.textColor),
                                         opacity: heroBackgroundImage ? 1 : 0.7
@@ -320,18 +320,18 @@ export function CompleteTemplate({
             <section className="py-20 bg-white">
                 <div className="container mx-auto px-4">
                     <div className="text-center max-w-3xl mx-auto mb-16">
-                        <h2 
+                        <h2
                             className="text-3xl font-bold mb-4"
-                            style={{ 
+                            style={{
                                 fontFamily: typographyConfig.fontFamily,
                                 color: getTextColor(typographyConfig.textColor)
                             }}
                         >
                             Cómo funciona
                         </h2>
-                        <p 
+                        <p
                             className="text-gray-600 text-lg"
-                            style={{ 
+                            style={{
                                 fontFamily: typographyConfig.fontFamily,
                                 color: getTextColor(typographyConfig.textColor),
                                 opacity: 0.7
@@ -352,18 +352,18 @@ export function CompleteTemplate({
                                         index === 1 ? <ShoppingBag className="w-8 h-8" /> :
                                             <Truck className="w-8 h-8" />}
                                 </div>
-                                <h3 
+                                <h3
                                     className="text-xl font-bold mb-3"
-                                    style={{ 
+                                    style={{
                                         fontFamily: typographyConfig.fontFamily,
                                         color: getTextColor(typographyConfig.textColor)
                                     }}
                                 >
                                     {step.title}
                                 </h3>
-                                <p 
+                                <p
                                     className="text-gray-600"
-                                    style={{ 
+                                    style={{
                                         fontFamily: typographyConfig.fontFamily,
                                         color: getTextColor(typographyConfig.textColor),
                                         opacity: 0.7
@@ -382,18 +382,18 @@ export function CompleteTemplate({
                 <section className="py-16 bg-gray-50">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-12">
-                            <h2 
+                            <h2
                                 className="text-2xl font-bold mb-4"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
                                 ¿Por qué elegirnos?
                             </h2>
-                            <p 
+                            <p
                                 className="text-gray-600"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor),
                                     opacity: 0.7
@@ -410,9 +410,9 @@ export function CompleteTemplate({
                                             {feature.icon}
                                         </span>
                                     </div>
-                                    <p 
+                                    <p
                                         className="text-sm font-medium text-gray-900"
-                                        style={{ 
+                                        style={{
                                             fontFamily: typographyConfig.fontFamily,
                                             color: getTextColor(typographyConfig.textColor)
                                         }}
@@ -432,18 +432,18 @@ export function CompleteTemplate({
                     <div className="container mx-auto px-4">
                         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
                             <div>
-                                <h2 
+                                <h2
                                     className="text-3xl font-bold mb-2"
-                                    style={{ 
+                                    style={{
                                         fontFamily: typographyConfig.fontFamily,
                                         color: getTextColor(typographyConfig.textColor)
                                     }}
                                 >
                                     {productConfig.sectionTitle || "Tendencias"}
                                 </h2>
-                                <p 
+                                <p
                                     className="text-gray-600"
-                                    style={{ 
+                                    style={{
                                         fontFamily: typographyConfig.fontFamily,
                                         color: getTextColor(typographyConfig.textColor),
                                         opacity: 0.7
@@ -504,18 +504,18 @@ export function CompleteTemplate({
                 <section className="py-20 bg-white">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-16">
-                            <h2 
+                            <h2
                                 className="text-3xl font-bold mb-4"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
                                 Lo que dicen nuestros clientes
                             </h2>
-                            <p 
+                            <p
                                 className="text-gray-600 text-lg"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor),
                                     opacity: 0.7
@@ -533,9 +533,9 @@ export function CompleteTemplate({
                                                 <span key={i} className="text-yellow-400 text-xl">★</span>
                                             ))}
                                         </div>
-                                        <p 
+                                        <p
                                             className="text-gray-700 italic mb-4"
-                                            style={{ 
+                                            style={{
                                                 fontFamily: typographyConfig.fontFamily,
                                                 color: getTextColor(typographyConfig.textColor),
                                                 opacity: 0.8
@@ -556,9 +556,9 @@ export function CompleteTemplate({
                                             />
                                         )}
                                         <div className="text-left">
-                                            <p 
+                                            <p
                                                 className="font-semibold text-gray-900"
-                                                style={{ 
+                                                style={{
                                                     fontFamily: typographyConfig.fontFamily,
                                                     color: getTextColor(typographyConfig.textColor)
                                                 }}
@@ -566,9 +566,9 @@ export function CompleteTemplate({
                                                 {testimonial.name}
                                             </p>
                                             {testimonial.role && (
-                                                <p 
+                                                <p
                                                     className="text-sm text-gray-500"
-                                                    style={{ 
+                                                    style={{
                                                         fontFamily: typographyConfig.fontFamily,
                                                         color: getTextColor(typographyConfig.textColor),
                                                         opacity: 0.6
@@ -590,18 +590,18 @@ export function CompleteTemplate({
             <section className="py-20 bg-gray-900 text-white relative overflow-hidden">
                 <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                 <div className="container mx-auto px-4 text-center relative z-10">
-                    <h2 
+                    <h2
                         className="text-3xl md:text-5xl font-bold mb-6"
-                        style={{ 
+                        style={{
                             fontFamily: typographyConfig.fontFamily,
                             color: 'white'
                         }}
                     >
                         ¿Listo para empezar?
                     </h2>
-                    <p 
+                    <p
                         className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto"
-                        style={{ 
+                        style={{
                             fontFamily: typographyConfig.fontFamily,
                             color: '#d1d5db'
                         }}
@@ -611,7 +611,7 @@ export function CompleteTemplate({
                     <Button
                         onClick={() => onStartChat()}
                         size="lg"
-                        style={{ 
+                        style={{
                             backgroundColor: primaryColor,
                             fontFamily: typographyConfig.fontFamily
                         }}
@@ -629,12 +629,12 @@ export function CompleteTemplate({
                         <div className="col-span-1 md:col-span-2">
                             <div className="flex items-center gap-2 mb-4">
                                 {organization.logo_url ? (
-                                    <Image 
-                                        src={organization.logo_url} 
-                                        alt={organization.name} 
+                                    <Image
+                                        src={organization.logo_url}
+                                        alt={organization.name}
                                         width={32}
                                         height={32}
-                                        className="h-8 w-auto object-contain" 
+                                        className="h-8 w-auto object-contain"
                                         loading="lazy"
                                         quality={90}
                                     />
@@ -643,9 +643,9 @@ export function CompleteTemplate({
                                         {organization.name.substring(0, 1)}
                                     </div>
                                 )}
-                                <span 
+                                <span
                                     className="text-xl font-bold"
-                                    style={{ 
+                                    style={{
                                         fontFamily: typographyConfig.fontFamily,
                                         color: getTextColor(typographyConfig.textColor)
                                     }}
@@ -653,9 +653,9 @@ export function CompleteTemplate({
                                     {organization.name}
                                 </span>
                             </div>
-                            <p 
+                            <p
                                 className="text-gray-500 max-w-xs mb-6"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor),
                                     opacity: 0.7
@@ -689,18 +689,18 @@ export function CompleteTemplate({
                             </div>
                         </div>
                         <div>
-                            <h4 
+                            <h4
                                 className="font-bold mb-4"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
                                 Enlaces
                             </h4>
-                            <ul 
+                            <ul
                                 className="space-y-2 text-gray-600"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor),
                                     opacity: 0.7
@@ -708,37 +708,60 @@ export function CompleteTemplate({
                             >
                                 <li><a href="#" className="hover:text-primary">Inicio</a></li>
                                 <li><a href="#products" className="hover:text-primary">Productos</a></li>
-                                <li><a href="#" className="hover:text-primary">Nosotros</a></li>
+                                <li>
+                                    <a
+                                        href={getStoreLink('/sobre-nosotros', isSubdomain, organization.slug)}
+                                        className="hover:text-primary"
+                                    >
+                                        Nosotros
+                                    </a>
+                                </li>
                                 <li><a href="#" className="hover:text-primary">Contacto</a></li>
                             </ul>
                         </div>
                         <div>
-                            <h4 
+                            <h4
                                 className="font-bold mb-4"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
                                 Legal
                             </h4>
-                            <ul 
+                            <ul
                                 className="space-y-2 text-gray-600"
-                                style={{ 
+                                style={{
                                     fontFamily: typographyConfig.fontFamily,
                                     color: getTextColor(typographyConfig.textColor),
                                     opacity: 0.7
                                 }}
                             >
-                                <li><a href="#" className="hover:text-primary">Términos</a></li>
-                                <li><a href="#" className="hover:text-primary">Privacidad</a></li>
-                                <li><a href="#" className="hover:text-primary">Envíos</a></li>
+                                {pages && pages.length > 0 ? (
+                                    pages
+                                        .filter(page => page.slug !== 'sobre-nosotros')
+                                        .map((page) => (
+                                            <li key={page.id}>
+                                                <a
+                                                    href={getStoreLink(`/${page.slug}`, isSubdomain, organization.slug)}
+                                                    className="hover:text-primary"
+                                                >
+                                                    {page.title}
+                                                </a>
+                                            </li>
+                                        ))
+                                ) : (
+                                    <>
+                                        <li><a href="#" className="hover:text-primary">Términos</a></li>
+                                        <li><a href="#" className="hover:text-primary">Privacidad</a></li>
+                                    </>
+                                )}
                             </ul>
                         </div>
                     </div>
                     <div className="border-t border-gray-100 pt-8 text-center text-gray-400 text-sm">
-                        <p 
-                            style={{ 
+                        <p
+                            style={{
                                 fontFamily: typographyConfig.fontFamily,
                                 color: getTextColor(typographyConfig.textColor),
                                 opacity: 0.5
