@@ -21,6 +21,7 @@ export interface FAQContent {
         title: string
         description: string
         buttonText: string
+        whatsappNumber?: string
     }
 }
 
@@ -76,6 +77,7 @@ export interface AboutContent {
         title: string
         description: string
         buttonText: string
+        whatsappNumber?: string // Optional override
     }
 }
 

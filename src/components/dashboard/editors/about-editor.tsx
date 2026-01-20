@@ -450,6 +450,17 @@ export function AboutEditor({ content, onChange }: AboutEditorProps) {
                                 placeholder="Chatear con nosotros ahora"
                             />
                         </div>
+                        <div>
+                            <label className="text-sm font-medium mb-2 block">Número de WhatsApp (Opcional)</label>
+                            <Input
+                                value={localContent.cta.whatsappNumber || ""}
+                                onChange={(e) => updateCTA({ whatsappNumber: e.target.value })}
+                                placeholder="Ej: 573001234567 (Si se deja vacío usa el del footer)"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Si agregas un número aquí, el botón abrirá un chat directo con este número.
+                            </p>
+                        </div>
                     </div>
                 )}
             </Card>

@@ -10,8 +10,11 @@ interface AboutTemplateProps {
     whatsappNumber?: string  // Corporate WhatsApp from footer config
 }
 
-export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563EB', whatsappNumber }: AboutTemplateProps) {
+export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563EB', whatsappNumber: globalWhatsapp }: AboutTemplateProps) {
     const [currentTeamIndex, setCurrentTeamIndex] = useState(0)
+
+    // Use content-specific WhatsApp if available, otherwise global
+    const whatsappToUse = content.cta?.whatsappNumber || globalWhatsapp
 
     const nextTeamMember = () => {
         if (content.team && currentTeamIndex < content.team.length - 1) {
@@ -226,7 +229,7 @@ export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563
                                 {content.cta.description}
                             </p>
                             <a
-                                href={whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : '#'}
+                                href={whatsappToUse ? `https://wa.me/${whatsappToUse.replace(/\D/g, '')}` : '#'}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="text-white px-10 py-4 rounded-xl text-lg font-bold transition-all shadow-lg flex items-center gap-3 mt-4"

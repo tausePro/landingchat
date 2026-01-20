@@ -10,9 +10,11 @@ interface FAQTemplateProps {
     whatsappNumber?: string
 }
 
-export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB', whatsappNumber }: FAQTemplateProps) {
+export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB', whatsappNumber: globalWhatsapp }: FAQTemplateProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [activeCategory, setActiveCategory] = useState<string>(content.categories?.[0]?.id || "todos")
+
+    const whatsappToUse = content.cta?.whatsappNumber || globalWhatsapp
 
     const filteredQuestions = content.questions.filter(q => {
         const matchesSearch = !searchQuery ||
@@ -122,7 +124,7 @@ export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB
                             </p>
                         </div>
                         <a
-                            href={whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : '#'}
+                            href={whatsappToUse ? `https://wa.me/${whatsappToUse.replace(/\D/g, '')}` : '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="mt-2 flex items-center gap-2 text-white font-bold py-3 px-8 rounded-xl transition-all transform active:scale-95 shadow-lg"

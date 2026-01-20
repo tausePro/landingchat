@@ -258,6 +258,20 @@ export function FAQEditor({ content, onChange }: FAQEditorProps) {
                                 placeholder="Chatear con un experto"
                             />
                         </div>
+                        <div>
+                            <Label htmlFor="cta-whatsapp">Número de WhatsApp (Opcional)</Label>
+                            <Input
+                                id="cta-whatsapp"
+                                value={localContent.cta.whatsappNumber || ""}
+                                onChange={(e) => updateContent({
+                                    cta: { ...localContent.cta!, whatsappNumber: e.target.value }
+                                })}
+                                placeholder="Ej: 573001234567 (Si se deja vacío usa el del footer)"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Si agregas un número aquí, el botón abrirá un chat directo con este número.
+                            </p>
+                        </div>
                     </CardContent>
                 )}
             </Card>
