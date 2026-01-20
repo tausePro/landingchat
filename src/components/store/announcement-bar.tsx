@@ -16,7 +16,7 @@ export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBa
     const getMessage = () => {
         // Si no hay configuración, mostrar mensaje por defecto
         if (!shippingConfig) {
-            return "Tu asistente de compras disponible 24/7"
+            return "Tu asistente de compras disponible siempre"
         }
 
         // Si el envío gratis está habilitado
@@ -28,7 +28,7 @@ export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBa
                     currency: 'COP',
                     minimumFractionDigits: 0
                 }).format(shippingConfig.free_shipping_min_amount)
-                
+
                 return `Envío gratis a partir de ${formattedAmount}`
             } else {
                 // Envío gratis sin monto mínimo
@@ -36,12 +36,12 @@ export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBa
             }
         } else {
             // Envío gratis no habilitado, mostrar mensaje por defecto
-            return "Tu asistente de compras disponible 24/7"
+            return "Tu asistente de compras disponible siempre"
         }
     }
 
     return (
-        <div 
+        <div
             className="w-full py-2 px-4 text-center text-white text-sm font-medium"
             style={{ backgroundColor: primaryColor }}
         >

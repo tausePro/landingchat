@@ -89,6 +89,7 @@ export default async function StorePageComponent({ params }: PageProps) {
 
     // Use the same primaryColor logic as StoreLayoutClient
     const primaryColor = org.settings?.branding?.primaryColor || "#2b7cee"
+    const whatsappNumber = org.settings?.storefront?.footer?.whatsappNumber
 
     return (
         <StoreLayoutClient
@@ -101,6 +102,7 @@ export default async function StorePageComponent({ params }: PageProps) {
                 content={content}
                 organizationSlug={slug}
                 primaryColor={primaryColor}
+                whatsappNumber={whatsappNumber}
             />
         </StoreLayoutClient>
     )

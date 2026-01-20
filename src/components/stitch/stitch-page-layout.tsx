@@ -56,7 +56,7 @@ export function StitchFAQLayout({ content }: { content: string }) {
                             ¿No encontraste lo que buscabas?
                         </h3>
                         <p className="text-gray-600 dark:text-gray-400 text-sm">
-                            Nuestro equipo de soporte está disponible 24/7 para ayudarte.
+                            Nuestro equipo de soporte está disponible para ayudarte.
                         </p>
                     </div>
                     <button className="mt-2 flex items-center gap-2 bg-primary hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-primary/20">

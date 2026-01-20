@@ -7,9 +7,10 @@ interface FAQTemplateProps {
     content: FAQContent
     organizationSlug: string
     primaryColor?: string
+    whatsappNumber?: string
 }
 
-export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB' }: FAQTemplateProps) {
+export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB', whatsappNumber }: FAQTemplateProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [activeCategory, setActiveCategory] = useState<string>(content.categories?.[0]?.id || "todos")
 
@@ -56,8 +57,8 @@ export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB
                         <button
                             onClick={() => setActiveCategory("todos")}
                             className={`flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full px-6 transition-colors ${activeCategory !== "todos"
-                                    ? "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                    : "text-white"
+                                ? "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                : "text-white"
                                 }`}
                             style={activeCategory === "todos" ? { backgroundColor: primaryColor } : {}}
                         >
@@ -68,8 +69,8 @@ export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB
                                 key={category.id}
                                 onClick={() => setActiveCategory(category.id)}
                                 className={`flex h-10 shrink-0 items-center justify-center gap-x-2 rounded-full px-6 transition-colors ${activeCategory !== category.id
-                                        ? "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                                        : "text-white"
+                                    ? "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    : "text-white"
                                     }`}
                                 style={activeCategory === category.id ? { backgroundColor: primaryColor } : {}}
                             >
@@ -120,13 +121,16 @@ export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB
                                 {content.cta.description}
                             </p>
                         </div>
-                        <button
+                        <a
+                            href={whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="mt-2 flex items-center gap-2 text-white font-bold py-3 px-8 rounded-xl transition-all transform active:scale-95 shadow-lg"
                             style={{ backgroundColor: primaryColor, boxShadow: `0 10px 15px -3px ${primaryColor}33, 0 4px 6px -4px ${primaryColor}33` }}
                         >
                             <span className="material-symbols-outlined text-xl">forum</span>
                             <span>{content.cta.buttonText}</span>
-                        </button>
+                        </a>
                     </div>
                 )}
             </div>
@@ -135,7 +139,7 @@ export function FAQTemplate({ content, organizationSlug, primaryColor = '#2563EB
             <div className="mt-8 flex justify-center">
                 <a
                     className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors font-medium text-sm group"
-                    href={`/store/${organizationSlug}`}
+                    href="/"
                 >
                     <span className="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">
                         arrow_back

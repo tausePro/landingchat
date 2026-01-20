@@ -7,9 +7,10 @@ interface AboutTemplateProps {
     content: AboutContent
     organizationSlug: string
     primaryColor?: string
+    whatsappNumber?: string  // Corporate WhatsApp from footer config
 }
 
-export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563EB' }: AboutTemplateProps) {
+export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563EB', whatsappNumber }: AboutTemplateProps) {
     const [currentTeamIndex, setCurrentTeamIndex] = useState(0)
 
     const nextTeamMember = () => {
@@ -224,13 +225,16 @@ export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563
                             <p className="text-lg md:text-xl text-[#60708a] dark:text-gray-400 max-w-xl mx-auto">
                                 {content.cta.description}
                             </p>
-                            <button
+                            <a
+                                href={whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : '#'}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-white px-10 py-4 rounded-xl text-lg font-bold transition-all shadow-lg flex items-center gap-3 mt-4"
                                 style={{ backgroundColor: primaryColor }}
                             >
                                 <span className="material-symbols-outlined">chat_bubble</span>
                                 {content.cta.buttonText}
-                            </button>
+                            </a>
                         </div>
                     </div>
                 </section>
@@ -240,7 +244,7 @@ export function AboutTemplate({ content, organizationSlug, primaryColor = '#2563
             <div className="mt-8 pb-12 flex justify-center">
                 <a
                     className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors font-medium text-sm group"
-                    href={`/store/${organizationSlug}`}
+                    href="/"
                 >
                     <span className="material-symbols-outlined text-lg group-hover:-translate-x-1 transition-transform">
                         arrow_back

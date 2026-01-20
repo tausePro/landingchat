@@ -61,7 +61,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
             ],
             cta: {
                 title: "¿No encontraste lo que buscabas?",
-                description: "Nuestro equipo de soporte está disponible 24/7 para ayudarte.",
+                description: "Nuestro equipo de soporte está disponible para ayudarte.",
                 buttonText: "Chatear con un experto"
             }
         },
