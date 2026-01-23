@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PosthogInit } from "@/components/analytics/posthog-init";
 import { Toaster } from "sonner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -44,6 +45,7 @@ export default function RootLayout({
           <Toaster richColors position="top-right" />
           <PosthogInit />
         </ThemeProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
