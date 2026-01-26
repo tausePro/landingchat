@@ -245,6 +245,38 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 )}
                             </div>
 
+                            {/* Precios por cantidad (mayoreo) */}
+                            {product.has_quantity_pricing && product.price_tiers && product.price_tiers.length > 0 && (
+                                <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">price_change</span>
+                                        <h4 className="text-sm font-bold text-blue-800 dark:text-blue-200">Precios por Cantidad</h4>
+                                        {product.minimum_quantity && (
+                                            <span className="text-xs bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full ml-auto">
+                                                Mín. {product.minimum_quantity} unidades
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        {product.price_tiers.map((tier: any, idx: number) => (
+                                            <div key={idx} className="flex items-center justify-between text-sm">
+                                                <span className="text-slate-600 dark:text-slate-300">
+                                                    {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} unidades
+                                                    {tier.label && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">({tier.label})</span>}
+                                                </span>
+                                                <span className="font-bold text-slate-900 dark:text-white">
+                                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(tier.unit_price)}/u
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">chat</span>
+                                        Consulta por cantidades especiales
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="flex items-center gap-2">
                                 <div className="flex text-yellow-400">
                                     {[1, 2, 3, 4, 5].map(i => (
@@ -422,7 +454,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                             {relatedProducts.map((relatedProduct) => {
                                 const productImage = relatedProduct.images?.[0] || relatedProduct.image_url || '/placeholder-product.png'
                                 const productLink = getStoreLink(`/producto/${relatedProduct.slug || relatedProduct.id}`, isSubdomain, slug)
-                                
+
                                 return (
                                     <Link
                                         key={relatedProduct.id}
