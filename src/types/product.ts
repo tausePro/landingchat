@@ -18,17 +18,37 @@ export const subscriptionConfigSchema = z.object({
   discount_percentage: z.number().min(0).max(100).optional(),
 })
 
+// Schema para precios escalonados (mayoreo)
+export const priceTierSchema = z.object({
+  min_quantity: z.number().int().positive(),
+  max_quantity: z.number().int().positive().optional(), // null = infinito
+  unit_price: z.number().positive(),
+  label: z.string().optional(), // "Mayoreo", "Distribuidor"
+})
+
+// Schema para opciones de select con precio
+export const choiceWithPriceSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  price_modifier: z.number().optional(), // +$5000
+  image_url: z.string().url().optional(), // Para visual picker
+})
+
 export const configOptionSchema = z.object({
   name: z.string().min(1, "Option name is required"),
-  type: z.enum(["text", "select", "number", "color"]),
+  type: z.enum(["text", "select", "number", "color", "image"]), // Agregado 'image'
   required: z.boolean(),
   placeholder: z.string().optional(),
   max_length: z.number().int().positive().optional(),
-  choices: z.array(z.string()).optional(),
+  choices: z.array(z.string()).optional(), // Para compatibilidad
+  choices_with_price: z.array(choiceWithPriceSchema).optional(), // Nuevo: choices con precio
   min: z.number().optional(),
   max: z.number().optional(),
   default: z.any().optional(),
   affects_preview: z.boolean().optional(),
+  price_modifier: z.number().optional(), // Precio adicional por esta opción
+  accept_formats: z.array(z.string()).optional(), // Para type 'image': ["png", "jpg", "svg"]
+  max_file_size_mb: z.number().optional(), // Para type 'image'
 })
 
 export const variantSchema = z.object({
@@ -91,6 +111,10 @@ export const createProductSchema = z.object({
   bundle_items: z.array(bundleItemSchema).default([]),
   bundle_discount_type: z.enum(['fixed', 'percentage']).optional().nullable(),
   bundle_discount_value: z.number().min(0).default(0),
+  // Precios escalonados (mayoreo)
+  has_quantity_pricing: z.boolean().default(false),
+  price_tiers: z.array(priceTierSchema).optional(),
+  minimum_quantity: z.number().int().positive().optional(),
   // UI Fields (Stitch Design)
   brand: z.string().optional().nullable(),
   benefits: z.array(z.string()).optional().nullable(),
@@ -115,6 +139,8 @@ export type ConfigOption = z.infer<typeof configOptionSchema>
 export type ProductVariant = z.infer<typeof variantSchema>
 export type ProductOption = z.infer<typeof optionSchema>
 export type BundleItem = z.infer<typeof bundleItemSchema>
+export type PriceTier = z.infer<typeof priceTierSchema>
+export type ChoiceWithPrice = z.infer<typeof choiceWithPriceSchema>
 
 // ============================================================================
 // Product Data Interface (full product from database)
@@ -156,6 +182,10 @@ export interface ProductData {
   bundle_items?: BundleItem[]
   bundle_discount_type?: 'fixed' | 'percentage' | null
   bundle_discount_value?: number
+  // Precios escalonados (mayoreo)
+  has_quantity_pricing?: boolean
+  price_tiers?: PriceTier[]
+  minimum_quantity?: number
   // UI Fields
   brand?: string | null
   benefits?: string[] | null

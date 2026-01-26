@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createProduct, updateProduct } from "../actions"
-import { ProductData, CreateProductInput, ConfigOption } from "@/types/product"
+import { ProductData, CreateProductInput, ConfigOption, PriceTier } from "@/types/product"
 import { getBadges } from "../../badges/actions"
 import { RichTextEditor } from "./rich-text-editor"
 import { ImageUpload } from "./image-upload"
@@ -12,6 +12,7 @@ import { VariantsEditor } from "./variants-editor"
 import { CategoriesInput } from "./categories-input"
 import { ConfigurableOptionsEditor } from "./configurable-options-editor"
 import { BundleEditor } from "./bundle-editor"
+import { PriceTiersEditor } from "./price-tiers-editor"
 import { BundleItem } from "@/types/product"
 import { enhanceProductDescription } from "../ai-actions"
 
@@ -59,6 +60,11 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [bundleItems, setBundleItems] = useState<BundleItem[]>(initialData?.bundle_items || [])
     const [bundleDiscountType, setBundleDiscountType] = useState<'fixed' | 'percentage' | null>(initialData?.bundle_discount_type || null)
     const [bundleDiscountValue, setBundleDiscountValue] = useState(initialData?.bundle_discount_value ?? 0)
+
+    // Price tiers state (precios por cantidad/mayoreo)
+    const [hasQuantityPricing, setHasQuantityPricing] = useState(initialData?.has_quantity_pricing ?? false)
+    const [priceTiers, setPriceTiers] = useState<PriceTier[]>(initialData?.price_tiers || [])
+    const [minimumQuantity, setMinimumQuantity] = useState<number | undefined>(initialData?.minimum_quantity)
 
     // AI Enhancement state
     const [isEnhancing, setIsEnhancing] = useState(false)
@@ -118,6 +124,10 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 bundle_items: isBundle ? bundleItems : [],
                 bundle_discount_type: isBundle ? bundleDiscountType : undefined,
                 bundle_discount_value: isBundle ? bundleDiscountValue : 0,
+                // Precios escalonados (mayoreo)
+                has_quantity_pricing: hasQuantityPricing,
+                price_tiers: hasQuantityPricing ? priceTiers : undefined,
+                minimum_quantity: hasQuantityPricing ? minimumQuantity : undefined,
                 // SEO fields
                 meta_title: metaTitle.trim() || undefined,
                 meta_description: metaDescription.trim() || undefined,
@@ -358,6 +368,44 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
 
                             <div className="border-t border-border-light dark:border-border-dark"></div>
 
+                            {/* Precios por Cantidad Toggle */}
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-primary">price_change</span>
+                                            Precios por Cantidad
+                                        </h3>
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                            Configura precios diferenciados para compras al por mayor.
+                                        </p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={hasQuantityPricing}
+                                            onChange={e => setHasQuantityPricing(e.target.checked)}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                    </label>
+                                </div>
+
+                                {/* Price Tiers Editor */}
+                                {hasQuantityPricing && (
+                                    <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-primary/20">
+                                        <PriceTiersEditor
+                                            tiers={priceTiers}
+                                            onChange={setPriceTiers}
+                                            minimumQuantity={minimumQuantity}
+                                            onMinimumQuantityChange={setMinimumQuantity}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="border-t border-border-light dark:border-border-dark"></div>
+
                             {/* Subscription Toggle */}
                             <div className="flex flex-col gap-4">
                                 <div className="flex items-center justify-between">
@@ -510,13 +558,13 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                 expand_more
                             </span>
                         </button>
-                        
+
                         {showSeoSection && (
                             <div className="mt-6 flex flex-col gap-6">
                                 <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
                                     Optimiza cómo aparece tu producto en buscadores y redes sociales. Usa "Mejorar con IA" para generar automáticamente.
                                 </p>
-                                
+
                                 <div>
                                     <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="meta-title">
                                         Título SEO

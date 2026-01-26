@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 
 export interface ConfigOption {
     name: string
-    type: 'text' | 'select' | 'number' | 'color'
+    type: 'text' | 'select' | 'number' | 'color' | 'image'
     required: boolean
     placeholder?: string
     max_length?: number
@@ -15,7 +15,10 @@ export interface ConfigOption {
     min?: number
     max?: number
     default?: any
-    affects_preview?: boolean // Si esta opción afecta la previsualización
+    affects_preview?: boolean
+    price_modifier?: number
+    accept_formats?: string[]
+    max_file_size_mb?: number
 }
 
 interface ConfigurableOptionsEditorProps {
@@ -132,29 +135,47 @@ export function ConfigurableOptionsEditor({ options, onChange }: ConfigurableOpt
                                     <option value="select">Selección</option>
                                     <option value="number">Número</option>
                                     <option value="color">Color</option>
+                                    <option value="image">Imagen/Logo</option>
                                 </select>
                             </div>
 
-                            <div className="flex items-center gap-4 pt-6">
-                                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={option.required}
-                                        onChange={(e) => updateOption(index, { required: e.target.checked })}
-                                        className="rounded"
+                            <div>
+                                <Label className="text-xs">Precio Adicional (opcional)</Label>
+                                <div className="relative mt-1">
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-500">+$</span>
+                                    <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={option.price_modifier || ""}
+                                        onChange={(e) => updateOption(index, {
+                                            price_modifier: parseFloat(e.target.value) || undefined
+                                        })}
+                                        className="text-sm h-9 pl-6"
+                                        step={100}
                                     />
-                                    Requerido
-                                </label>
-                                <label className="flex items-center gap-2 text-xs cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={option.affects_preview || false}
-                                        onChange={(e) => updateOption(index, { affects_preview: e.target.checked })}
-                                        className="rounded"
-                                    />
-                                    Afecta vista previa
-                                </label>
+                                </div>
                             </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-3">
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={option.required}
+                                    onChange={(e) => updateOption(index, { required: e.target.checked })}
+                                    className="rounded"
+                                />
+                                Requerido
+                            </label>
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={option.affects_preview || false}
+                                    onChange={(e) => updateOption(index, { affects_preview: e.target.checked })}
+                                    className="rounded"
+                                />
+                                Afecta vista previa
+                            </label>
                         </div>
 
                         {/* Type-specific fields */}
@@ -243,6 +264,45 @@ export function ConfigurableOptionsEditor({ options, onChange }: ConfigurableOpt
                                     className="mt-1 text-sm h-9"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">También puedes usar códigos hex: #FFFFFF, #000000</p>
+                            </div>
+                        )}
+
+                        {option.type === 'image' && (
+                            <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">image</span>
+                                    <Label className="text-xs font-medium text-purple-800 dark:text-purple-200">Configuración de Imagen</Label>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label className="text-xs">Formatos aceptados</Label>
+                                        <Input
+                                            placeholder="png, jpg, svg"
+                                            value={option.accept_formats?.join(', ') || ""}
+                                            onChange={(e) => updateOption(index, {
+                                                accept_formats: e.target.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+                                            })}
+                                            className="mt-1 text-sm h-9"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Tamaño máximo (MB)</Label>
+                                        <Input
+                                            type="number"
+                                            placeholder="5"
+                                            value={option.max_file_size_mb || ""}
+                                            onChange={(e) => updateOption(index, {
+                                                max_file_size_mb: parseFloat(e.target.value) || undefined
+                                            })}
+                                            className="mt-1 text-sm h-9"
+                                            min={1}
+                                            step={1}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                                    El cliente podrá subir su logo o imagen para personalizar el producto.
+                                </p>
                             </div>
                         )}
                     </div>
