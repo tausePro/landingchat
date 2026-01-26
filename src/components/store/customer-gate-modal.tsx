@@ -51,8 +51,9 @@ export function CustomerGateModal({
     const [name, setName] = useState("")
     const [phone, setPhone] = useState("")
     const [countryCode, setCountryCode] = useState("+57")
-    const [errors, setErrors] = useState<{ name?: string; phone?: string }>({})
+    const [errors, setErrors] = useState<{ name?: string; phone?: string; dataConsent?: string }>({})
     const [returningCustomer, setReturningCustomer] = useState<Customer | null>(null)
+    const [dataConsentAccepted, setDataConsentAccepted] = useState(false)
 
     const nameInputRef = useRef<HTMLInputElement>(null)
 
@@ -75,7 +76,7 @@ export function CustomerGateModal({
     }, [isOpen])
 
     const validateForm = (): boolean => {
-        const newErrors: { name?: string; phone?: string } = {}
+        const newErrors: { name?: string; phone?: string; dataConsent?: string } = {}
 
         if (!name.trim()) {
             newErrors.name = "Por favor ingresa tu nombre"
@@ -88,6 +89,10 @@ export function CustomerGateModal({
             newErrors.phone = "Por favor ingresa tu WhatsApp"
         } else if (cleanPhone.length < 7 || cleanPhone.length > 15) {
             newErrors.phone = "Número de WhatsApp inválido"
+        }
+
+        if (!dataConsentAccepted) {
+            newErrors.dataConsent = "Debes aceptar el tratamiento de datos para continuar"
         }
 
         setErrors(newErrors)
@@ -234,6 +239,36 @@ export function CustomerGateModal({
                                 </div>
                                 {errors.phone && (
                                     <p className="text-sm text-red-500">{errors.phone}</p>
+                                )}
+                            </div>
+
+                            {/* Checkbox de tratamiento de datos */}
+                            <div className="space-y-2">
+                                <label className="flex items-start gap-3 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        checked={dataConsentAccepted}
+                                        onChange={(e) => {
+                                            setDataConsentAccepted(e.target.checked)
+                                            if (errors.dataConsent) setErrors({ ...errors, dataConsent: undefined })
+                                        }}
+                                        className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                                        disabled={state === "loading"}
+                                    />
+                                    <span className="text-xs text-gray-500 leading-relaxed">
+                                        Acepto el{" "}
+                                        <a
+                                            href={`/store/${slug}/privacidad`}
+                                            target="_blank"
+                                            className="text-primary hover:underline font-medium"
+                                        >
+                                            tratamiento de mis datos personales
+                                        </a>
+                                        {" "}según la Ley 1581 de 2012
+                                    </span>
+                                </label>
+                                {errors.dataConsent && (
+                                    <p className="text-sm text-red-500">{errors.dataConsent}</p>
                                 )}
                             </div>
 
