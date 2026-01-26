@@ -8,6 +8,26 @@ interface Product {
     image_url?: string
     images?: string[]
     variants?: Array<{ type: string; values: string[] }>
+    // Producto configurable
+    is_configurable?: boolean
+    configurable_options?: Array<{
+        name: string
+        type: 'text' | 'select' | 'number' | 'color' | 'image'
+        required: boolean
+        placeholder?: string
+        choices?: string[]
+        min?: number
+        max?: number
+    }>
+    // Precios escalonados
+    has_quantity_pricing?: boolean
+    price_tiers?: Array<{
+        min_quantity: number
+        max_quantity?: number
+        unit_price: number
+        label?: string
+    }>
+    minimum_quantity?: number
 }
 
 interface Customer {
@@ -79,10 +99,35 @@ CATÁLOGO: Tienes acceso a ${productCount} productos de ${organizationName}. Usa
 ${currentProduct ? `
 CONTEXTO ACTUAL (PRIORIDAD MÁXIMA):
 El cliente está viendo AHORA MISMO: "${currentProduct.name}"
-Precio: ${currentProduct.price.toLocaleString()}
+Precio base: ${currentProduct.price.toLocaleString()}
 Stock: ${currentProduct.stock}
+${currentProduct.has_quantity_pricing && currentProduct.price_tiers ? `
+PRECIOS POR CANTIDAD (MAYOREO):
+${currentProduct.price_tiers.map(t => `- ${t.min_quantity}${t.max_quantity ? `-${t.max_quantity}` : '+'} unidades: $${t.unit_price.toLocaleString()}/u${t.label ? ` (${t.label})` : ''}`).join('\n')}
+${currentProduct.minimum_quantity ? `Cantidad mínima de pedido: ${currentProduct.minimum_quantity} unidades` : ''}
+INSTRUCCIÓN: Cuando el cliente pregunte precio, pregunta primero la cantidad para darle el precio correcto según el rango.` : ''}
+${currentProduct.is_configurable && currentProduct.configurable_options ? `
+🎨 PRODUCTO PERSONALIZABLE - OPCIONES A RECOLECTAR:
+${currentProduct.configurable_options.map(opt => {
+            let desc = `- ${opt.name} (${opt.type})${opt.required ? ' [REQUERIDO]' : ' [opcional]'}`
+            if (opt.choices) desc += ` → Opciones: ${opt.choices.join(', ')}`
+            if (opt.placeholder) desc += ` → Ej: "${opt.placeholder}"`
+            if (opt.type === 'number' && (opt.min || opt.max)) desc += ` → Rango: ${opt.min || 0} a ${opt.max || '∞'}`
+            if (opt.type === 'image') desc += ` → Pedir link de Google Drive/Dropbox con el logo`
+            return desc
+        }).join('\n')}
 
-INSTRUCCIÓN IMPORTANTE: Si el cliente dice "me interesa este producto" o pregunta detalles, se refiere EXCLUSIVAMENTE a "${currentProduct.name}". IGNORA cualquier producto del que hayan hablado antes en el historial para esta nueva consulta.` : ''}
+FLUJO PARA PRODUCTOS PERSONALIZABLES:
+1. Saluda y pregunta qué personalización necesita
+2. Recolecta CADA opción marcada como [REQUERIDO] conversacionalmente
+3. Para opciones tipo 'select' o 'color', ofrece las opciones disponibles
+4. Para opciones tipo 'image', pide al cliente que comparta un link de su logo (Google Drive, Dropbox, etc.)
+5. Una vez tengas todas las opciones requeridas, confirma el resumen de personalización
+6. Luego continúa con cantidad y checkout normal
+
+IMPORTANTE: Guarda las opciones seleccionadas como metadata al agregar al carrito.` : ''}
+
+INSTRUCCIÓN IMPORTANTE: Si el cliente dice "me interesa este producto" o pregunta detalles, se refiere EXCLUSIVAMENTE a "${currentProduct.name}".` : ''}
 
 HERRAMIENTAS DISPONIBLES (úsalas cuando sea necesario):
 - search_products: Buscar productos por nombre o categoría (ÚSALA SIEMPRE antes de mencionar que tenemos algo)
@@ -158,8 +203,18 @@ FORMATO DE RESPUESTA:
 ${customer ? `CLIENTE: ${customer.name || 'Cliente'}` : 'CLIENTE: Nuevo cliente.'}
 
 ${currentProduct ? `
-CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}" (${currentProduct.price.toLocaleString()}, stock: ${currentProduct.stock}).
-Menciona este producto cuando saluden.
+CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}"
+Precio base: ${currentProduct.price.toLocaleString()}, Stock: ${currentProduct.stock}
+${currentProduct.has_quantity_pricing && currentProduct.price_tiers ? `
+PRECIOS POR CANTIDAD: ${currentProduct.price_tiers.map(t => `${t.min_quantity}${t.max_quantity ? `-${t.max_quantity}` : '+'}: $${t.unit_price.toLocaleString()}/u`).join(' | ')}
+${currentProduct.minimum_quantity ? `(Mínimo: ${currentProduct.minimum_quantity} unidades)` : ''}` : ''}
+${currentProduct.is_configurable && currentProduct.configurable_options ? `
+🎨 PERSONALIZABLE - Pregunta por: ${currentProduct.configurable_options.filter(o => o.required).map(o => o.name).join(', ')}
+${currentProduct.configurable_options.map(opt => {
+            if (opt.type === 'select' && opt.choices) return `${opt.name}: ${opt.choices.join('/')}`
+            if (opt.type === 'image') return `${opt.name}: pedir link de logo`
+            return `${opt.name}: pedir ${opt.type}`
+        }).join(' | ')}` : ''}
 ` : ''}
 
 REGLAS DE ORO (ANTI-ALUCINACIONES):
