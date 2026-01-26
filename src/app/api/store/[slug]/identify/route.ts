@@ -27,7 +27,34 @@ export async function POST(
 
         const { name, phone } = validation.data
 
+        // Normalizar teléfono y generar variantes para búsqueda
         const cleanPhone = phone.replace(/[^\d+]/g, "")
+
+        // Extraer solo dígitos (sin +)
+        const digitsOnly = phone.replace(/\D/g, "")
+
+        // Generar variantes de búsqueda para encontrar clientes con diferentes formatos
+        const phoneVariants: string[] = []
+
+        // Si tiene prefijo de país (57), generar variantes
+        if (digitsOnly.startsWith("57") && digitsOnly.length >= 12) {
+            // Formato: 573001234567 -> también buscar como 3001234567 y +573001234567
+            phoneVariants.push(digitsOnly)                    // 573001234567
+            phoneVariants.push(digitsOnly.substring(2))       // 3001234567 (sin código de país)
+            phoneVariants.push(`+${digitsOnly}`)             // +573001234567
+        } else if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
+            // Formato: 3001234567 -> también buscar como 573001234567 y +573001234567
+            phoneVariants.push(digitsOnly)                    // 3001234567
+            phoneVariants.push(`57${digitsOnly}`)            // 573001234567
+            phoneVariants.push(`+57${digitsOnly}`)           // +573001234567
+        } else {
+            // Fallback: usar el número limpio como está
+            phoneVariants.push(cleanPhone)
+            phoneVariants.push(digitsOnly)
+        }
+
+        // Eliminar duplicados
+        const uniqueVariants = [...new Set(phoneVariants.filter(p => p.length > 0))]
 
         // Use service role key to bypass RLS
         const supabase = createClient(
@@ -46,13 +73,16 @@ export async function POST(
             return NextResponse.json({ error: "Tienda no encontrada" }, { status: 404 })
         }
 
-        // Buscar cliente existente
-        const { data: existingCustomer } = await supabase
+        // Buscar cliente existente con cualquiera de las variantes de teléfono
+        const { data: existingCustomers } = await supabase
             .from("customers")
-            .select("id, full_name, phone, email, total_orders, total_spent")
+            .select("id, full_name, phone, email, total_orders, total_spent, created_at")
             .eq("organization_id", organization.id)
-            .eq("phone", cleanPhone)
-            .single()
+            .in("phone", uniqueVariants)
+            .order("created_at", { ascending: true }) // El más antiguo primero (cliente original)
+            .limit(1)
+
+        const existingCustomer = existingCustomers?.[0]
 
         if (existingCustomer) {
             await supabase

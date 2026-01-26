@@ -40,11 +40,30 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
     const [showGateModal, setShowGateModal] = useState(false)
+
+    // --- DUMMY DATA FOR TESTING UI (If no products found) ---
+    const dummyProducts = products.length > 0 ? products : [
+        { id: "d1", name: "Sérum Hidratante", price: 85000, image_url: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&q=80&w=200", slug: "serum-hidratante" },
+        { id: "d2", name: "Crema Facial", price: 65000, image_url: "https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?auto=format&fit=crop&q=80&w=200", slug: "crema-facial" },
+        { id: "d3", name: "Tónico Revitalizante", price: 45000, image_url: "https://images.unsplash.com/photo-1608248597279-f99d160bfbc8?auto=format&fit=crop&q=80&w=200", slug: "tonico-revitalizante" },
+        { id: "d4", name: "Mascarilla Arcilla", price: 55000, image_url: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=200", slug: "mascarilla-arcilla" },
+        { id: "d5", name: "Aceite Esencial", price: 35000, image_url: "https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?auto=format&fit=crop&q=80&w=200", slug: "aceite-esencial" }
+    ]
+    const productsToUse = dummyProducts
+    // --------------------------------------------------------
+
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
     const [shippingConfig, setShippingConfig] = useState<any>(null)
-    const { setIsOpen: setCartOpen } = useCartStore()
+    const { setIsOpen: setCartOpen, setOrganizationSlug } = useCartStore()
+
+    // Clear cart if switching organizations
+    useEffect(() => {
+        if (organization.slug) {
+            setOrganizationSlug(organization.slug)
+        }
+    }, [organization.slug, setOrganizationSlug])
 
     // Capturar UTM params al entrar a la tienda
     useTrackingParams(slug)
@@ -162,7 +181,8 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
     }
 
     // Feature Flag for Storefront 2.0
-    const USE_CONVERSATIONAL_LAYOUT = true
+    // Desactivado temporalmente mientras implementamos checkout conversacional
+    const USE_CONVERSATIONAL_LAYOUT = false
 
     const content = (
         <div className="min-h-screen bg-white dark:bg-gray-950 text-slate-900 dark:text-slate-100" style={{ fontFamily: fontFamily }}>

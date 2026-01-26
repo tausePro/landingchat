@@ -11,10 +11,12 @@ import {
     StartCheckoutSchema,
     GetShippingOptionsSchema,
     ApplyDiscountSchema,
+    RenderCheckoutSummarySchema,
     GetStoreInfoSchema,
     GetOrderStatusSchema,
     GetCustomerHistorySchema,
     ConfirmShippingDetailsSchema,
+    CreatePaymentLinkSchema,
     EscalateToHumanSchema
 } from "./tools"
 
@@ -74,6 +76,9 @@ export async function executeTool(
             case "apply_discount":
                 return await applyDiscount(supabase, input, context)
 
+            case "render_checkout_summary":
+                return await renderCheckoutSummary(supabase, input, context)
+
             case "get_store_info":
                 return await getStoreInfo(supabase, input, context)
 
@@ -85,6 +90,9 @@ export async function executeTool(
 
             case "confirm_shipping_details":
                 return await confirmShippingDetails(supabase, input, context)
+
+            case "create_payment_link":
+                return await createPaymentLink(supabase, input, context)
 
             case "escalate_to_human":
                 return await escalateToHuman(supabase, input, context)
@@ -733,13 +741,14 @@ async function getCustomerHistory(supabase: any, context: ToolContext): Promise<
 
     const { data: customer } = await supabase
         .from("customers")
-        .select("full_name, metadata, total_orders, total_spent")
+        .select("full_name, email, phone, metadata, total_orders, total_spent, document_type, document_number, person_type, business_name")
         .eq("id", context.customerId)
         .single()
 
+    // Obtener órdenes recientes CON customer_info para reutilizar datos de envío
     const { data: orders } = await supabase
         .from("orders")
-        .select("id, items, total, status, created_at")
+        .select("id, items, total, status, created_at, customer_info")
         .eq("customer_id", context.customerId)
         .order("created_at", { ascending: false })
         .limit(5)
@@ -748,15 +757,47 @@ async function getCustomerHistory(supabase: any, context: ToolContext): Promise<
     const purchasedProducts = orders?.flatMap((o: any) => o.items?.map((i: any) => i.name)) || []
     const categories = [...new Set(purchasedProducts)]
 
+    // Obtener última dirección de envío de la orden más reciente
+    const lastOrder = orders?.[0]
+    const lastShippingInfo = lastOrder?.customer_info ? {
+        name: lastOrder.customer_info.name,
+        email: lastOrder.customer_info.email,
+        phone: lastOrder.customer_info.phone,
+        address: lastOrder.customer_info.address,
+        city: lastOrder.customer_info.city,
+        state: lastOrder.customer_info.state,
+        document_type: lastOrder.customer_info.document_type,
+        document_number: lastOrder.customer_info.document_number,
+        person_type: lastOrder.customer_info.person_type,
+        business_name: lastOrder.customer_info.business_name
+    } : null
+
+    // También obtener de metadata del cliente (puede ser más reciente si se actualizó en checkout)
+    const customerAddress = customer?.metadata ? {
+        address: customer.metadata.address,
+        city: customer.metadata.city,
+        state: customer.metadata.state
+    } : null
+
     return {
         success: true,
         data: {
             hasHistory: true,
             customer: {
                 name: customer?.full_name,
+                email: customer?.email,
+                phone: customer?.phone,
                 totalOrders: customer?.total_orders || 0,
-                totalSpent: customer?.total_spent || 0
+                totalSpent: customer?.total_spent || 0,
+                // Datos de facturación guardados
+                documentType: customer?.document_type,
+                documentNumber: customer?.document_number,
+                personType: customer?.person_type,
+                businessName: customer?.business_name
             },
+            // ⭐ NUEVA DATA: Última información de envío para reutilizar
+            lastShippingInfo: lastShippingInfo,
+            savedAddress: customerAddress,
             recentOrders: orders?.map((o: any) => ({
                 id: o.id,
                 date: o.created_at,
@@ -786,17 +827,37 @@ async function confirmShippingDetails(supabase: any, input: any, context: ToolCo
         },
         shipping: {
             address: validatedData.address,
-            city: validatedData.city
+            city: validatedData.city,
+            state: validatedData.state
         }
     }
 
-    // Guardar los datos en el chat para uso posterior en checkout
+    // Guardar los datos en el chat para uso posterior en checkout (createPaymentLink)
+    // Obtener metadata existente primero
+    const { data: existingChat } = await supabase
+        .from("chats")
+        .select("metadata")
+        .eq("id", context.chatId)
+        .single()
+
     await supabase
         .from("chats")
         .update({
             metadata: {
-                ...context,
+                ...(existingChat?.metadata || {}),
                 shippingDetails: confirmation,
+                confirmed_shipping: {
+                    customer_name: validatedData.customer_name,
+                    email: validatedData.email,
+                    phone: validatedData.phone,
+                    address: validatedData.address,
+                    city: validatedData.city,
+                    state: validatedData.state,
+                    document_type: validatedData.document_type || "CC",
+                    document_number: validatedData.document_number,
+                    person_type: validatedData.person_type || "Natural",
+                    business_name: validatedData.business_name
+                },
                 confirmedAt: new Date().toISOString()
             }
         })
@@ -807,7 +868,9 @@ async function confirmShippingDetails(supabase: any, input: any, context: ToolCo
         data: {
             confirmed: true,
             details: confirmation,
-            message: "Perfecto, he confirmado todos tus datos. ¿Todo está correcto para proceder con el pago?"
+            message: "Datos confirmados correctamente.",
+            nextStep: "payment",
+            instructions: "Ahora pregunta al cliente qué método de pago prefiere: Pago en línea (ePayco) o contra entrega. Luego usa 'create_payment_link' con el método elegido."
         }
     }
 }
@@ -852,6 +915,226 @@ async function escalateToHuman(supabase: any, input: any, context: ToolContext):
             message: assignedAgent
                 ? `Te estoy transfiriendo con ${assignedAgent.name}. Un momento por favor.`
                 : "He notificado a nuestro equipo. Te atenderán en breve."
+        }
+    }
+}
+
+// ==================== CHECKOUT CONVERSACIONAL ====================
+
+async function renderCheckoutSummary(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { message } = RenderCheckoutSummarySchema.parse(input)
+
+    // Obtener carrito actual
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    if (!cart || !cart.items?.length) {
+        return {
+            success: true,
+            data: {
+                isEmpty: true,
+                ui_component: "checkout_summary",
+                message: "Tu carrito está vacío. ¿Te ayudo a encontrar algo?"
+            }
+        }
+    }
+
+    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const itemCount = cart.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
+
+    // Obtener configuración de envío de la organización
+    const { data: shippingSettings } = await supabase
+        .from("shipping_settings")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 120000
+    const defaultShipping = shippingSettings?.default_shipping_rate || 10000
+    const qualifiesForFreeShipping = subtotal >= freeShippingThreshold
+
+    return {
+        success: true,
+        data: {
+            ui_component: "checkout_summary",
+            message: message || "¡Excelente elección! Aquí tienes el resumen de tu pedido:",
+            cart: {
+                items: cart.items.map((item: any) => ({
+                    id: item.product_id,
+                    name: item.name,
+                    price: item.price,
+                    quantity: item.quantity,
+                    image_url: item.image_url,
+                    subtotal: item.price * item.quantity
+                })),
+                itemCount,
+                subtotal,
+                estimatedShipping: qualifiesForFreeShipping ? 0 : defaultShipping,
+                freeShippingThreshold,
+                qualifiesForFreeShipping,
+                total: subtotal + (qualifiesForFreeShipping ? 0 : defaultShipping)
+            },
+            nextStep: "shipping_form",
+            instructions: "Para continuar, necesito tus datos de envío. ¿Me los puedes proporcionar?"
+        }
+    }
+}
+
+// ==================== CREACIÓN DE LINK DE PAGO ====================
+
+async function createPaymentLink(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    console.log("[createPaymentLink] Starting with input:", input)
+    console.log("[createPaymentLink] Context:", { chatId: context.chatId, organizationId: context.organizationId })
+
+    const { payment_method, customer_message } = CreatePaymentLinkSchema.parse(input)
+
+    // Obtener el carrito actual
+    const { data: cart, error: cartError } = await supabase
+        .from("carts")
+        .select("*")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+
+    console.log("[createPaymentLink] Cart query result:", { cart: cart?.id, items: cart?.items?.length, error: cartError })
+
+    if (!cart || !cart.items?.length) {
+        console.log("[createPaymentLink] ERROR: No cart or empty items")
+        return {
+            success: false,
+            error: "No hay productos en el carrito. Agrega productos antes de proceder al pago."
+        }
+    }
+
+    // Obtener datos de envío confirmados (del chat metadata o del último confirm_shipping)
+    const { data: chat } = await supabase
+        .from("chats")
+        .select("metadata, customer_id")
+        .eq("id", context.chatId)
+        .single()
+
+    console.log("[createPaymentLink] Chat metadata:", chat?.metadata)
+    console.log("[createPaymentLink] Confirmed shipping:", chat?.metadata?.confirmed_shipping)
+
+    const shippingInfo = chat?.metadata?.confirmed_shipping
+
+    if (!shippingInfo) {
+        console.log("[createPaymentLink] ERROR: No confirmed_shipping in metadata")
+        return {
+            success: false,
+            error: "No hay datos de envío confirmados. Usa confirm_shipping_details primero."
+        }
+    }
+
+    // Calcular totales
+    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+
+    // Obtener configuración de envío
+    const { data: shippingSettings } = await supabase
+        .from("shipping_settings")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 120000
+    const shippingCost = subtotal >= freeShippingThreshold ? 0 : (shippingSettings?.default_shipping_rate || 7000)
+    const total = subtotal + shippingCost
+
+    // Obtener organización para el slug
+    const { data: organization } = await supabase
+        .from("organizations")
+        .select("id, slug, name")
+        .eq("id", context.organizationId)
+        .single()
+
+    // Generar número de orden único
+    const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`
+
+    // Crear la orden
+    const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+            organization_id: context.organizationId,
+            customer_id: chat?.customer_id || null,
+            chat_id: context.chatId,
+            order_number: orderNumber,
+            items: cart.items.map((item: any) => ({
+                product_id: item.product_id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                image_url: item.image_url
+            })),
+            subtotal: subtotal,
+            shipping_cost: shippingCost,
+            total: total,
+            status: "pending",
+            payment_status: "pending",
+            payment_method: payment_method || "epayco",
+            customer_info: {
+                name: shippingInfo.customer_name,
+                email: shippingInfo.email || null,
+                phone: shippingInfo.phone,
+                address: shippingInfo.address,
+                city: shippingInfo.city,
+                state: shippingInfo.state || null,
+                document_type: shippingInfo.document_type || "CC",
+                document_number: shippingInfo.document_number,
+                person_type: shippingInfo.person_type || "Natural",
+                business_name: shippingInfo.business_name || null
+            }
+        })
+        .select("id, order_number")
+        .single()
+
+    if (orderError) {
+        console.error("[createPaymentLink] Error creating order:", orderError)
+        return {
+            success: false,
+            error: "Error al crear la orden. Por favor intenta de nuevo."
+        }
+    }
+
+    // Marcar carrito como convertido
+    await supabase
+        .from("carts")
+        .update({ status: "converted", converted_order_id: order.id })
+        .eq("id", cart.id)
+
+    // Generar link de pago según el método
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    let paymentUrl: string
+    let paymentInstructions: string
+
+    if (payment_method === "manual" || payment_method === "contraentrega") {
+        paymentUrl = `${baseUrl}/store/${organization.slug}/order/${order.id}`
+        paymentInstructions = "Tu pedido ha sido registrado. Puedes pagar contra entrega o por transferencia."
+    } else {
+        // ePayco o Wompi - redirigir a página de checkout
+        paymentUrl = `${baseUrl}/store/${organization.slug}/checkout/epayco/${order.id}`
+        paymentInstructions = "Haz clic en el enlace para completar tu pago de forma segura."
+    }
+
+    return {
+        success: true,
+        data: {
+            ui_component: "payment_link",
+            order: {
+                id: order.id,
+                orderNumber: order.order_number,
+                total: total,
+                subtotal: subtotal,
+                shippingCost: shippingCost,
+                itemCount: cart.items.length
+            },
+            paymentMethod: payment_method || "epayco",
+            paymentUrl: paymentUrl,
+            message: customer_message || "¡Gracias por tu compra!",
+            instructions: paymentInstructions
         }
     }
 }

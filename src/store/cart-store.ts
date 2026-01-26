@@ -14,6 +14,8 @@ export interface CartItem extends Product {
 
 interface CartState {
     items: CartItem[]
+    organizationSlug: string | null
+    setOrganizationSlug: (slug: string) => void
     isOpen: boolean
     addItem: (product: Product, quantity?: number) => void
     removeItem: (productId: string) => void
@@ -28,7 +30,15 @@ export const useCartStore = create<CartState>()(
     persist(
         (set, get) => ({
             items: [],
+            organizationSlug: null,
             isOpen: false,
+            setOrganizationSlug: (slug) => {
+                const currentSlug = get().organizationSlug
+                // If slug changes OR is initialized from null (legacy state), clear cart
+                if (currentSlug !== slug) {
+                    set({ items: [], organizationSlug: slug })
+                }
+            },
             addItem: (product, quantity = 1) => {
                 const items = get().items
                 const existingItem = items.find((item) => item.id === product.id)

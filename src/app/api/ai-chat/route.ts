@@ -4,13 +4,22 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { z } from "zod"
 
+const cartItemSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    price: z.number(),
+    quantity: z.number(),
+    image_url: z.string().optional()
+})
+
 const aiChatSchema = z.object({
     message: z.string().min(1, "Message is required").max(2000, "Message too long"),
     chatId: z.string().uuid().optional(),
     slug: z.string().min(1, "Slug is required"),
     customerId: z.string().uuid().optional(),
     currentProductId: z.string().uuid().optional(),
-    context: z.string().optional()
+    context: z.string().optional(),
+    cartItems: z.array(cartItemSchema).optional() // Carrito del frontend
 })
 
 export async function POST(request: NextRequest) {
@@ -50,7 +59,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { message, chatId, slug, customerId: bodyCustomerId, currentProductId } = validation.data
+        const { message, chatId, slug, customerId: bodyCustomerId, currentProductId, cartItems } = validation.data
 
         const supabase = createServiceClient()
 
@@ -131,6 +140,48 @@ export async function POST(request: NextRequest) {
             agentId = chat.assigned_agent_id
             // Usar customerId del body si existe, sino del chat
             customerId = bodyCustomerId || chat.customer_id
+        }
+
+        // Sync frontend cart with database (if cartItems provided)
+        if (cartItems && cartItems.length > 0 && currentChatId) {
+            // Transform frontend cart items to DB format
+            const dbCartItems = cartItems.map(item => ({
+                product_id: item.id,
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity,
+                image_url: item.image_url || null
+            }))
+
+            // Upsert cart in database
+            const { data: existingCart } = await supabase
+                .from("carts")
+                .select("id")
+                .eq("chat_id", currentChatId)
+                .eq("status", "active")
+                .single()
+
+            if (existingCart) {
+                // Update existing cart
+                await supabase
+                    .from("carts")
+                    .update({
+                        items: dbCartItems,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq("id", existingCart.id)
+            } else {
+                // Create new cart
+                await supabase
+                    .from("carts")
+                    .insert({
+                        organization_id: organization.id,
+                        chat_id: currentChatId,
+                        customer_id: customerId || null,
+                        items: dbCartItems,
+                        status: "active"
+                    })
+            }
         }
 
         // Process message with AI agent

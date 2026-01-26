@@ -149,16 +149,16 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         // Si hay un ID de chat existente, intentar retomarlo
         if (existingChatId) {
             const historyLoaded = await fetchHistory(existingChatId)
-            
+
             if (historyLoaded) {
                 // Chat retomado exitosamente
                 setChatId(existingChatId)
                 currentChatId = existingChatId
-                
+
                 // Verificar si hay contexto de producto nuevo para inyectar en la conversación existente
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
-                
+
                 if (!productId) {
                     setIsInitializing(false)
                     return
@@ -181,6 +181,16 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 })
 
                 if (!response.ok) {
+                    // Si el cliente no existe (fue eliminado), limpiar localStorage y redirigir
+                    if (response.status === 404) {
+                        console.warn("Cliente no encontrado, limpiando sesión...")
+                        localStorage.removeItem(`customer_${slug}`)
+                        localStorage.removeItem(`customer_name_${slug}`)
+                        localStorage.removeItem(`chatId_${slug}`)
+                        const storeUrl = getStoreLink('/?action=chat', isSubdomain, slug)
+                        router.push(storeUrl)
+                        return
+                    }
                     throw new Error("Failed to init chat")
                 }
 
@@ -220,10 +230,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     // Esto ayuda al agente a diferenciar del contexto histórico
                     const targetProduct = loadedProducts.find(p => p.id === productId)
                     const productName = targetProduct ? targetProduct.name : 'este producto'
-                    
+
                     // Activar indicador de "escribiendo"
                     setIsLoading(true)
-                    
+
                     // Llamada no bloqueante (Background processing)
                     fetch('/api/ai-chat', {
                         method: 'POST',
@@ -278,8 +288,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     })
                 }
             } else {
-                 setError("No se pudo iniciar la conversación.")
-                 setIsInitializing(false)
+                setError("No se pudo iniciar la conversación.")
+                setIsInitializing(false)
             }
         } catch (error) {
             console.error("Error initializing chat:", error)
@@ -292,7 +302,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         try {
             const res = await fetch(`/api/store/${slug}/chat/${id}/messages`)
             if (!res.ok) return false
-            
+
             const historyData = await res.json()
             if (historyData.messages) {
                 const parsedMessages = historyData.messages.map((m: any) => ({
@@ -334,7 +344,15 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     message: textToSend,
                     chatId,
                     slug,
-                    customerId
+                    customerId,
+                    // Sync frontend cart with backend
+                    cartItems: items.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        quantity: item.quantity,
+                        image_url: item.image_url
+                    }))
                     // Note: NOT passing currentProductId here - that context is only for initial message
                     // The AI should use search_products tool to find products for user queries
                 })
@@ -432,25 +450,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     // Smart Recommendations Logic
     // 1. Identify the most relevant category from the last active product
     const lastActiveProduct = activeProducts.length > 0 ? activeProducts[activeProducts.length - 1] : null
-    
+
     let recommendedProducts: Product[] = []
-    
+
     if (lastActiveProduct && lastActiveProduct.categories && Array.isArray(lastActiveProduct.categories) && lastActiveProduct.categories.length > 0) {
         // 2. Filter products by matching category, excluding current active products
-        recommendedProducts = products.filter(p => 
+        recommendedProducts = products.filter(p =>
             p.id !== lastActiveProduct.id && // Not the same product
             !activeProducts.find((ap: any) => ap.id === p.id) && // Not already in conversation
             p.categories?.some((c: string) => lastActiveProduct.categories?.includes(c)) // Matches any category
         ).slice(0, 5)
     }
-    
+
     // 3. Fallback: If not enough recommendations, fill with other available products
     if (recommendedProducts.length < 5) {
-        const fallback = products.filter(p => 
-            !activeProducts.find((ap: any) => ap.id === p.id) && 
+        const fallback = products.filter(p =>
+            !activeProducts.find((ap: any) => ap.id === p.id) &&
             !recommendedProducts.find(rp => rp.id === p.id)
         ).slice(0, 5 - recommendedProducts.length)
-        
+
         recommendedProducts = [...recommendedProducts, ...fallback]
     }
 
@@ -464,7 +482,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Algo salió mal</h3>
                     <p className="text-sm text-gray-500 mt-2 max-w-xs mx-auto">{error}</p>
                 </div>
-                <button 
+                <button
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
                 >
@@ -526,10 +544,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             activeProducts={activeProducts} // Living Sidebar Data
             recommendedProducts={recommendedProducts}
             customHeader={
-                <StoreHeader 
+                <StoreHeader
                     slug={slug}
                     organization={organization}
-                    onStartChat={() => {}} // No-op in chat
+                    onStartChat={() => { }} // No-op in chat
                     primaryColor={primaryColor}
                     showStoreName={showStoreName}
                     isChatMode={true}
@@ -564,10 +582,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             onCartClick={toggleCart}
             onDeleteChat={handleDeleteChat}
             rightSidebar={
-                <CartSidebar 
-                    slug={slug} 
-                    primaryColor={primaryColor} 
-                    recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)} 
+                <CartSidebar
+                    slug={slug}
+                    primaryColor={primaryColor}
+                    recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
                     onCheckout={() => setIsCheckoutOpen(true)}
                     shippingConfig={shippingConfig}
                 />
@@ -581,7 +599,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 <div className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md md:hidden">
                     <div className="container mx-auto flex h-14 items-center justify-between px-4">
                         <div className="flex items-center gap-3">
-                            <div 
+                            <div
                                 className="size-8 rounded-full flex items-center justify-center text-white"
                                 style={{ backgroundColor: primaryColor }}
                             >
@@ -612,7 +630,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {messages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-50">
-                            <div 
+                            <div
                                 className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
                                 style={{ backgroundColor: `${primaryColor}20` }}
                             >
@@ -639,27 +657,27 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                                     <div className="space-y-2 max-w-[85%]">
                                         {msg.content && (
-                                            <div 
+                                            <div
                                                 className={`text-sm font-normal leading-normal px-4 py-3 shadow-sm ${msg.role === 'user'
-                                                ? 'rounded-2xl rounded-br-none text-white'
-                                                : 'rounded-2xl rounded-bl-none bg-white dark:bg-gray-800 text-slate-800 dark:text-gray-200 border border-slate-200 dark:border-gray-700'
-                                                }`}
+                                                    ? 'rounded-2xl rounded-br-none text-white'
+                                                    : 'rounded-2xl rounded-bl-none bg-white dark:bg-gray-800 text-slate-800 dark:text-gray-200 border border-slate-200 dark:border-gray-700'
+                                                    }`}
                                                 style={msg.role === 'user' ? { backgroundColor: primaryColor } : {}}
                                             >
                                                 {msg.role === 'user' ? (
                                                     msg.content
                                                 ) : (
-                                                    <ReactMarkdown 
+                                                    <ReactMarkdown
                                                         remarkPlugins={[remarkGfm]}
                                                         components={{
-                                                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                                                            a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium hover:opacity-80" style={{ color: primaryColor }} {...props} />,
-                                                            ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-                                                            ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-                                                            li: ({node, ...props}) => <li className="" {...props} />,
-                                                            strong: ({node, ...props}) => <strong className="font-bold" {...props} />,
-                                                            em: ({node, ...props}) => <em className="italic" {...props} />,
-                                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 pl-3 italic text-gray-500 dark:text-gray-400 my-2" style={{ borderColor: `${primaryColor}50` }} {...props} />,
+                                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                            a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium hover:opacity-80" style={{ color: primaryColor }} {...props} />,
+                                                            ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                                                            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                                                            li: ({ node, ...props }) => <li className="" {...props} />,
+                                                            strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
+                                                            em: ({ node, ...props }) => <em className="italic" {...props} />,
+                                                            blockquote: ({ node, ...props }) => <blockquote className="border-l-2 pl-3 italic text-gray-500 dark:text-gray-400 my-2" style={{ borderColor: `${primaryColor}50` }} {...props} />,
                                                         }}
                                                     >
                                                         {msg.content}
@@ -669,7 +687,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                         )}
 
                                         {msg.product && (
-                                            <ChatProductCard 
+                                            <ChatProductCard
                                                 product={msg.product}
                                                 formatPrice={formatPrice}
                                                 primaryColor={primaryColor}
@@ -698,7 +716,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                             })}
                                                             disabled={product.stock <= 0}
                                                             className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-md h-8 gap-1 text-xs font-bold leading-normal tracking-[0.015em] transition-colors disabled:opacity-50"
-                                                            style={{ 
+                                                            style={{
                                                                 backgroundColor: `${primaryColor}20`,
                                                                 color: primaryColor
                                                             }}
@@ -742,19 +760,19 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                 {/* Magic Input Area */}
                 <div className="w-full shrink-0 p-5 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 relative z-30">
-                     {/* Quick Replies - Floating above input */}
-                     <div className="absolute -top-12 left-6 flex gap-2 overflow-x-auto max-w-[95%] pb-2 scrollbar-hide mask-fade-right z-10">
+                    {/* Quick Replies - Floating above input */}
+                    <div className="absolute -top-12 left-6 flex gap-2 overflow-x-auto max-w-[95%] pb-2 scrollbar-hide mask-fade-right z-10">
                         {[
                             { text: "Recomiéndame un producto para...", icon: "auto_awesome" },
                             { text: "Quiero ver ofertas disponibles", icon: "local_offer" },
                             { text: "¿Qué métodos de pago aceptan?", icon: "credit_card" }
                         ].map((qr, i) => (
-                            <button 
+                            <button
                                 key={i}
                                 onClick={() => handleSend(qr.text)}
                                 className="whitespace-nowrap flex items-center gap-1.5 px-4 py-1.5 bg-white/90 dark:bg-gray-800/90 backdrop-blur border text-xs font-bold rounded-full shadow-sm transition-all transform hover:-translate-y-0.5"
-                                style={{ 
-                                    color: primaryColor, 
+                                style={{
+                                    color: primaryColor,
                                     borderColor: `${primaryColor}30`,
                                 }}
                                 onMouseEnter={(e) => {
@@ -773,9 +791,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     <div className="max-w-4xl mx-auto relative">
                         {/* Magic Glow Effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-100 via-purple-50 to-indigo-100 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 rounded-2xl opacity-50 blur-sm pointer-events-none"></div>
-                        
+
                         <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-2 flex items-center gap-2 focus-within:ring-2 transition-all"
-                             style={{ '--tw-ring-color': `${primaryColor}30` } as any}
+                            style={{ '--tw-ring-color': `${primaryColor}30` } as any}
                         >
                             <div className="flex-1 px-2 py-1">
                                 <textarea
@@ -789,7 +807,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                     style={{ minHeight: '24px' }}
                                 />
                             </div>
-                            
+
                             <div className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-700 pl-2">
                                 <button className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors" title="Adjuntar imagen (Próximamente)"
                                     style={{ '--hover-color': primaryColor } as any}
@@ -801,7 +819,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                 <button className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 rounded-xl transition-colors" title="Emoji (Próximamente)">
                                     <span className="material-symbols-outlined text-[20px]">sentiment_satisfied</span>
                                 </button>
-                                
+
                                 <button
                                     onClick={() => handleSend()}
                                     disabled={!input.trim() || isLoading}
@@ -813,7 +831,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="max-w-4xl mx-auto mt-3 flex justify-center">
                         <p className="text-[10px] text-gray-400 text-center font-medium">
                             LandingChat AI • Recomendaciones personalizadas basadas en tu navegación.
@@ -821,8 +839,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     </div>
                 </div>
             </div>
-            <CartDrawer 
-                slug={slug} 
+            <CartDrawer
+                slug={slug}
                 primaryColor={primaryColor}
                 recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
                 onlyMobile={true}

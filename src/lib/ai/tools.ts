@@ -199,6 +199,19 @@ export const tools: Anthropic.Tool[] = [
             required: ["code"]
         }
     },
+    {
+        name: "render_checkout_summary",
+        description: "Muestra el resumen del carrito con opción de proceder al checkout conversacional. USAR cuando el cliente dice que quiere comprar, pagar, o finalizar su compra. Esto renderiza una tarjeta visual con los productos, totales, y botón para continuar.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                message: {
+                    type: "string",
+                    description: "Mensaje opcional para acompañar el resumen (ej: '¡Excelente elección! Aquí tienes tu resumen:')"
+                }
+            }
+        }
+    },
 
     // ==================== INFORMACIÓN ====================
     {
@@ -243,7 +256,7 @@ export const tools: Anthropic.Tool[] = [
     // ==================== CONFIRMACIÓN ====================
     {
         name: "confirm_shipping_details",
-        description: "Confirma y resume los datos de envío proporcionados por el cliente antes de proceder al checkout. Usar cuando el cliente haya dado toda su información de contacto y envío.",
+        description: "Confirma y resume los datos de envío proporcionados por el cliente antes de proceder al checkout. Usar cuando el cliente haya dado su información de contacto y envío. El email es OPCIONAL.",
         input_schema: {
             type: "object" as const,
             properties: {
@@ -253,7 +266,7 @@ export const tools: Anthropic.Tool[] = [
                 },
                 email: {
                     type: "string",
-                    description: "Email del cliente"
+                    description: "Email del cliente (OPCIONAL - no pedir si no lo ofrece)"
                 },
                 phone: {
                     type: "string",
@@ -261,30 +274,54 @@ export const tools: Anthropic.Tool[] = [
                 },
                 address: {
                     type: "string",
-                    description: "Dirección completa de envío"
+                    description: "Dirección completa de envío incluyendo barrio"
                 },
                 city: {
                     type: "string",
                     description: "Ciudad de envío"
                 },
+                state: {
+                    type: "string",
+                    description: "Departamento de envío"
+                },
                 document_type: {
                     type: "string",
-                    description: "Tipo de documento (CC, NIT, etc.)"
+                    description: "Tipo de documento (CC, NIT, CE). Por defecto CC si no especifica."
                 },
                 document_number: {
                     type: "string",
-                    description: "Número de documento"
+                    description: "Número de documento/cédula"
                 },
                 person_type: {
                     type: "string",
-                    description: "Tipo de persona (Natural o Jurídica)"
+                    description: "Tipo de persona (Natural o Jurídica). Por defecto Natural."
                 },
                 business_name: {
                     type: "string",
-                    description: "Nombre de empresa (si es persona jurídica)"
+                    description: "Nombre de empresa (solo si es persona jurídica)"
                 }
             },
-            required: ["customer_name", "email", "phone", "address", "city", "document_type", "document_number", "person_type"]
+            // Email es OPCIONAL - solo los campos mínimos necesarios
+            required: ["customer_name", "phone", "address", "city", "document_number"]
+        }
+    },
+
+    // ==================== PAGO ====================
+    {
+        name: "create_payment_link",
+        description: "Crea una orden y genera un link de pago. USAR después de confirmar los datos de envío con confirm_shipping_details. El cliente recibirá un link para pagar con la pasarela seleccionada.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                payment_method: {
+                    type: "string",
+                    description: "Método de pago: 'epayco' (tarjetas y PSE), 'wompi' (tarjetas), 'manual' (contraentrega/transferencia). Por defecto 'epayco'."
+                },
+                customer_message: {
+                    type: "string",
+                    description: "Mensaje opcional para el cliente (ej: 'Gracias por tu compra!')"
+                }
+            }
         }
     },
 
@@ -363,6 +400,10 @@ export const ApplyDiscountSchema = z.object({
     code: z.string()
 })
 
+export const RenderCheckoutSummarySchema = z.object({
+    message: z.string().optional()
+})
+
 export const GetStoreInfoSchema = z.object({
     topic: z.string().optional()
 })
@@ -376,14 +417,20 @@ export const GetCustomerHistorySchema = z.object({})
 
 export const ConfirmShippingDetailsSchema = z.object({
     customer_name: z.string(),
-    email: z.string().email(),
+    email: z.string().email().optional(), // OPCIONAL
     phone: z.string(),
     address: z.string(),
     city: z.string(),
-    document_type: z.string(),
+    state: z.string().optional(), // Departamento
+    document_type: z.string().optional().default("CC"),
     document_number: z.string(),
-    person_type: z.string(),
+    person_type: z.string().optional().default("Natural"),
     business_name: z.string().optional()
+})
+
+export const CreatePaymentLinkSchema = z.object({
+    payment_method: z.string().optional().default("epayco"),
+    customer_message: z.string().optional()
 })
 
 export const EscalateToHumanSchema = z.object({
