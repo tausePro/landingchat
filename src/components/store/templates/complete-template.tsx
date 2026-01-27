@@ -246,7 +246,7 @@ export function CompleteTemplate({
                                     <Button
                                         variant="outline"
                                         size="lg"
-                                        className={`w-full sm:w-auto text-base h-14 ${heroBackgroundImage ? 'border-white text-white hover:bg-white/10' : ''}`}
+                                        className={`w-full sm:w-auto text-base h-14 ${heroBackgroundImage ? 'border-white text-white bg-transparent hover:bg-white/10 hover:text-white' : ''}`}
                                         onClick={() => {
                                             const productsUrl = getStoreLink('/productos', isSubdomain, organization.slug)
                                             window.location.href = productsUrl
