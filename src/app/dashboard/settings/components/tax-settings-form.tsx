@@ -32,7 +32,7 @@ export function TaxSettingsForm({ organization }: TaxSettingsFormProps) {
     const [loading, setLoading] = useState(false)
 
     const form = useForm<TaxFormValues>({
-        resolver: zodResolver(taxFormSchema),
+        resolver: zodResolver(taxFormSchema) as any,
         defaultValues: {
             tax_enabled: organization.tax_enabled || false,
             tax_rate: organization.tax_rate || 0,
