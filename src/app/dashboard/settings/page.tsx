@@ -7,6 +7,7 @@ import { IdentificationForm } from "./components/identification-form"
 import { StorefrontForm } from "./components/storefront-form"
 import { CustomDomainForm } from "./components/custom-domain-form"
 import { StoreMaintenanceToggle } from "./components/store-maintenance-toggle"
+import { TaxSettingsForm } from "./components/tax-settings-form"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
@@ -34,6 +35,7 @@ export default async function SettingsPage() {
                             <TabsTrigger value="storefront">Storefront</TabsTrigger>
                             <TabsTrigger value="domain">Dominio</TabsTrigger>
                             <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
+                            <TabsTrigger value="taxes">Impuestos</TabsTrigger>
                             <TabsTrigger value="payments">Pagos</TabsTrigger>
                             <TabsTrigger value="shipping">Envíos</TabsTrigger>
                             <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
@@ -42,17 +44,17 @@ export default async function SettingsPage() {
                             <ProfileForm profile={data.profile} />
                         </TabsContent>
                         <TabsContent value="organization">
-                            <OrganizationForm organization={data.organization} />
+                            <OrganizationForm organization={data.organization as any} />
                         </TabsContent>
                         <TabsContent value="identification">
-                            <IdentificationForm organization={data.organization} />
+                            <IdentificationForm organization={data.organization as any} />
                         </TabsContent>
                         <TabsContent value="storefront">
-                            <StorefrontForm organization={data.organization} />
+                            <StorefrontForm organization={data.organization as any} />
                         </TabsContent>
                         <TabsContent value="domain">
-                            <CustomDomainForm 
-                                organization={data.organization} 
+                            <CustomDomainForm
+                                organization={data.organization as any}
                                 hasCustomDomainFeature={data.hasCustomDomainFeature}
                             />
                         </TabsContent>
@@ -64,21 +66,24 @@ export default async function SettingsPage() {
                                         Controla la visibilidad de tu tienda para el público mientras realizas cambios.
                                     </p>
                                 </div>
-                                <StoreMaintenanceToggle 
+                                <StoreMaintenanceToggle
                                     organizationId={data.organization.id}
                                     storeSlug={data.organization.slug}
-                                    customDomain={data.organization.custom_domain}
+                                    customDomain={data.organization.custom_domain || null}
                                     initialMaintenanceMode={data.organization.maintenance_mode || false}
-                                    initialMaintenanceMessage={data.organization.maintenance_message || undefined}
-                                    initialBypassToken={data.organization.maintenance_bypass_token}
+                                    initialMaintenanceMessage={data.organization.maintenance_message || "Estamos realizando mejoras en nuestra tienda. Volveremos pronto con novedades increíbles."}
+                                    initialBypassToken={data.organization.maintenance_bypass_token || null}
                                 />
                             </div>
+                        </TabsContent>
+                        <TabsContent value="taxes">
+                            <TaxSettingsForm organization={data.organization} />
                         </TabsContent>
                         <TabsContent value="payments">
                             <div className="text-sm text-muted-foreground">
                                 <p>Configura tus pasarelas de pago para recibir pagos de tus clientes.</p>
                                 <div className="mt-4">
-                                    <Link 
+                                    <Link
                                         href="/dashboard/settings/payments"
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                                     >
@@ -94,7 +99,7 @@ export default async function SettingsPage() {
                             <div className="text-sm text-muted-foreground">
                                 <p>Configura tarifas de envío, zonas geográficas y reglas de envío gratis.</p>
                                 <div className="mt-4">
-                                    <Link 
+                                    <Link
                                         href="/dashboard/marketing/shipping"
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                                     >
@@ -110,7 +115,7 @@ export default async function SettingsPage() {
                             <div className="text-sm text-muted-foreground">
                                 <p>Conecta WhatsApp para atender clientes y recibir notificaciones.</p>
                                 <div className="mt-4">
-                                    <Link 
+                                    <Link
                                         href="/dashboard/settings/whatsapp"
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                                     >

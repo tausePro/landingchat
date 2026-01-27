@@ -77,6 +77,7 @@ export const orderCustomerSchema = z.object({
   document_number: z.string(),
   person_type: personTypeSchema,
   business_name: z.string().optional(), // Required when person_type is "Jurídica"
+  payment_method_fee: z.number().optional(), // Fee for specific payment methods (e.g. COD)
 })
 
 export type OrderCustomer = z.infer<typeof orderCustomerSchema>

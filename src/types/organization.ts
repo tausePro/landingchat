@@ -27,6 +27,10 @@ export const organizationDetailsSchema = z.object({
     .url("Invalid logo URL")
     .optional()
     .or(z.literal("")),
+  // Tax settings
+  tax_enabled: z.boolean().optional(),
+  tax_rate: z.number().min(0).max(100).optional(),
+  prices_include_tax: z.boolean().optional(),
 })
 
 // ============================================================================
@@ -76,10 +80,23 @@ export interface Organization {
   storefront_config?: Record<string, unknown>
   primary_color?: string
   secondary_color?: string
-  // SEO fields
-  meta_title?: string
-  meta_description?: string
   favicon_url?: string | null
+  // SEO fields
+  seo_title?: string | null
+  seo_description?: string | null
+  seo_keywords?: string | null
+  // Settings & Config
+  tracking_config?: OrganizationTrackingConfig | null
+  settings?: OrganizationSettingsOverrides | null
+  custom_domain?: string | null
+  // Maintenance
+  maintenance_mode?: boolean
+  maintenance_message?: string | null
+  maintenance_bypass_token?: string | null
+  // Tax settings
+  tax_enabled?: boolean
+  tax_rate?: number
+  prices_include_tax?: boolean
 }
 
 // ============================================================================

@@ -32,6 +32,10 @@ export interface OrderDetail {
     }>
     shipping_address: any
     billing_address: any
+    customer_info: any
+    // Payment fields
+    payment_method: string
+    payment_status: string
     // Tracking fields
     source_channel?: string
     chat_id?: string
@@ -77,68 +81,71 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             return null
         }
 
-    // Fetch order - don't join customers, use customer_info instead
-    const { data: order, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
-        .eq("organization_id", profile.organization_id)
-        .single()
+        // Fetch order - don't join customers, use customer_info instead
+        const { data: order, error } = await supabase
+            .from("orders")
+            .select("*")
+            .eq("id", orderId)
+            .eq("organization_id", profile.organization_id)
+            .single()
 
-    if (error) {
-        console.error("[getOrderDetail] Error fetching order:", error)
-        return null
-    }
+        if (error) {
+            console.error("[getOrderDetail] Error fetching order:", error)
+            return null
+        }
 
-    if (!order) {
-        console.error("[getOrderDetail] Order not found:", orderId)
-        return null
-    }
+        if (!order) {
+            console.error("[getOrderDetail] Order not found:", orderId)
+            return null
+        }
 
-    console.log("[getOrderDetail] Order found:", {
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        hasItems: Array.isArray(order.items),
-        itemsCount: Array.isArray(order.items) ? order.items.length : 0,
-        hasCustomerInfo: !!order.customer_info
-    })
+        console.log("[getOrderDetail] Order found:", {
+            id: order.id,
+            status: order.status,
+            total: order.total,
+            hasItems: Array.isArray(order.items),
+            itemsCount: Array.isArray(order.items) ? order.items.length : 0,
+            hasCustomerInfo: !!order.customer_info
+        })
 
-    // Extract customer info from JSONB field
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const customerInfo = order.customer_info as any
+        // Extract customer info from JSONB field
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const customerInfo = order.customer_info as any
 
-    return {
-        id: order.id,
-        order_number: order.order_number || `#${order.id.slice(0, 8)}`,
-        created_at: order.created_at,
-        updated_at: order.updated_at || order.created_at,
-        status: order.status,
-        total: order.total || 0,
-        subtotal: order.subtotal || 0,
-        tax: order.tax || 0,
-        shipping_cost: order.shipping_cost || 0,
-        notes: order.notes || null,
-        customer: customerInfo ? {
-            id: order.customer_id || 'anonymous',
-            full_name: customerInfo.name || customerInfo.full_name || 'Cliente anónimo',
-            email: customerInfo.email || null,
-            phone: customerInfo.phone || null
-        } : null,
-        items: Array.isArray(order.items) ? order.items : [],
-        shipping_address: order.shipping_address || (customerInfo ? {
-            street: customerInfo.address,
-            city: customerInfo.city,
-            state: 'Colombia', // Default/Fallback
-            postal_code: '',
-            country: 'Colombia'
-        } : null),
-        billing_address: null,
-        // Tracking fields
-        source_channel: order.source_channel || 'web',
-        chat_id: order.chat_id || undefined,
-        utm_data: order.utm_data || undefined,
-    }
+        return {
+            id: order.id,
+            order_number: order.order_number || `#${order.id.slice(0, 8)}`,
+            created_at: order.created_at,
+            updated_at: order.updated_at || order.created_at,
+            status: order.status,
+            total: order.total || 0,
+            subtotal: order.subtotal || 0,
+            tax: order.tax || 0,
+            shipping_cost: order.shipping_cost || 0,
+            notes: order.notes || null,
+            payment_method: order.payment_method || 'manual',
+            payment_status: order.payment_status || 'pending',
+            customer: customerInfo ? {
+                id: order.customer_id || 'anonymous',
+                full_name: customerInfo.name || customerInfo.full_name || 'Cliente anónimo',
+                email: customerInfo.email || null,
+                phone: customerInfo.phone || null
+            } : null,
+            items: Array.isArray(order.items) ? order.items : [],
+            shipping_address: order.shipping_address || (customerInfo ? {
+                street: customerInfo.address,
+                city: customerInfo.city,
+                state: 'Colombia', // Default/Fallback
+                postal_code: '',
+                country: 'Colombia'
+            } : null),
+            billing_address: null,
+            customer_info: customerInfo,
+            // Tracking fields
+            source_channel: order.source_channel || 'web',
+            chat_id: order.chat_id || undefined,
+            utm_data: order.utm_data || undefined,
+        }
     } catch (error) {
         console.error("[getOrderDetail] Unexpected error:", error)
         return null

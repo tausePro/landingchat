@@ -45,6 +45,107 @@ interface CreateOrderParams {
     }
 }
 
+
+/**
+ * Calculate order totals including tax and fees
+ * This ensures frontend and backend use the SAME calculation logic
+ */
+export async function calculateOrderSummary(params: {
+    slug: string,
+    items: Array<{ id: string, price: number, quantity: number }>,
+    paymentMethod?: string,
+    shippingCost?: number
+}) {
+    const supabase = await createServiceClient()
+
+    try {
+        // 1. Get Organization (for tax settings)
+        const { data: org, error: orgError } = await supabase
+            .from("organizations")
+            .select("id, tax_enabled, tax_rate, prices_include_tax")
+            .eq("slug", params.slug)
+            .single()
+
+        if (orgError || !org) return { success: false, error: "Organización no encontrada" }
+
+        // 2. Get Product Tax Rates
+        const productIds = params.items.map(item => item.id)
+        const { data: products } = await supabase
+            .from("products")
+            .select("id, tax_rate")
+            .in("id", productIds)
+
+        const productTaxMap = new Map()
+        products?.forEach(p => productTaxMap.set(p.id, p.tax_rate))
+
+        // 3. Calculate Tax
+        let calculatedTax = 0
+
+        params.items.forEach(item => {
+            let itemTaxRate = 0
+            const productTaxRate = productTaxMap.get(item.id)
+
+            if (productTaxRate !== null && productTaxRate !== undefined) {
+                itemTaxRate = Number(productTaxRate)
+            } else if (org.tax_enabled) {
+                itemTaxRate = Number(org.tax_rate || 0)
+            }
+
+            if (itemTaxRate > 0) {
+                const itemTotal = item.price * item.quantity
+                if (org.prices_include_tax) {
+                    const basePrice = itemTotal / (1 + (itemTaxRate / 100))
+                    calculatedTax += itemTotal - basePrice
+                } else {
+                    calculatedTax += itemTotal * (itemTaxRate / 100)
+                }
+            }
+        })
+
+        calculatedTax = Math.round(calculatedTax * 100) / 100
+
+        // 4. Calculate Payment Fee
+        let paymentMethodFee = 0
+        if (params.paymentMethod === 'contraentrega' || params.paymentMethod === 'cash_on_delivery') {
+            const { data: manualPayment } = await supabase
+                .from("manual_payment_methods")
+                .select("cod_enabled, cod_additional_cost")
+                .eq("organization_id", org.id)
+                .single()
+
+            if (manualPayment?.cod_enabled) {
+                paymentMethodFee = manualPayment.cod_additional_cost || 0
+            }
+        }
+
+        // 5. Calculate Final Total
+        let subtotal = params.items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+        let total = subtotal
+
+        // If prices exclude tax, add calculated tax to total
+        // If prices include tax, tax is already in subtotal, so don't add
+        if (!org.prices_include_tax) {
+            total += calculatedTax
+        }
+
+        total += (params.shippingCost || 0) + paymentMethodFee
+
+        return {
+            success: true,
+            subtotal,
+            tax: calculatedTax,
+            shipping: params.shippingCost || 0,
+            paymentMethodFee,
+            total,
+            pricesIncludeTax: org.prices_include_tax
+        }
+
+    } catch (error) {
+        console.error("Error calculating summary:", error)
+        return { success: false, error: "Error de cálculo" }
+    }
+}
+
 /**
  * Generate unique order number
  * Format: ORD-YYYYMMDD-XXX
@@ -80,7 +181,7 @@ function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: str
  * Get shipping configuration for organization
  */
 export async function getShippingConfig(slug: string) {
-    const supabase = createServiceClient()
+    const supabase = await createServiceClient()
 
     try {
         // Get organization ID from slug
@@ -104,8 +205,8 @@ export async function getShippingConfig(slug: string) {
         if (shippingError) {
             console.error("[getShippingConfig] Error:", shippingError)
             // Return default shipping if no config found
-            return { 
-                success: true, 
+            return {
+                success: true,
                 config: {
                     default_shipping_rate: 5000, // Default 5000 COP
                     free_shipping_enabled: false,
@@ -115,8 +216,8 @@ export async function getShippingConfig(slug: string) {
             }
         }
 
-        return { 
-            success: true, 
+        return {
+            success: true,
             config: shippingSettings
         }
     } catch (error) {
@@ -131,7 +232,7 @@ export async function getShippingConfig(slug: string) {
  * Get available payment gateways for organization
  */
 export async function getAvailablePaymentGateways(slug: string) {
-    const supabase = createServiceClient()
+    const supabase = await createServiceClient()
 
     try {
         // Get organization ID from slug
@@ -157,8 +258,8 @@ export async function getAvailablePaymentGateways(slug: string) {
             return { success: false, error: "Error al obtener pasarelas", gateways: [] }
         }
 
-        return { 
-            success: true, 
+        return {
+            success: true,
             gateways: gateways || []
         }
     } catch (error) {
@@ -167,10 +268,51 @@ export async function getAvailablePaymentGateways(slug: string) {
     }
 }
 
+/**
+ * Get manual payment methods info for organization (bank transfer, Nequi, COD)
+ */
+export async function getManualPaymentInfo(slug: string) {
+    const supabase = await createServiceClient()
+
+    try {
+        // Get organization ID from slug
+        const { data: org, error: orgError } = await supabase
+            .from("organizations")
+            .select("id")
+            .eq("slug", slug)
+            .single()
+
+        if (orgError || !org) {
+            return { success: false, error: "Organización no encontrada", data: null }
+        }
+
+        // Get manual payment methods config
+        const { data: manualPayment, error: manualError } = await supabase
+            .from("manual_payment_methods")
+            .select("*")
+            .eq("organization_id", org.id)
+            .single()
+
+        if (manualError && manualError.code !== "PGRST116") {
+            console.error("[getManualPaymentInfo] Error:", manualError)
+            return { success: false, error: "Error al obtener métodos manuales", data: null }
+        }
+
+        return {
+            success: true,
+            data: manualPayment || null
+        }
+    } catch (error) {
+        console.error("[getManualPaymentInfo] Unexpected error:", error)
+        return { success: false, error: "Error inesperado", data: null }
+    }
+}
+
+
 export async function createOrder(params: CreateOrderParams) {
     // ⚠️ Security: Use service client to bypass RLS restrictions on orders/customers table
     // Since we blocked public anonymity access in production
-    const supabase = createServiceClient()
+    const supabase = await createServiceClient()
 
     try {
         // 1. Get Organization ID from Slug
@@ -214,26 +356,106 @@ export async function createOrder(params: CreateOrderParams) {
         // 3. Generate unique order number
         const orderNumber = generateOrderNumber()
 
-        // 4. Calculate tax (IVA 19% included in total)
-        // Formula: tax = total / 1.19 * 0.19
-        const calculatedTax = Math.round((params.total / 1.19 * 0.19) * 100) / 100
+        // 4. Calculate tax 
+        // 4. Calculate Taxes and Fees
+        let calculatedTax = 0
+        let paymentMethodFee = 0
+
+        // 4.1 Get Organization Tax Settings
+        const { data: orgSettings } = await supabase
+            .from("organizations")
+            .select("tax_enabled, tax_rate, prices_include_tax")
+            .eq("id", org.id)
+            .single()
+
+        // 4.2 Get COD Fee if applicable
+        if (params.paymentMethod === 'contraentrega' || params.paymentMethod === 'cash_on_delivery') {
+            const manualPaymentInfo = await getManualPaymentInfo(params.slug)
+            if (manualPaymentInfo.success && manualPaymentInfo.data?.cod_enabled) {
+                paymentMethodFee = manualPaymentInfo.data.cod_additional_cost || 0
+            }
+        }
+
+        // 4.3 Calculate Tax per Item
+        // We need to fetch product tax rates to be accurate
+        const productIds = params.items.map(item => item.id)
+        const { data: products } = await supabase
+            .from("products")
+            .select("id, tax_rate")
+            .in("id", productIds)
+
+        const productTaxMap = new Map()
+        products?.forEach(p => productTaxMap.set(p.id, p.tax_rate))
+
+        params.items.forEach(item => {
+            let itemTaxRate = 0
+
+            // Determine tax rate for this item
+            const productTaxRate = productTaxMap.get(item.id)
+
+            if (productTaxRate !== null && productTaxRate !== undefined) {
+                // Product has override (can be 0 for exempt)
+                itemTaxRate = Number(productTaxRate)
+            } else if (orgSettings?.tax_enabled) {
+                // Fallback to global rate
+                itemTaxRate = Number(orgSettings.tax_rate || 0)
+            }
+
+            if (itemTaxRate > 0) {
+                const itemTotal = item.price * item.quantity
+
+                if (orgSettings?.prices_include_tax) {
+                    // Price includes tax: Tax = Price - (Price / (1 + Rate))
+                    const basePrice = itemTotal / (1 + (itemTaxRate / 100))
+                    calculatedTax += itemTotal - basePrice
+                } else {
+                    // Price excludes tax: Tax = Price * Rate
+                    calculatedTax += itemTotal * (itemTaxRate / 100)
+                }
+            }
+        })
+
+        // Round tax to 2 decimals
+        calculatedTax = Math.round(calculatedTax * 100) / 100
 
         // 5. Transform cart items to order items format
         const orderItems = transformCartItemsToOrderItems(params.items)
 
         // 6. Create Order
+        // Recalculate total to ensure consistency
+        // If prices include tax, subtotal already includes it, so don't add it again to total
+        // If prices exclude tax, add it.
+        // HOWEVER: The frontend passes 'subtotal' and 'total'. 
+        // We should respect the frontend 'subtotal' as the base price sum.
+        // But we must correct the 'total' with our calculated tax and fees for security.
+
+        let finalTotal = params.subtotal
+
+        if (!orgSettings?.prices_include_tax) {
+            finalTotal += calculatedTax
+        }
+
+        finalTotal += params.shippingCost + paymentMethodFee
+
+        // If there's a small difference (rounding) vs frontend, prefer backend calc? 
+        // Or just trust backend calc is safer. 
+        // For now, let's use our calculated finalTotal.
+
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .insert({
                 organization_id: org.id,
                 customer_id: customer?.id,
                 order_number: orderNumber,
-                customer_info: params.customerInfo, // Store complete customer info including tax fields
+                customer_info: {
+                    ...params.customerInfo,
+                    payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined
+                },
                 items: orderItems,
                 subtotal: params.subtotal,
                 shipping_cost: params.shippingCost,
                 tax: calculatedTax,
-                total: params.total,
+                total: finalTotal,
                 status: 'pending',
                 payment_status: 'pending',
                 payment_method: params.paymentMethod,
@@ -250,15 +472,17 @@ export async function createOrder(params: CreateOrderParams) {
             return { success: false, error: "Error al crear la orden" }
         }
 
-        // 7. If payment method is not manual, initiate payment
-        if (params.paymentMethod !== 'manual') {
+        // 7. If payment method requires online gateway, initiate payment
+        // Skip for offline methods: manual (bank transfer/Nequi) and contraentrega (cash on delivery)
+        const offlinePaymentMethods = ['manual', 'contraentrega', 'cash_on_delivery']
+        if (!offlinePaymentMethods.includes(params.paymentMethod)) {
             // Obtener el dominio personalizado de la organización si existe
             const { data: orgDetails } = await supabase
                 .from("organizations")
                 .select("custom_domain, slug")
                 .eq("id", org.id)
                 .single()
-            
+
             // Construir la URL base: usar dominio personalizado si existe, sino landingchat.co
             let baseUrl: string
             if (orgDetails?.custom_domain) {

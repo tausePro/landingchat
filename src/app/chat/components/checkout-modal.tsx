@@ -23,7 +23,7 @@ interface CheckoutModalProps {
 }
 
 
-import { getAvailablePaymentGateways, getShippingConfig } from "../actions"
+import { getAvailablePaymentGateways, getShippingConfig, getManualPaymentInfo, calculateOrderSummary } from "../actions"
 import { calculateShippingCost } from "@/lib/utils/shipping"
 import { useEffect } from "react"
 
@@ -34,8 +34,18 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const [loading, setLoading] = useState(false)
     const [shippingConfig, setShippingConfig] = useState<any>(null)
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
-    const [availableGateways, setAvailableGateways] = useState<Array<{provider: string, is_active: boolean, is_test_mode: boolean}>>([])
+    const [availableGateways, setAvailableGateways] = useState<Array<{ provider: string, is_active: boolean, is_test_mode: boolean }>>([])
     const [gatewaysLoading, setGatewaysLoading] = useState(true)
+    const [manualPaymentInfo, setManualPaymentInfo] = useState<{
+        bank_transfer_enabled?: boolean
+        bank_name?: string
+        account_type?: string
+        account_number?: string
+        account_holder?: string
+        nequi_number?: string
+        cod_enabled?: boolean
+        cod_additional_cost?: number
+    } | null>(null)
 
     useEffect(() => {
         if (isOpen) {
@@ -72,6 +82,13 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                 }
                 setGatewaysLoading(false)
             })
+
+            // Load manual payment info
+            getManualPaymentInfo(slug).then(result => {
+                if (result.success && result.data) {
+                    setManualPaymentInfo(result.data)
+                }
+            })
         }
     }, [isOpen, slug])
 
@@ -89,11 +106,58 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         business_name: ""
     })
 
-    const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'epayco' | 'manual'>('manual')
+    const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'epayco' | 'manual' | 'contraentrega'>('manual')
 
     const subtotal = total()
     const shippingCost = shippingConfig ? calculateShippingCost(shippingConfig, subtotal, formData.city) : 0
-    const finalTotal = subtotal + shippingCost
+
+    // Order Summary Calculation
+    const [orderSummary, setOrderSummary] = useState<{
+        subtotal: number
+        tax: number
+        shipping: number
+        paymentMethodFee: number
+        total: number
+        pricesIncludeTax: boolean
+    } | null>(null)
+
+    // Calculate totals when dependencies change
+
+    useEffect(() => {
+        const fetchSummary = async () => {
+            const result = await calculateOrderSummary({
+                slug,
+                items: items.map(i => ({ id: i.id, price: i.price, quantity: i.quantity })),
+                paymentMethod,
+                shippingCost
+            })
+
+            if (result.success && result.subtotal !== undefined) {
+                setOrderSummary({
+                    subtotal: result.subtotal,
+                    tax: result.tax || 0,
+                    shipping: result.shipping || 0,
+                    paymentMethodFee: result.paymentMethodFee || 0,
+                    total: result.total || 0,
+                    pricesIncludeTax: result.pricesIncludeTax || false
+                })
+            }
+        }
+
+        // Debounce calculation? For now just call it.
+        fetchSummary()
+    }, [items, slug, paymentMethod, shippingCost])
+
+    // Fallback totals if summary is loading or failed
+    const displaySubtotal = orderSummary?.subtotal ?? subtotal
+    const displayShipping = orderSummary?.shipping ?? shippingCost
+    const displayTax = orderSummary?.tax ?? 0
+    // Calculate local fallback fee
+    const localFee = (paymentMethod === 'contraentrega' && manualPaymentInfo?.cod_additional_cost) ? manualPaymentInfo.cod_additional_cost : 0
+    const displayFee = orderSummary?.paymentMethodFee ?? localFee
+
+    // Final total for display and submission
+    const finalTotal = orderSummary?.total ?? (subtotal + shippingCost + localFee)
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -111,7 +175,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
             toast.error("Por favor completa todos los campos de facturación")
             return
         }
-        
+
         if (!formData.state) {
             toast.error("Por favor selecciona tu departamento")
             return
@@ -130,7 +194,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         try {
             // Obtener tracking params (UTM, referrer, etc.)
             const trackingParams = getTrackingParams(slug)
-            
+
             const result = await createOrder({
                 slug,
                 customerInfo: formData,
@@ -195,18 +259,18 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                         {step === 'success' && "¡Orden Recibida!"}
                     </DialogTitle>
                 </DialogHeader>
-                
+
                 <div className="flex-1 overflow-y-auto pr-2 -mr-2">
                     {step === 'contact' && (
                         <form onSubmit={handleSubmitContact} className="space-y-4 py-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo</Label>
-                                <Input 
-                                    id="name" 
-                                    name="name" 
-                                    required 
-                                    value={formData.name} 
-                                    onChange={handleInputChange} 
+                                <Input
+                                    id="name"
+                                    name="name"
+                                    required
+                                    value={formData.name}
+                                    onChange={handleInputChange}
                                     placeholder="Ej. Juan Pérez"
                                     className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                 />
@@ -215,12 +279,12 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Email <span className="text-gray-400 text-xs font-normal">(Opcional)</span>
                                 </Label>
-                                <Input 
-                                    id="email" 
-                                    name="email" 
-                                    type="email" 
-                                    value={formData.email} 
-                                    onChange={handleInputChange} 
+                                <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={handleInputChange}
                                     placeholder="juan@ejemplo.com"
                                     className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                 />
@@ -231,13 +295,13 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                     <div className="inline-flex items-center justify-center px-4 rounded-l-xl border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium">
                                         🇨🇴 +57
                                     </div>
-                                    <Input 
-                                        id="phone" 
-                                        name="phone" 
-                                        type="tel" 
-                                        required 
-                                        value={formData.phone} 
-                                        onChange={handleInputChange} 
+                                    <Input
+                                        id="phone"
+                                        name="phone"
+                                        type="tel"
+                                        required
+                                        value={formData.phone}
+                                        onChange={handleInputChange}
                                         placeholder="300 123 4567"
                                         className="flex-1 h-12 rounded-l-none rounded-r-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                     />
@@ -265,12 +329,12 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                                 <SelectItem value="TI" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">T.I.</SelectItem>
                                             </SelectContent>
                                         </Select>
-                                        <Input 
-                                            id="document_number" 
-                                            name="document_number" 
-                                            required 
-                                            value={formData.document_number} 
-                                            onChange={handleInputChange} 
+                                        <Input
+                                            id="document_number"
+                                            name="document_number"
+                                            required
+                                            value={formData.document_number}
+                                            onChange={handleInputChange}
                                             placeholder="Número"
                                             className="flex-1 h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                         />
@@ -278,38 +342,36 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 </div>
 
                                 <div className="flex flex-col gap-3">
-                                    <label 
-                                        className={`relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary ${
-                                            formData.person_type === 'Natural' 
-                                                ? 'border-primary bg-blue-50 dark:bg-blue-900/20' 
-                                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
-                                        }`}
+                                    <label
+                                        className={`relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary ${formData.person_type === 'Natural'
+                                            ? 'border-primary bg-blue-50 dark:bg-blue-900/20'
+                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                                            }`}
                                         onClick={() => handleSelectChange('person_type', 'Natural')}
                                     >
-                                        <input 
-                                            type="radio" 
-                                            name="person_type" 
+                                        <input
+                                            type="radio"
+                                            name="person_type"
                                             checked={formData.person_type === 'Natural'}
-                                            onChange={() => {}}
+                                            onChange={() => { }}
                                             className="form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300"
                                         />
                                         <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">
                                             Natural (Persona)
                                         </span>
                                     </label>
-                                    <label 
-                                        className={`relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary ${
-                                            formData.person_type === 'Jurídica' 
-                                                ? 'border-primary bg-blue-50 dark:bg-blue-900/20' 
-                                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
-                                        }`}
+                                    <label
+                                        className={`relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary ${formData.person_type === 'Jurídica'
+                                            ? 'border-primary bg-blue-50 dark:bg-blue-900/20'
+                                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50'
+                                            }`}
                                         onClick={() => handleSelectChange('person_type', 'Jurídica')}
                                     >
-                                        <input 
-                                            type="radio" 
-                                            name="person_type" 
+                                        <input
+                                            type="radio"
+                                            name="person_type"
                                             checked={formData.person_type === 'Jurídica'}
-                                            onChange={() => {}}
+                                            onChange={() => { }}
                                             className="form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300"
                                         />
                                         <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">
@@ -321,11 +383,11 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 {formData.person_type === "Jurídica" && (
                                     <div className="grid gap-2">
                                         <Label htmlFor="business_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre de la Empresa</Label>
-                                        <Input 
-                                            id="business_name" 
-                                            name="business_name" 
-                                            value={formData.business_name} 
-                                            onChange={handleInputChange} 
+                                        <Input
+                                            id="business_name"
+                                            name="business_name"
+                                            value={formData.business_name}
+                                            onChange={handleInputChange}
                                             placeholder="Mi Empresa S.A.S."
                                             className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                         />
@@ -342,9 +404,9 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         </SelectTrigger>
                                         <SelectContent className="max-h-60 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg z-50">
                                             {COLOMBIA_DEPARTMENTS.map((dept) => (
-                                                <SelectItem 
-                                                    key={dept} 
-                                                    value={dept} 
+                                                <SelectItem
+                                                    key={dept}
+                                                    value={dept}
                                                     className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800 cursor-pointer px-3 py-2"
                                                 >
                                                     {dept}
@@ -352,22 +414,22 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    <Input 
-                                        id="city" 
-                                        name="city" 
-                                        required 
-                                        value={formData.city} 
-                                        onChange={handleInputChange} 
+                                    <Input
+                                        id="city"
+                                        name="city"
+                                        required
+                                        value={formData.city}
+                                        onChange={handleInputChange}
                                         placeholder="Ciudad"
                                         className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                     />
                                 </div>
-                                <Input 
-                                    id="address" 
-                                    name="address" 
-                                    required 
-                                    value={formData.address} 
-                                    onChange={handleInputChange} 
+                                <Input
+                                    id="address"
+                                    name="address"
+                                    required
+                                    value={formData.address}
+                                    onChange={handleInputChange}
                                     placeholder="Dirección completa"
                                     className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                 />
@@ -396,8 +458,20 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-slate-500 dark:text-slate-400">Envío</span>
-                                    <span>{formatPrice(shippingCost)}</span>
+                                    <span>{formatPrice(displayShipping)}</span>
                                 </div>
+                                {displayTax > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500 dark:text-slate-400">Impuestos</span>
+                                        <span>{formatPrice(displayTax)}</span>
+                                    </div>
+                                )}
+                                {displayFee > 0 && (
+                                    <div className="flex justify-between text-amber-600">
+                                        <span>Costo Contraentrega</span>
+                                        <span>{formatPrice(displayFee)}</span>
+                                    </div>
+                                )}
                                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-bold text-base">
                                     <span>Total a Pagar</span>
                                     <span className="text-primary">{formatPrice(finalTotal)}</span>
@@ -435,7 +509,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                                 )}
                                             </div>
                                         ))}
-                                        
+
                                         {/* Always show manual payment option */}
                                         <div
                                             className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
@@ -444,9 +518,87 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                             <span className="font-bold">Transferencia</span>
                                             <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
                                         </div>
+
+                                        {/* Show COD option if enabled */}
+                                        {manualPaymentInfo?.cod_enabled && (
+                                            <div
+                                                className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'contraentrega' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                onClick={() => setPaymentMethod('contraentrega' as any)}
+                                            >
+                                                <span className="font-bold">Contra Entrega</span>
+                                                <span className="text-xs text-center text-slate-500">
+                                                    Paga al recibir
+                                                    {manualPaymentInfo.cod_additional_cost && manualPaymentInfo.cod_additional_cost > 0 && (
+                                                        <span className="block text-amber-600">+${manualPaymentInfo.cod_additional_cost.toLocaleString('es-CO')}</span>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
+
+                            {/* Bank Transfer Details - Show when manual payment selected */}
+                            {paymentMethod === 'manual' && manualPaymentInfo && manualPaymentInfo.bank_transfer_enabled && (
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
+                                    <h4 className="font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-2">
+                                        <span className="material-symbols-outlined">account_balance</span>
+                                        Datos para Transferencia
+                                    </h4>
+                                    <div className="text-sm space-y-2 text-blue-900 dark:text-blue-200">
+                                        {manualPaymentInfo.bank_name && (
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-600 dark:text-blue-400">Banco:</span>
+                                                <span className="font-medium">{manualPaymentInfo.bank_name}</span>
+                                            </div>
+                                        )}
+                                        {manualPaymentInfo.account_type && (
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-600 dark:text-blue-400">Tipo:</span>
+                                                <span className="font-medium capitalize">{manualPaymentInfo.account_type}</span>
+                                            </div>
+                                        )}
+                                        {manualPaymentInfo.account_number && (
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-600 dark:text-blue-400">Cuenta:</span>
+                                                <span className="font-mono font-medium">{manualPaymentInfo.account_number}</span>
+                                            </div>
+                                        )}
+                                        {manualPaymentInfo.account_holder && (
+                                            <div className="flex justify-between">
+                                                <span className="text-blue-600 dark:text-blue-400">Titular:</span>
+                                                <span className="font-medium">{manualPaymentInfo.account_holder}</span>
+                                            </div>
+                                        )}
+                                        {manualPaymentInfo.nequi_number && (
+                                            <>
+                                                <hr className="border-blue-200 dark:border-blue-700" />
+                                                <div className="flex justify-between">
+                                                    <span className="text-blue-600 dark:text-blue-400">Nequi:</span>
+                                                    <span className="font-mono font-medium">{manualPaymentInfo.nequi_number}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                                        Recuerda enviar el comprobante de pago al WhatsApp de la tienda.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* No bank info configured message */}
+                            {paymentMethod === 'manual' && (!manualPaymentInfo || !manualPaymentInfo.bank_transfer_enabled) && (
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                    <div className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-amber-500">info</span>
+                                        <div>
+                                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                                                Después de confirmar tu orden, recibirás instrucciones de pago por WhatsApp o correo.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-3 pt-2">
                                 <div className="flex gap-3">

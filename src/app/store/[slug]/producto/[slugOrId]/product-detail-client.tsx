@@ -8,6 +8,7 @@ import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { useCartStore } from "@/store/cart-store"
+import { getColorHex } from "@/lib/constants/colors"
 
 interface ProductDetailClientProps {
     product: any
@@ -115,6 +116,12 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
     const handleVariantChange = (type: string, value: string) => {
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
+
+        // Update image if this variant has a mapping for the selected value
+        const variant = product.variants?.find((v: any) => v.type === type)
+        if (variant?.hasImageMapping && variant?.images?.[value]) {
+            setSelectedImage(variant.images[value])
+        }
     }
 
     const handleChat = (productId?: string) => {
@@ -352,17 +359,22 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                                     key={vIdx}
                                                     onClick={() => handleVariantChange(variant.type, value)}
                                                     className={`
-                                                        ${variant.type.toLowerCase().includes('color') ? 'w-10 h-10 rounded-full' : 'px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem]'}
+                                                        ${variant.type.toLowerCase().includes('color') ? 'w-10 h-10 rounded-full shadow-sm' : 'px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem]'}
                                                         ${isSelected
-                                                            ? (variant.type.toLowerCase().includes('color') ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary')
-                                                            : (variant.type.toLowerCase().includes('color') ? 'ring-1 ring-slate-200 dark:ring-slate-700' : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200')
+                                                            ? (variant.type.toLowerCase().includes('color') ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary')
+                                                            : (variant.type.toLowerCase().includes('color') ? 'ring-1 ring-slate-200 dark:ring-slate-700 hover:scale-105' : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400')
                                                         }
+                                                        transition-all duration-200
                                                     `}
-                                                    style={variant.type.toLowerCase().includes('color') ? { backgroundColor: value } : {}}
+                                                    style={variant.type.toLowerCase().includes('color') ? { backgroundColor: getColorHex(value) } : {}}
+                                                    title={value}
                                                 >
                                                     {!variant.type.toLowerCase().includes('color') && value}
+                                                    {/* Screen reader text for colors */}
+                                                    {variant.type.toLowerCase().includes('color') && <span className="sr-only">{value}</span>}
                                                 </button>
                                             )
+
                                         })}
                                     </div>
                                 </div>

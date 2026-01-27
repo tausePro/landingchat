@@ -64,7 +64,11 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     // Price tiers state (precios por cantidad/mayoreo)
     const [hasQuantityPricing, setHasQuantityPricing] = useState(initialData?.has_quantity_pricing ?? false)
     const [priceTiers, setPriceTiers] = useState<PriceTier[]>(initialData?.price_tiers || [])
+
     const [minimumQuantity, setMinimumQuantity] = useState<number | undefined>(initialData?.minimum_quantity)
+
+    // Tax state
+    const [taxRate, setTaxRate] = useState<string>(initialData?.tax_rate !== undefined && initialData?.tax_rate !== null ? initialData.tax_rate.toString() : "")
 
     // AI Enhancement state
     const [isEnhancing, setIsEnhancing] = useState(false)
@@ -128,6 +132,9 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 has_quantity_pricing: hasQuantityPricing,
                 price_tiers: hasQuantityPricing ? priceTiers : undefined,
                 minimum_quantity: hasQuantityPricing ? minimumQuantity : undefined,
+
+                // Tax override
+                tax_rate: taxRate !== "" ? parseFloat(taxRate) : undefined,
                 // SEO fields
                 meta_title: metaTitle.trim() || undefined,
                 meta_description: metaDescription.trim() || undefined,
@@ -534,7 +541,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Atributos y Variantes</h2>
                         <div className="mt-6">
-                            <VariantsEditor variants={variants} onChange={setVariants} />
+                            <VariantsEditor variants={variants} onChange={setVariants} productImages={images} />
                         </div>
                     </div>
 
@@ -718,6 +725,33 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                     </label>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Tax Settings */}
+                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                        <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Impuestos</h2>
+                        <div className="mt-6">
+                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                Tasa de Impuesto (%)
+                            </label>
+                            <div className="relative mt-2">
+                                <input
+                                    className="form-input w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pr-8"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    placeholder="Global"
+                                    value={taxRate}
+                                    onChange={e => setTaxRate(e.target.value)}
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-text-light-secondary font-bold">%</span>
+                            </div>
+                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-2">
+                                Déjalo vacío para usar la configuración global de la tienda. <br />
+                                <span className="text-primary cursor-pointer" onClick={() => setTaxRate("0")}>Clic aquí para 0% (Exento)</span>
+                            </p>
                         </div>
                     </div>
                 </div>

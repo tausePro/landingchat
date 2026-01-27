@@ -57,6 +57,8 @@ export const variantSchema = z.object({
   priceAdjustment: z.number().optional(), // Legacy field
   hasPriceAdjustment: z.boolean().optional(),
   priceAdjustments: z.record(z.string(), z.number()).optional(), // { "XL": 5000, "XXL": 10000 }
+  hasImageMapping: z.boolean().optional(),
+  images: z.record(z.string(), z.string()).optional(), // { "Rojo": "url_imagen" }
 })
 
 export const optionSchema = z.object({
@@ -120,6 +122,8 @@ export const createProductSchema = z.object({
   benefits: z.array(z.string()).optional().nullable(),
   faq: z.array(z.object({ question: z.string(), answer: z.string() })).optional().nullable(),
   specifications: z.array(z.object({ label: z.string(), value: z.string() })).optional().nullable(),
+  // Tax override
+  tax_rate: z.number().min(0).optional().nullable(),
 })
 
 // ============================================================================
@@ -192,4 +196,5 @@ export interface ProductData {
   faq?: { question: string; answer: string }[] | null
   specifications?: { label: string; value: string }[] | null
   created_at: string
+  tax_rate?: number | null
 }

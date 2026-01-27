@@ -1,5 +1,6 @@
 import { CreditCard } from "lucide-react"
 import { PaymentConfigWrapper } from "./components/payment-config-wrapper"
+import { ManualPaymentForm } from "./components/manual-payment-form"
 
 export const metadata = {
     title: "Pasarela de Pago | Dashboard",
@@ -22,6 +23,9 @@ export default function PaymentsSettingsPage() {
             </div>
 
             <PaymentConfigWrapper />
+
+            <ManualPaymentForm />
         </div>
     )
 }
+

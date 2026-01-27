@@ -16,14 +16,17 @@ interface Variant {
     values: string[]
     hasPriceAdjustment?: boolean
     priceAdjustments?: Record<string, number> // { "S": 0, "XL": 5000 }
+    hasImageMapping?: boolean
+    images?: Record<string, string> // { "Rojo": "url_to_red_image", "Azul": "url_to_blue_image" }
 }
 
 interface VariantsEditorProps {
     variants: Variant[]
     onChange: (variants: Variant[]) => void
+    productImages: string[]
 }
 
-export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
+export function VariantsEditor({ variants, onChange, productImages = [] }: VariantsEditorProps) {
     // Local state for input values (allows free typing)
     const [localValues, setLocalValues] = useState<string[]>(
         variants.map(v => v.values.join(', '))
@@ -113,6 +116,30 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
         return price > 0 ? `+$${price.toLocaleString()}` : `-$${Math.abs(price).toLocaleString()}`
     }
 
+    const handleImageMappingToggle = (index: number, enabled: boolean) => {
+        const newVariants = [...variants]
+        newVariants[index] = { ...newVariants[index], hasImageMapping: enabled }
+        if (!enabled) {
+            newVariants[index].images = {}
+        }
+        onChange(newVariants)
+    }
+
+    const handleImageSelect = (variantIndex: number, valueName: string, imageUrl: string) => {
+        const newVariants = [...variants]
+        const images = { ...(newVariants[variantIndex].images || {}) }
+
+        // Toggle selection: if already selected, remove it
+        if (images[valueName] === imageUrl) {
+            delete images[valueName]
+        } else {
+            images[valueName] = imageUrl
+        }
+
+        newVariants[variantIndex] = { ...newVariants[variantIndex], images }
+        onChange(newVariants)
+    }
+
     return (
         <div className="flex flex-col gap-6">
             {variants.map((variant, index) => (
@@ -198,6 +225,67 @@ export function VariantsEditor({ variants, onChange }: VariantsEditorProps) {
                                     ))}
                                     <p className="col-span-full text-xs text-muted-foreground mt-1">
                                         Ej: XL +$5,000 se suma al precio base
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Image Mapping Toggle */}
+                            <div className="flex items-center gap-3 pt-2 border-t">
+                                <Checkbox
+                                    id={`image-toggle-${index}`}
+                                    checked={variant.hasImageMapping || false}
+                                    onCheckedChange={(checked) => handleImageMappingToggle(index, checked as boolean)}
+                                />
+                                <Label htmlFor={`image-toggle-${index}`} className="cursor-pointer text-sm font-normal">
+                                    Esta variante cambia la imagen del producto
+                                </Label>
+                            </div>
+
+                            {/* Image Selection per Value */}
+                            {variant.hasImageMapping && (
+                                <div className="flex flex-col gap-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                    {productImages.length === 0 ? (
+                                        <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                                            Debes subir imágenes al producto primero para poder asignarlas.
+                                        </p>
+                                    ) : (
+                                        variant.values.map((val) => (
+                                            <div key={val} className="flex flex-col gap-2">
+                                                <Label className="text-sm font-medium">{val}</Label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {productImages.map((img, imgIdx) => {
+                                                        const isSelected = variant.images?.[val] === img
+                                                        return (
+                                                            <div
+                                                                key={imgIdx}
+                                                                onClick={() => handleImageSelect(index, val, img)}
+                                                                className={`
+                                                                    relative w-12 h-12 rounded-md overflow-hidden cursor-pointer border-2 transition-all
+                                                                    ${isSelected
+                                                                        ? 'border-primary ring-2 ring-primary/20'
+                                                                        : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                                                                    }
+                                                                `}
+                                                            >
+                                                                <img
+                                                                    src={img}
+                                                                    alt={`Opción para ${val}`}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                                {isSelected && (
+                                                                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                                                        <span className="material-symbols-outlined text-white text-sm font-bold shadow-sm">check</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Selecciona la imagen que corresponde a cada valor de la variante.
                                     </p>
                                 </div>
                             )}

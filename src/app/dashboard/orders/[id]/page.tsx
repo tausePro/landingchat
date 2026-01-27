@@ -16,7 +16,7 @@ interface OrderDetailPageProps {
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
     const { id } = await params
-    
+
     let order
     try {
         order = await getOrderDetail(id)
@@ -136,12 +136,36 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
 
                     {/* Sidebar */}
                     <div className="space-y-6">
-                        {/* Status */}
+                        {/* Estado */}
                         <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                             <h2 className="text-lg font-bold text-text-light-primary dark:text-text-dark-primary mb-4">
                                 Estado
                             </h2>
                             <OrderStatusBadge status={order.status} />
+                        </div>
+
+                        {/* Payment Method */}
+                        <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                            <h2 className="text-lg font-bold text-text-light-primary dark:text-text-dark-primary mb-4">
+                                Método de Pago
+                            </h2>
+                            <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                    <span className="material-symbols-outlined">payments</span>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-text-light-primary dark:text-text-dark-primary capitalize">
+                                        {order.payment_method === 'wompi' && 'Wompi'}
+                                        {order.payment_method === 'epayco' && 'ePayco'}
+                                        {order.payment_method === 'manual' && 'Transferencia Bancaria'}
+                                        {(order.payment_method === 'contraentrega' || order.payment_method === 'cash_on_delivery') && 'Contra Entrega'}
+                                        {!['wompi', 'epayco', 'manual', 'contraentrega', 'cash_on_delivery'].includes(order.payment_method) && order.payment_method}
+                                    </p>
+                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary capitalize">
+                                        {order.payment_status === 'paid' ? 'Pagado' : order.payment_status === 'pending' ? 'Pendiente' : order.payment_status}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Customer Info */}
@@ -209,6 +233,15 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                         </span>
                                     </div>
                                 )}
+                                {order.customer_info?.payment_method_fee && order.customer_info.payment_method_fee > 0 && (
+                                    <div className="flex justify-between text-sm text-amber-600">
+                                        <span>Costo Contraentrega</span>
+                                        <span className="font-medium">
+                                            {formatCurrency(order.customer_info.payment_method_fee)}
+                                        </span>
+                                    </div>
+                                )}
+
                                 <div className="pt-3 border-t border-border-light dark:border-border-dark flex justify-between">
                                     <span className="font-bold text-text-light-primary dark:text-text-dark-primary">Total</span>
                                     <span className="font-bold text-xl text-text-light-primary dark:text-text-dark-primary">
@@ -234,7 +267,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                         )}
 
                         {/* Customer Journey */}
-                        <CustomerJourney 
+                        <CustomerJourney
                             sourceChannel={order.source_channel}
                             chatId={order.chat_id}
                             utmData={order.utm_data}
