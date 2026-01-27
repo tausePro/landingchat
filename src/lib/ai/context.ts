@@ -99,6 +99,7 @@ CATÁLOGO: Tienes acceso a ${productCount} productos de ${organizationName}. Usa
 ${currentProduct ? `
 CONTEXTO ACTUAL (PRIORIDAD MÁXIMA):
 El cliente está viendo AHORA MISMO: "${currentProduct.name}"
+ID: ${currentProduct.id}
 Precio base: ${currentProduct.price.toLocaleString()}
 Stock: ${currentProduct.stock}
 ${currentProduct.has_quantity_pricing && currentProduct.price_tiers ? `
