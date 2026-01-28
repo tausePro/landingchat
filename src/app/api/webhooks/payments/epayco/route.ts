@@ -313,24 +313,30 @@ async function processOrderUpdate(
             .single()
 
         if (order) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const customer = order.customers as any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const orderItems = order.order_items as any[]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const customerInfo = order.customer_info as any
+            const customer = order.customers as { name?: string; email?: string; phone?: string } | null
+            const orderItems = order.order_items as Array<{
+                quantity: number
+                product_id: string
+                products: { name?: string } | null
+            }>
+            const customerInfo = order.customer_info as {
+                name?: string
+                email?: string
+                phone?: string
+                city?: string
+            } | null
 
             // 1. Enviar notificación de venta por WhatsApp
             try {
                 const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                
+
                 await sendSaleNotification(
                     { organizationId },
                     {
                         id: order.order_number || order.id,
                         total: order.total,
                         customerName: customer?.name || customerInfo?.name || "Cliente",
-                        items: orderItems?.map((item: any) => ({
+                        items: orderItems?.map((item) => ({
                             name: item.products?.name || "Producto",
                             quantity: item.quantity,
                         })) || [],
@@ -344,7 +350,7 @@ async function processOrderUpdate(
             // 2. Enviar evento Purchase a Meta Conversions API (server-side tracking)
             try {
                 const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
-                
+
                 await trackServerPurchase(
                     organizationId,
                     {
@@ -352,7 +358,7 @@ async function processOrderUpdate(
                         orderNumber: order.order_number,
                         total: order.total,
                         currency: "COP",
-                        items: orderItems?.map((item: any) => ({
+                        items: orderItems?.map((item) => ({
                             productId: item.product_id,
                             quantity: item.quantity,
                         })),

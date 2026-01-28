@@ -273,18 +273,19 @@ async function processOrderUpdate(
 
             if (order) {
                 const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const customer = order.customers as any
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const orderItems = order.order_items as any[]
-                
+                const customer = order.customers as { name?: string } | null
+                const orderItems = order.order_items as Array<{
+                    quantity: number
+                    products: { name?: string } | null
+                }>
+
                 await sendSaleNotification(
                     { organizationId },
                     {
                         id: order.order_number || order.id,
                         total: order.total,
                         customerName: customer?.name || "Cliente",
-                        items: orderItems?.map((item: any) => ({
+                        items: orderItems?.map((item) => ({
                             name: item.products?.name || "Producto",
                             quantity: item.quantity,
                         })) || [],

@@ -18,7 +18,7 @@ interface ProcessMessageOutput {
     response: string
     actions: Array<{
         type: string
-        data: any
+        data: Record<string, unknown>
     }>
     metadata: {
         model: string
@@ -34,7 +34,7 @@ interface ProcessMessageOutput {
 export async function processMessage(input: ProcessMessageInput): Promise<ProcessMessageOutput> {
     const startTime = Date.now()
     const toolsUsed: string[] = []
-    const actions: Array<{ type: string; data: any }> = []
+    const actions: Array<{ type: string; data: Record<string, unknown> }> = []
 
     try {
         console.log("[processMessage] Starting with input:", { chatId: input.chatId, agentId: input.agentId, currentProductId: input.currentProductId })
@@ -172,7 +172,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
         }
 
         // 8. Prepare message history
-        let currentMessages: Anthropic.MessageParam[] = [
+        const currentMessages: Anthropic.MessageParam[] = [
             ...conversationHistory,
             { role: 'user' as const, content: input.message }
         ]
@@ -191,6 +191,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
                 max_tokens: 1024,
                 system: fullSystemPrompt,
                 messages: currentMessages,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK type incompatibility
                 tools: tools as any
             })
 
@@ -205,7 +206,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
             const textBlocks = response.content.filter(block => block.type === "text")
 
             if (textBlocks.length > 0) {
-                finalResponseText += textBlocks.map(b => (b as any).text).join("\n")
+                finalResponseText += textBlocks.map(b => (b as Anthropic.TextBlock).text).join("\n")
             }
 
             if (toolUseBlocks.length === 0) {
@@ -294,12 +295,13 @@ REGLAS CRÍTICAS DE INVENTARIO:
             }
         }
 
-    } catch (error: any) {
+    } catch (error) {
+        const err = error as Error
         console.error("[processMessage] ========== ERROR DETAILS ==========")
-        console.error("[processMessage] Error name:", error.name)
-        console.error("[processMessage] Error message:", error.message)
-        console.error("[processMessage] Error stack:", error.stack)
-        console.error("[processMessage] Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+        console.error("[processMessage] Error name:", err.name)
+        console.error("[processMessage] Error message:", err.message)
+        console.error("[processMessage] Error stack:", err.stack)
+        console.error("[processMessage] Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2))
         console.error("[processMessage] =====================================")
 
         return {

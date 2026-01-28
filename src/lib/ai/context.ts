@@ -35,7 +35,14 @@ interface Customer {
     name?: string
     email?: string
     phone?: string
-    metadata?: any
+    metadata?: Record<string, unknown>
+}
+
+interface OrderItem {
+    product_id?: string
+    name?: string
+    quantity: number
+    price?: number
 }
 
 interface Order {
@@ -43,7 +50,7 @@ interface Order {
     created_at: string
     total: number
     status: string
-    items: any[]
+    items: OrderItem[]
 }
 
 interface AgentConfig {
@@ -312,8 +319,14 @@ export function buildConversationHistory(messages: Message[]): Array<{ role: 'us
     }))
 }
 
+interface CartItem {
+    name?: string
+    price?: number
+    quantity?: number
+}
+
 // Build cart context
-export function buildCartContext(cart?: { items: any[]; total?: number }): string {
+export function buildCartContext(cart?: { items: CartItem[]; total?: number }): string {
     if (!cart || !cart.items || cart.items.length === 0) {
         return "CARRITO ACTUAL: Vacío"
     }
