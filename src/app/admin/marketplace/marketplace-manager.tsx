@@ -124,13 +124,13 @@ export function MarketplaceManager({ items }: MarketplaceManagerProps) {
                             <div className="flex justify-between text-sm mb-2">
                                 <span className="text-muted-foreground">Precio:</span>
                                 <span className="font-bold text-green-600">
-                                    ${item.base_price.toLocaleString()} / {item.billing_period}
+                                    ${item.base_price.toLocaleString('es-CO')} / {item.billing_period}
                                 </span>
                             </div>
                             <div className="flex justify-between text-sm">
                                 <span className="text-muted-foreground">Costo:</span>
                                 <span className="font-medium text-slate-500">
-                                    ${item.cost.toLocaleString()}
+                                    ${item.cost.toLocaleString('es-CO')}
                                 </span>
                             </div>
                         </CardContent>
