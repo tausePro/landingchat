@@ -49,7 +49,7 @@ export default function AgentSetupPage() {
 
     return (
         <>
-            <ProgressBar currentStep={2} totalSteps={4} stepLabel="Configura tu Agente" />
+            <ProgressBar currentStep={2} totalSteps={5} stepLabel="Configura tu Agente" />
 
             <div className="flex flex-wrap justify-between gap-3">
                 <div className="flex flex-col gap-2">

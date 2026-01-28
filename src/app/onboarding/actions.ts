@@ -199,7 +199,7 @@ export async function completeOnboarding(): Promise<ActionResult<{ redirectTo: s
       .from("organizations")
       .update({
         onboarding_completed: true,
-        onboarding_step: 4
+        onboarding_step: 5
       })
       .eq("id", profile.organization_id)
 

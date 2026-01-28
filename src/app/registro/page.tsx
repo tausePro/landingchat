@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+import { setupNewUser } from "./actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export default function RegistroPage() {
         setError(null)
 
         try {
-            // Sign up
+            // 1. Sign up con Supabase Auth
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
@@ -37,78 +38,20 @@ export default function RegistroPage() {
             })
             if (error) throw error
 
-            // Create organization and profile
+            // 2. Configurar usuario (org + perfil + suscripción trial)
             if (data.user) {
-                // 1. Check if profile already exists
-                const { data: existingProfile } = await supabase
-                    .from("profiles")
-                    .select("id")
-                    .eq("id", data.user.id)
-                    .single()
+                const result = await setupNewUser(data.user.id, fullName, email)
 
-                if (existingProfile) {
-                    // Profile exists, just redirect
-                    router.push("/dashboard")
-                    return
+                if (!result.success) {
+                    throw new Error(result.error || "Error al configurar usuario")
                 }
-
-                // 2. Check if organization already exists (by slug)
-                const slug = `org-${data.user.id.substring(0, 8)}`
-                let orgId
-
-                const { data: existingOrg } = await supabase
-                    .from("organizations")
-                    .select("id")
-                    .eq("slug", slug)
-                    .single()
-
-                if (existingOrg) {
-                    orgId = existingOrg.id
-                } else {
-                    // Create organization
-                    const { data: org, error: orgError } = await supabase
-                        .from("organizations")
-                        .insert({
-                            name: `${fullName}'s Organization`,
-                            slug: slug,
-                        })
-                        .select()
-                        .single()
-
-                    if (orgError) {
-                        // If error is duplicate key (race condition), try to fetch again
-                        if (orgError.code === '23505') {
-                            const { data: retryOrg } = await supabase
-                                .from("organizations")
-                                .select("id")
-                                .eq("slug", slug)
-                                .single()
-                            if (retryOrg) orgId = retryOrg.id
-                            else throw orgError
-                        } else {
-                            throw orgError
-                        }
-                    } else {
-                        orgId = org.id
-                    }
-                }
-
-                // 3. Create profile
-                const { error: profileError } = await supabase
-                    .from("profiles")
-                    .insert({
-                        id: data.user.id,
-                        organization_id: orgId,
-                        full_name: fullName,
-                        role: "admin",
-                    })
-
-                if (profileError) throw profileError
             }
 
-            router.push("/dashboard")
-        } catch (err: any) {
-            setError(err.message || "Error al crear la cuenta")
+            // 3. Redirigir al onboarding
+            router.push("/onboarding/welcome")
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : "Error al crear la cuenta"
+            setError(errorMessage)
         } finally {
             setLoading(false)
         }

@@ -5,7 +5,7 @@ import { ProgressBar } from "@/components/onboarding/progress-bar"
 export default function ProductIntegrationPage() {
     return (
         <>
-            <ProgressBar currentStep={3} totalSteps={4} stepLabel="Integra tu catálogo de productos" />
+            <ProgressBar currentStep={3} totalSteps={5} stepLabel="Integra tu catálogo de productos" />
 
             <div className="flex flex-wrap justify-between gap-4 py-4">
                 <div className="flex flex-col gap-1">
@@ -90,7 +90,7 @@ export default function ProductIntegrationPage() {
 
             {/* Skip Button */}
             <div className="flex justify-center py-6 mt-auto">
-                <Link href="/onboarding/success">
+                <Link href="/onboarding/plan">
                     <Button variant="secondary" className="h-11 px-5 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800">
                         <span className="truncate">Omitir por ahora</span>
                     </Button>
