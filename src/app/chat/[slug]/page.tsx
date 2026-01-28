@@ -2,6 +2,7 @@
 
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { getStoredUUID, getStoredString, setStoredUUID } from "@/lib/utils/storage"
 import { ChatLayout } from "@/components/layout/chat-layout"
 
 import { useState, useEffect, use, useRef } from "react"
@@ -75,11 +76,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         if (initializationRef.current) return
         initializationRef.current = true
 
-        // Verificar que el usuario esté identificado
-        const storedCustomerId = localStorage.getItem(`customer_${slug}`)
-        const storedCustomerName = localStorage.getItem(`customer_name_${slug}`)
+        // Verificar que el usuario esté identificado (con validación de UUID)
+        const storedCustomerId = getStoredUUID(`customer_${slug}`)
+        const storedCustomerName = getStoredString(`customer_name_${slug}`)
         // Si no hay chatId en localStorage, será null, lo que forzará crear uno nuevo
-        const storedChatId = localStorage.getItem(`chatId_${slug}`)
+        const storedChatId = getStoredUUID(`chatId_${slug}`)
 
         if (!storedCustomerId) {
             // No identificado, redirigir al store
@@ -199,7 +200,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 if (data.chatId) {
                     currentChatId = data.chatId
                     setChatId(data.chatId)
-                    localStorage.setItem(`chatId_${slug}`, data.chatId)
+                    setStoredUUID(`chatId_${slug}`, data.chatId)
 
                     if (data.agent) {
                         setAgent((prev: any) => ({ ...prev, ...data.agent }))
@@ -561,13 +562,13 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 // Navigate to selected chat or reload messages
                 if (selectedChatId !== chatId) {
                     setChatId(selectedChatId)
-                    localStorage.setItem(`chatId_${slug}`, selectedChatId)
+                    setStoredUUID(`chatId_${slug}`, selectedChatId)
                     fetchHistory(selectedChatId)
                 }
             }}
             onNewConversation={() => {
                 // Clear current chat and start fresh
-                localStorage.removeItem(`chatId_${slug}`)
+                try { localStorage.removeItem(`chatId_${slug}`) } catch { /* ignore */ }
                 setMessages([])
                 setChatId(null)
 

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { useChat } from "@/hooks/use-chat"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { getStoredUUID, setStoredUUID } from "@/lib/utils/storage"
 
 const ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001" // Default Seed Org
 
@@ -29,7 +30,7 @@ export function EmbeddableChat({
     // Initialize Chat Session
     useEffect(() => {
         const initChat = async () => {
-            const storedChatId = localStorage.getItem("landingchat_session_id")
+            const storedChatId = getStoredUUID("landingchat_session_id")
             if (storedChatId) {
                 setChatId(storedChatId)
             } else {
@@ -45,7 +46,7 @@ export function EmbeddableChat({
                     .single()
 
                 if (data) {
-                    localStorage.setItem("landingchat_session_id", data.id)
+                    setStoredUUID("landingchat_session_id", data.id)
                     setChatId(data.id)
                 } else if (error) {
                     console.error("Error creating chat:", JSON.stringify(error, null, 2))

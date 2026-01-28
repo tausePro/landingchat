@@ -9,6 +9,7 @@ import { StoreHeader } from "@/components/store/store-header"
 import { EnhancedStoreHeader } from "@/components/store/enhanced-store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
+import { getStoredUUID, setStoredUUID, setStoredString } from "@/lib/utils/storage"
 import { StorePresence } from "@/components/store/store-presence"
 import { CartDrawer } from "@/app/chat/components/cart-drawer"
 import { ensurePosthog } from "@/lib/analytics/posthog-client"
@@ -105,8 +106,8 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
         const context = searchParams.get('context')
 
         if (action === 'chat') {
-            // Verificar si ya está identificado
-            const customerId = localStorage.getItem(`customer_${organization.slug}`)
+            // Verificar si ya está identificado (con validación de UUID)
+            const customerId = getStoredUUID(`customer_${organization.slug}`)
 
             if (customerId) {
                 // Ya identificado, ir directamente al chat
@@ -127,8 +128,8 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
     }, [searchParams, organization.slug, router, isSubdomain])
 
     const handleStartChat = (productId?: string, query?: string) => {
-        // Verificar si ya está identificado
-        const customerId = localStorage.getItem(`customer_${organization.slug}`)
+        // Verificar si ya está identificado (con validación de UUID)
+        const customerId = getStoredUUID(`customer_${organization.slug}`)
 
         if (customerId) {
             // Ya identificado, ir al chat
@@ -151,9 +152,9 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
     }
 
     const handleCustomerIdentified = (customer: any) => {
-        // Guardar en localStorage
-        localStorage.setItem(`customer_${organization.slug}`, customer.id)
-        localStorage.setItem(`customer_name_${organization.slug}`, customer.full_name)
+        // Guardar en localStorage (con validación)
+        setStoredUUID(`customer_${organization.slug}`, customer.id)
+        setStoredString(`customer_name_${organization.slug}`, customer.full_name)
 
         // Identificar en PostHog
         const posthog = ensurePosthog()

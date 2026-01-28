@@ -6,6 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
+import { getStoredUUID } from "@/lib/utils/storage"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { useCartStore } from "@/store/cart-store"
 
@@ -127,7 +128,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         if (productId) params.set('product', productId)
         if (contextParts.length > 0) params.set('context', contextParts.join(', '))
 
-        const customerId = localStorage.getItem(`customer_${organization.slug}`)
+        const customerId = getStoredUUID(`customer_${organization.slug}`)
 
         if (customerId) {
             let chatUrl = getChatUrl(isSubdomain, organization.slug)
