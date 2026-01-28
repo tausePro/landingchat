@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { SubscriptionManager } from "./components/subscription-manager"
 
 export default async function SubscriptionPage() {
@@ -67,22 +68,24 @@ export default async function SubscriptionPage() {
     }
 
     return (
-        <div className="container max-w-5xl py-8">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-                    Mi Suscripción
-                </h1>
-                <p className="mt-2 text-slate-600 dark:text-slate-400">
-                    Administra tu plan y facturación
-                </p>
-            </div>
+        <DashboardLayout>
+            <div className="max-w-5xl">
+                <div className="mb-8">
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+                        Mi Suscripción
+                    </h1>
+                    <p className="mt-2 text-slate-600 dark:text-slate-400">
+                        Administra tu plan y facturación
+                    </p>
+                </div>
 
-            <SubscriptionManager
-                subscription={subscription}
-                currentPlan={currentPlan}
-                plans={plans || []}
-                daysRemaining={daysRemaining}
-            />
-        </div>
+                <SubscriptionManager
+                    subscription={subscription}
+                    currentPlan={currentPlan}
+                    plans={plans || []}
+                    daysRemaining={daysRemaining}
+                />
+            </div>
+        </DashboardLayout>
     )
 }

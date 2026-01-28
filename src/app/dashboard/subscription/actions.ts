@@ -5,14 +5,29 @@ import { getPlatformWompiCredentials } from "@/app/admin/platform-payments/actio
 import crypto from "crypto"
 
 /**
+ * Datos para inicializar el Widget de Wompi en el cliente
+ * NO incluye el integrity secret, solo la firma generada
+ */
+export interface WompiWidgetData {
+    publicKey: string
+    amountInCents: number
+    currency: string
+    reference: string
+    redirectUrl: string
+    integritySignature: string
+    customerEmail?: string
+    isTestMode: boolean
+}
+
+/**
  * Actualiza o cambia el plan de suscripción del usuario
  * Si el plan es gratuito o menor, cambia inmediatamente
- * Si el plan requiere pago, genera URL de checkout de Wompi
+ * Si el plan requiere pago, genera datos para el Widget de Wompi
  */
 export async function upgradeSubscription(planId: string): Promise<{
     success: boolean
     data?: {
-        checkoutUrl?: string
+        widgetData?: WompiWidgetData
         changed?: boolean
     }
     error?: string
@@ -30,7 +45,7 @@ export async function upgradeSubscription(planId: string): Promise<{
         // 2. Obtener organización del usuario
         const { data: profile } = await supabase
             .from("profiles")
-            .select("organization_id")
+            .select("organization_id, email")
             .eq("id", user.id)
             .single()
 
@@ -78,8 +93,14 @@ export async function upgradeSubscription(planId: string): Promise<{
             return await changePlanImmediately(serviceSupabase, profile.organization_id, newPlan, currentSub?.id)
         }
 
-        // 8. Es un upgrade, generar checkout de Wompi
-        return await generateWompiCheckout(serviceSupabase, profile.organization_id, newPlan, currentSub?.id)
+        // 8. Es un upgrade, generar datos para Widget de Wompi
+        return await generateWompiWidgetData(
+            serviceSupabase,
+            profile.organization_id,
+            newPlan,
+            currentSub?.id,
+            profile.email || user.email
+        )
 
     } catch (error) {
         console.error("[upgradeSubscription] Error:", error)
@@ -98,7 +119,7 @@ async function changeToFreePlan(
 ): Promise<{ success: boolean; data?: { changed: boolean }; error?: string }> {
     const now = new Date()
     const periodEnd = new Date(now)
-    periodEnd.setMonth(periodEnd.getMonth() + 1) // Free plan válido por 1 mes
+    periodEnd.setMonth(periodEnd.getMonth() + 1)
 
     const subscriptionData = {
         organization_id: organizationId,
@@ -142,7 +163,6 @@ async function changePlanImmediately(
 ): Promise<{ success: boolean; data?: { changed: boolean }; error?: string }> {
     const now = new Date()
 
-    // Mantener el período actual pero actualizar el plan
     const subscriptionData = {
         plan_id: plan.id as string,
         currency: (plan.currency as string) || "COP",
@@ -162,7 +182,6 @@ async function changePlanImmediately(
 
         if (error) throw error
     } else {
-        // Crear nueva suscripción con trial
         const periodEnd = new Date(now)
         periodEnd.setDate(periodEnd.getDate() + 7)
 
@@ -183,12 +202,17 @@ async function changePlanImmediately(
     return { success: true, data: { changed: true } }
 }
 
-async function generateWompiCheckout(
+/**
+ * Genera los datos necesarios para el Widget de Wompi
+ * La firma se genera en el servidor, el cliente solo recibe datos seguros
+ */
+async function generateWompiWidgetData(
     supabase: ReturnType<typeof createServiceClient>,
     organizationId: string,
     plan: Record<string, unknown>,
-    subscriptionId?: string
-): Promise<{ success: boolean; data?: { checkoutUrl: string }; error?: string }> {
+    subscriptionId?: string,
+    customerEmail?: string
+): Promise<{ success: boolean; data?: { widgetData: WompiWidgetData }; error?: string }> {
     // Obtener credenciales de Wompi de la plataforma
     const credentials = await getPlatformWompiCredentials()
     if (!credentials.success || !credentials.data) {
@@ -221,7 +245,6 @@ async function generateWompiCheckout(
         if (insertError) throw insertError
         subId = newSub.id
     } else {
-        // Actualizar plan pendiente
         await supabase
             .from("subscriptions")
             .update({
@@ -240,31 +263,31 @@ async function generateWompiCheckout(
     const amountInCents = Math.round((plan.price as number) * 100)
     const currency = (plan.currency as string) || "COP"
 
-    // URL de redirección
+    // URL de redirección (después de pago)
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
     const redirectUrl = `${baseUrl}/dashboard/subscription/result`
 
-    // Generar firma de integridad
+    // Generar firma de integridad en el servidor (seguro)
     const signatureString = `${reference}${amountInCents}${currency}${credentials.data.integritySecret}`
     const integritySignature = crypto
         .createHash("sha256")
         .update(signatureString)
         .digest("hex")
 
-    // Construir URL de checkout de Wompi
-    const checkoutParams = new URLSearchParams({
-        "public-key": credentials.data.publicKey,
-        "currency": currency,
-        "amount-in-cents": amountInCents.toString(),
-        "reference": reference,
-        "redirect-url": redirectUrl,
-        "signature:integrity": integritySignature,
-    })
-
-    const checkoutUrl = `https://checkout.wompi.co/p/?${checkoutParams.toString()}`
-
+    // Retornar datos para el Widget (sin exponer secrets)
     return {
         success: true,
-        data: { checkoutUrl }
+        data: {
+            widgetData: {
+                publicKey: credentials.data.publicKey,
+                amountInCents,
+                currency,
+                reference,
+                redirectUrl,
+                integritySignature,
+                customerEmail,
+                isTestMode: credentials.data.isTestMode,
+            }
+        }
     }
 }

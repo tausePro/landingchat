@@ -1,11 +1,41 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Check, Loader2, AlertTriangle, CreditCard, Calendar, Zap } from "lucide-react"
-import { upgradeSubscription } from "../actions"
+import { upgradeSubscription, type WompiWidgetData } from "../actions"
+
+// Declarar tipos para el widget de Wompi
+declare global {
+    interface Window {
+        WidgetCheckout?: new (config: WompiWidgetConfig) => WompiWidget
+    }
+}
+
+interface WompiWidgetConfig {
+    currency: string
+    amountInCents: number
+    reference: string
+    publicKey: string
+    redirectUrl: string
+    "signature:integrity": string
+    customerData?: {
+        email?: string
+    }
+}
+
+interface WompiWidget {
+    open: (callback: (result: WompiResult) => void) => void
+}
+
+interface WompiResult {
+    transaction?: {
+        id: string
+        status: string
+    }
+}
 
 interface Plan {
     id: string
@@ -47,6 +77,53 @@ export function SubscriptionManager({
 }: SubscriptionManagerProps) {
     const [upgrading, setUpgrading] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [wompiLoaded, setWompiLoaded] = useState(false)
+
+    // Cargar el script del Widget de Wompi
+    useEffect(() => {
+        if (typeof window !== "undefined" && !window.WidgetCheckout) {
+            const script = document.createElement("script")
+            script.src = "https://checkout.wompi.co/widget.js"
+            script.async = true
+            script.onload = () => setWompiLoaded(true)
+            document.body.appendChild(script)
+
+            return () => {
+                // Cleanup si es necesario
+            }
+        } else if (window.WidgetCheckout) {
+            setWompiLoaded(true)
+        }
+    }, [])
+
+    const openWompiWidget = useCallback((widgetData: WompiWidgetData) => {
+        if (!window.WidgetCheckout) {
+            setError("El widget de pago no está disponible. Intenta recargar la página.")
+            setUpgrading(null)
+            return
+        }
+
+        const checkout = new window.WidgetCheckout({
+            currency: widgetData.currency,
+            amountInCents: widgetData.amountInCents,
+            reference: widgetData.reference,
+            publicKey: widgetData.publicKey,
+            redirectUrl: widgetData.redirectUrl,
+            "signature:integrity": widgetData.integritySignature,
+            customerData: widgetData.customerEmail ? {
+                email: widgetData.customerEmail
+            } : undefined
+        })
+
+        checkout.open((result: WompiResult) => {
+            setUpgrading(null)
+
+            if (result.transaction) {
+                // Redirigir a la página de resultado con el ID de transacción
+                window.location.href = `${widgetData.redirectUrl}?id=${result.transaction.id}`
+            }
+        })
+    }, [])
 
     const handleUpgrade = async (planId: string) => {
         setUpgrading(planId)
@@ -60,11 +137,11 @@ export function SubscriptionManager({
             return
         }
 
-        if (result.data?.checkoutUrl) {
-            // Redirigir a Wompi para pago
-            window.location.href = result.data.checkoutUrl
-        } else {
-            // Recargar página para ver cambios
+        if (result.data?.widgetData) {
+            // Abrir el Widget de Wompi para pago seguro
+            openWompiWidget(result.data.widgetData)
+        } else if (result.data?.changed) {
+            // El plan cambió inmediatamente (gratis o downgrade)
             window.location.reload()
         }
     }
@@ -261,7 +338,7 @@ export function SubscriptionManager({
                                             className="w-full"
                                             variant={isUpgrade ? "default" : "outline"}
                                             onClick={() => handleUpgrade(plan.id)}
-                                            disabled={upgrading !== null}
+                                            disabled={upgrading !== null || (!wompiLoaded && isUpgrade && plan.price > 0)}
                                         >
                                             {upgrading === plan.id ? (
                                                 <>
