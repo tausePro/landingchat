@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl, getStoreLink } from "@/lib/utils/store-urls"
+import { getStoredUUID } from "@/lib/utils/storage"
 
 interface ProductCTAButtonProps {
     slug: string
@@ -15,11 +16,9 @@ export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mob
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
 
-    console.log('ProductCTAButton received slug:', slug)
-
     const handleClick = () => {
-        // Check if customer is already identified
-        const customerId = localStorage.getItem(`customer_${slug}`)
+        // Check if customer is already identified (with UUID validation)
+        const customerId = getStoredUUID(`customer_${slug}`)
 
         if (customerId) {
             // Navigate directly to chat with product
