@@ -68,6 +68,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         { icon: "group", label: "Clientes", href: "/dashboard/customers" },
         { icon: "campaign", label: "Marketing", href: "/dashboard/marketing" },
         { icon: "smart_toy", label: "Agentes", href: "/dashboard/agents" },
+        { icon: "card_membership", label: "Suscripción", href: "/dashboard/subscription" },
     ]
 
     return (
