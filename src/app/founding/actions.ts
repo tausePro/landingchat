@@ -81,6 +81,7 @@ export async function getFoundingLandingData(): Promise<ActionResult<FoundingLan
                 hero_description: program.hero_description,
                 cta_button_text: program.cta_button_text,
             },
+            landing_config: program.landing_config || null,
             tiers: (tiers || []).map((tier) => {
                 const claimed = claimedByTier[tier.id] || 0
                 const currentPrice = calculateCurrentPrice(tier, program)

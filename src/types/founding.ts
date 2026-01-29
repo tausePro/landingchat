@@ -207,6 +207,64 @@ export type ReserveFoundingSlotInput = z.infer<typeof ReserveFoundingSlotInputSc
 // RESPONSE TYPES
 // =============================================================================
 
+// Configuración visual de la landing
+export interface FoundingLandingConfig {
+    // Logo
+    logo_type: "icon" | "image" | "text"
+    logo_icon: string
+    logo_image_url: string | null
+    logo_text: string
+
+    // Colors
+    primary_gradient_from: string
+    primary_gradient_to: string
+    accent_color: string
+
+    // Header
+    header_badge_text: string
+    header_badge_visible: boolean
+
+    // Hero
+    hero_badge_text: string
+    hero_badge_visible: boolean
+
+    // Social proof
+    social_proof_title: string
+    social_proof_companies: Array<{ name: string; logo_url: string | null }>
+    social_proof_badge_text: string
+    social_proof_badge_visible: boolean
+
+    // Benefits
+    benefits_title: string
+    benefits_discount_badge: string
+    benefits: Array<{
+        icon: string
+        icon_color: string
+        title: string
+        description: string
+    }>
+
+    // Features
+    features_subtitle: string
+    features_title: string
+    features: Array<{
+        icon: string
+        title: string
+        description: string
+    }>
+
+    // Final CTA
+    final_cta_title: string
+    final_cta_subtitle: string
+    final_cta_description: string
+    final_cta_button_text: string
+    final_cta_badges: string[]
+
+    // Footer
+    footer_links: Array<{ label: string; href: string }>
+    footer_copyright: string
+}
+
 // Datos públicos para la landing (sin info sensible)
 export interface FoundingLandingData {
     program: {
@@ -221,6 +279,7 @@ export interface FoundingLandingData {
         hero_description: string
         cta_button_text: string
     }
+    landing_config: FoundingLandingConfig | null
     tiers: Array<{
         id: string
         name: string

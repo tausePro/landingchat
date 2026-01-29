@@ -216,5 +216,6 @@ export {
   type UpdateFoundingTierInput,
   type ReserveFoundingSlotInput,
   type FoundingLandingData,
+  type FoundingLandingConfig,
   type FoundingMetrics,
 } from "./founding"

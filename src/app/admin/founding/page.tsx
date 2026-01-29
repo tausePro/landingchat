@@ -36,7 +36,10 @@ import {
     Rocket,
     Target,
     Zap,
+    Palette,
+    ExternalLink,
 } from "lucide-react"
+import Link from "next/link"
 import { toast } from "sonner"
 import {
     getFoundingProgram,
@@ -168,6 +171,18 @@ export default function FoundingAdminPage() {
                 <div className="flex items-center gap-3">
                     <Button variant="outline" size="icon" onClick={loadData}>
                         <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/founding" target="_blank">
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Ver Landing
+                        </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/admin/founding/landing">
+                            <Palette className="h-4 w-4 mr-2" />
+                            Editor Landing
+                        </Link>
                     </Button>
                     <Button
                         variant="outline"
