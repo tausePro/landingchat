@@ -2,6 +2,7 @@ import { MinimalTemplate } from "./minimal-template"
 import { CompleteTemplate } from "./complete-template"
 import { SingleProductTemplate } from "./single-product-template"
 import { ServicesTemplate } from "./services-template"
+import { RealEstateTemplate } from "./real-estate-template"
 
 interface TemplateRendererProps {
     template: string
@@ -43,6 +44,8 @@ export function TemplateRenderer({
             return <SingleProductTemplate {...templateProps} />
         case "services":
             return <ServicesTemplate {...templateProps} />
+        case "real-estate":
+            return <RealEstateTemplate organization={organization} properties={products} />
         default:
             return <MinimalTemplate {...templateProps} />
     }
