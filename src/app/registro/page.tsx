@@ -1,24 +1,57 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { setupNewUser } from "./actions"
+import { Zap, Check, Clock, Loader2 } from "lucide-react"
+import { setupNewUser, setupFoundingUser, getFoundingTierInfo } from "./actions"
+import { formatFoundingPrice, calculateAnnualPrice } from "@/types"
 
 export const dynamic = 'force-dynamic'
 
-export default function RegistroPage() {
+interface FoundingTierInfo {
+    id: string
+    name: string
+    current_price: number
+    regular_price: number
+    slots_remaining: number
+    free_months: number
+    currency: string
+}
+
+function RegistroForm() {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [loading, setLoading] = useState(false)
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [fullName, setFullName] = useState("")
     const [error, setError] = useState<string | null>(null)
 
+    // Founding member params
+    const planSlug = searchParams.get("plan")
+    const isFounding = searchParams.get("founding") === "true"
+    const [foundingTier, setFoundingTier] = useState<FoundingTierInfo | null>(null)
+    const [loadingTier, setLoadingTier] = useState(isFounding)
+
     const supabase = createClient()
+
+    // Cargar info del tier founding si aplica
+    useEffect(() => {
+        if (isFounding && planSlug) {
+            setLoadingTier(true)
+            getFoundingTierInfo(planSlug).then((result) => {
+                if (result.success && result.data) {
+                    setFoundingTier(result.data)
+                }
+                setLoadingTier(false)
+            })
+        }
+    }, [isFounding, planSlug])
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -38,17 +71,37 @@ export default function RegistroPage() {
             })
             if (error) throw error
 
-            // 2. Configurar usuario (org + perfil + suscripción trial)
-            if (data.user) {
+            if (!data.user) {
+                throw new Error("Error al crear usuario")
+            }
+
+            // 2. Configurar usuario según tipo
+            if (isFounding && foundingTier) {
+                // FOUNDING MEMBER: Reservar slot y redirigir a checkout
+                const result = await setupFoundingUser(
+                    data.user.id,
+                    fullName,
+                    email,
+                    foundingTier.id
+                )
+
+                if (!result.success) {
+                    throw new Error(result.error || "Error al reservar cupo")
+                }
+
+                // Redirigir a checkout founding con el slot reservado
+                router.push(`/founding/checkout?slot=${result.slotId}`)
+            } else {
+                // REGISTRO NORMAL: Trial gratuito
                 const result = await setupNewUser(data.user.id, fullName, email)
 
                 if (!result.success) {
                     throw new Error(result.error || "Error al configurar usuario")
                 }
-            }
 
-            // 3. Redirigir al onboarding
-            router.push("/onboarding/welcome")
+                // Redirigir al onboarding
+                router.push("/onboarding/welcome")
+            }
         } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : "Error al crear la cuenta"
             setError(errorMessage)
@@ -56,6 +109,11 @@ export default function RegistroPage() {
             setLoading(false)
         }
     }
+
+    // Calcular precios para founding
+    const annualInfo = foundingTier
+        ? calculateAnnualPrice(foundingTier.current_price, foundingTier.free_months)
+        : null
 
     return (
         <div className="relative flex min-h-screen w-full flex-col items-center justify-center bg-background-light dark:bg-background-dark px-4">
@@ -68,10 +126,67 @@ export default function RegistroPage() {
                         </svg>
                     </div>
                     <h1 className="text-2xl font-black text-slate-900 dark:text-white">LandingChat</h1>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Crea tu cuenta gratis
-                    </p>
+                    {isFounding ? (
+                        <div className="flex flex-col items-center gap-1">
+                            <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
+                                <Zap className="size-3 mr-1" />
+                                FOUNDING MEMBER
+                            </Badge>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Asegura tu cupo exclusivo
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Crea tu cuenta gratis
+                        </p>
+                    )}
                 </div>
+
+                {/* Founding Member Info Card */}
+                {isFounding && foundingTier && !loadingTier && (
+                    <div className="mb-6 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="font-semibold text-emerald-800 dark:text-emerald-300">
+                                Plan {foundingTier.name}
+                            </span>
+                            <Badge className="bg-emerald-500 text-white">
+                                {foundingTier.slots_remaining} cupos
+                            </Badge>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                            <div className="flex items-center gap-2">
+                                <Check className="size-4 text-emerald-600" />
+                                <span>
+                                    <strong>{formatFoundingPrice(foundingTier.current_price)}/mes</strong>
+                                    <span className="text-slate-500 line-through ml-2">
+                                        {formatFoundingPrice(foundingTier.regular_price)}
+                                    </span>
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Check className="size-4 text-emerald-600" />
+                                <span>Precio congelado de por vida</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Check className="size-4 text-emerald-600" />
+                                <span>Paga {annualInfo?.monthsPaid} meses, obtén 12</span>
+                            </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-700">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                                <Clock className="size-3" />
+                                Pago anual único: <strong>{formatFoundingPrice(annualInfo?.totalPrice || 0)}</strong>
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {loadingTier && isFounding && (
+                    <div className="mb-6 flex items-center justify-center py-4">
+                        <Loader2 className="size-6 animate-spin text-primary" />
+                    </div>
+                )}
 
                 {/* Form */}
                 <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-sm">
@@ -123,8 +238,27 @@ export default function RegistroPage() {
                             </div>
                         )}
 
-                        <Button type="submit" disabled={loading} className="w-full h-12 mt-2">
-                            {loading ? "Creando cuenta..." : "Crear Cuenta"}
+                        <Button
+                            type="submit"
+                            disabled={loading || (isFounding && !foundingTier)}
+                            className={`w-full h-12 mt-2 ${isFounding
+                                ? "bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600"
+                                : ""
+                                }`}
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 size-4 animate-spin" />
+                                    {isFounding ? "Reservando cupo..." : "Creando cuenta..."}
+                                </>
+                            ) : isFounding ? (
+                                <>
+                                    <Zap className="mr-2 size-4" />
+                                    Asegurar Mi Cupo
+                                </>
+                            ) : (
+                                "Crear Cuenta"
+                            )}
                         </Button>
                     </form>
 
@@ -135,12 +269,27 @@ export default function RegistroPage() {
                     </div>
 
                     <div className="mt-4 text-center">
-                        <Link href="/" className="text-sm text-slate-600 dark:text-slate-400 hover:text-primary">
-                            ← Volver al inicio
+                        <Link
+                            href={isFounding ? "/founding" : "/"}
+                            className="text-sm text-slate-600 dark:text-slate-400 hover:text-primary"
+                        >
+                            ← {isFounding ? "Volver a planes founding" : "Volver al inicio"}
                         </Link>
                     </div>
                 </div>
             </div>
         </div>
+    )
+}
+
+export default function RegistroPage() {
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen items-center justify-center">
+                <Loader2 className="size-8 animate-spin text-primary" />
+            </div>
+        }>
+            <RegistroForm />
+        </Suspense>
     )
 }
