@@ -78,6 +78,7 @@ export function SubscriptionManager({
     const [upgrading, setUpgrading] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [wompiLoaded, setWompiLoaded] = useState(false)
+    const [fallbackUrl, setFallbackUrl] = useState<string | null>(null)
 
     // Cargar el script del Widget de Wompi
     useEffect(() => {
@@ -103,31 +104,64 @@ export function SubscriptionManager({
             return
         }
 
-        const checkout = new window.WidgetCheckout({
-            currency: widgetData.currency,
-            amountInCents: widgetData.amountInCents,
-            reference: widgetData.reference,
-            publicKey: widgetData.publicKey,
-            redirectUrl: widgetData.redirectUrl,
-            "signature:integrity": widgetData.integritySignature,
-            customerData: widgetData.customerEmail ? {
-                email: widgetData.customerEmail
-            } : undefined
-        })
+        try {
+            console.log("[Wompi Widget] Abriendo widget con datos:", {
+                currency: widgetData.currency,
+                amountInCents: widgetData.amountInCents,
+                reference: widgetData.reference,
+                publicKey: widgetData.publicKey.substring(0, 20) + "...",
+                redirectUrl: widgetData.redirectUrl,
+                isTestMode: widgetData.isTestMode
+            })
 
-        checkout.open((result: WompiResult) => {
+            const checkout = new window.WidgetCheckout({
+                currency: widgetData.currency,
+                amountInCents: widgetData.amountInCents,
+                reference: widgetData.reference,
+                publicKey: widgetData.publicKey,
+                redirectUrl: widgetData.redirectUrl,
+                "signature:integrity": widgetData.integritySignature,
+                customerData: widgetData.customerEmail ? {
+                    email: widgetData.customerEmail
+                } : undefined
+            })
+
+            // Timeout de seguridad: si el widget no responde en 10 segundos, mostrar fallback
+            const timeoutId = setTimeout(() => {
+                console.warn("[Wompi Widget] Timeout - el widget no respondió")
+                setUpgrading(null)
+
+                // Si estamos en modo sandbox y hay URL de fallback, mostrarla
+                if (widgetData.isTestMode && widgetData.checkoutUrl) {
+                    setFallbackUrl(widgetData.checkoutUrl)
+                    setError("El widget de pago no pudo abrirse (esto es común en localhost). Usa el botón alternativo abajo para continuar con el pago en modo sandbox.")
+                } else {
+                    setError("El widget de pago tardó demasiado en responder. Por favor, intenta de nuevo o contacta soporte.")
+                }
+            }, 10000)
+
+            checkout.open((result: WompiResult) => {
+                clearTimeout(timeoutId)
+                setUpgrading(null)
+
+                console.log("[Wompi Widget] Resultado:", result)
+
+                if (result.transaction) {
+                    // Redirigir a la página de resultado con el ID de transacción
+                    window.location.href = `${widgetData.redirectUrl}?id=${result.transaction.id}`
+                }
+            })
+        } catch (err) {
+            console.error("[Wompi Widget] Error al abrir widget:", err)
+            setError("Error al abrir el widget de pago. Intenta recargar la página.")
             setUpgrading(null)
-
-            if (result.transaction) {
-                // Redirigir a la página de resultado con el ID de transacción
-                window.location.href = `${widgetData.redirectUrl}?id=${result.transaction.id}`
-            }
-        })
+        }
     }, [])
 
     const handleUpgrade = async (planId: string) => {
         setUpgrading(planId)
         setError(null)
+        setFallbackUrl(null)
 
         const result = await upgradeSubscription(planId)
 
@@ -264,6 +298,22 @@ export function SubscriptionManager({
             {error && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-900/20">
                     <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                    {fallbackUrl && (
+                        <div className="mt-3">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.location.href = fallbackUrl}
+                                className="border-amber-500 text-amber-700 hover:bg-amber-50"
+                            >
+                                <AlertTriangle className="mr-2 size-4" />
+                                Abrir checkout de Wompi (Sandbox)
+                            </Button>
+                            <p className="mt-2 text-xs text-slate-500">
+                                Este enlace solo está disponible en modo sandbox para pruebas de desarrollo.
+                            </p>
+                        </div>
+                    )}
                 </div>
             )}
 

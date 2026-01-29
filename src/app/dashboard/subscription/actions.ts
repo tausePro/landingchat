@@ -17,6 +17,8 @@ export interface WompiWidgetData {
     integritySignature: string
     customerEmail?: string
     isTestMode: boolean
+    /** URL de checkout directo (fallback para desarrollo) - SOLO usar en sandbox */
+    checkoutUrl?: string
 }
 
 /**
@@ -274,6 +276,23 @@ async function generateWompiWidgetData(
         .update(signatureString)
         .digest("hex")
 
+    // En modo sandbox, generar también URL de checkout directo como fallback para desarrollo local
+    let checkoutUrl: string | undefined
+    if (credentials.data.isTestMode) {
+        const checkoutParams = new URLSearchParams({
+            "public-key": credentials.data.publicKey,
+            currency,
+            "amount-in-cents": amountInCents.toString(),
+            reference,
+            "redirect-url": redirectUrl,
+            "signature:integrity": integritySignature,
+        })
+        if (customerEmail) {
+            checkoutParams.set("customer-data:email", customerEmail)
+        }
+        checkoutUrl = `https://checkout.wompi.co/p/?${checkoutParams.toString()}`
+    }
+
     // Retornar datos para el Widget (sin exponer secrets)
     return {
         success: true,
@@ -287,6 +306,7 @@ async function generateWompiWidgetData(
                 integritySignature,
                 customerEmail,
                 isTestMode: credentials.data.isTestMode,
+                checkoutUrl, // Solo disponible en modo sandbox
             }
         }
     }
