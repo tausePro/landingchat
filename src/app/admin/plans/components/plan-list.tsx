@@ -11,10 +11,16 @@ interface PlanListProps {
     onEdit: (plan: Plan) => void
 }
 
+function formatLimit(value: number): string {
+    if (value === -1) return "Ilimitado"
+    return value.toLocaleString("es-CO")
+}
+
 export function PlanList({ plans, onEdit }: PlanListProps) {
     const [loading, setLoading] = useState<string | null>(null)
 
     const formatPrice = (price: number, currency: string) => {
+        if (price === 0) return "Gratis"
         return new Intl.NumberFormat('es-CO', {
             style: 'currency',
             currency: currency,
@@ -88,18 +94,41 @@ export function PlanList({ plans, onEdit }: PlanListProps) {
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-slate-900 dark:text-white text-sm font-semibold">{plan.name}</div>
                                 <div className="text-slate-500 dark:text-slate-400 text-xs">{plan.slug}</div>
+                                {plan.founding_tier_slug && (
+                                    <div className="mt-1">
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300">
+                                            Founding: {plan.founding_tier_slug}
+                                        </span>
+                                    </div>
+                                )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex flex-col">
                                     <div className="text-slate-900 dark:text-white text-sm font-medium">
                                         {formatPrice(plan.price, plan.currency)}/{plan.billing_period === 'monthly' ? 'mes' : 'año'}
                                     </div>
+                                    {plan.yearly_price != null && plan.yearly_price > 0 && (
+                                        <div className="text-slate-500 dark:text-slate-400 text-xs mt-1">
+                                            Anual: {formatPrice(plan.yearly_price, plan.currency)}
+                                            {plan.yearly_discount_months != null && plan.yearly_discount_months > 0 && (
+                                                <span className="text-green-600 dark:text-green-400 ml-1">
+                                                    ({plan.yearly_discount_months} meses gratis)
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-slate-500 dark:text-slate-400 text-sm">{plan.max_products} Productos</div>
-                                <div className="text-slate-500 dark:text-slate-400 text-sm">{plan.max_agents} Agentes</div>
-                                <div className="text-slate-500 dark:text-slate-400 text-sm">{plan.max_monthly_conversations.toLocaleString()} Conv/mes</div>
+                                <div className="text-slate-500 dark:text-slate-400 text-sm">
+                                    {formatLimit(plan.max_products)} Productos
+                                </div>
+                                <div className="text-slate-500 dark:text-slate-400 text-sm">
+                                    {formatLimit(plan.max_agents)} Agentes
+                                </div>
+                                <div className="text-slate-500 dark:text-slate-400 text-sm">
+                                    {formatLimit(plan.max_monthly_conversations)} Conv/mes
+                                </div>
                             </td>
                             <td className="px-6 py-4">
                                 <div className="flex items-center gap-2 flex-wrap">

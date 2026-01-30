@@ -95,28 +95,32 @@ export function PlanUsageCard() {
 
             const whatsappUsed = orgData?.whatsapp_conversations_used || 0
 
+            const calcPercentage = (current: number, limit: number) => {
+                if (limit === -1) return 0 // Ilimitado
+                if (limit <= 0) return 0
+                return Math.min((current / limit) * 100, 100)
+            }
+
             setUsage({
                 products: {
                     current: products,
                     limit: limits.max_products,
-                    percentage: Math.min((products / limits.max_products) * 100, 100),
+                    percentage: calcPercentage(products, limits.max_products),
                 },
                 agents: {
                     current: agents,
                     limit: limits.max_agents,
-                    percentage: Math.min((agents / limits.max_agents) * 100, 100),
+                    percentage: calcPercentage(agents, limits.max_agents),
                 },
                 conversations: {
                     current: conversations,
                     limit: limits.max_monthly_conversations,
-                    percentage: Math.min((conversations / limits.max_monthly_conversations) * 100, 100),
+                    percentage: calcPercentage(conversations, limits.max_monthly_conversations),
                 },
                 whatsapp: {
                     current: whatsappUsed,
                     limit: limits.max_whatsapp_conversations,
-                    percentage: limits.max_whatsapp_conversations > 0 
-                        ? Math.min((whatsappUsed / limits.max_whatsapp_conversations) * 100, 100)
-                        : 0,
+                    percentage: calcPercentage(whatsappUsed, limits.max_whatsapp_conversations),
                 },
                 planName,
             })
@@ -133,6 +137,11 @@ export function PlanUsageCard() {
     }
 
     const showAlert = (percentage: number) => percentage >= 80
+
+    const formatLimit = (limit: number) => {
+        if (limit === -1) return "∞"
+        return limit.toLocaleString("es-CO")
+    }
 
     if (loading) {
         return (
@@ -172,7 +181,7 @@ export function PlanUsageCard() {
                             )}
                         </div>
                         <span className="text-muted-foreground">
-                            {usage.products.current} / {usage.products.limit}
+                            {usage.products.current} / {formatLimit(usage.products.limit)}
                         </span>
                     </div>
                     <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden dark:bg-slate-700">
@@ -194,7 +203,7 @@ export function PlanUsageCard() {
                             )}
                         </div>
                         <span className="text-muted-foreground">
-                            {usage.agents.current} / {usage.agents.limit}
+                            {usage.agents.current} / {formatLimit(usage.agents.limit)}
                         </span>
                     </div>
                     <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden dark:bg-slate-700">
@@ -216,7 +225,7 @@ export function PlanUsageCard() {
                             )}
                         </div>
                         <span className="text-muted-foreground">
-                            {usage.conversations.current} / {usage.conversations.limit}
+                            {usage.conversations.current} / {formatLimit(usage.conversations.limit)}
                         </span>
                     </div>
                     <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden dark:bg-slate-700">
@@ -239,7 +248,7 @@ export function PlanUsageCard() {
                                 )}
                             </div>
                             <span className="text-muted-foreground">
-                                {usage.whatsapp.current} / {usage.whatsapp.limit}
+                                {usage.whatsapp.current} / {formatLimit(usage.whatsapp.limit)}
                             </span>
                         </div>
                         <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden dark:bg-slate-700">

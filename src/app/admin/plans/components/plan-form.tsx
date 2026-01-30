@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { type Plan, type CreatePlanInput, CreatePlanInputSchema } from "@/types"
 import { createPlan, updatePlan } from "../actions"
 import { Button } from "@/components/ui/button"
@@ -35,12 +35,12 @@ const AVAILABLE_FEATURES = [
     { key: "custom_domain", label: "Dominio Personalizado" },
     { key: "api_access", label: "Acceso API" },
     { key: "priority_support", label: "Soporte Prioritario" },
+    { key: "crm_integration", label: "CRM Integration" },
+    { key: "white_glove_support", label: "Soporte White-Glove" },
 ]
 
-export function PlanForm({ plan, open, onClose }: PlanFormProps) {
-    const isEditing = !!plan
-
-    const [formData, setFormData] = useState<CreatePlanInput>({
+function getDefaultFormData(plan?: Plan | null): CreatePlanInput {
+    return {
         name: plan?.name || "",
         slug: plan?.slug || "",
         description: plan?.description || "",
@@ -52,10 +52,24 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
         max_monthly_conversations: plan?.max_monthly_conversations || 500,
         features: plan?.features || {},
         is_active: plan?.is_active ?? true,
-    })
+        yearly_price: plan?.yearly_price ?? null,
+        yearly_discount_months: plan?.yearly_discount_months ?? null,
+        founding_tier_slug: plan?.founding_tier_slug ?? null,
+    }
+}
 
+export function PlanForm({ plan, open, onClose }: PlanFormProps) {
+    const isEditing = !!plan
+
+    const [formData, setFormData] = useState<CreatePlanInput>(getDefaultFormData(plan))
     const [loading, setLoading] = useState(false)
     const [errors, setErrors] = useState<Record<string, string>>({})
+
+    // Reset form data when plan changes
+    useEffect(() => {
+        setFormData(getDefaultFormData(plan))
+        setErrors({})
+    }, [plan])
 
     const handleChange = (field: keyof CreatePlanInput, value: unknown) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
@@ -82,6 +96,15 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
         handleChange("name", name)
         if (!isEditing) {
             handleChange("slug", generateSlug(name))
+        }
+    }
+
+    const handleLimitChange = (field: "max_products" | "max_agents" | "max_monthly_conversations", value: string) => {
+        const num = parseInt(value)
+        if (value === "-1" || num === -1) {
+            handleChange(field, -1)
+        } else {
+            handleChange(field, isNaN(num) || num < 1 ? 1 : num)
         }
     }
 
@@ -134,7 +157,7 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 id="name"
                                 value={formData.name}
                                 onChange={(e) => handleNameChange(e.target.value)}
-                                placeholder="Ej: Pro"
+                                placeholder="Ej: Growth"
                             />
                             {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
                         </div>
@@ -144,7 +167,7 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 id="slug"
                                 value={formData.slug}
                                 onChange={(e) => handleChange("slug", e.target.value)}
-                                placeholder="Ej: pro"
+                                placeholder="Ej: growth"
                             />
                             {errors.slug && <p className="text-sm text-destructive">{errors.slug}</p>}
                         </div>
@@ -161,10 +184,10 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                         />
                     </div>
 
-                    {/* Precio */}
+                    {/* Precio mensual */}
                     <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="price">Precio</Label>
+                            <Label htmlFor="price">Precio Mensual</Label>
                             <Input
                                 id="price"
                                 type="number"
@@ -206,9 +229,65 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                         </div>
                     </div>
 
+                    {/* Precio anual */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="yearly_price">Precio Anual (opcional)</Label>
+                            <Input
+                                id="yearly_price"
+                                type="number"
+                                min="0"
+                                value={formData.yearly_price ?? ""}
+                                onChange={(e) => {
+                                    const val = e.target.value
+                                    handleChange("yearly_price", val === "" ? null : parseFloat(val) || 0)
+                                }}
+                                placeholder="Ej: 1490000 (paga 10 meses)"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Precio total anual. Dejar vacío si no ofrece plan anual.
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="yearly_discount_months">Meses gratis (anual)</Label>
+                            <Input
+                                id="yearly_discount_months"
+                                type="number"
+                                min="0"
+                                max="6"
+                                value={formData.yearly_discount_months ?? ""}
+                                onChange={(e) => {
+                                    const val = e.target.value
+                                    handleChange("yearly_discount_months", val === "" ? null : parseInt(val) || 0)
+                                }}
+                                placeholder="Ej: 2"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Cantidad de meses gratis al pagar anual (ej: 2 = paga 10, recibe 12).
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Vínculo con Founding */}
+                    <div className="space-y-2">
+                        <Label htmlFor="founding_tier_slug">Founding Tier vinculado (slug)</Label>
+                        <Input
+                            id="founding_tier_slug"
+                            value={formData.founding_tier_slug || ""}
+                            onChange={(e) => handleChange("founding_tier_slug", e.target.value || null)}
+                            placeholder="Ej: starter, growth, premium"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Slug del Founding Tier al que corresponde este plan. Se usa para vincular founding members con su plan regular.
+                        </p>
+                    </div>
+
                     {/* Límites */}
                     <div className="space-y-2">
                         <Label>Límites del Plan</Label>
+                        <p className="text-xs text-muted-foreground">
+                            Usa <strong>-1</strong> para indicar ilimitado.
+                        </p>
                         <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="max_products" className="text-sm text-muted-foreground">
@@ -217,10 +296,13 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 <Input
                                     id="max_products"
                                     type="number"
-                                    min="1"
+                                    min="-1"
                                     value={formData.max_products}
-                                    onChange={(e) => handleChange("max_products", parseInt(e.target.value) || 1)}
+                                    onChange={(e) => handleLimitChange("max_products", e.target.value)}
                                 />
+                                {formData.max_products === -1 && (
+                                    <p className="text-xs text-green-600 font-medium">Ilimitado</p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="max_agents" className="text-sm text-muted-foreground">
@@ -229,10 +311,13 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 <Input
                                     id="max_agents"
                                     type="number"
-                                    min="1"
+                                    min="-1"
                                     value={formData.max_agents}
-                                    onChange={(e) => handleChange("max_agents", parseInt(e.target.value) || 1)}
+                                    onChange={(e) => handleLimitChange("max_agents", e.target.value)}
                                 />
+                                {formData.max_agents === -1 && (
+                                    <p className="text-xs text-green-600 font-medium">Ilimitado</p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="max_monthly_conversations" className="text-sm text-muted-foreground">
@@ -241,10 +326,13 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 <Input
                                     id="max_monthly_conversations"
                                     type="number"
-                                    min="1"
+                                    min="-1"
                                     value={formData.max_monthly_conversations}
-                                    onChange={(e) => handleChange("max_monthly_conversations", parseInt(e.target.value) || 1)}
+                                    onChange={(e) => handleLimitChange("max_monthly_conversations", e.target.value)}
                                 />
+                                {formData.max_monthly_conversations === -1 && (
+                                    <p className="text-xs text-green-600 font-medium">Ilimitado</p>
+                                )}
                             </div>
                         </div>
                     </div>
