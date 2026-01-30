@@ -16,6 +16,12 @@ export type BillingPeriod = z.infer<typeof BillingPeriodEnum>
 export const PlanFeaturesSchema = z.record(z.string(), z.boolean()).default({})
 export type PlanFeatures = z.infer<typeof PlanFeaturesSchema>
 
+// Validador para límites: positivo o -1 (ilimitado)
+const limitSchema = z.number().int().refine(
+  (n) => n === -1 || n > 0,
+  { message: 'Debe ser un número positivo o -1 (ilimitado)' }
+)
+
 // Schema principal de Plan
 export const PlanSchema = z.object({
   id: z.string().uuid(),
@@ -26,11 +32,16 @@ export const PlanSchema = z.object({
   price: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
   currency: CurrencyEnum,
   billing_period: BillingPeriodEnum,
-  max_products: z.number().int().positive('Debe ser un número positivo'),
-  max_agents: z.number().int().positive('Debe ser un número positivo'),
-  max_monthly_conversations: z.number().int().positive('Debe ser un número positivo'),
+  max_products: limitSchema,
+  max_agents: limitSchema,
+  max_monthly_conversations: limitSchema,
   features: PlanFeaturesSchema,
   is_active: z.boolean(),
+  // Campos de precio anual
+  yearly_price: z.number().nullable().optional(),
+  yearly_discount_months: z.number().int().min(0).nullable().optional(),
+  // Vínculo con founding tiers
+  founding_tier_slug: z.string().nullable().optional(),
   created_at: z.string(),
   updated_at: z.string(),
 })
@@ -46,11 +57,14 @@ export const CreatePlanInputSchema = z.object({
   price: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
   currency: CurrencyEnum.default('COP'),
   billing_period: BillingPeriodEnum.default('monthly'),
-  max_products: z.number().int().positive().default(100),
-  max_agents: z.number().int().positive().default(1),
-  max_monthly_conversations: z.number().int().positive().default(500),
+  max_products: limitSchema.default(100),
+  max_agents: limitSchema.default(1),
+  max_monthly_conversations: limitSchema.default(500),
   features: PlanFeaturesSchema.optional(),
   is_active: z.boolean().default(true),
+  yearly_price: z.number().nullable().optional(),
+  yearly_discount_months: z.number().int().min(0).nullable().optional(),
+  founding_tier_slug: z.string().nullable().optional(),
 })
 
 export type CreatePlanInput = z.infer<typeof CreatePlanInputSchema>
@@ -65,11 +79,14 @@ export const UpdatePlanInputSchema = z.object({
   price: z.number().min(0).optional(),
   currency: CurrencyEnum.optional(),
   billing_period: BillingPeriodEnum.optional(),
-  max_products: z.number().int().positive().optional(),
-  max_agents: z.number().int().positive().optional(),
-  max_monthly_conversations: z.number().int().positive().optional(),
+  max_products: limitSchema.optional(),
+  max_agents: limitSchema.optional(),
+  max_monthly_conversations: limitSchema.optional(),
   features: PlanFeaturesSchema.optional(),
   is_active: z.boolean().optional(),
+  yearly_price: z.number().nullable().optional(),
+  yearly_discount_months: z.number().int().min(0).nullable().optional(),
+  founding_tier_slug: z.string().nullable().optional(),
 })
 
 export type UpdatePlanInput = z.infer<typeof UpdatePlanInputSchema>
@@ -91,6 +108,9 @@ export function serializePlanForDb(plan: CreatePlanInput): Record<string, unknow
     max_monthly_conversations: plan.max_monthly_conversations ?? 500,
     features: plan.features ?? {},
     is_active: plan.is_active ?? true,
+    yearly_price: plan.yearly_price ?? null,
+    yearly_discount_months: plan.yearly_discount_months ?? null,
+    founding_tier_slug: plan.founding_tier_slug ?? null,
   }
 }
 
@@ -107,11 +127,14 @@ export function deserializePlanFromDb(dbRow: Record<string, unknown>): Plan {
     price: Number(dbRow.price || 0),
     currency: dbRow.currency || 'COP',
     billing_period: billingPeriod === 'yearly' ? 'yearly' : 'monthly',
-    max_products: dbRow.max_products || 100,
-    max_agents: dbRow.max_agents || 1,
-    max_monthly_conversations: dbRow.max_monthly_conversations || 500,
+    max_products: dbRow.max_products ?? 100,
+    max_agents: dbRow.max_agents ?? 1,
+    max_monthly_conversations: dbRow.max_monthly_conversations ?? 500,
     features: dbRow.features ?? {},
     is_active: dbRow.is_active ?? dbRow.is_public ?? true,
+    yearly_price: dbRow.yearly_price ? Number(dbRow.yearly_price) : null,
+    yearly_discount_months: dbRow.yearly_discount_months ?? null,
+    founding_tier_slug: dbRow.founding_tier_slug ?? null,
     created_at: dbRow.created_at || new Date().toISOString(),
     updated_at: dbRow.updated_at || new Date().toISOString(),
   })

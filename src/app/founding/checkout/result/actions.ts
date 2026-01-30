@@ -67,7 +67,7 @@ export async function verifyFoundingPayment(
                 .from("founding_slots")
                 .select(`
                     *,
-                    tier:founding_tiers(id, name, max_products, max_agents, max_monthly_conversations, features),
+                    tier:founding_tiers(id, name, slug, max_products, max_agents, max_monthly_conversations, features),
                     program:founding_program(id, free_months),
                     organization:organizations(id, name)
                 `)
@@ -86,7 +86,7 @@ export async function verifyFoundingPayment(
                     .from("founding_slots")
                     .select(`
                         *,
-                        tier:founding_tiers(id, name, max_products, max_agents, max_monthly_conversations, features),
+                        tier:founding_tiers(id, name, slug, max_products, max_agents, max_monthly_conversations, features),
                         program:founding_program(id, free_months),
                         organization:organizations(id, name)
                     `)
@@ -121,22 +121,32 @@ export async function verifyFoundingPayment(
                     })
                     .eq("id", slot.id)
 
-                // 2. Crear suscripción con precio congelado
+                // 2. Buscar el plan regular correspondiente al founding tier (por slug)
+                const tierSlug = tier?.slug || tier?.name?.toLowerCase() || "starter"
+                const { data: matchingPlan } = await supabase
+                    .from("plans")
+                    .select("id")
+                    .eq("founding_tier_slug", tierSlug)
+                    .eq("is_active", true)
+                    .limit(1)
+                    .single()
+
+                // 3. Crear suscripción con precio congelado vinculada al plan correcto
                 const now = new Date()
                 const periodEnd = new Date(now)
                 periodEnd.setFullYear(periodEnd.getFullYear() + 1) // 1 año
 
-                await supabase
+                const { data: newSub } = await supabase
                     .from("subscriptions")
                     .upsert({
                         organization_id: slot.organization_id,
-                        plan_id: tier?.id || null, // Usar tier_id si tenemos un plan equivalente
+                        plan_id: matchingPlan?.id || null,
                         status: "active",
                         current_period_start: now.toISOString(),
                         current_period_end: periodEnd.toISOString(),
                         cancel_at_period_end: false,
                         currency: slot.locked_currency || "COP",
-                        price: slot.locked_price, // Precio congelado
+                        price: slot.locked_price, // Precio congelado del founding
                         max_products: tier?.max_products || 100,
                         max_agents: tier?.max_agents || 1,
                         max_monthly_conversations: tier?.max_monthly_conversations || 500,
@@ -144,12 +154,14 @@ export async function verifyFoundingPayment(
                     }, {
                         onConflict: "organization_id",
                     })
+                    .select("id")
+                    .single()
 
-                // 3. Registrar transacción
+                // 4. Registrar transacción vinculada a la suscripción
                 await supabase
                     .from("payment_transactions")
                     .insert({
-                        subscription_id: null, // Lo actualizamos después si es necesario
+                        subscription_id: newSub?.id || null,
                         organization_id: slot.organization_id,
                         amount: tx.amount_in_cents / 100,
                         currency: tx.currency,
@@ -162,7 +174,7 @@ export async function verifyFoundingPayment(
                         completed_at: new Date().toISOString(),
                     })
 
-                // 4. Agregar al activity feed
+                // 5. Agregar al activity feed
                 const displayName = organization?.name
                     ? anonymizeNameForFeed(organization.name)
                     : `Empresa #${slot.slot_number}`
@@ -175,7 +187,7 @@ export async function verifyFoundingPayment(
                     message: `${displayName} acaba de asegurar su cupo como Founding Member`,
                 })
 
-                console.log(`[verifyFoundingPayment] Activated slot #${slot.slot_number} for org ${slot.organization_id}`)
+                console.log(`[verifyFoundingPayment] Activated slot #${slot.slot_number} for org ${slot.organization_id}, plan_id: ${matchingPlan?.id}`)
             }
 
             return success({

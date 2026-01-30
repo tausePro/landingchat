@@ -49,6 +49,9 @@ interface Plan {
     max_agents: number
     max_monthly_conversations: number
     features: Record<string, boolean>
+    yearly_price?: number | null
+    yearly_discount_months?: number | null
+    founding_tier_slug?: string | null
 }
 
 interface Subscription {
@@ -266,10 +269,10 @@ export function SubscriptionManager({
                                 <div>
                                     <p className="text-sm text-slate-500">Límites</p>
                                     <p className="text-sm text-slate-900 dark:text-white">
-                                        {currentPlan.max_products.toLocaleString("es-CO")} productos
+                                        {currentPlan.max_products === -1 ? "Productos ilimitados" : `${currentPlan.max_products.toLocaleString("es-CO")} productos`}
                                     </p>
                                     <p className="text-sm text-slate-600">
-                                        {currentPlan.max_monthly_conversations.toLocaleString("es-CO")} conv/mes
+                                        {currentPlan.max_monthly_conversations === -1 ? "Conv. ilimitadas" : `${currentPlan.max_monthly_conversations.toLocaleString("es-CO")} conv/mes`}
                                     </p>
                                 </div>
                             </div>
@@ -364,16 +367,40 @@ export function SubscriptionManager({
                                     <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
                                             <Check className="size-4 text-green-500" />
-                                            <span>{plan.max_products.toLocaleString("es-CO")} productos</span>
+                                            <span>
+                                                {plan.max_products === -1 ? "Productos ilimitados" : `${plan.max_products.toLocaleString("es-CO")} productos`}
+                                            </span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <Check className="size-4 text-green-500" />
-                                            <span>{plan.max_agents} agente{plan.max_agents > 1 ? "s" : ""}</span>
+                                            <span>
+                                                {plan.max_agents === -1 ? "Agentes ilimitados" : `${plan.max_agents} agente${plan.max_agents > 1 ? "s" : ""}`}
+                                            </span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <Check className="size-4 text-green-500" />
-                                            <span>{plan.max_monthly_conversations.toLocaleString("es-CO")} conv/mes</span>
+                                            <span>
+                                                {plan.max_monthly_conversations === -1 ? "Conv. ilimitadas" : `${plan.max_monthly_conversations.toLocaleString("es-CO")} conv/mes`}
+                                            </span>
                                         </li>
+                                        {plan.features?.crm_integration && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500" />
+                                                <span>CRM Integration</span>
+                                            </li>
+                                        )}
+                                        {plan.features?.custom_domain && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500" />
+                                                <span>Dominio personalizado</span>
+                                            </li>
+                                        )}
+                                        {plan.features?.white_glove_support && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500" />
+                                                <span>Soporte White-Glove</span>
+                                            </li>
+                                        )}
                                     </ul>
                                 </CardContent>
 

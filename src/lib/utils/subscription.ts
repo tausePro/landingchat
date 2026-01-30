@@ -39,32 +39,29 @@ export interface UsageWithLimits {
 
 /**
  * Calcula el porcentaje de uso de un recurso
- * @param usage - Cantidad usada
- * @param limit - Límite máximo
- * @returns Porcentaje de uso (0-100+)
+ * -1 significa ilimitado → siempre retorna 0%
  */
 export function calculateUsagePercentage(usage: number, limit: number): number {
+    if (limit === -1) return 0 // Ilimitado
     if (limit <= 0) return 0
     return (usage / limit) * 100
 }
 
 /**
  * Verifica si un recurso está dentro del límite
- * @param usage - Cantidad usada
- * @param limit - Límite máximo
- * @returns true si está dentro del límite, false si excede
+ * -1 significa ilimitado → siempre permitido
  */
 export function checkResourceLimit(usage: number, limit: number): boolean {
+    if (limit === -1) return true // Ilimitado
     return usage <= limit
 }
 
 /**
  * Determina si se debe mostrar alerta de uso alto (>=80%)
- * @param usage - Cantidad usada
- * @param limit - Límite máximo
- * @returns true si el uso es >= 80%
+ * -1 significa ilimitado → nunca alerta
  */
 export function shouldShowUsageAlert(usage: number, limit: number): boolean {
+    if (limit === -1) return false // Ilimitado
     const percentage = calculateUsagePercentage(usage, limit)
     return percentage >= 80
 }
