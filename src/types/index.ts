@@ -155,6 +155,7 @@ export {
 export {
   WhatsAppInstanceTypeSchema,
   WhatsAppInstanceStatusSchema,
+  WhatsAppProviderSchema,
   WhatsAppInstanceSchema,
   CreateWhatsAppInstanceInputSchema,
   UpdateWhatsAppInstanceInputSchema,
@@ -169,6 +170,7 @@ export {
   hashPhoneNumber,
   type WhatsAppInstanceType,
   type WhatsAppInstanceStatus,
+  type WhatsAppProvider,
   type WhatsAppInstance,
   type CreateWhatsAppInstanceInput,
   type UpdateWhatsAppInstanceInput,

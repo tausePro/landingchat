@@ -5,7 +5,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
-import { EvolutionClient } from "@/lib/evolution"
+import { sendWhatsAppMessage } from "@/lib/whatsapp"
 
 interface NotificationContext {
     organizationId: string
@@ -167,55 +167,20 @@ Un nuevo cliente está chateando con tu agente IA.`
 
 /**
  * Función auxiliar para enviar notificación por WhatsApp
+ * Usa el provider agnóstico (Meta Cloud API o Evolution API)
  */
 async function sendNotification(
     organizationId: string,
     phoneNumber: string,
     message: string
 ): Promise<void> {
-    const supabase = await createServiceClient()
-
-    // 1. Obtener configuración de Evolution API
-    const { data: settings } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "evolution_api_config")
-        .single()
-
-    if (!settings?.value) {
-        throw new Error("Evolution API not configured")
-    }
-
-    const config = settings.value as { url: string; apiKey: string }
-
-    // 2. Obtener instancia CORPORATIVA (Sender - El Bot)
-    const { data: corporateInstance } = await supabase
-        .from("whatsapp_instances")
-        .select("instance_name")
-        .eq("organization_id", organizationId)
-        .eq("instance_type", "corporate")
-        .eq("status", "connected")
-        .single()
-
-    if (!corporateInstance) {
-        console.warn("[WhatsApp Notifications] No connected corporate instance found to send message")
-        return // No podemos enviar si no hay bot conectado
-    }
-
-    const client = new EvolutionClient({
-        baseUrl: config.url,
-        apiKey: config.apiKey,
-    })
-
-    // 3. Enviar mensaje desde el Bot al número Personal
     try {
-        await client.sendTextMessage(corporateInstance.instance_name, {
-            number: phoneNumber,
-            text: message,
-        })
+        // El provider decide automáticamente si usar Meta Cloud API o Evolution API
+        // Envía desde la instancia corporativa al número personal
+        await sendWhatsAppMessage(organizationId, phoneNumber, message)
         console.log("[WhatsApp Notifications] Notification sent to:", phoneNumber)
     } catch (error) {
-        console.error("[WhatsApp Notifications] Failed to send via Evolution:", error)
+        console.error("[WhatsApp Notifications] Failed to send notification:", error)
         throw error
     }
 }

@@ -7,7 +7,7 @@
 
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
-import { EvolutionClient } from "@/lib/evolution"
+import { sendWhatsAppMessage } from "@/lib/whatsapp"
 
 interface IncomingMessage {
     channel: "web" | "whatsapp"
@@ -96,6 +96,7 @@ export async function processIncomingMessage(
 
 /**
  * Envía una respuesta por WhatsApp
+ * Usa el provider agnóstico que decide entre Meta Cloud API o Evolution API
  */
 async function sendWhatsAppResponse(
     organizationId: string,
@@ -105,20 +106,6 @@ async function sendWhatsAppResponse(
     try {
         const supabase = await createServiceClient()
 
-        // Obtener instancia de WhatsApp corporativa
-        const { data: instance } = await supabase
-            .from("whatsapp_instances")
-            .select("instance_name")
-            .eq("organization_id", organizationId)
-            .eq("instance_type", "corporate")
-            .eq("status", "connected")
-            .single()
-
-        if (!instance) {
-            console.error("[Unified Messaging] No WhatsApp instance found for org:", organizationId)
-            return
-        }
-
         // Obtener número del cliente desde el chat
         const { data: chat } = await supabase
             .from("chats")
@@ -127,7 +114,7 @@ async function sendWhatsAppResponse(
             .single()
 
         const phoneNumber = chat?.phone_number || chat?.whatsapp_chat_id
-        
+
         if (!phoneNumber) {
             console.error("[Unified Messaging] No phone number in chat:", chatId)
             return
@@ -135,29 +122,8 @@ async function sendWhatsAppResponse(
 
         console.log("[Unified Messaging] Sending WhatsApp message to:", phoneNumber)
 
-        // Obtener configuración de Evolution API
-        const { data: settings } = await supabase
-            .from("system_settings")
-            .select("value")
-            .eq("key", "evolution_api_config")
-            .single()
-
-        if (!settings?.value) {
-            console.error("[Unified Messaging] Evolution API not configured")
-            return
-        }
-
-        const config = settings.value as { url: string; apiKey: string }
-        const client = new EvolutionClient({
-            baseUrl: config.url,
-            apiKey: config.apiKey,
-        })
-
-        // Enviar mensaje - Evolution API espera el número sin @s.whatsapp.net
-        await client.sendTextMessage(instance.instance_name, {
-            number: phoneNumber,
-            text: response,
-        })
+        // El provider decide automáticamente si usar Meta Cloud API o Evolution API
+        await sendWhatsAppMessage(organizationId, phoneNumber, response)
 
         console.log("[Unified Messaging] WhatsApp message sent successfully to:", phoneNumber)
     } catch (error) {

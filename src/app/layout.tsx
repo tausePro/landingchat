@@ -27,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
+        <meta name="facebook-domain-verification" content="r1esb665hp44c572sk86eim73wadvx" />
         <link href={materialSymbols} rel="stylesheet" />
         <link href={googleFonts} rel="stylesheet" />
       </head>

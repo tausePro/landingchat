@@ -1,5 +1,6 @@
 /**
- * Tipos y schemas para integración WhatsApp con Evolution API
+ * Tipos y schemas para integración WhatsApp
+ * Soporta dos providers: Meta Cloud API (oficial) y Evolution API (legacy)
  */
 
 import { z } from "zod"
@@ -19,11 +20,15 @@ export const WhatsAppInstanceStatusSchema = z.enum([
 ])
 export type WhatsAppInstanceStatus = z.infer<typeof WhatsAppInstanceStatusSchema>
 
+export const WhatsAppProviderSchema = z.enum(["evolution", "meta"])
+export type WhatsAppProvider = z.infer<typeof WhatsAppProviderSchema>
+
 export const WhatsAppInstanceSchema = z.object({
     id: z.string().uuid(),
     organization_id: z.string().uuid(),
     instance_name: z.string(),
     instance_type: WhatsAppInstanceTypeSchema,
+    provider: WhatsAppProviderSchema.default("evolution"),
     status: WhatsAppInstanceStatusSchema.default("disconnected"),
     phone_number: z.string().nullable().optional(),
     phone_number_display: z.string().nullable().optional(),
@@ -40,6 +45,11 @@ export const WhatsAppInstanceSchema = z.object({
     last_message_at: z.string().nullable().optional(),
     created_at: z.string(),
     updated_at: z.string(),
+    // Meta Cloud API fields
+    meta_phone_number_id: z.string().nullable().optional(),
+    meta_waba_id: z.string().nullable().optional(),
+    meta_access_token: z.string().nullable().optional(),
+    meta_business_id: z.string().nullable().optional(),
     // Datos de la organización (cuando se hace JOIN)
     organizations: z.object({
         name: z.string(),
@@ -189,6 +199,7 @@ export function deserializeWhatsAppInstance(
             organization_id: data.organization_id,
             instance_name: data.instance_name,
             instance_type: data.instance_type,
+            provider: data.provider ?? "evolution",
             status: data.status ?? "disconnected",
             phone_number: data.phone_number,
             phone_number_display: data.phone_number_display,
@@ -205,6 +216,11 @@ export function deserializeWhatsAppInstance(
             last_message_at: data.last_message_at,
             created_at: data.created_at,
             updated_at: data.updated_at,
+            // Meta Cloud API fields
+            meta_phone_number_id: data.meta_phone_number_id,
+            meta_waba_id: data.meta_waba_id,
+            meta_access_token: data.meta_access_token,
+            meta_business_id: data.meta_business_id,
             organizations,
         })
     } catch (error) {

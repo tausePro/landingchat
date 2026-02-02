@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MessageSquare, Phone, TrendingUp } from "lucide-react"
+import { MessageSquare, Phone, TrendingUp, Shield, AlertTriangle } from "lucide-react"
 import { QRModal } from "./qr-modal"
-import { connectWhatsApp, disconnectWhatsApp } from "../actions"
+import { EmbeddedSignup } from "./embedded-signup"
+import { connectWhatsApp, disconnectWhatsApp, getMetaSignupConfig } from "../actions"
 import { toast } from "sonner"
 import type { WhatsAppInstance } from "@/types"
 
@@ -22,11 +23,32 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
     const [showQRModal, setShowQRModal] = useState(false)
     const [qrCode, setQrCode] = useState<string>("")
     const [instanceId, setInstanceId] = useState<string>("")
+    const [metaConfig, setMetaConfig] = useState<{ app_id: string; config_id: string } | null>(null)
+    const [loadingConfig, setLoadingConfig] = useState(true)
 
     const isConnected = instance?.status === "connected"
     const isConnecting_status = instance?.status === "connecting"
+    const provider = instance?.provider || "evolution"
 
-    const handleConnect = async () => {
+    // Cargar configuración de Meta al montar
+    useEffect(() => {
+        async function loadMetaConfig() {
+            try {
+                const result = await getMetaSignupConfig()
+                if (result.success && result.data) {
+                    setMetaConfig(result.data)
+                }
+            } catch {
+                // Si falla, simplemente no mostramos la opción Meta
+            } finally {
+                setLoadingConfig(false)
+            }
+        }
+        loadMetaConfig()
+    }, [])
+
+    // Handler para conectar via Evolution (QR) - legacy
+    const handleConnectEvolution = async () => {
         setIsConnecting(true)
         try {
             const result = await connectWhatsApp()
@@ -38,11 +60,17 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
             } else {
                 toast.error("Error al conectar")
             }
-        } catch (error) {
+        } catch {
             toast.error("Error al conectar WhatsApp")
         } finally {
             setIsConnecting(false)
         }
+    }
+
+    // Handler para cuando Meta Embedded Signup completa
+    const handleMetaSuccess = () => {
+        toast.success("WhatsApp Business conectado exitosamente")
+        onUpdate()
     }
 
     const handleDisconnect = async () => {
@@ -57,7 +85,7 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
             } else {
                 toast.error("Error al desconectar")
             }
-        } catch (error) {
+        } catch {
             toast.error("Error al desconectar WhatsApp")
         } finally {
             setIsDisconnecting(false)
@@ -69,7 +97,7 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
         onUpdate()
     }
 
-    const usagePercentage = instance
+    const usagePercentage = instance && planLimit > 0
         ? Math.round((instance.conversations_this_month / planLimit) * 100)
         : 0
 
@@ -89,20 +117,38 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
                                 </CardDescription>
                             </div>
                         </div>
-                        <Badge
-                            variant={isConnected ? "default" : "secondary"}
-                            className={
-                                isConnected
-                                    ? "bg-green-500 hover:bg-green-600 text-white"
-                                    : "text-gray-600 dark:text-gray-400"
-                            }
-                        >
-                            {isConnected
-                                ? "Conectado"
-                                : isConnecting_status
-                                  ? "Conectando..."
-                                  : "Desconectado"}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                            {isConnected && (
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        provider === "meta"
+                                            ? "border-blue-500 text-blue-600 dark:text-blue-400 text-xs"
+                                            : "border-orange-500 text-orange-600 dark:text-orange-400 text-xs"
+                                    }
+                                >
+                                    {provider === "meta" ? (
+                                        <><Shield className="h-3 w-3 mr-1" />Oficial</>
+                                    ) : (
+                                        <><AlertTriangle className="h-3 w-3 mr-1" />Evolution</>
+                                    )}
+                                </Badge>
+                            )}
+                            <Badge
+                                variant={isConnected ? "default" : "secondary"}
+                                className={
+                                    isConnected
+                                        ? "bg-green-500 hover:bg-green-600 text-white"
+                                        : "text-gray-600 dark:text-gray-400"
+                                }
+                            >
+                                {isConnected
+                                    ? "Conectado"
+                                    : isConnecting_status
+                                      ? "Conectando..."
+                                      : "Desconectado"}
+                            </Badge>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -118,6 +164,20 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
                                 </span>
                             </div>
 
+                            {/* Alerta si está conectado via Evolution (riesgo de ban) */}
+                            {provider === "evolution" && metaConfig && (
+                                <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                                    <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
+                                    <div className="text-xs text-orange-700 dark:text-orange-300">
+                                        <p className="font-medium">Conexión no oficial</p>
+                                        <p className="mt-0.5">
+                                            Esta conexión usa Evolution API (no oficial) y puede ser bloqueada por Meta.
+                                            Te recomendamos migrar a WhatsApp Business API oficial.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-muted-foreground">
@@ -125,25 +185,29 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
                                     </span>
                                     <span className="font-medium">
                                         {instance.conversations_this_month} /{" "}
-                                        {planLimit}
+                                        {planLimit === -1 ? "∞" : planLimit}
                                     </span>
                                 </div>
-                                <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                                    <div
-                                        className={`h-full transition-all ${
-                                            usagePercentage > 80
-                                                ? "bg-red-500"
-                                                : usagePercentage > 60
-                                                  ? "bg-yellow-500"
-                                                  : "bg-green-500"
-                                        }`}
-                                        style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                                    />
-                                </div>
-                                {usagePercentage > 80 && (
-                                    <p className="text-xs text-yellow-600 dark:text-yellow-500">
-                                        ⚠️ Estás cerca del límite de tu plan
-                                    </p>
+                                {planLimit > 0 && (
+                                    <>
+                                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full transition-all ${
+                                                    usagePercentage > 80
+                                                        ? "bg-red-500"
+                                                        : usagePercentage > 60
+                                                          ? "bg-yellow-500"
+                                                          : "bg-green-500"
+                                                }`}
+                                                style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                                            />
+                                        </div>
+                                        {usagePercentage > 80 && (
+                                            <p className="text-xs text-yellow-600 dark:text-yellow-500">
+                                                Estás cerca del límite de tu plan
+                                            </p>
+                                        )}
+                                    </>
                                 )}
                             </div>
 
@@ -193,21 +257,76 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
                                     <TrendingUp className="h-4 w-4 mt-0.5 flex-shrink-0" />
                                     <p>
                                         Tu plan incluye hasta{" "}
-                                        <strong>{planLimit}</strong>{" "}
+                                        <strong>{planLimit === -1 ? "ilimitadas" : planLimit}</strong>{" "}
                                         conversaciones por mes
                                     </p>
                                 </div>
                             </div>
 
-                            <Button
-                                onClick={handleConnect}
-                                disabled={isConnecting || planLimit === 0}
-                                className="w-full"
-                            >
-                                {isConnecting
-                                    ? "Conectando..."
-                                    : "Conectar WhatsApp"}
-                            </Button>
+                            {/* Opción principal: Meta Cloud API (Embedded Signup) */}
+                            {!loadingConfig && metaConfig && planLimit !== 0 && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2">
+                                        <Shield className="h-4 w-4 text-blue-600" />
+                                        <span className="text-sm font-medium">
+                                            Conexión oficial (recomendada)
+                                        </span>
+                                    </div>
+                                    <EmbeddedSignup
+                                        appId={metaConfig.app_id}
+                                        configId={metaConfig.config_id}
+                                        onSuccess={handleMetaSuccess}
+                                    />
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        Usa la API oficial de Meta — sin riesgo de bloqueo
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Separador si ambas opciones están disponibles */}
+                            {!loadingConfig && metaConfig && planLimit !== 0 && (
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <span className="w-full border-t" />
+                                    </div>
+                                    <div className="relative flex justify-center text-xs uppercase">
+                                        <span className="bg-card px-2 text-muted-foreground">
+                                            o
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Opción secundaria: Evolution API (QR) */}
+                            {planLimit !== 0 && (
+                                <div className="space-y-3">
+                                    {metaConfig && (
+                                        <div className="flex items-center gap-2">
+                                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                                            <span className="text-sm font-medium text-muted-foreground">
+                                                Conexión por QR (no oficial)
+                                            </span>
+                                        </div>
+                                    )}
+                                    <Button
+                                        variant={metaConfig ? "outline" : "default"}
+                                        onClick={handleConnectEvolution}
+                                        disabled={isConnecting}
+                                        className="w-full"
+                                    >
+                                        {isConnecting
+                                            ? "Conectando..."
+                                            : metaConfig
+                                                ? "Conectar con QR (Evolution)"
+                                                : "Conectar WhatsApp"}
+                                    </Button>
+                                    {metaConfig && (
+                                        <p className="text-xs text-orange-600 dark:text-orange-400 text-center">
+                                            Usa API no oficial — Meta puede bloquear tu número
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {planLimit === 0 && (
                                 <p className="text-xs text-center text-muted-foreground">

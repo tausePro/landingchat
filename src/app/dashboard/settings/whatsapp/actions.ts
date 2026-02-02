@@ -306,10 +306,10 @@ export async function disconnectWhatsApp(): Promise<ActionResult<void>> {
 
         const supabase = await createClient()
 
-        // Obtener instancia
+        // Obtener instancia (incluir provider para saber cómo desconectar)
         const { data: instance } = await supabase
             .from("whatsapp_instances")
-            .select("id, instance_name")
+            .select("id, instance_name, provider")
             .eq("organization_id", orgId)
             .eq("instance_type", "corporate")
             .single()
@@ -318,41 +318,50 @@ export async function disconnectWhatsApp(): Promise<ActionResult<void>> {
             return failure("No hay WhatsApp conectado")
         }
 
-        // Obtener configuración de Evolution API
-        // Usamos serviceClient porque system_settings tiene RLS restrictivo
-        const serviceClient = createServiceClient()
-        const { data: settings } = await serviceClient
-            .from("system_settings")
-            .select("value")
-            .eq("key", "evolution_api_config")
-            .single()
+        // Solo llamar Evolution API logout si el provider es evolution
+        if (instance.provider === "evolution" || !instance.provider) {
+            const serviceClient = createServiceClient()
+            const { data: settings } = await serviceClient
+                .from("system_settings")
+                .select("value")
+                .eq("key", "evolution_api_config")
+                .single()
 
-        if (settings?.value) {
-            const config = settings.value as { url: string; apiKey: string }
-            const { EvolutionClient } = await import("@/lib/evolution")
-            const evolutionClient = new EvolutionClient({
-                baseUrl: config.url,
-                apiKey: config.apiKey,
-            })
+            if (settings?.value) {
+                const config = settings.value as { url: string; apiKey: string }
+                const { EvolutionClient } = await import("@/lib/evolution")
+                const evolutionClient = new EvolutionClient({
+                    baseUrl: config.url,
+                    apiKey: config.apiKey,
+                })
 
-            try {
-                await evolutionClient.logout(instance.instance_name)
-            } catch (error) {
-                console.error("Error al desconectar de Evolution:", error)
-                // Continuar aunque falle
+                try {
+                    await evolutionClient.logout(instance.instance_name)
+                } catch (error) {
+                    console.error("Error al desconectar de Evolution:", error)
+                    // Continuar aunque falle
+                }
             }
         }
+        // Para Meta Cloud API, no hay "logout" — solo desvinculamos en nuestra DB
 
         // Actualizar estado en DB
+        const updateData: Record<string, unknown> = {
+            status: "disconnected",
+            phone_number: null,
+            phone_number_display: null,
+            disconnected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        }
+
+        // Limpiar campos Meta si aplica
+        if (instance.provider === "meta") {
+            updateData.meta_access_token = null
+        }
+
         const { error } = await supabase
             .from("whatsapp_instances")
-            .update({
-                status: "disconnected",
-                phone_number: null,
-                phone_number_display: null,
-                disconnected_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq("id", instance.id)
 
         if (error) {
@@ -458,6 +467,47 @@ export async function updateNotificationSettings(
             error instanceof Error
                 ? error.message
                 : "Error al actualizar configuración"
+        )
+    }
+}
+
+/**
+ * Obtiene la configuraci\u00f3n de Meta WhatsApp para el Embedded Signup
+ * (Solo devuelve datos p\u00fablicos necesarios para el frontend)
+ */
+export async function getMetaSignupConfig(): Promise<
+    ActionResult<{ app_id: string; config_id: string } | null>
+> {
+    try {
+        const orgId = await getCurrentOrganization()
+        if (!orgId) {
+            return failure("No autorizado")
+        }
+
+        // Usar serviceClient porque system_settings tiene RLS restrictivo
+        const serviceClient = createServiceClient()
+        const { data: settings } = await serviceClient
+            .from("system_settings")
+            .select("value")
+            .eq("key", "meta_whatsapp_config")
+            .single()
+
+        if (!settings?.value) {
+            return success(null)
+        }
+
+        const config = settings.value as Record<string, string>
+        if (!config.app_id || !config.config_id) {
+            return success(null) // Embedded Signup no configurado
+        }
+
+        return success({
+            app_id: config.app_id,
+            config_id: config.config_id,
+        })
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al obtener configuraci\u00f3n de Meta"
         )
     }
 }

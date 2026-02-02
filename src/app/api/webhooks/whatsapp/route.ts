@@ -10,19 +10,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { z } from "zod"
-import crypto from "crypto"
-
-// Schema para validar el payload del webhook
-const WebhookPayloadSchema = z.object({
-    event: z.string(),
-    instance: z.string(),
-    data: z.record(z.string(), z.unknown()),
-    destination: z.string().optional(),
-    date_time: z.string().optional(),
-    sender: z.string().optional(),
-    server_url: z.string().optional(),
-    apikey: z.string().optional(),
-})
+import {
+    findOrCreateCustomer,
+    findOrCreateChat,
+    checkConversationLimit,
+    logWebhook,
+    updateWebhookLog,
+    verifyEvolutionSignature,
+} from "@/lib/whatsapp/webhook-utils"
 
 // Schema para mensaje entrante
 const IncomingMessageSchema = z.object({
@@ -48,33 +43,6 @@ const ConnectionUpdateSchema = z.object({
     statusReason: z.number().optional(),
 })
 
-/**
- * Valida la firma del webhook usando HMAC-SHA256
- */
-async function validateWebhookSignature(
-    request: NextRequest,
-    body: string,
-    webhookSecret: string
-): Promise<boolean> {
-    const signature = request.headers.get("x-webhook-signature") || 
-                     request.headers.get("x-hub-signature-256")
-    
-    if (!signature) {
-        return false
-    }
-
-    // Calcular HMAC-SHA256 del body
-    const hmac = crypto.createHmac("sha256", webhookSecret)
-    hmac.update(body)
-    const expectedSignature = `sha256=${hmac.digest("hex")}`
-
-    // Comparación segura contra timing attacks
-    return crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
-    )
-}
-
 export async function POST(request: NextRequest) {
     try {
         // Leer el body como texto primero para validar firma
@@ -93,14 +61,14 @@ export async function POST(request: NextRequest) {
 
         // Validar firma SOLO si hay webhookSecret configurado Y la firma está presente
         if (config?.value?.webhookSecret) {
-            const signature = request.headers.get("x-webhook-signature") || 
+            const signature = request.headers.get("x-webhook-signature") ||
                              request.headers.get("x-hub-signature-256")
-            
+
             // Solo validar si Evolution envía firma
             if (signature) {
-                const isValid = await validateWebhookSignature(
-                    request,
+                const isValid = verifyEvolutionSignature(
                     bodyText,
+                    signature,
                     config.value.webhookSecret
                 )
 
@@ -128,24 +96,12 @@ export async function POST(request: NextRequest) {
         console.log("[WhatsApp Webhook] Path:", url.pathname)
         console.log("[WhatsApp Webhook] Event from path:", eventFromPath)
         
-        // Guardar log en DB para debugging en producción (no bloquear si falla)
-        try {
-            const headers: Record<string, string> = {}
-            request.headers.forEach((value, key) => {
-                headers[key] = value
-            })
-            
-            await supabase.from("webhook_logs").insert({
-                webhook_type: "whatsapp",
-                event_type: body.event || eventFromPath,
-                instance_name: body.instance || body.instanceName,
-                payload: body,
-                headers,
-                processing_result: "processing",
-            })
-        } catch (logError) {
-            console.error("Failed to log webhook (non-blocking):", logError)
-        }
+        // Guardar log en DB para debugging en producción
+        const headers: Record<string, string> = {}
+        request.headers.forEach((value, key) => {
+            headers[key] = value
+        })
+        await logWebhook(supabase, "whatsapp", body.event || eventFromPath, body.instance || body.instanceName, body, headers)
         
         // Determinar el evento (puede venir en el body o en la ruta)
         let event = body.event || eventFromPath
@@ -190,8 +146,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Procesar según el tipo de evento
-        let processingResult = "success"
-        let errorMessage: string | null = null
+        let processingResult: "success" | "warning" | "error" = "success"
+        let errorMessage: string | undefined
         
         try {
             switch (event) {
@@ -219,21 +175,8 @@ export async function POST(request: NextRequest) {
             console.error("[WhatsApp Webhook] Processing error:", processingError)
         }
         
-        // Actualizar log con resultado (no bloquear si falla)
-        try {
-            await supabase
-                .from("webhook_logs")
-                .update({
-                    processing_result: processingResult,
-                    error_message: errorMessage,
-                })
-                .eq("instance_name", instance)
-                .eq("webhook_type", "whatsapp")
-                .order("created_at", { ascending: false })
-                .limit(1)
-        } catch (logError) {
-            console.error("Failed to update webhook log (non-blocking):", logError)
-        }
+        // Actualizar log con resultado
+        await updateWebhookLog(supabase, "whatsapp", instance, processingResult, errorMessage)
 
         return NextResponse.json({ received: true, status: processingResult })
     } catch (error) {
@@ -433,170 +376,8 @@ async function handleConnectionUpdate(
     }
 }
 
-/**
- * Busca o crea un cliente por número de teléfono
- */
-async function findOrCreateCustomer(
-    supabase: SupabaseClient,
-    organizationId: string,
-    phoneNumber: string,
-    pushName?: string
-) {
-    // Buscar cliente existente
-    const { data: existing } = await supabase
-        .from("customers")
-        .select("id, full_name, phone")
-        .eq("organization_id", organizationId)
-        .eq("phone", phoneNumber)
-        .single()
-
-    if (existing) {
-        // Actualizar nombre si tenemos uno nuevo
-        if (pushName && !existing.full_name) {
-            await supabase
-                .from("customers")
-                .update({ full_name: pushName })
-                .eq("id", existing.id)
-        }
-        return { ...existing, name: existing.full_name }
-    }
-
-    // Crear nuevo cliente
-    const { data: newCustomer, error } = await supabase
-        .from("customers")
-        .insert({
-            organization_id: organizationId,
-            phone: phoneNumber,
-            full_name: pushName || `WhatsApp ${phoneNumber.slice(-4)}`,
-            metadata: { source: "whatsapp" },
-        })
-        .select("id, full_name, phone")
-        .single()
-
-    if (error) {
-        console.error("[WhatsApp Webhook] Error creating customer:", error)
-        throw error
-    }
-
-    return { ...newCustomer, name: newCustomer.full_name }
-}
-
-/**
- * Busca o crea una conversación para el cliente
- */
-async function findOrCreateChat(
-    supabase: SupabaseClient,
-    organizationId: string,
-    customerId: string,
-    phoneNumber: string
-) {
-    // Buscar chat activo existente (últimas 24 horas)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    
-    const { data: existing } = await supabase
-        .from("chats")
-        .select("id")
-        .eq("organization_id", organizationId)
-        .eq("customer_id", customerId)
-        .eq("channel", "whatsapp")
-        .gte("updated_at", twentyFourHoursAgo)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .single()
-
-    if (existing) {
-        // Actualizar timestamp
-        await supabase
-            .from("chats")
-            .update({ updated_at: new Date().toISOString() })
-            .eq("id", existing.id)
-        return existing
-    }
-
-    // Crear nuevo chat
-    const { data: newChat, error } = await supabase
-        .from("chats")
-        .insert({
-            organization_id: organizationId,
-            customer_id: customerId,
-            channel: "whatsapp",
-            whatsapp_chat_id: phoneNumber,
-            phone_number: phoneNumber, // Guardar también en phone_number para búsquedas
-            status: "active",
-        })
-        .select("id")
-        .single()
-
-    if (error) {
-        console.error("[WhatsApp Webhook] Error creating chat:", error)
-        throw error
-    }
-
-    // Incrementar contador de conversaciones del mes
-    await incrementConversationCount(supabase, organizationId)
-
-    return newChat
-}
-
-/**
- * Verifica si la organización puede crear más conversaciones
- */
-async function checkConversationLimit(
-    supabase: SupabaseClient,
-    organizationId: string
-): Promise<boolean> {
-    // Obtener organización
-    const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("id, whatsapp_conversations_used")
-        .eq("id", organizationId)
-        .single()
-
-    if (orgError || !org) {
-        console.error("[WhatsApp Webhook] Error fetching org:", orgError)
-        return false
-    }
-
-    // Obtener suscripción activa con plan
-    const { data: subscription } = await supabase
-        .from("subscriptions")
-        .select("id, plan_id, plans(max_whatsapp_conversations)")
-        .eq("organization_id", organizationId)
-        .eq("status", "active")
-        .single()
-
-    // Límite por defecto si no hay suscripción (plan gratuito = 10, pero para admin/testing = 1000)
-    const DEFAULT_LIMIT_NO_SUBSCRIPTION = 1000
-    const DEFAULT_LIMIT_FREE_PLAN = 10
-    
-    let limit: number
-    if (subscription?.plans) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const planData = subscription.plans as any
-        limit = planData.max_whatsapp_conversations || DEFAULT_LIMIT_FREE_PLAN
-    } else {
-        // Sin suscripción - usar límite alto para no bloquear (admin/testing)
-        limit = DEFAULT_LIMIT_NO_SUBSCRIPTION
-    }
-    
-    const used = org.whatsapp_conversations_used || 0
-
-    console.log(`[WhatsApp Webhook] Conversation limit: used=${used}, limit=${limit}, hasSubscription=${!!subscription}`)
-    
-    return used < limit
-}
-
-/**
- * Incrementa el contador de conversaciones usadas
- */
-async function incrementConversationCount(
-    supabase: SupabaseClient,
-    organizationId: string
-) {
-    await supabase.rpc("increment_whatsapp_conversations", {
-        org_id: organizationId,
-    })
-}
+// findOrCreateCustomer, findOrCreateChat, checkConversationLimit
+// ahora importados de @/lib/whatsapp/webhook-utils
 
 // Permitir GET para verificación de webhook
 export async function GET() {
