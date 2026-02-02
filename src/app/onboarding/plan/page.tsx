@@ -86,7 +86,7 @@ export default function OnboardingPlanPage() {
             {/* Plans Grid */}
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {plans.map((plan) => {
-                    const isPopular = plan.slug === "starter" || plan.slug === "pro"
+                    const isPopular = plan.slug === "starter" || plan.slug === "growth"
                     const isSelecting = selecting === plan.id
 
                     return (
@@ -130,15 +130,21 @@ export default function OnboardingPlanPage() {
                                     <ul className="space-y-2 text-sm">
                                         <li className="flex items-center gap-2">
                                             <Check className="size-4 text-green-500 shrink-0" />
-                                            <span>{plan.max_products.toLocaleString("es-CO")} productos</span>
+                                            <span>
+                                                {plan.max_products === -1 ? "Productos ilimitados" : `${plan.max_products.toLocaleString("es-CO")} productos`}
+                                            </span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <Check className="size-4 text-green-500 shrink-0" />
-                                            <span>{plan.max_agents} agente{plan.max_agents > 1 ? "s" : ""} de IA</span>
+                                            <span>
+                                                {plan.max_agents === -1 ? "Agentes ilimitados" : `${plan.max_agents} agente${plan.max_agents > 1 ? "s" : ""} de IA`}
+                                            </span>
                                         </li>
                                         <li className="flex items-center gap-2">
                                             <Check className="size-4 text-green-500 shrink-0" />
-                                            <span>{plan.max_monthly_conversations.toLocaleString("es-CO")} conversaciones/mes</span>
+                                            <span>
+                                                {plan.max_monthly_conversations === -1 ? "Conversaciones ilimitadas" : `${plan.max_monthly_conversations.toLocaleString("es-CO")} conversaciones/mes`}
+                                            </span>
                                         </li>
                                         {plan.features?.whatsapp && (
                                             <li className="flex items-center gap-2">
@@ -156,6 +162,18 @@ export default function OnboardingPlanPage() {
                                             <li className="flex items-center gap-2">
                                                 <Check className="size-4 text-green-500 shrink-0" />
                                                 <span>Dominio personalizado</span>
+                                            </li>
+                                        )}
+                                        {plan.features?.crm_integration && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500 shrink-0" />
+                                                <span>CRM Integration</span>
+                                            </li>
+                                        )}
+                                        {plan.features?.white_glove_support && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500 shrink-0" />
+                                                <span>Soporte White-Glove</span>
                                             </li>
                                         )}
                                     </ul>
