@@ -155,10 +155,18 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
     // Get Logo Icon component
     const LogoIcon = iconMap[config.logo_icon] || Zap
 
-    // Dynamic gradient style
+    // Dynamic gradient style (para fondos/botones)
     const gradientStyle = {
         background: `linear-gradient(to right, ${config.primary_gradient_from}, ${config.primary_gradient_to})`
     }
+
+    // Gradient para texto (bg-clip-text necesita las propiedades webkit explícitas)
+    const gradientTextStyle = {
+        background: `linear-gradient(to right, ${config.primary_gradient_from}, ${config.primary_gradient_to})`,
+        WebkitBackgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+        backgroundClip: "text",
+    } as React.CSSProperties
 
     return (
         <div className="min-h-screen bg-[#0a0a0f] text-white">
@@ -254,8 +262,8 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                     <h1 className="text-5xl sm:text-7xl font-black tracking-tight mb-6">
                         <span className="block text-white">{program.hero_title}</span>
                         <span
-                            className="block bg-clip-text text-transparent"
-                            style={gradientStyle}
+                            className="block"
+                            style={gradientTextStyle}
                         >
                             {program.hero_subtitle}
                         </span>
@@ -274,8 +282,7 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                             </p>
                             <div className="text-5xl sm:text-6xl font-black">
                                 <span
-                                    className="bg-clip-text text-transparent"
-                                    style={gradientStyle}
+                                    style={gradientTextStyle}
                                 >
                                     {program.slots_remaining}
                                 </span>
@@ -364,10 +371,7 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                                 i === 0 ? (
                                     <span key={i}>
                                         {part}
-                                        <span
-                                            className="bg-clip-text text-transparent"
-                                            style={gradientStyle}
-                                        >
+                                        <span style={gradientTextStyle}>
                                             FUNDADOR
                                         </span>
                                     </span>
@@ -638,10 +642,7 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                     <h2 className="text-4xl sm:text-5xl font-black mb-4">
                         {config.final_cta_title}
                         <br />
-                        <span
-                            className="bg-clip-text text-transparent"
-                            style={gradientStyle}
-                        >
+                        <span style={gradientTextStyle}>
                             {config.final_cta_subtitle}
                         </span>
                     </h2>
