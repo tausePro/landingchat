@@ -185,6 +185,20 @@ export {
   type ChannelType,
 } from "./whatsapp"
 
+// Landing Page configuration types
+export {
+  defaultLandingConfig,
+  type LandingMainConfig,
+  type LandingNavLink,
+  type LandingMetric,
+  type LandingTrustBadge,
+  type LandingFeature,
+  type LandingTestimonial,
+  type LandingMarketplaceAgent,
+  type LandingComparisonRow,
+  type LandingFooterColumn,
+} from "./landing"
+
 // Founding Members / Early Adopters domain types
 export {
   FoundingSlotStatusEnum,

@@ -15,8 +15,25 @@ const materialSymbols = "https://fonts.googleapis.com/css2?family=Material+Symbo
 const googleFonts = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cinzel:wght@400;500;600;700&display=swap";
 
 export const metadata: Metadata = {
-  title: "LandingChat - El Futuro de las Compras es una Conversación",
-  description: "Plataforma de comercio conversacional y gestión de agentes.",
+  metadataBase: new URL("https://landingchat.co"),
+  title: {
+    default: "LandingChat OS - El Sistema Operativo de Ventas para Colombia",
+    template: "%s | LandingChat",
+  },
+  description: "Convierte tu tráfico en ingresos. Infraestructura completa para escalar ventas en LATAM con IA, datos y pagos integrados.",
+  openGraph: {
+    type: "website",
+    locale: "es_CO",
+    siteName: "LandingChat",
+  },
+  twitter: {
+    card: "summary_large_image",
+    creator: "@landingchat",
+  },
+  other: {
+    "geo.region": "CO",
+    "geo.placename": "Colombia",
+  },
 };
 
 export default function RootLayout({

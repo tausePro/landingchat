@@ -23,6 +23,16 @@
   --color-text-secondary: #6c757d;
 
   --font-display: "Manrope", sans-serif;
+  --font-landing: "Inter", sans-serif;
+
+  /* Landing page palette */
+  --color-landing-mint: #00E0C6;
+  --color-landing-mint-dark: #00B8A2;
+  --color-landing-violet: #6366f1;
+  --color-landing-violet-light: #818cf8;
+  --color-landing-deep: #0f172a;
+  --color-landing-deep-light: #334155;
+  --color-landing-surface: #f8fafc;
 }
 
 /* Custom Utilities for semantic usage */
@@ -37,6 +47,47 @@
 
   .text-secondary-text {
     @apply text-text-light-secondary dark:text-text-dark-secondary;
+  }
+}
+
+/* Landing page utilities */
+@layer utilities {
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
+  }
+
+  .glass-panel-dark {
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .landing-text-gradient {
+    background: linear-gradient(135deg, var(--color-landing-violet), var(--color-landing-mint));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hover-magnetic {
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease;
+  }
+  .hover-magnetic:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.3);
+  }
+
+  .bento-card {
+    transition: all 0.3s ease;
+  }
+  .bento-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.1);
   }
 }
 
