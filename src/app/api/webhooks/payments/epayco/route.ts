@@ -7,6 +7,9 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import crypto from "crypto"
+import { logger } from "@/lib/logger"
+
+const log = logger("webhooks/payments-epayco")
 
 interface EpaycoWebhookPayload {
     x_ref_payco: string
@@ -117,7 +120,7 @@ export async function POST(request: Request) {
 
         const isValid = validateEpaycoSignature(payload, customerId, encryptionKey)
         if (!isValid) {
-            console.error("[ePayco Webhook] Invalid signature")
+            log.error("Invalid signature")
             await logWebhook(supabase, org.id, "epayco", "error", payload, { error: "Invalid signature" })
             return NextResponse.json(
                 { error: "Invalid signature" },
@@ -140,7 +143,7 @@ export async function POST(request: Request) {
         if (existingTx) {
             // Idempotencia: si el estado ya es el mismo, no hacer nada
             if (existingTx.status === status) {
-                console.log(`[ePayco Webhook] Duplicate webhook for transaction ${payload.x_ref_payco}, status already ${status}`)
+                log.info("Duplicate webhook, no action taken", { transactionId: payload.x_ref_payco, status })
                 await logWebhook(supabase, org.id, "epayco", "duplicate", payload, { 
                     message: "Duplicate webhook, no action taken",
                     transactionId: existingTx.id 
@@ -248,7 +251,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ received: true })
     } catch (error) {
-        console.error("[ePayco Webhook] Error:", error)
+        log.error("Unhandled error", { error: error instanceof Error ? error.message : String(error) })
         await logWebhook(supabase, null, "epayco", "error", null, { 
             error: error instanceof Error ? error.message : "Unknown error",
             processingTime: Date.now() - startTime
@@ -342,9 +345,9 @@ async function processOrderUpdate(
                         })) || [],
                     }
                 )
-                console.log(`[ePayco Webhook] Sale notification sent for order ${order.order_number}`)
+                log.info("Sale notification sent", { orderNumber: order.order_number })
             } catch (notifError) {
-                console.error("[ePayco Webhook] Error sending sale notification:", notifError)
+                log.error("Error sending sale notification", { error: notifError instanceof Error ? notifError.message : String(notifError) })
             }
 
             // 2. Enviar evento Purchase a Meta Conversions API (server-side tracking)
@@ -369,9 +372,9 @@ async function processOrderUpdate(
                     },
                     supabase
                 )
-                console.log(`[ePayco Webhook] Meta CAPI Purchase event sent for order ${order.order_number}`)
+                log.info("Meta CAPI Purchase event sent", { orderNumber: order.order_number })
             } catch (capiError) {
-                console.error("[ePayco Webhook] Error sending Meta CAPI event:", capiError)
+                log.error("Error sending Meta CAPI event", { error: capiError instanceof Error ? capiError.message : String(capiError) })
             }
         }
     }
@@ -399,7 +402,7 @@ async function logWebhook(
             created_at: new Date().toISOString(),
         })
     } catch (error) {
-        console.error("[ePayco Webhook] Error logging webhook:", error)
+        log.error("Error logging webhook", { error: error instanceof Error ? error.message : String(error) })
         // No fallar el webhook si el logging falla
     }
 }
@@ -410,7 +413,7 @@ function validateEpaycoSignature(
     encryptionKey: string
 ): boolean {
     if (!customerId || !encryptionKey) {
-        console.error("[ePayco Webhook] Missing P_CUST_ID_CLIENTE or P_ENCRYPTION_KEY")
+        log.error("Missing P_CUST_ID_CLIENTE or P_ENCRYPTION_KEY")
         return false
     }
 
@@ -429,7 +432,7 @@ function validateEpaycoSignature(
         .update(stringToSign)
         .digest("hex")
 
-    console.log("[ePayco Webhook] Signature validation:", {
+    log.debug("Signature validation", {
         customerId: customerId.substring(0, 4) + "***",
         encryptionKey: encryptionKey.substring(0, 4) + "***",
         stringToSign: stringToSign.substring(0, 20) + "...",

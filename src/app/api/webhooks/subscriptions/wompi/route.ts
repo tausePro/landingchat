@@ -10,6 +10,9 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import crypto from "crypto"
+import { logger } from "@/lib/logger"
+
+const log = logger("webhooks/subscriptions-wompi")
 
 interface WompiWebhookPayload {
     event: string
@@ -56,8 +59,7 @@ export async function POST(request: Request) {
         const payload: WompiWebhookPayload = await request.json()
         const transaction = payload.data.transaction
 
-        console.log("[Subscription Webhook] Received event:", payload.event)
-        console.log("[Subscription Webhook] Transaction:", transaction.id, transaction.status)
+        log.info("Received event", { event: payload.event, transactionId: transaction.id, status: transaction.status })
 
         // Obtener configuración de Wompi de la plataforma
         const { data: config, error: configError } = await supabase
@@ -67,7 +69,7 @@ export async function POST(request: Request) {
             .single()
 
         if (configError || !config) {
-            console.error("[Subscription Webhook] Platform config not found:", configError)
+            log.error("Platform config not found", { error: configError?.message })
             await logWebhook(supabase, null, "error", payload, { error: "Platform config not found" })
             return NextResponse.json(
                 { error: "Platform not configured" },
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
         const platformConfig = config as PlatformConfig
 
         if (!platformConfig.value.is_active) {
-            console.error("[Subscription Webhook] Platform payments not active")
+            log.error("Platform payments not active")
             await logWebhook(supabase, null, "error", payload, { error: "Platform payments not active" })
             return NextResponse.json(
                 { error: "Platform payments not active" },
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
             const isValid = validateWompiSignature(payload, integritySecret)
 
             if (!isValid) {
-                console.error("[Subscription Webhook] Invalid signature")
+                log.error("Invalid signature")
                 await logWebhook(supabase, null, "error", payload, { error: "Invalid signature" })
                 return NextResponse.json(
                     { error: "Invalid signature" },
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
         const subscriptionId = extractSubscriptionId(reference)
 
         if (!subscriptionId) {
-            console.error("[Subscription Webhook] Invalid reference format:", reference)
+            log.error("Invalid reference format", { reference })
             await logWebhook(supabase, null, "error", payload, { error: "Invalid reference format" })
             return NextResponse.json(
                 { error: "Invalid reference format" },
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
             .single()
 
         if (subError || !subscription) {
-            console.error("[Subscription Webhook] Subscription not found:", subscriptionId, subError)
+            log.error("Subscription not found", { subscriptionId, error: subError?.message })
             await logWebhook(supabase, null, "error", payload, {
                 error: "Subscription not found",
                 subscriptionId
@@ -158,7 +160,7 @@ export async function POST(request: Request) {
             .single()
 
         if (txError) {
-            console.error("[Subscription Webhook] Error saving transaction:", txError)
+            log.error("Error saving transaction", { error: txError.message })
         }
 
         // Actualizar estado de la suscripción según el pago
@@ -181,7 +183,7 @@ export async function POST(request: Request) {
                 })
                 .eq("id", subscription.id)
 
-            console.log(`[Subscription Webhook] Subscription ${subscription.id} renewed until ${newPeriodEnd.toISOString()}`)
+            log.info("Subscription renewed", { subscriptionId: subscription.id, until: newPeriodEnd.toISOString() })
 
         } else if (paymentStatus === "declined" || paymentStatus === "error") {
             // Marcar como past_due si el pago falló
@@ -193,7 +195,7 @@ export async function POST(request: Request) {
                 })
                 .eq("id", subscription.id)
 
-            console.log(`[Subscription Webhook] Subscription ${subscription.id} marked as past_due`)
+            log.info("Subscription marked as past_due", { subscriptionId: subscription.id })
         }
 
         await logWebhook(supabase, subscription.organization_id, "success", payload, {
@@ -206,7 +208,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true })
 
     } catch (error) {
-        console.error("[Subscription Webhook] Error:", error)
+        log.error("Unhandled error", { error: error instanceof Error ? error.message : String(error) })
         await logWebhook(supabase, null, "error", null, {
             error: error instanceof Error ? error.message : "Unknown error",
             processingTime: Date.now() - startTime
@@ -266,7 +268,7 @@ function validateWompiSignature(payload: WompiWebhookPayload, integritySecret: s
 
         return hash === signature.checksum
     } catch (error) {
-        console.error("[Subscription Webhook] Error validating signature:", error)
+        log.error("Error validating signature", { error: error instanceof Error ? error.message : String(error) })
         return false
     }
 }
@@ -292,7 +294,7 @@ async function logWebhook(
             created_at: new Date().toISOString(),
         })
     } catch (error) {
-        console.error("[Subscription Webhook] Error logging webhook:", error)
+        log.error("Error logging webhook", { error: error instanceof Error ? error.message : String(error) })
     }
 }
 

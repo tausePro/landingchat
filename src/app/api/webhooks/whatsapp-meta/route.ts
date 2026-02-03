@@ -20,6 +20,9 @@ import {
     updateWebhookLog,
     verifyMetaSignature,
 } from "@/lib/whatsapp/webhook-utils"
+import { logger } from "@/lib/logger"
+
+const log = logger("webhooks/whatsapp-meta")
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = any
@@ -33,7 +36,7 @@ export async function GET(request: NextRequest) {
     const token = request.nextUrl.searchParams.get("hub.verify_token")
     const challenge = request.nextUrl.searchParams.get("hub.challenge")
 
-    console.log("[Meta Webhook] Verification request:", { mode, token: token?.substring(0, 8) + "...", challenge: challenge?.substring(0, 20) })
+    log.info("Verification request", { mode, tokenPrefix: token?.substring(0, 8) })
 
     if (mode !== "subscribe" || !token || !challenge) {
         return new Response("Missing parameters", { status: 400 })
@@ -43,16 +46,16 @@ export async function GET(request: NextRequest) {
     const config = await getMetaWhatsAppConfig()
 
     if (!config) {
-        console.error("[Meta Webhook] Meta WhatsApp config not found in system_settings")
+        log.error("Meta WhatsApp config not found in system_settings")
         return new Response("Not configured", { status: 500 })
     }
 
     if (token !== config.verify_token) {
-        console.error("[Meta Webhook] Invalid verify token")
+        log.error("Invalid verify token")
         return new Response("Invalid verify token", { status: 403 })
     }
 
-    console.log("[Meta Webhook] Verification successful!")
+    log.info("Verification successful")
     // Meta espera que devolvamos el challenge como texto plano
     return new Response(challenge, {
         status: 200,
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
         const config = await getMetaWhatsAppConfig()
 
         if (!config) {
-            console.error("[Meta Webhook] Meta WhatsApp config not found")
+            log.error("Meta WhatsApp config not found")
             // Retornar 200 para que Meta no reintente
             return NextResponse.json({ received: true })
         }
@@ -82,18 +85,18 @@ export async function POST(request: NextRequest) {
         if (signature) {
             const isValid = verifyMetaSignature(bodyText, signature, config.app_secret)
             if (!isValid) {
-                console.error("[Meta Webhook] Invalid signature")
+                log.error("Invalid signature")
                 return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
             }
         } else {
-            console.warn("[Meta Webhook] No signature header received")
+            log.warn("No signature header received")
         }
 
         const body = JSON.parse(bodyText) as MetaWebhookPayload
 
         // Verificar que es un evento de WhatsApp Business Account
         if (body.object !== "whatsapp_business_account") {
-            console.log("[Meta Webhook] Ignoring non-WhatsApp event:", body.object)
+            log.info("Ignoring non-WhatsApp event", { object: body.object })
             return NextResponse.json({ received: true })
         }
 
@@ -116,7 +119,7 @@ export async function POST(request: NextRequest) {
                 const instance = await findInstanceByMetaPhoneNumberId(phoneNumberId)
 
                 if (!instance) {
-                    console.error(`[Meta Webhook] No instance found for phone_number_id: ${phoneNumberId}`)
+                    log.error("No instance found for phone_number_id", { phoneNumberId })
                     await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, "warning", "Instance not found")
                     continue
                 }
@@ -138,7 +141,7 @@ export async function POST(request: NextRequest) {
                     // Procesar errores
                     if (value.errors && value.errors.length > 0) {
                         for (const error of value.errors) {
-                            console.error(`[Meta Webhook] Error from Meta: ${error.code} - ${error.title}: ${error.message}`)
+                            log.error("Error from Meta", { code: error.code, title: error.title, message: error.message })
                         }
                         processingResult = "warning"
                         errorMessage = value.errors.map(e => `${e.code}: ${e.title}`).join(", ")
@@ -146,7 +149,7 @@ export async function POST(request: NextRequest) {
                 } catch (processingError) {
                     processingResult = "error"
                     errorMessage = processingError instanceof Error ? processingError.message : String(processingError)
-                    console.error("[Meta Webhook] Processing error:", processingError)
+                    log.error("Processing error", { error: errorMessage })
                 }
 
                 await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, processingResult, errorMessage)
@@ -156,7 +159,7 @@ export async function POST(request: NextRequest) {
         // Meta requiere respuesta 200 rápida
         return NextResponse.json({ received: true })
     } catch (error) {
-        console.error("[Meta Webhook] Error:", error)
+        log.error("Unhandled error", { error: error instanceof Error ? error.message : String(error) })
         // Siempre responder 200 para evitar reintentos de Meta
         return NextResponse.json({ received: true })
     }
@@ -220,21 +223,20 @@ async function handleSingleMessage(
             messageText = message.button?.text || ""
             break
         case "reaction":
-            // Las reacciones no se procesan como mensaje de texto
-            console.log(`[Meta Webhook] Reaction ${message.reaction?.emoji} to message ${message.reaction?.message_id}`)
+            log.debug("Reaction received", { emoji: message.reaction?.emoji, messageId: message.reaction?.message_id })
             return
         default:
-            console.log(`[Meta Webhook] Unsupported message type: ${message.type}`)
+            log.info("Unsupported message type", { type: message.type })
             messageText = `[${message.type} no soportado]`
     }
 
     if (!messageText) {
-        console.log("[Meta Webhook] Message without extractable text, skipping")
+        log.debug("Message without extractable text, skipping")
         return
     }
 
     const phoneNumber = message.from
-    console.log(`[Meta Webhook] Message from ${phoneNumber}: ${messageText.substring(0, 50)}...`)
+    log.info("Message received", { from: phoneNumber, preview: messageText.substring(0, 50) })
 
     // Buscar o crear cliente
     const customer = await findOrCreateCustomer(supabase, organizationId, phoneNumber, contactName)
@@ -242,7 +244,7 @@ async function handleSingleMessage(
     // Verificar límite de conversaciones
     const canContinue = await checkConversationLimit(supabase, organizationId)
     if (!canContinue) {
-        console.log(`[Meta Webhook] Organization ${organizationId} reached conversation limit`)
+        log.warn("Conversation limit reached", { orgId: organizationId })
         // TODO: Enviar template de límite alcanzado
         return
     }
@@ -265,7 +267,7 @@ async function handleSingleMessage(
     })
 
     // Procesar mensaje con el agente IA
-    console.log(`[Meta Webhook] Processing message with AI agent for chat ${chat.id}`)
+    log.info("Processing with AI agent", { chatId: chat.id })
     const { processIncomingMessage } = await import("@/lib/messaging/unified")
     const result = await processIncomingMessage({
         channel: "whatsapp",
@@ -280,9 +282,9 @@ async function handleSingleMessage(
     })
 
     if (result.success) {
-        console.log(`[Meta Webhook] AI response sent successfully`)
+        log.info("AI response sent", { chatId: chat.id })
     } else {
-        console.error(`[Meta Webhook] AI processing failed:`, result.error)
+        log.error("AI processing failed", { chatId: chat.id, error: result.error })
     }
 }
 
@@ -295,15 +297,17 @@ async function handleStatusUpdates(
     value: MetaWebhookValue
 ) {
     for (const status of value.statuses || []) {
-        console.log(
-            `[Meta Webhook] Message ${status.id} to ${status.recipient_id}: ${status.status}` +
-            (status.pricing ? ` (${status.pricing.category}, billable: ${status.pricing.billable})` : "")
-        )
+        log.debug("Message status update", {
+            messageId: status.id,
+            recipientId: status.recipient_id,
+            status: status.status,
+            ...(status.pricing ? { pricingCategory: status.pricing.category, billable: status.pricing.billable } : {}),
+        })
 
         // Si el mensaje falló, loggearlo
         if (status.status === "failed" && status.errors) {
             for (const error of status.errors) {
-                console.error(`[Meta Webhook] Message delivery failed: ${error.code} - ${error.title}: ${error.message}`)
+                log.error("Message delivery failed", { code: error.code, title: error.title, message: error.message })
             }
         }
 

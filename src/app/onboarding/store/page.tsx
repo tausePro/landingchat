@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input"
 import { ProgressBar } from "@/components/onboarding/progress-bar"
 import { LogoUploader } from "@/components/onboarding/logo-uploader"
 import { updateOrganizationDetails } from "../actions"
+import { createClient } from "@/lib/supabase/client"
 
 
 export default function StoreConfigPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
+    const [organizationId, setOrganizationId] = useState<string | null>(null)
     const [formData, setFormData] = useState({
         name: "",
         subdomain: "",
@@ -19,6 +21,26 @@ export default function StoreConfigPage() {
         industry: "",
         logoUrl: ""
     })
+
+    // Fetch organization_id from user profile
+    useEffect(() => {
+        const fetchOrgId = async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase
+                .from("profiles")
+                .select("organization_id")
+                .eq("id", user.id)
+                .single()
+
+            if (profile?.organization_id) {
+                setOrganizationId(profile.organization_id)
+            }
+        }
+        fetchOrgId()
+    }, [])
 
     // Subdomain validation state
     const [subdomainStatus, setSubdomainStatus] = useState<"idle" | "checking" | "available" | "unavailable" | "invalid">("idle")
@@ -152,10 +174,12 @@ export default function StoreConfigPage() {
                 </div>
 
                 {/* Logo Uploader */}
-                <LogoUploader
-                    organizationId="temp-org-id" // TODO: Get from auth context
-                    onUploadComplete={(url) => setFormData({ ...formData, logoUrl: url })}
-                />
+                {organizationId && (
+                    <LogoUploader
+                        organizationId={organizationId}
+                        onUploadComplete={(url) => setFormData({ ...formData, logoUrl: url })}
+                    />
+                )}
 
                 {/* Contact Email & Industry */}
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
