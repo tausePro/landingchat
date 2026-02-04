@@ -14,15 +14,25 @@ export function LandingFooter({ config }: LandingFooterProps) {
                     {/* Brand column */}
                     <div className="col-span-2">
                         <Link href="/" className="flex items-center gap-2 mb-4">
-                            <div className="w-8 h-8 bg-gradient-to-br from-landing-violet to-landing-mint rounded-lg flex items-center justify-center">
-                                <Layers className="w-4 h-4 text-white" />
-                            </div>
-                            <span className="text-white font-bold text-lg font-landing">
-                                LandingChat
-                            </span>
-                            <span className="text-[10px] font-bold text-landing-mint border border-landing-mint/30 rounded px-1 py-0.5">
-                                OS
-                            </span>
+                            {config.logo_type === "image" && config.logo_image_url ? (
+                                <img src={config.logo_image_url} alt={config.logo_text || "Logo"} className="h-8 w-auto object-contain" />
+                            ) : config.logo_type === "text" ? (
+                                <span className="text-white font-bold text-lg font-landing">
+                                    {config.logo_text || "LandingChat"}
+                                </span>
+                            ) : (
+                                <>
+                                    <div className="w-8 h-8 bg-gradient-to-br from-landing-violet to-landing-mint rounded-lg flex items-center justify-center">
+                                        <Layers className="w-4 h-4 text-white" />
+                                    </div>
+                                    <span className="text-white font-bold text-lg font-landing">
+                                        {config.logo_text || "LandingChat"}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-landing-mint border border-landing-mint/30 rounded px-1 py-0.5">
+                                        OS
+                                    </span>
+                                </>
+                            )}
                         </Link>
                         <p className="text-slate-400 text-sm leading-relaxed max-w-xs mb-6">
                             {config.footer_description}

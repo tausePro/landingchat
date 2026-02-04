@@ -17,15 +17,30 @@ export function LandingHeader({ config }: LandingHeaderProps) {
             <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                 {/* Logo */}
                 <div className="flex items-center gap-3">
-                    <div className="size-10 bg-landing-deep text-white flex items-center justify-center rounded-xl shadow-lg shadow-landing-violet/20">
-                        <Layers className="size-6" />
-                    </div>
-                    <h2 className="text-landing-deep text-xl font-bold tracking-tight">
-                        LandingChat{" "}
-                        <span className="text-xs font-normal text-landing-violet bg-landing-violet/10 px-2 py-0.5 rounded-full ml-1 border border-landing-violet/20">
-                            OS
-                        </span>
-                    </h2>
+                    {config.logo_type === "image" && config.logo_image_url ? (
+                        <img
+                            src={config.logo_image_url}
+                            alt={config.logo_text || "Logo"}
+                            className="h-10 w-auto object-contain"
+                        />
+                    ) : config.logo_type === "text" ? (
+                        <h2 className="text-landing-deep text-xl font-bold tracking-tight">
+                            {config.logo_text || "LandingChat"}
+                        </h2>
+                    ) : (
+                        /* Default: icon */
+                        <>
+                            <div className="size-10 bg-landing-deep text-white flex items-center justify-center rounded-xl shadow-lg shadow-landing-violet/20">
+                                <Layers className="size-6" />
+                            </div>
+                            <h2 className="text-landing-deep text-xl font-bold tracking-tight">
+                                {config.logo_text || "LandingChat"}{" "}
+                                <span className="text-xs font-normal text-landing-violet bg-landing-violet/10 px-2 py-0.5 rounded-full ml-1 border border-landing-violet/20">
+                                    OS
+                                </span>
+                            </h2>
+                        </>
+                    )}
                 </div>
 
                 {/* Desktop Nav */}

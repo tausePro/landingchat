@@ -11,13 +11,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import { Save, RotateCcw, Plus, Trash2, Eye, Loader2, GripVertical } from "lucide-react"
+import { Save, RotateCcw, Plus, Trash2, Eye, Loader2, GripVertical, Layers, Type, ImageIcon, Upload } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LandingSettingsPage() {
     const [config, setConfig] = useState<LandingMainConfig>(defaultLandingConfig)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [hasChanges, setHasChanges] = useState(false)
+    const [uploadingLogo, setUploadingLogo] = useState(false)
 
     useEffect(() => {
         loadConfig()
@@ -49,6 +51,45 @@ export default function LandingSettingsPage() {
             setHasChanges(false)
         } else {
             toast.error(result.error ?? "Error al guardar")
+        }
+    }
+
+    const handleLogoUpload = async (file: File) => {
+        const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/webp"]
+        if (!validTypes.includes(file.type)) {
+            toast.error("Formato no válido. Usa PNG, JPG, SVG o WEBP.")
+            return
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error("El archivo es muy grande. Máximo 2MB.")
+            return
+        }
+
+        setUploadingLogo(true)
+        try {
+            const supabase = createClient()
+            const fileExt = file.name.split(".").pop()
+            const fileName = `landing-logo-${Date.now()}.${fileExt}`
+            const fullPath = `landing/${fileName}`
+
+            const { error: uploadError } = await supabase.storage
+                .from("organization-logos")
+                .upload(fullPath, file, { cacheControl: "3600", upsert: false })
+
+            if (uploadError) throw uploadError
+
+            const { data: { publicUrl } } = supabase.storage
+                .from("organization-logos")
+                .getPublicUrl(fullPath)
+
+            update("logo_image_url", publicUrl)
+            update("logo_type", "image")
+            toast.success("Logo subido correctamente")
+        } catch (err) {
+            console.error("Error uploading logo:", err)
+            toast.error("Error al subir el logo. Intenta de nuevo.")
+        } finally {
+            setUploadingLogo(false)
         }
     }
 
@@ -113,6 +154,144 @@ export default function LandingSettingsPage() {
 
                 {/* ====== HERO & HEADER TAB ====== */}
                 <TabsContent value="hero" className="space-y-6">
+                    {/* Logo / Branding */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Logo / Branding</CardTitle>
+                            <CardDescription>Elige cómo se muestra el logo en el header y footer</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Logo type selector */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div
+                                    className={`p-4 rounded-lg border-2 cursor-pointer transition-colors text-center ${config.logo_type === "icon" ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" : "border-slate-200 dark:border-slate-700"}`}
+                                    onClick={() => update("logo_type", "icon")}
+                                >
+                                    <Layers className="size-8 mx-auto mb-2 text-slate-600 dark:text-slate-400" />
+                                    <p className="text-sm font-medium">Icono + Texto</p>
+                                    <p className="text-xs text-slate-500 mt-1">Logo por defecto</p>
+                                </div>
+                                <div
+                                    className={`p-4 rounded-lg border-2 cursor-pointer transition-colors text-center ${config.logo_type === "image" ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" : "border-slate-200 dark:border-slate-700"}`}
+                                    onClick={() => update("logo_type", "image")}
+                                >
+                                    <ImageIcon className="size-8 mx-auto mb-2 text-slate-600 dark:text-slate-400" />
+                                    <p className="text-sm font-medium">Imagen</p>
+                                    <p className="text-xs text-slate-500 mt-1">Sube tu logo</p>
+                                </div>
+                                <div
+                                    className={`p-4 rounded-lg border-2 cursor-pointer transition-colors text-center ${config.logo_type === "text" ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" : "border-slate-200 dark:border-slate-700"}`}
+                                    onClick={() => update("logo_type", "text")}
+                                >
+                                    <Type className="size-8 mx-auto mb-2 text-slate-600 dark:text-slate-400" />
+                                    <p className="text-sm font-medium">Solo Texto</p>
+                                    <p className="text-xs text-slate-500 mt-1">Nombre de la marca</p>
+                                </div>
+                            </div>
+
+                            {/* Logo text (applies to icon and text types) */}
+                            {(config.logo_type === "icon" || config.logo_type === "text") && (
+                                <div>
+                                    <Label>Texto del Logo</Label>
+                                    <Input value={config.logo_text} onChange={(e) => update("logo_text", e.target.value)} placeholder="LandingChat" />
+                                </div>
+                            )}
+
+                            {/* Image uploader (only for image type) */}
+                            {config.logo_type === "image" && (
+                                <div className="space-y-3">
+                                    {config.logo_image_url ? (
+                                        <div className="flex items-center gap-4 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
+                                            <img
+                                                src={config.logo_image_url}
+                                                alt="Logo preview"
+                                                className="h-16 w-auto max-w-[200px] object-contain rounded-lg border"
+                                            />
+                                            <div className="flex-1">
+                                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Logo actual</p>
+                                                <p className="text-xs text-slate-500 truncate max-w-xs">{config.logo_image_url}</p>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    update("logo_image_url", null)
+                                                }}
+                                            >
+                                                Cambiar
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div
+                                            onDrop={(e) => {
+                                                e.preventDefault()
+                                                const file = e.dataTransfer.files[0]
+                                                if (file) handleLogoUpload(file)
+                                            }}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 p-8 transition-colors hover:border-indigo-400"
+                                        >
+                                            {uploadingLogo ? (
+                                                <Loader2 className="size-8 animate-spin text-indigo-500" />
+                                            ) : (
+                                                <Upload className="size-8 text-slate-400" />
+                                            )}
+                                            <div className="text-center">
+                                                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                                    {uploadingLogo ? "Subiendo..." : "Arrastra y suelta tu logo aquí"}
+                                                </p>
+                                                <p className="text-xs text-slate-500 mt-1">PNG, JPG, SVG o WEBP (máx. 2MB)</p>
+                                            </div>
+                                            <label className="rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 cursor-pointer">
+                                                Seleccionar archivo
+                                                <input
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0]
+                                                        if (file) handleLogoUpload(file)
+                                                    }}
+                                                    className="hidden"
+                                                    disabled={uploadingLogo}
+                                                />
+                                            </label>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <Label>O pega la URL directamente</Label>
+                                        <Input
+                                            value={config.logo_image_url ?? ""}
+                                            onChange={(e) => update("logo_image_url", e.target.value || null)}
+                                            placeholder="https://..."
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Preview */}
+                            <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 p-4 border">
+                                <p className="text-xs text-slate-500 mb-3">Vista previa del logo:</p>
+                                <div className="flex items-center gap-3">
+                                    {config.logo_type === "image" && config.logo_image_url ? (
+                                        <img src={config.logo_image_url} alt="Logo" className="h-10 w-auto object-contain" />
+                                    ) : config.logo_type === "text" ? (
+                                        <span className="text-xl font-bold text-slate-900 dark:text-white">{config.logo_text || "LandingChat"}</span>
+                                    ) : (
+                                        <>
+                                            <div className="size-10 bg-slate-900 text-white flex items-center justify-center rounded-xl">
+                                                <Layers className="size-6" />
+                                            </div>
+                                            <span className="text-xl font-bold text-slate-900 dark:text-white">
+                                                {config.logo_text || "LandingChat"}{" "}
+                                                <span className="text-xs font-normal text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full ml-1">OS</span>
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Header / Navegación</CardTitle>

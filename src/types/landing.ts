@@ -59,6 +59,11 @@ export interface LandingFooterColumn {
 }
 
 export interface LandingMainConfig {
+    // Branding / Logo
+    logo_type: "icon" | "image" | "text"
+    logo_image_url: string | null
+    logo_text: string
+
     // Header
     header_nav_links: LandingNavLink[]
     header_cta_text: string
@@ -136,6 +141,11 @@ export interface LandingMainConfig {
 // ============================================
 
 export const defaultLandingConfig: LandingMainConfig = {
+    // Branding / Logo
+    logo_type: "icon",
+    logo_image_url: null,
+    logo_text: "LandingChat",
+
     // Header
     header_nav_links: [
         { label: "Sistema", href: "#features" },
