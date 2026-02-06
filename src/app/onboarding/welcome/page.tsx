@@ -1,76 +1,88 @@
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { MessageCircle, Store, Bot, ArrowRight, Sparkles } from "lucide-react"
 
 export default function OnboardingWelcome() {
     return (
-        <>
-            {/* Page Heading */}
-            <div className="flex flex-wrap justify-between gap-3 p-4">
-                <div className="flex min-w-72 flex-col gap-3">
-                    <p className="text-slate-900 dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">
-                        ¡Bienvenido a LandingChat!
-                    </p>
-                    <p className="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">
-                        Vamos a configurar tu espacio de trabajo para que empieces a vender y comunicarte con tus clientes en minutos.
-                    </p>
+        <div className="flex flex-col items-center text-center max-w-2xl mx-auto">
+            {/* Hero Section */}
+            <div className="flex flex-col items-center gap-4 mb-12">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                    <Sparkles className="size-4" />
+                    3 pasos para empezar
                 </div>
+
+                <h1 className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    ¡Bienvenido a{" "}
+                    <span className="bg-gradient-to-r from-primary to-violet-600 bg-clip-text text-transparent">
+                        LandingChat
+                    </span>
+                    !
+                </h1>
+
+                <p className="text-lg text-slate-600 dark:text-slate-400 max-w-md">
+                    Configura tu agente de ventas en minutos y empieza a atender clientes 24/7.
+                </p>
             </div>
 
             {/* Benefits Cards */}
-            <h3 className="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-8">
-                Empieza a disfrutar de los beneficios clave
-            </h3>
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4">
-                <div className="flex flex-1 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex-col transition-all hover:shadow-lg hover:border-primary/50">
-                    <div className="text-primary">
-                        <span className="material-symbols-outlined text-3xl">forum</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-12">
+                <div className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-white/60 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
+                    <div className="size-14 bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/30 dark:to-violet-800/30 rounded-2xl flex items-center justify-center">
+                        <Store className="size-7 text-violet-600" />
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-slate-900 dark:text-white text-base font-bold leading-tight">
-                            Centraliza tus Canales
-                        </h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">
-                            Conecta todas tus plataformas de mensajería en un solo lugar.
+                    <div className="text-center">
+                        <h3 className="font-semibold text-slate-900 dark:text-white">
+                            Tu Negocio
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Cuéntanos sobre ti
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-1 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex-col transition-all hover:shadow-lg hover:border-primary/50">
-                    <div className="text-primary">
-                        <span className="material-symbols-outlined text-3xl">storefront</span>
+
+                <div className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-white/60 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
+                    <div className="size-14 bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-800/30 rounded-2xl flex items-center justify-center">
+                        <MessageCircle className="size-7 text-green-600" />
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-slate-900 dark:text-white text-base font-bold leading-tight">
-                            Crea tu Tienda Conversacional
-                        </h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">
-                            Diseña una experiencia de compra única a través del chat.
+                    <div className="text-center">
+                        <h3 className="font-semibold text-slate-900 dark:text-white">
+                            WhatsApp
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Conecta tu número
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-1 gap-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex-col transition-all hover:shadow-lg hover:border-primary/50">
-                    <div className="text-primary">
-                        <span className="material-symbols-outlined text-3xl">group</span>
+
+                <div className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-white/60 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all">
+                    <div className="size-14 bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30 rounded-2xl flex items-center justify-center">
+                        <Bot className="size-7 text-amber-600" />
                     </div>
-                    <div className="flex flex-col gap-1">
-                        <h2 className="text-slate-900 dark:text-white text-base font-bold leading-tight">
-                            Gestiona tu Equipo
-                        </h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">
-                            Colabora y asigna conversaciones a múltiples agentes fácilmente.
+                    <div className="text-center">
+                        <h3 className="font-semibold text-slate-900 dark:text-white">
+                            Probar Agente
+                        </h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Ve la magia en acción
                         </p>
                     </div>
                 </div>
             </div>
 
             {/* CTA Button */}
-            <div className="flex justify-center p-4 mt-8">
-                <Link href="/onboarding/store" className="w-full max-w-xs">
-                    <Button className="w-full h-12 text-base font-bold gap-2 transition-transform hover:scale-105">
-                        <span>Comenzar Configuración</span>
-                        <span className="material-symbols-outlined">arrow_forward</span>
-                    </Button>
-                </Link>
-            </div>
-        </>
+            <Link href="/onboarding/business" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto h-14 px-10 text-lg font-bold gap-3 bg-gradient-to-r from-primary to-violet-600 hover:from-primary/90 hover:to-violet-600/90 shadow-xl shadow-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-primary/30">
+                    Comenzar Configuración
+                    <ArrowRight className="size-5" />
+                </Button>
+            </Link>
+
+            <p className="text-sm text-slate-400 mt-6">
+                Solo tomará ~3 minutos
+            </p>
+        </div>
     )
 }
