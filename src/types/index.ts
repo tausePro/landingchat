@@ -235,3 +235,28 @@ export {
   type FoundingLandingConfig,
   type FoundingMetrics,
 } from "./founding"
+
+// Industry Templates & Modules domain types
+export {
+  IndustrySlugEnum,
+  ModuleSlugEnum,
+  IndustryTemplateSchema,
+  ModuleDefinitionSchema,
+  DashboardMenuItemSchema,
+  SelectIndustryInputSchema,
+  UpdateEnabledModulesInputSchema,
+  CORE_MODULES,
+  INDUSTRY_MODULES,
+  MODULE_ICONS,
+  MODULE_PATHS,
+  MODULE_NAMES,
+  buildDashboardMenu,
+  getDefaultModulesForIndustry,
+  type IndustrySlug,
+  type ModuleSlug,
+  type IndustryTemplate,
+  type ModuleDefinition,
+  type DashboardMenuItem,
+  type SelectIndustryInput,
+  type UpdateEnabledModulesInput,
+} from "./industry"
