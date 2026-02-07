@@ -22,6 +22,10 @@ import {
     Crown,
     Gem,
     Gift,
+    BrainCircuit,
+    Package,
+    CreditCard,
+    Database,
 } from "lucide-react"
 import {
     type FoundingLandingData,
@@ -38,7 +42,8 @@ interface FoundingLandingProps {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const iconMap: Record<string, React.ComponentType<any>> = {
     Zap, Star, Shield, MessageSquare, BarChart3, Users, Clock, Sparkles,
-    Heart, Rocket, Target, Award, Crown, Gem, Gift, Check
+    Heart, Rocket, Target, Award, Crown, Gem, Gift, Check, BrainCircuit,
+    Package, CreditCard, Database
 }
 
 // Configuración por defecto
@@ -274,30 +279,118 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                         {program.hero_description}
                     </p>
 
-                    {/* Counter */}
-                    <div className="relative mx-auto max-w-xl rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm mb-8">
-                        <div className="text-center">
-                            <p className="text-sm uppercase tracking-wider text-slate-400 mb-2">
+                    {/* Counter with Progress */}
+                    <div className="relative mx-auto max-w-xl rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-sm mb-8 overflow-hidden group">
+                        {/* Animated border glow */}
+                        <div
+                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+                            style={{
+                                background: `linear-gradient(90deg, transparent, ${config.primary_gradient_from}10, transparent)`,
+                                animation: "shimmer 2s infinite"
+                            }}
+                        />
+
+                        <div className="relative z-10 text-center">
+                            <p className="text-sm uppercase tracking-wider text-slate-400 mb-3">
                                 Cupos Restantes:
                             </p>
-                            <div className="text-5xl sm:text-6xl font-black">
-                                <span
-                                    style={gradientTextStyle}
-                                >
+                            <div className="text-5xl sm:text-6xl font-black mb-4">
+                                <span style={gradientTextStyle}>
                                     {program.slots_remaining}
                                 </span>
                                 <span className="text-slate-500">/{program.total_slots}</span>
                             </div>
+
+                            {/* Progress bar */}
+                            <div className="relative h-2 bg-white/10 rounded-full overflow-hidden mb-2">
+                                <div
+                                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000"
+                                    style={{
+                                        width: `${((program.total_slots - program.slots_remaining) / program.total_slots) * 100}%`,
+                                        background: `linear-gradient(to right, ${config.primary_gradient_from}, ${config.primary_gradient_to})`
+                                    }}
+                                />
+                                {/* Animated shine */}
+                                <div
+                                    className="absolute inset-y-0 left-0 w-20 rounded-full opacity-30"
+                                    style={{
+                                        background: `linear-gradient(90deg, transparent, white, transparent)`,
+                                        animation: "shimmer 2s infinite"
+                                    }}
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                {program.total_slots - program.slots_remaining} fundadores ya aseguraron su lugar
+                            </p>
                         </div>
 
-                        {/* Activity Feed Ticker */}
+                        {/* Activity Feed Ticker - Enhanced */}
                         {activity_feed.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-white/10">
-                                <div className="flex items-center justify-center gap-2 text-sm text-slate-400 h-6 overflow-hidden">
-                                    <Users className="size-4 flex-shrink-0" style={{ color: config.primary_gradient_from }} />
-                                    <span className="animate-fade-in">
-                                        {activity_feed[currentActivityIndex]?.message || "Únete a los founding members"}
-                                    </span>
+                            <div className="mt-6 pt-5 border-t border-white/10">
+                                <div className="relative">
+                                    {/* Notification card style */}
+                                    <div
+                                        className="flex items-center gap-3 rounded-xl p-3 transition-all duration-500"
+                                        style={{ backgroundColor: `${config.primary_gradient_from}10` }}
+                                    >
+                                        {/* Animated avatar */}
+                                        <div
+                                            className="relative size-10 rounded-full flex items-center justify-center shrink-0"
+                                            style={{ background: `linear-gradient(135deg, ${config.primary_gradient_from}, ${config.primary_gradient_to})` }}
+                                        >
+                                            <Users className="size-5 text-white" />
+                                            {/* Pulse ring */}
+                                            <span
+                                                className="absolute inset-0 rounded-full animate-ping opacity-30"
+                                                style={{ backgroundColor: config.primary_gradient_from }}
+                                            />
+                                        </div>
+
+                                        {/* Message with slide animation */}
+                                        <div className="flex-1 min-w-0 overflow-hidden">
+                                            <p
+                                                key={currentActivityIndex}
+                                                className="text-sm text-white font-medium truncate animate-slide-up"
+                                            >
+                                                {activity_feed[currentActivityIndex]?.message || "Únete a los founding members"}
+                                            </p>
+                                            <p className="text-xs text-slate-500 mt-0.5">Hace unos momentos</p>
+                                        </div>
+
+                                        {/* Live indicator */}
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="relative flex size-2">
+                                                <span
+                                                    className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                                                    style={{ backgroundColor: config.primary_gradient_from }}
+                                                />
+                                                <span
+                                                    className="relative inline-flex size-2 rounded-full"
+                                                    style={{ backgroundColor: config.primary_gradient_from }}
+                                                />
+                                            </span>
+                                            <span className="text-xs font-medium" style={{ color: config.primary_gradient_from }}>
+                                                EN VIVO
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Dots indicator */}
+                                    {activity_feed.length > 1 && (
+                                        <div className="flex justify-center gap-1.5 mt-3">
+                                            {activity_feed.slice(0, 5).map((_, i) => (
+                                                <span
+                                                    key={i}
+                                                    className="size-1.5 rounded-full transition-all duration-300"
+                                                    style={{
+                                                        backgroundColor: i === currentActivityIndex % 5
+                                                            ? config.primary_gradient_from
+                                                            : "rgba(255,255,255,0.2)"
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -592,46 +685,220 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                 </div>
             </section>
 
-            {/* Features Section */}
+            {/* Features Bento Grid Section */}
             <section
-                className="py-20 px-4"
+                className="py-24 px-4 relative"
                 style={{
-                    background: `linear-gradient(to bottom, transparent, ${config.primary_gradient_from}05, transparent)`
+                    background: `linear-gradient(to bottom, transparent, ${config.primary_gradient_from}08, transparent)`
                 }}
             >
-                <div className="mx-auto max-w-6xl">
-                    <div className="text-center mb-12">
-                        <p
-                            className="text-sm uppercase tracking-wider mb-2"
-                            style={{ color: config.primary_gradient_from }}
+                {/* Subtle grid pattern */}
+                <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:24px_24px] opacity-50" />
+
+                <div className="mx-auto max-w-6xl relative z-10">
+                    <div className="text-center mb-16">
+                        <div
+                            className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-4"
+                            style={{
+                                backgroundColor: `${config.primary_gradient_from}15`,
+                                borderColor: `${config.primary_gradient_from}30`,
+                                color: config.primary_gradient_from
+                            }}
                         >
+                            <Sparkles className="size-3" />
                             {config.features_subtitle}
-                        </p>
+                        </div>
                         <h2 className="text-3xl sm:text-4xl font-bold">
                             {config.features_title}
                         </h2>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {config.features.map((feature, i) => {
-                            const FeatureIcon = iconMap[feature.icon] || Sparkles
-                            return (
-                                <div
-                                    key={i}
-                                    className="rounded-xl border border-white/10 bg-white/5 p-5 hover:border-opacity-30 transition-colors"
-                                    style={{ "--hover-border": config.primary_gradient_from } as React.CSSProperties}
-                                >
+                    {/* Bento Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        {/* Agente IA - Large card */}
+                        <div
+                            className="md:col-span-2 group relative rounded-2xl border border-white/10 bg-white/[0.03] p-8 overflow-hidden transition-all duration-500 hover:border-white/20 hover:bg-white/[0.05]"
+                        >
+                            {/* Glow effect on hover */}
+                            <div
+                                className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"
+                                style={{ background: `linear-gradient(to right, ${config.primary_gradient_from}20, ${config.primary_gradient_to}20)` }}
+                            />
+
+                            <div className="relative z-10">
+                                <div className="flex items-start justify-between mb-6">
                                     <div
-                                        className="rounded-lg p-2 w-fit mb-3"
+                                        className="size-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110"
+                                        style={{ background: `linear-gradient(135deg, ${config.primary_gradient_from}, ${config.primary_gradient_to})` }}
+                                    >
+                                        <BrainCircuit className="size-7 text-white" />
+                                    </div>
+                                    <span
+                                        className="text-xs font-bold px-2 py-1 rounded-full"
+                                        style={{
+                                            backgroundColor: `${config.primary_gradient_from}20`,
+                                            color: config.primary_gradient_from
+                                        }}
+                                    >
+                                        CORE
+                                    </span>
+                                </div>
+                                <h4 className="text-xl font-bold mb-2 text-white group-hover:text-white/90 transition-colors">
+                                    Tu Empleado Digital 24/7
+                                </h4>
+                                <p className="text-slate-400 leading-relaxed group-hover:text-slate-300 transition-colors">
+                                    Entrénalo con tu catálogo y políticas. Responde preguntas, procesa pedidos y cierra ventas mientras duermes. Powered by GPT-4o + RAG.
+                                </p>
+
+                                {/* Animated stats */}
+                                <div className="mt-6 pt-6 border-t border-white/10 grid grid-cols-3 gap-4">
+                                    <div className="text-center">
+                                        <div className="text-2xl font-black" style={{ color: config.primary_gradient_from }}>24/7</div>
+                                        <div className="text-xs text-slate-500">Disponible</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-2xl font-black" style={{ color: config.primary_gradient_from }}>&lt;3s</div>
+                                        <div className="text-xs text-slate-500">Respuesta</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-2xl font-black" style={{ color: config.primary_gradient_from }}>95%</div>
+                                        <div className="text-xs text-slate-500">Precisión</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CAPI & Data */}
+                        <div
+                            className="group relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 overflow-hidden transition-all duration-500 hover:border-white/20 hover:bg-white/[0.05]"
+                        >
+                            <div
+                                className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"
+                                style={{ background: `${config.primary_gradient_to}20` }}
+                            />
+
+                            <div className="relative z-10">
+                                <div
+                                    className="size-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
+                                    style={{ backgroundColor: `${config.primary_gradient_to}20` }}
+                                >
+                                    <Database className="size-6" style={{ color: config.primary_gradient_to }} />
+                                </div>
+                                <h4 className="font-bold mb-2 text-white">CAPI & First-Party Data</h4>
+                                <p className="text-sm text-slate-400 mb-4">
+                                    Eventos server-side con Match Quality superior al 90%.
+                                </p>
+
+                                {/* Mini progress bars */}
+                                <div className="space-y-2">
+                                    {[
+                                        { label: "Purchase", value: 98 },
+                                        { label: "Lead", value: 95 },
+                                        { label: "ViewContent", value: 87 },
+                                    ].map((item) => (
+                                        <div key={item.label} className="flex items-center gap-2">
+                                            <span className="text-xs text-slate-500 w-20">{item.label}</span>
+                                            <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-1000 group-hover:w-full"
+                                                    style={{
+                                                        width: `${item.value}%`,
+                                                        background: `linear-gradient(to right, ${config.primary_gradient_from}, ${config.primary_gradient_to})`
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="text-xs font-bold" style={{ color: config.primary_gradient_from }}>{item.value}%</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Stock Inteligente */}
+                        <div
+                            className="group relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 overflow-hidden transition-all duration-500 hover:border-white/20 hover:bg-white/[0.05]"
+                        >
+                            <div
+                                className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"
+                                style={{ background: `${config.accent_color}20` }}
+                            />
+
+                            <div className="relative z-10">
+                                <div
+                                    className="size-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
+                                    style={{ backgroundColor: `${config.accent_color}20` }}
+                                >
+                                    <Package className="size-6" style={{ color: config.accent_color }} />
+                                </div>
+                                <h4 className="font-bold mb-2 text-white">Stock Inteligente</h4>
+                                <p className="text-sm text-slate-400 mb-4">
+                                    Tu agente conoce inventario en tiempo real y sugiere alternativas.
+                                </p>
+
+                                {/* Mini product card */}
+                                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                                    <div className="flex gap-3">
+                                        <div className="size-10 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center">
+                                            <Package className="size-5 text-pink-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-semibold text-white truncate">Vestido Floral XS</div>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <span className="size-1.5 bg-amber-500 rounded-full animate-pulse" />
+                                                <span className="text-[10px] text-amber-400">¡Últimas 3!</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Pagos - Wide */}
+                        <div
+                            className="md:col-span-2 group relative rounded-2xl border border-white/10 bg-white/[0.03] p-8 overflow-hidden transition-all duration-500 hover:border-white/20 hover:bg-white/[0.05]"
+                        >
+                            <div
+                                className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl"
+                                style={{ background: `linear-gradient(to right, ${config.primary_gradient_from}20, ${config.primary_gradient_to}20)` }}
+                            />
+
+                            <div className="relative z-10 grid md:grid-cols-2 gap-6 items-center">
+                                <div>
+                                    <div
+                                        className="size-12 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110"
                                         style={{ backgroundColor: `${config.primary_gradient_from}20` }}
                                     >
-                                        <FeatureIcon className="size-5" style={{ color: config.primary_gradient_from }} />
+                                        <CreditCard className="size-6" style={{ color: config.primary_gradient_from }} />
                                     </div>
-                                    <h4 className="font-semibold mb-1">{feature.title}</h4>
-                                    <p className="text-sm text-slate-400">{feature.description}</p>
+                                    <h4 className="text-xl font-bold mb-2 text-white">Cobra desde el Chat</h4>
+                                    <p className="text-slate-400 leading-relaxed">
+                                        Genera links de pago con un clic. Integración nativa con las principales pasarelas de LATAM.
+                                    </p>
                                 </div>
-                            )
-                        })}
+
+                                {/* Payment logos grid */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                        { name: "wompi", color: "#00C389" },
+                                        { name: "ePayco", color: "#009EE3" },
+                                        { name: "addi", color: "#00D1A1" },
+                                        { name: "Bold", color: "#ffffff" },
+                                    ].map((gateway) => (
+                                        <div
+                                            key={gateway.name}
+                                            className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center justify-center transition-all duration-300 hover:bg-white/10 hover:scale-105"
+                                        >
+                                            <span
+                                                className="text-sm font-black"
+                                                style={{ color: gateway.color }}
+                                            >
+                                                {gateway.name}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
