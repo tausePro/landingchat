@@ -105,7 +105,6 @@ export default function BusinessConfigPage() {
                 .update({
                     name: formData.name,
                     industry: formData.industry,
-                    industry_slug: formData.industry,
                     enabled_modules: enabledModules,
                     logo_url: formData.logoUrl || null,
                     onboarding_step: 1,

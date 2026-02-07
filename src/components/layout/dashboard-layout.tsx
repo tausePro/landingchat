@@ -129,7 +129,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 if (profile?.organization_id) {
                     const { data: org } = await supabase
                         .from("organizations")
-                        .select("onboarding_completed, enabled_modules, industry_slug")
+                        .select("onboarding_completed, enabled_modules, industry")
                         .eq("id", profile.organization_id)
                         .single()
 
@@ -139,7 +139,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                             return
                         }
                         setEnabledModules(org.enabled_modules || [])
-                        setIndustrySlug(org.industry_slug || "")
+                        setIndustrySlug(org.industry || "")
                     }
                 }
             } catch (error) {
