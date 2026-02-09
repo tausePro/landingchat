@@ -304,7 +304,7 @@ export const defaultLandingConfig: LandingMainConfig = {
             links: [
                 { label: "Privacidad", href: "/privacidad" },
                 { label: "Términos de Servicio", href: "/terminos" },
-                { label: "Seguridad", href: "#" },
+                { label: "Seguridad", href: "/seguridad" },
             ],
         },
     ],
