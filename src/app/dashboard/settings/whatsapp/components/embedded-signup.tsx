@@ -81,7 +81,7 @@ export function EmbeddedSignup({ appId, configId, onSuccess }: EmbeddedSignupPro
         }
     }, [appId])
 
-    // Escuchar mensajes del Embedded Signup popup
+    // Escuchar mensajes del Embedded Signup popup (sessionInfoListener)
     const handleMessage = useCallback(async (event: MessageEvent) => {
         // Solo procesar mensajes del dominio de Facebook
         if (event.origin !== "https://www.facebook.com" && event.origin !== "https://web.facebook.com") {
@@ -91,14 +91,25 @@ export function EmbeddedSignup({ appId, configId, onSuccess }: EmbeddedSignupPro
         try {
             const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data
 
-            if (data.type === "WA_EMBEDDED_SIGNUP" && data.event === "FINISH") {
-                const phoneNumberId = data.data?.phone_number_id
-                const wabaId = data.data?.waba_id
+            // Capturar datos del Embedded Signup cuando termina
+            if (data.type === "WA_EMBEDDED_SIGNUP") {
+                if (data.event === "FINISH" && data.data) {
+                    const phoneNumberId = data.data.phone_number_id
+                    const wabaId = data.data.waba_id
 
-                if (phoneNumberId && wabaId) {
-                    console.log("[EmbeddedSignup] Received signup data:", { phoneNumberId, wabaId })
-                    // Datos recibidos, ahora esperar el code del FB.login callback
-                    // Se procesará en el callback de FB.login
+                    if (phoneNumberId && wabaId) {
+                        console.log("[EmbeddedSignup] Received signup data:", { phoneNumberId, wabaId })
+                        // Guardar en sessionStorage para usar en el callback de FB.login
+                        sessionStorage.setItem("wa_phone_number_id", phoneNumberId)
+                        sessionStorage.setItem("wa_waba_id", wabaId)
+                    }
+                } else if (data.event === "CANCEL") {
+                    console.log("[EmbeddedSignup] User cancelled signup")
+                    setLoading(false)
+                } else if (data.event === "ERROR") {
+                    console.error("[EmbeddedSignup] Error from Meta:", data.data)
+                    toast.error("Error en el proceso de conexión")
+                    setLoading(false)
                 }
             }
         } catch {
