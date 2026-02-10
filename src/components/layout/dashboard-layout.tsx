@@ -76,7 +76,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 
 // Mapeo de módulos a items de navegación
 const MODULE_TO_NAV: Record<string, NavItem> = {
-    conversations: { slug: "conversations", label: "Chats", href: "/dashboard/chats", icon: MessageSquare },
+    conversations: { slug: "conversations", label: "Chats", href: "/dashboard/chats/console", icon: MessageSquare },
     products: { slug: "products", label: "Productos", href: "/dashboard/products", icon: Package },
     orders: { slug: "orders", label: "Pedidos", href: "/dashboard/orders", icon: ShoppingCart },
     customers: { slug: "customers", label: "Clientes", href: "/dashboard/customers", icon: Users },
