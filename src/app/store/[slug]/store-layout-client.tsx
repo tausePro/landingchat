@@ -79,6 +79,10 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
     const headerSettings = storefrontSettings.header || {}
     const selectedTemplate = storefrontSettings.template || "minimal"
     const showStoreName = headerSettings.showStoreName ?? true
+    const menuItems = headerSettings.menuItems || [
+        { id: "home", label: "Inicio", url: "/" },
+        { id: "products", label: "Productos", url: "/productos" }
+    ]
 
     // Typography
     const fontFamily = typographySettings.fontFamily || "Inter"
@@ -195,6 +199,7 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
                     onStartChat={handleStartChat}
                     primaryColor={primaryColor}
                     showStoreName={showStoreName}
+                    menuItems={menuItems}
                     hideOnMobile={hideHeaderOnMobile}
                     shippingConfig={shippingConfig}
                 />
