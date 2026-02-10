@@ -122,9 +122,41 @@ export function EmbeddedSignup({ appId, configId, onSuccess }: EmbeddedSignupPro
         return () => window.removeEventListener("message", handleMessage)
     }, [handleMessage])
 
+    // Procesar la respuesta de FB.login de forma async (separada del callback síncrono)
+    const processLoginResponse = async (code: string) => {
+        try {
+            // Esperar un momento para que el mensaje de FINISH llegue via postMessage
+            await new Promise(resolve => setTimeout(resolve, 1000))
+
+            const callbackResponse = await fetch("/api/auth/whatsapp-meta/callback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    code,
+                    phone_number_id: sessionStorage.getItem("wa_phone_number_id") || "",
+                    waba_id: sessionStorage.getItem("wa_waba_id") || "",
+                }),
+            })
+
+            const result = await callbackResponse.json()
+
+            if (result.success) {
+                toast.success("WhatsApp Business conectado exitosamente")
+                onSuccess()
+            } else {
+                toast.error(result.error || "Error al conectar WhatsApp Business")
+            }
+        } catch (error) {
+            console.error("[EmbeddedSignup] Error:", error)
+            toast.error("Error al procesar la conexión")
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleConnect = () => {
         if (!window.FB) {
-            toast.error("Facebook SDK no cargado. Recarga la p\u00e1gina.")
+            toast.error("Facebook SDK no cargado. Recarga la página.")
             return
         }
 
@@ -135,54 +167,15 @@ export function EmbeddedSignup({ appId, configId, onSuccess }: EmbeddedSignupPro
 
         setLoading(true)
 
+        // FB.login requiere un callback SÍNCRONO — no acepta async functions
         window.FB.login(
-            async (response: FBLoginResponse) => {
+            (response: FBLoginResponse) => {
                 if (response.authResponse?.code) {
-                    // Tenemos el code, ahora necesitamos phone_number_id y waba_id
-                    // Estos vienen del mensaje de FINISH del Embedded Signup
-                    // Pero Meta también los envía como parte del auth response en el session-info callback
-
-                    try {
-                        // Enviar code al backend para intercambiar por token
-                        // El phone_number_id y waba_id se obtienen via el session-info callback
-                        // que Meta envía como window message
-                        const code = response.authResponse.code
-
-                        // Esperar un momento para que el mensaje de FINISH llegue
-                        await new Promise(resolve => setTimeout(resolve, 1000))
-
-                        // Intentar obtener phone_number_id y waba_id del session storage
-                        // (se guardaron en el handleMessage)
-                        // Si no tenemos los datos del popup, usar Graph API para obtenerlos
-                        const callbackResponse = await fetch("/api/auth/whatsapp-meta/callback", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                                code,
-                                // Estos valores se obtienen del Embedded Signup popup
-                                // Temporalmente usar placeholders — se actualizarán cuando Meta los envíe
-                                phone_number_id: sessionStorage.getItem("wa_phone_number_id") || "",
-                                waba_id: sessionStorage.getItem("wa_waba_id") || "",
-                            }),
-                        })
-
-                        const result = await callbackResponse.json()
-
-                        if (result.success) {
-                            toast.success("WhatsApp Business conectado exitosamente")
-                            onSuccess()
-                        } else {
-                            toast.error(result.error || "Error al conectar WhatsApp Business")
-                        }
-                    } catch (error) {
-                        console.error("[EmbeddedSignup] Error:", error)
-                        toast.error("Error al procesar la conexi\u00f3n")
-                    }
+                    processLoginResponse(response.authResponse.code)
                 } else {
-                    toast.error("No se complet\u00f3 la autorizaci\u00f3n")
+                    toast.error("No se completó la autorización")
+                    setLoading(false)
                 }
-
-                setLoading(false)
             },
             {
                 config_id: configId,
