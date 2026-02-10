@@ -28,16 +28,25 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
     const hostname = headersList.get('host') || ''
     const isSub = isSubdomain(hostname)
 
-    // Obtener categorías únicas de los productos
-    const categories = Array.from(
-        new Set(products.map((p: any) => p.category).filter(Boolean))
-    ).sort() as string[]
+    // Obtener categorías únicas de los productos (categories es text[] en la BD)
+    const categoriesSet = new Set<string>()
+    products.forEach((p: any) => {
+        if (Array.isArray(p.categories)) {
+            p.categories.forEach((c: string) => {
+                if (c && c.trim()) categoriesSet.add(c.trim())
+            })
+        } else if (p.categories && typeof p.categories === 'string') {
+            if (p.categories.trim()) categoriesSet.add(p.categories.trim())
+        }
+    })
+    const categories = Array.from(categoriesSet).sort()
 
     // Filtrar por categoría si se especifica (case-insensitive)
     const filteredProducts = categoria
-        ? products.filter((p: any) =>
-            p.category?.toLowerCase() === categoria.toLowerCase()
-        )
+        ? products.filter((p: any) => {
+            const pCats = Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean)
+            return pCats.some((c: string) => c.toLowerCase() === categoria.toLowerCase())
+        })
         : products
 
     // Título dinámico

@@ -767,7 +767,7 @@ export function CompleteTemplate({
                                 opacity: 0.5
                             }}
                         >
-                            © 2024 {organization.name}. Powered by LandingChat.
+                            © {new Date().getFullYear()} {organization.name}. Powered by LandingChat.
                         </p>
                     </div>
                 </div>

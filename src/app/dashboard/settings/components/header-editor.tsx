@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { updateOrganization } from "../actions"
 import { Button } from "@/components/ui/button"
-import { ChevronUp, ChevronDown, Trash2, Plus, ExternalLink } from "lucide-react"
+import { ChevronUp, ChevronDown, Trash2, Plus, ExternalLink, Zap } from "lucide-react"
 
 interface HeaderEditorProps {
     organization: {
@@ -25,12 +25,24 @@ interface MenuItem {
     openInNewTab?: boolean
 }
 
+interface QuickLink {
+    label: string
+    url: string
+}
+
 const DEFAULT_MENU_ITEMS: MenuItem[] = [
     { id: "home", label: "Inicio", url: "/" },
     { id: "products", label: "Productos", url: "/productos" }
 ]
 
 const MAX_MENU_ITEMS = 6
+
+// Enlaces rápidos fijos
+const STATIC_QUICK_LINKS: QuickLink[] = [
+    { label: "Inicio", url: "/" },
+    { label: "Productos", url: "/productos" },
+    { label: "Mi Perfil", url: "/profile" },
+]
 
 export function HeaderEditor({ organization }: HeaderEditorProps) {
     const [loading, setLoading] = useState(false)
@@ -40,6 +52,52 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
     const [menuItems, setMenuItems] = useState<MenuItem[]>(
         organization.settings?.storefront?.header?.menuItems || DEFAULT_MENU_ITEMS
     )
+    const [quickLinks, setQuickLinks] = useState<QuickLink[]>(STATIC_QUICK_LINKS)
+    const [loadingCategories, setLoadingCategories] = useState(true)
+
+    // Cargar categorías del store para sugerencias rápidas
+    useEffect(() => {
+        async function loadCategories() {
+            try {
+                const res = await fetch(`/api/store/${organization.slug}/categories`)
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.categories && data.categories.length > 0) {
+                        const categoryLinks: QuickLink[] = data.categories.map((cat: string) => ({
+                            label: cat,
+                            url: `/productos?categoria=${cat.toLowerCase()}`
+                        }))
+                        setQuickLinks([...STATIC_QUICK_LINKS, ...categoryLinks])
+                    }
+                }
+            } catch {
+                // Si falla, mantener solo los links estáticos
+            } finally {
+                setLoadingCategories(false)
+            }
+        }
+        loadCategories()
+    }, [organization.slug])
+
+    // --- Agregar un quick link como menu item ---
+    const handleAddQuickLink = (link: QuickLink) => {
+        if (menuItems.length >= MAX_MENU_ITEMS) return
+        // Verificar si ya existe
+        const exists = menuItems.some(
+            item => item.url === link.url && item.label === link.label
+        )
+        if (exists) return
+
+        setMenuItems([
+            ...menuItems,
+            {
+                id: Math.random().toString(36).substring(2, 9),
+                label: link.label,
+                url: link.url,
+                openInNewTab: false
+            }
+        ])
+    }
 
     // --- Menu item handlers ---
     const handleAddMenuItem = () => {
@@ -106,6 +164,11 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
         }
     }
 
+    // Verificar si un quick link ya fue agregado
+    const isQuickLinkAdded = (link: QuickLink) => {
+        return menuItems.some(item => item.url === link.url && item.label === link.label)
+    }
+
     return (
         <Card className="bg-white dark:bg-gray-900/50 border-gray-200 dark:border-gray-800">
             <CardHeader className="pb-6">
@@ -139,6 +202,55 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                         <p className="text-sm text-muted-foreground mt-1">
                             Configura los enlaces del menú principal de tu tienda
                         </p>
+                    </div>
+
+                    {/* Enlaces rápidos */}
+                    <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <Zap className="w-4 h-4 text-amber-500" />
+                            Enlaces rápidos
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {/* Páginas */}
+                            {STATIC_QUICK_LINKS.map((link) => (
+                                <button
+                                    key={link.url}
+                                    onClick={() => handleAddQuickLink(link)}
+                                    disabled={isQuickLinkAdded(link) || menuItems.length >= MAX_MENU_ITEMS}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <Plus className="w-3 h-3" />
+                                    {link.label}
+                                </button>
+                            ))}
+
+                            {/* Categorías de productos */}
+                            {!loadingCategories && quickLinks.length > STATIC_QUICK_LINKS.length && (
+                                <>
+                                    <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 self-center mx-1" />
+                                    {quickLinks.slice(STATIC_QUICK_LINKS.length).map((link) => (
+                                        <button
+                                            key={link.url}
+                                            onClick={() => handleAddQuickLink(link)}
+                                            disabled={isQuickLinkAdded(link) || menuItems.length >= MAX_MENU_ITEMS}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                            {link.label}
+                                        </button>
+                                    ))}
+                                </>
+                            )}
+
+                            {loadingCategories && (
+                                <span className="text-xs text-gray-400 self-center">Cargando categorías...</span>
+                            )}
+                        </div>
+                        {quickLinks.length > STATIC_QUICK_LINKS.length && (
+                            <p className="text-xs text-gray-400">
+                                Los enlaces <span className="text-blue-500">azules</span> son categorías de tus productos
+                            </p>
+                        )}
                     </div>
 
                     {/* Lista de items */}
@@ -224,14 +336,14 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                         ))}
                     </div>
 
-                    {/* Botón agregar */}
+                    {/* Botón agregar vacío */}
                     <button
                         onClick={handleAddMenuItem}
                         disabled={menuItems.length >= MAX_MENU_ITEMS}
                         className="w-full flex items-center justify-center gap-2 py-3 px-4 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                         <Plus className="w-4 h-4" />
-                        Agregar Enlace
+                        Agregar Enlace Personalizado
                         {menuItems.length >= MAX_MENU_ITEMS && (
                             <span className="text-xs text-gray-400 ml-1">(máx. {MAX_MENU_ITEMS})</span>
                         )}
@@ -239,7 +351,7 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
 
                     {/* Tip */}
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                        💡 Usa rutas relativas como <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">/productos</code> o URLs completas como <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">https://instagram.com/...</code>
+                        Usa rutas relativas como <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">/productos</code> o URLs completas como <code className="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">https://instagram.com/...</code>
                     </p>
                 </div>
 
