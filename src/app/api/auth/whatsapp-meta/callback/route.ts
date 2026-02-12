@@ -147,12 +147,21 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Suscribir webhook automáticamente para recibir mensajes
+        const webhookSubscribed = await client.subscribeWebhook(waba_id, tokenResponse.access_token)
+        if (!webhookSubscribed) {
+            console.warn(`[Meta Callback] Webhook subscription failed for WABA ${waba_id} (org: ${orgId}). Messages may not be received.`)
+        } else {
+            console.log(`[Meta Callback] Webhook subscribed for WABA ${waba_id}`)
+        }
+
         console.log(`[Meta Callback] WhatsApp Meta connected for org ${orgId}, phone: ${phoneNumber}`)
 
         return NextResponse.json({
             success: true,
             phone_number: phoneNumber,
             phone_number_display: phoneNumberDisplay,
+            webhook_subscribed: webhookSubscribed,
         })
     } catch (error) {
         console.error("[Meta Callback] Error:", error)
