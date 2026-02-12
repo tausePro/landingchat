@@ -61,10 +61,13 @@ export async function getStoreData(slug: string, limit?: number) {
         org.settings?.storefront?.template === 'real-estate'
     
     if (isRealEstate) {
-        const { data: props } = await supabase
+        // Usar service client para evitar restricciones RLS en acceso público (subdominios)
+        const serviceClient = createServiceClient()
+        const { data: props } = await serviceClient
             .from('properties')
             .select('*')
             .eq('organization_id', org.id)
+            .eq('status', 'active')
             .order('created_at', { ascending: false })
         
         properties = props || []
