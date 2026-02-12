@@ -8,6 +8,7 @@ interface TemplateRendererProps {
     template: string
     organization: any
     products: any[]
+    properties?: any[]
     pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
@@ -19,6 +20,7 @@ export function TemplateRenderer({
     template,
     organization,
     products,
+    properties = [],
     pages = [],
     primaryColor,
     heroSettings,
@@ -45,7 +47,7 @@ export function TemplateRenderer({
         case "services":
             return <ServicesTemplate {...templateProps} />
         case "real-estate":
-            return <RealEstateTemplate organization={organization} properties={products} />
+            return <RealEstateTemplate organization={organization} properties={properties} onStartChat={onStartChat} />
         default:
             return <MinimalTemplate {...templateProps} />
     }

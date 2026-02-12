@@ -28,6 +28,7 @@ interface StoreLayoutClientProps {
     slug: string
     organization: any
     products: any[]
+    properties?: any[]
     pages?: Array<{ id: string; slug: string; title: string }>
     children?: React.ReactNode
     hideNavigation?: boolean
@@ -35,7 +36,7 @@ interface StoreLayoutClientProps {
     initialIsSubdomain?: boolean
 }
 
-export function StoreLayoutClient({ slug, organization, products, pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, properties = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientIsSubdomain = useIsSubdomain()
@@ -211,6 +212,7 @@ export function StoreLayoutClient({ slug, organization, products, pages = [], ch
                         template={selectedTemplate}
                         organization={organization}
                         products={products}
+                        properties={properties}
                         pages={pages}
                         primaryColor={primaryColor}
                         heroSettings={heroSettings}

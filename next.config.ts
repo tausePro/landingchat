@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: '**.gravatar.com',
       },
+      {
+        protocol: 'https',
+        hostname: '**.arrendasoft.co',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.arrendasoft.com',
+      },
     ],
   },
   async headers() {

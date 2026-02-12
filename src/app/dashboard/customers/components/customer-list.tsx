@@ -1,232 +1,192 @@
 "use client"
 
-import { Customer, deleteCustomer } from "../actions"
-import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { type Customer } from "@/types/customer"
+import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { toast } from "sonner"
+import Link from "next/link"
+import { cn } from "@/lib/utils"
+import {
+    computeIntentScore,
+    getIntentScoreLabel,
+    getIntentScoreColor,
+} from "../lib/intent-score"
 
 interface CustomerListProps {
     customers: Customer[]
     isLoading?: boolean
 }
 
+const COP_FORMAT = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 0,
+})
+
 export function CustomerList({ customers, isLoading }: CustomerListProps) {
-    const router = useRouter()
-    const [deletingId, setDeletingId] = useState<string | null>(null)
-
-    const handleWhatsApp = (phone: string | null) => {
-        if (!phone) return
-        const cleanPhone = phone.replace(/\D/g, '')
-        window.open(`https://wa.me/${cleanPhone}`, '_blank')
-    }
-
-    const handleEmail = (email: string | null) => {
-        if (!email) return
-        window.open(`mailto:${email}`, '_blank')
-    }
-
-    const handleDelete = async (customerId: string, customerName: string) => {
-        if (!confirm(`¿Estás seguro de eliminar a ${customerName}? Esta acción no se puede deshacer.`)) {
-            return
-        }
-        setDeletingId(customerId)
-        const result = await deleteCustomer(customerId)
-        if (result.success) {
-            toast.success('Cliente eliminado correctamente')
-            router.refresh()
-        } else {
-            toast.error(result.error || 'Error al eliminar cliente')
-        }
-        setDeletingId(null)
-    }
-
     if (isLoading) {
-        return <div className="p-8 text-center">Cargando clientes...</div>
+        return <div className="p-8 text-center text-text-light-secondary dark:text-text-dark-secondary">Cargando clientes...</div>
     }
 
     if (customers.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-12 text-center border rounded-lg bg-slate-50 dark:bg-slate-900/50">
+            <div className="flex flex-col items-center justify-center p-12 text-center border rounded-xl bg-card-light dark:bg-card-dark border-border-light dark:border-border-dark">
                 <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-full mb-4">
                     <span className="material-symbols-outlined text-4xl text-slate-400">group</span>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">No tienes clientes aún</h3>
-                <p className="text-muted-foreground max-w-sm mb-6">
-                    Importa tu base de datos o espera a que lleguen desde el chat.
+                <h3 className="text-lg font-semibold mb-2 text-text-light-primary dark:text-text-dark-primary">
+                    No se encontraron clientes
+                </h3>
+                <p className="text-text-light-secondary dark:text-text-dark-secondary max-w-sm mb-6">
+                    Importa tu base de datos, crea un lead manualmente o espera a que lleguen desde el chat.
                 </p>
-                <Button>
-                    <span className="material-symbols-outlined mr-2">upload</span>
-                    Importar Clientes
-                </Button>
             </div>
         )
     }
 
     return (
         <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-hidden">
+            {/* Header de la tabla */}
+            <div className="px-6 py-3 border-b border-border-light dark:border-border-dark bg-background-light/50 dark:bg-background-dark/50">
+                <h3 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary">
+                    Lista de Clientes
+                    <span className="text-text-light-secondary dark:text-text-dark-secondary font-normal ml-2 text-xs">
+                        {customers.length} resultados
+                    </span>
+                </h3>
+            </div>
+
             <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-text-light-secondary dark:text-text-dark-secondary uppercase bg-background-light dark:bg-background-dark">
                         <tr>
-                            <th className="px-6 py-3" scope="col">Cliente</th>
-                            <th className="px-6 py-3" scope="col">Contacto</th>
-                            <th className="px-6 py-3" scope="col">Ubicación</th>
-                            <th className="px-6 py-3" scope="col">Categoría</th>
-                            <th className="px-6 py-3" scope="col">Compras</th>
+                            <th className="px-6 py-3" scope="col">Nombre del Cliente</th>
                             <th className="px-6 py-3" scope="col">Última Actividad</th>
+                            <th className="px-6 py-3" scope="col">Score de Intención</th>
+                            <th className="px-6 py-3" scope="col">Total Gastado</th>
                             <th className="px-6 py-3 text-right" scope="col">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {customers.map((customer) => (
-                            <tr key={customer.id} className="border-b border-border-light dark:border-border-dark hover:bg-background-light/50 dark:hover:bg-background-dark/50">
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-primary/20 rounded-full size-10 flex items-center justify-center shrink-0">
-                                            <span className="text-primary font-bold text-sm">
-                                                {customer.full_name?.substring(0, 2).toUpperCase() || "CL"}
+                        {customers.map((customer) => {
+                            const score = computeIntentScore({
+                                category: customer.category,
+                                total_orders: customer.total_orders,
+                                total_spent: customer.total_spent,
+                                last_interaction_at: customer.last_interaction_at,
+                            })
+
+                            const isRecentlyActive = customer.last_interaction_at
+                                && (Date.now() - new Date(customer.last_interaction_at).getTime()) < 5 * 60 * 1000
+
+                            const activityTime = customer.last_interaction_at
+                                ? formatDistanceToNow(new Date(customer.last_interaction_at), { addSuffix: false, locale: es })
+                                : formatDistanceToNow(new Date(customer.created_at), { addSuffix: false, locale: es })
+
+                            const activityLabel = customer.last_interaction_at
+                                ? "Última interacción"
+                                : "Registrado"
+
+                            return (
+                                <tr
+                                    key={customer.id}
+                                    className="border-b border-border-light dark:border-border-dark hover:bg-background-light/50 dark:hover:bg-background-dark/50 transition-colors"
+                                >
+                                    {/* Nombre del Cliente */}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative">
+                                                <div className="bg-primary/20 rounded-full size-10 flex items-center justify-center shrink-0">
+                                                    <span className="text-primary font-bold text-sm">
+                                                        {customer.full_name?.substring(0, 2).toUpperCase() || "CL"}
+                                                    </span>
+                                                </div>
+                                                {/* Indicador de actividad */}
+                                                <span className={cn(
+                                                    "absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white dark:border-slate-900",
+                                                    isRecentlyActive
+                                                        ? "bg-green-500"
+                                                        : "bg-gray-300 dark:bg-gray-600"
+                                                )} />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-text-light-primary dark:text-text-dark-primary">
+                                                    {customer.full_name || "Cliente Sin Nombre"}
+                                                </span>
+                                                <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary flex items-center gap-1">
+                                                    {customer.phone && (
+                                                        <>
+                                                            <span className="material-symbols-outlined text-[12px] text-green-600">call</span>
+                                                            {customer.phone}
+                                                        </>
+                                                    )}
+                                                    {!customer.phone && customer.email && (
+                                                        <>
+                                                            <span className="material-symbols-outlined text-[12px]">mail</span>
+                                                            {customer.email}
+                                                        </>
+                                                    )}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* Última Actividad */}
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm text-text-light-primary dark:text-text-dark-primary">
+                                                {activityLabel}
+                                            </span>
+                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                                                hace {activityTime}
                                             </span>
                                         </div>
+                                    </td>
+
+                                    {/* Score de Intención */}
+                                    <td className="px-6 py-4">
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                "text-xs font-semibold",
+                                                getIntentScoreColor(score)
+                                            )}
+                                        >
+                                            {getIntentScoreLabel(score)}
+                                            {score === "alta" && (
+                                                <span className="ml-1">🔥</span>
+                                            )}
+                                        </Badge>
+                                    </td>
+
+                                    {/* Total Gastado */}
+                                    <td className="px-6 py-4">
                                         <div className="flex flex-col">
-                                            <span className="font-medium text-text-light-primary dark:text-text-dark-primary">{customer.full_name || "Cliente Sin Nombre"}</span>
-                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">ID: {customer.id.substring(0, 8)}</span>
+                                            <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">
+                                                {COP_FORMAT.format(customer.total_spent || 0)}
+                                            </span>
+                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                                                {customer.total_orders || 0} órdenes
+                                            </span>
                                         </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-1">
-                                        {customer.phone && (
-                                            <div 
-                                                className="flex items-center gap-1.5 text-xs cursor-pointer hover:underline text-green-600" 
-                                                onClick={() => handleWhatsApp(customer.phone)}
-                                            >
-                                                <span className="material-symbols-outlined text-[14px]">call</span>
-                                                {customer.phone}
-                                            </div>
-                                        )}
-                                        {customer.email && (
-                                            <div 
-                                                className="flex items-center gap-1.5 text-xs text-text-light-secondary dark:text-text-dark-secondary cursor-pointer hover:underline"
-                                                onClick={() => handleEmail(customer.email)}
-                                            >
-                                                <span className="material-symbols-outlined text-[14px]">mail</span>
-                                                {customer.email}
-                                            </div>
-                                        )}
-                                        {!customer.phone && !customer.email && (
-                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">-</span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                        <span className="text-sm text-text-light-primary dark:text-text-dark-primary">{customer.address?.city || "-"}</span>
-                                        {customer.address?.neighborhood && (
-                                            <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">{customer.address.neighborhood}</span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    {customer.category ? (
-                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getCategoryColor(customer.category)}`}>
-                                            {getCategoryLabel(customer.category)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-text-light-secondary dark:text-text-dark-secondary text-xs">-</span>
-                                    )}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col">
-                                        <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(customer.total_spent || 0)}
-                                        </span>
-                                        <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary">{customer.total_orders || 0} órdenes</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-text-light-secondary dark:text-text-dark-secondary">
-                                    {customer.last_interaction_at
-                                        ? formatDistanceToNow(new Date(customer.last_interaction_at), { addSuffix: true, locale: es })
-                                        : formatDistanceToNow(new Date(customer.created_at), { addSuffix: true, locale: es })
-                                    }
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={deletingId === customer.id}>
-                                                <span className="sr-only">Abrir menú</span>
-                                                <span className="material-symbols-outlined">{deletingId === customer.id ? 'hourglass_empty' : 'more_vert'}</span>
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(customer.id)}>
-                                                <span className="material-symbols-outlined text-[16px] mr-2">content_copy</span>
-                                                Copiar ID
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            {customer.phone && (
-                                                <DropdownMenuItem onClick={() => handleWhatsApp(customer.phone)}>
-                                                    <span className="material-symbols-outlined text-[16px] mr-2 text-green-600">chat</span>
-                                                    WhatsApp
-                                                </DropdownMenuItem>
-                                            )}
-                                            {customer.email && (
-                                                <DropdownMenuItem onClick={() => handleEmail(customer.email)}>
-                                                    <span className="material-symbols-outlined text-[16px] mr-2">mail</span>
-                                                    Enviar Email
-                                                </DropdownMenuItem>
-                                            )}
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem 
-                                                className="text-red-600"
-                                                onClick={() => handleDelete(customer.id, customer.full_name || 'este cliente')}
-                                            >
-                                                <span className="material-symbols-outlined text-[16px] mr-2">delete</span>
-                                                Eliminar
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </td>
-                            </tr>
-                        ))}
+                                    </td>
+
+                                    {/* Acciones */}
+                                    <td className="px-6 py-4 text-right">
+                                        <Link
+                                            href={`/dashboard/chats/console?search=${encodeURIComponent(customer.full_name || customer.phone || "")}`}
+                                            className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                                        >
+                                            Ver Chats
+                                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                        </Link>
+                                    </td>
+                                </tr>
+                            )
+                        })}
                     </tbody>
                 </table>
             </div>
         </div>
     )
-}
-
-function getCategoryColor(category: string) {
-    const cat = category?.toLowerCase() || ''
-    if (cat.includes('vip') || cat.includes('fieles 4')) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-    if (cat.includes('fieles 3')) return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300'
-    if (cat.includes('fieles 2') || cat === 'recurrente') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-    if (cat.includes('fieles 1')) return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-    if (cat.includes('recuperar') || cat === 'riesgo' || cat === 'inactivo') return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300'
-    if (cat === 'nuevo') return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
-    return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-}
-
-function getCategoryLabel(category: string) {
-    const cat = category?.toLowerCase() || ''
-    if (cat.includes('vip') || cat.includes('fieles 4')) return 'VIP'
-    if (cat.includes('fieles 3')) return 'Fieles 3'
-    if (cat.includes('fieles 2')) return 'Fieles 2'
-    if (cat.includes('fieles 1')) return 'Fieles 1'
-    if (cat === 'recurrente') return 'Recurrente'
-    if (cat.includes('recuperar') || cat === 'riesgo') return 'A Recuperar'
-    if (cat === 'inactivo') return 'Inactivo'
-    if (cat === 'nuevo') return 'Nuevo'
-    return category.charAt(0).toUpperCase() + category.slice(1)
 }

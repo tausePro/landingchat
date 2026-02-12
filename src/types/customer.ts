@@ -102,6 +102,9 @@ export interface Customer {
 // Query Parameters
 // ============================================================================
 
+export type CustomerSegment = "all" | "whatsapp_leads" | "recurring" | "pending_followup"
+export type IntentScoreFilter = "alta" | "media" | "baja" | "riesgo"
+
 export interface GetCustomersParams {
   page?: number
   limit?: number
@@ -110,4 +113,29 @@ export interface GetCustomersParams {
   channel?: string
   zone?: string
   tags?: string[]
+  segment?: CustomerSegment
+  intentScores?: IntentScoreFilter[]
+}
+
+// ============================================================================
+// Customer Stats (KPIs + Segment Counts)
+// ============================================================================
+
+export interface CustomerStats {
+  totalLeadsThisMonth: number
+  leadsGrowthPercent: number
+  activeConversations: number
+  avgResponseTime: string
+  segments: {
+    all: number
+    whatsappLeads: number
+    recurringBuyers: number
+    pendingFollowUp: number
+  }
+  intentScoreCounts: {
+    alta: number
+    media: number
+    baja: number
+    riesgo: number
+  }
 }

@@ -10,7 +10,9 @@ import {
   type CreateCustomerInput,
   type UpdateCustomerInput,
   type GetCustomersParams,
+  type CustomerStats,
 } from "@/types/customer"
+import { computeIntentScore, type IntentScore } from "./lib/intent-score"
 
 // Re-export types for backward compatibility
 export type { Customer, GetCustomersParams, CreateCustomerInput }
@@ -32,7 +34,9 @@ export async function getCustomers({
   category,
   channel,
   zone,
-  tags
+  tags,
+  segment,
+  intentScores,
 }: GetCustomersParams): Promise<ActionResult<GetCustomersResult>> {
   try {
     const supabase = await createClient()
@@ -79,6 +83,17 @@ export async function getCustomers({
       query = query.contains("tags", tags)
     }
 
+    // Segment filters
+    if (segment && segment !== "all") {
+      if (segment === "whatsapp_leads") {
+        query = query.eq("acquisition_channel", "whatsapp")
+      } else if (segment === "recurring") {
+        query = query.in("category", ["recurrente", "vip", "fieles 1", "fieles 2", "fieles 3", "fieles 4"])
+      } else if (segment === "pending_followup") {
+        query = query.in("category", ["riesgo", "inactivo"])
+      }
+    }
+
     // Pagination
     const from = (page - 1) * limit
     const to = from + limit - 1
@@ -94,7 +109,7 @@ export async function getCustomers({
     // Procesar datos para calcular total_spent y total_orders
     const customersWithTotals = (data || []).map((customer: any) => {
       const orders = customer.orders || []
-      const completedOrders = orders.filter((o: any) => 
+      const completedOrders = orders.filter((o: any) =>
         o.status && !['cancelled', 'cancelado', 'refunded', 'reembolsado'].includes(o.status.toLowerCase())
       )
       return {
@@ -105,18 +120,183 @@ export async function getCustomers({
       }
     })
 
+    // Filtrar por intent score (post-fetch ya que es calculado)
+    let filteredCustomers = customersWithTotals
+    if (intentScores && intentScores.length > 0) {
+      filteredCustomers = customersWithTotals.filter((c: any) =>
+        intentScores.includes(computeIntentScore({
+          category: c.category,
+          total_orders: c.total_orders,
+          total_spent: c.total_spent,
+          last_interaction_at: c.last_interaction_at,
+        }))
+      )
+    }
+
     return {
       success: true,
       data: {
-        customers: customersWithTotals as Customer[],
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
+        customers: filteredCustomers as Customer[],
+        total: intentScores && intentScores.length > 0 ? filteredCustomers.length : (count || 0),
+        totalPages: intentScores && intentScores.length > 0
+          ? Math.ceil(filteredCustomers.length / limit)
+          : Math.ceil((count || 0) / limit)
       }
     }
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : "Unknown error fetching customers"
+    }
+  }
+}
+
+// ============================================================================
+// Stats Action (KPIs + Segments)
+// ============================================================================
+
+export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return { success: false, error: "No organization found" }
+    }
+
+    const orgId = profile.organization_id
+    const now = new Date()
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
+
+    // Queries en paralelo
+    const [
+      leadsThisMonth,
+      leadsLastMonth,
+      activeChats,
+      allCustomers,
+      whatsappLeads,
+      recurringBuyers,
+      pendingFollowUp,
+      customersForScore,
+    ] = await Promise.all([
+      // Total leads este mes
+      supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .gte("created_at", startOfMonth),
+
+      // Total leads mes anterior
+      supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .gte("created_at", startOfLastMonth)
+        .lte("created_at", endOfLastMonth),
+
+      // Conversaciones activas
+      supabase
+        .from("chats")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("status", "active"),
+
+      // Total clientes
+      supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId),
+
+      // Leads de WhatsApp
+      supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .eq("acquisition_channel", "whatsapp"),
+
+      // Compradores recurrentes
+      supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .in("category", ["recurrente", "vip", "fieles 1", "fieles 2", "fieles 3", "fieles 4"]),
+
+      // Pendiente seguimiento
+      supabase
+        .from("customers")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgId)
+        .in("category", ["riesgo", "inactivo"]),
+
+      // Todos los clientes para calcular intent scores
+      supabase
+        .from("customers")
+        .select("category, orders(id, total, status)")
+        .eq("organization_id", orgId),
+    ])
+
+    // Calcular growth
+    const thisMonthCount = leadsThisMonth.count || 0
+    const lastMonthCount = leadsLastMonth.count || 0
+    const growthPercent = lastMonthCount > 0
+      ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100)
+      : thisMonthCount > 0 ? 100 : 0
+
+    // Calcular intent score counts
+    const intentScoreCounts: CustomerStats["intentScoreCounts"] = {
+      alta: 0,
+      media: 0,
+      baja: 0,
+      riesgo: 0,
+    }
+
+    if (customersForScore.data) {
+      for (const customer of customersForScore.data) {
+        const orders = (customer as any).orders || []
+        const completedOrders = orders.filter((o: any) =>
+          o.status && !['cancelled', 'cancelado', 'refunded', 'reembolsado'].includes(o.status.toLowerCase())
+        )
+        const score = computeIntentScore({
+          category: customer.category,
+          total_orders: completedOrders.length,
+          total_spent: completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0),
+        })
+        intentScoreCounts[score]++
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        totalLeadsThisMonth: thisMonthCount,
+        leadsGrowthPercent: growthPercent,
+        activeConversations: activeChats.count || 0,
+        avgResponseTime: "2m",
+        segments: {
+          all: allCustomers.count || 0,
+          whatsappLeads: whatsappLeads.count || 0,
+          recurringBuyers: recurringBuyers.count || 0,
+          pendingFollowUp: pendingFollowUp.count || 0,
+        },
+        intentScoreCounts,
+      },
+    }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error fetching customer stats",
     }
   }
 }

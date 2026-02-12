@@ -43,6 +43,13 @@ const TEMPLATES = [
         description: "Optimizado para negocios basados en servicios",
         preview: "/templates/services-preview.png",
         features: ["Hero", "Lista de servicios", "Testimonios", "Contacto"]
+    },
+    {
+        id: "real-estate",
+        name: "Inmobiliaria",
+        description: "Diseñado para mostrar propiedades con filtros y búsqueda",
+        preview: "/templates/real-estate-preview.png",
+        features: ["Buscador", "Filtros por tipo/ciudad/precio", "Galería", "Detalle de propiedad"]
     }
 ]
 

@@ -184,6 +184,17 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Guardar mensaje del usuario en la base de datos
+        await supabase.from("messages").insert({
+            chat_id: currentChatId,
+            sender_type: "user",
+            content: message,
+            metadata: {
+                source: "web_chat",
+                ...(currentProductId ? { product_context: currentProductId } : {})
+            }
+        })
+
         // Process message with AI agent
         const result = await processMessage({
             message,

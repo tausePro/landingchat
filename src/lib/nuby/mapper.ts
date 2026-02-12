@@ -3,9 +3,14 @@ import type { NubyProperty } from './types'
 /**
  * Convierte una propiedad de Nuby al formato de la BD local
  */
-export function mapNubyPropertyToLocal(nubyProperty: NubyProperty, organizationId: string) {
+export function mapNubyPropertyToLocal(
+  nubyProperty: NubyProperty,
+  organizationId: string,
+  baseUrl: string
+) {
   // Parsear coordenadas "lat:lng" a formato text "lat,lng"
-  const [lat, lng] = nubyProperty.coordenadas.split(':').map(parseFloat)
+  const coordinatesRaw = nubyProperty.coordenadas || ''
+  const [lat, lng] = coordinatesRaw.split(':').map(parseFloat)
   const coordinatesText = lat && lng ? `${lat},${lng}` : null
   
   // Extraer características numéricas
@@ -14,6 +19,10 @@ export function mapNubyPropertyToLocal(nubyProperty: NubyProperty, organizationI
   const floor = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('piso'))?.valor
   const age = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('antigüedad'))?.valor
   const parking = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('garaje') || f.descripcion.toLowerCase().includes('parqueadero'))?.valor
+
+  const rawStatus = String(nubyProperty.estado ?? '').trim().toLowerCase()
+  // Activo por defecto — solo marcar inactivo si explícitamente dice inactivo/0/false
+  const isInactive = rawStatus === '0' || rawStatus === 'false' || rawStatus === 'inactivo' || rawStatus === 'inactive' || rawStatus === 'deshabilitado'
 
   return {
     organization_id: organizationId,
@@ -25,7 +34,7 @@ export function mapNubyPropertyToLocal(nubyProperty: NubyProperty, organizationI
     description: nubyProperty.observaciones || '',
     property_type: nubyProperty.tipo_servicio_id,
     property_class: nubyProperty.clase_inmueble,
-    status: nubyProperty.estado === '1' ? 'active' : 'inactive',
+    status: isInactive ? 'inactive' : 'active',
     
     price_rent: parseFloat(nubyProperty.valor_arriendo1) || null,
     price_sale: parseFloat(nubyProperty.valor_venta1) || null,
@@ -55,11 +64,21 @@ export function mapNubyPropertyToLocal(nubyProperty: NubyProperty, organizationI
       valueText: f.valor_texto
     })),
     
-    images: nubyProperty.imagenes.map(img => ({
-      position: parseInt(img.posicion),
-      url: img.imagen,
-      size: img.size
-    })),
+    images: nubyProperty.imagenes.map(img => {
+      const rawUrl = img.imagen || ''
+      let normalizedUrl = rawUrl
+
+      if (rawUrl && !rawUrl.startsWith('http')) {
+        normalizedUrl = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
+        normalizedUrl = `${baseUrl}${normalizedUrl}`
+      }
+
+      return {
+        position: parseInt(img.posicion),
+        url: normalizedUrl,
+        size: img.size
+      }
+    }),
     
     videos: nubyProperty.videos.map(v => ({
       position: parseInt(v.posicion),
