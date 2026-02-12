@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -31,14 +31,20 @@ interface Property {
 interface RealEstateTemplateProps {
   organization: any
   properties: Property[]
+  onStartChat?: (productId?: string) => void
 }
 
-export function RealEstateTemplate({ organization, properties }: RealEstateTemplateProps) {
+export function RealEstateTemplate({ organization, properties, onStartChat }: RealEstateTemplateProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [propertyType, setPropertyType] = useState<string>("all")
   const [city, setCity] = useState<string>("all")
   const [minPrice, setMinPrice] = useState<string>("")
   const [maxPrice, setMaxPrice] = useState<string>("")
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   const cities = useMemo(() => {
     const uniqueCities = [...new Set(properties.map(p => p.city).filter(Boolean))]
@@ -111,28 +117,32 @@ export function RealEstateTemplate({ organization, properties }: RealEstateTempl
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="md:col-span-2"
                 />
-                <Select value={propertyType} onValueChange={setPropertyType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {propertyTypes.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={city} onValueChange={setCity}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Ciudad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {cities.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isMounted && (
+                  <Select value={propertyType} onValueChange={setPropertyType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {propertyTypes.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {isMounted && (
+                  <Select value={city} onValueChange={setCity}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ciudad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {cities.map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
           </div>
@@ -228,7 +238,7 @@ export function RealEstateTemplate({ organization, properties }: RealEstateTempl
           <p className="text-xl text-blue-100 mb-8">
             Chatea con nuestro asistente virtual para encontrar tu propiedad ideal
           </p>
-          <Button size="lg" variant="secondary">
+          <Button size="lg" variant="secondary" onClick={() => onStartChat?.()}>
             Iniciar Chat
           </Button>
         </div>
@@ -248,19 +258,25 @@ function PropertyCard({
   formatFeatures: (property: Property) => string
   organizationSlug: string
 }) {
-  const mainImage = property.images.find(img => img.position === 1) || property.images[0]
+  const images = property.images || []
+  const mainImage = images.find(img => img.position === 1) || images[0]
   const price = property.price_rent || property.price_sale || 0
   const priceLabel = property.price_rent ? 'Arriendo' : 'Venta'
+  const isValidImageUrl = (url?: string | null) =>
+    Boolean(url && url.startsWith('http') && !url.includes('arrendasoft.coimg'))
+  const shouldBypassOptimization = (url?: string | null) =>
+    Boolean(url && url.includes('arrendasoft.co'))
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       <div className="relative aspect-[4/3] bg-gray-200">
-        {mainImage ? (
+        {isValidImageUrl(mainImage?.url) ? (
           <Image
-            src={mainImage.url}
+            src={mainImage!.url}
             alt={property.title}
             fill
             className="object-cover"
+            unoptimized={shouldBypassOptimization(mainImage?.url)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -295,7 +311,7 @@ function PropertyCard({
               {formatPrice(price)}
             </p>
           </div>
-          <Link href={`/chat/${organizationSlug}?property=${property.external_code}`}>
+          <Link href={`/store/${organizationSlug}/property/${property.external_code}`}>
             <Button size="sm">
               Ver más
             </Button>

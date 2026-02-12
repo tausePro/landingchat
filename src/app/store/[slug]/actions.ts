@@ -54,7 +54,23 @@ export async function getStoreData(slug: string, limit?: number) {
         .eq("is_published", true)
         .order("title", { ascending: true })
 
-    // 5. Get WhatsApp phone from connected instance if not in settings
+    // 5. Fetch Properties for real estate organizations
+    let properties: any[] = []
+    const isRealEstate = org.settings?.industry === 'real_estate' || 
+        org.storefront_template === 'real-estate' ||
+        org.settings?.storefront?.template === 'real-estate'
+    
+    if (isRealEstate) {
+        const { data: props } = await supabase
+            .from('properties')
+            .select('*')
+            .eq('organization_id', org.id)
+            .order('created_at', { ascending: false })
+        
+        properties = props || []
+    }
+
+    // 6. Get WhatsApp phone from connected instance if not in settings
     let whatsappPhone = org.settings?.whatsapp?.phone || org.settings?.contact?.phone
     if (!whatsappPhone) {
         const { data: whatsappInstance } = await supabase
@@ -85,7 +101,8 @@ export async function getStoreData(slug: string, limit?: number) {
     return {
         organization: enrichedOrg,
         products: products || [],
-        pages: pages || []
+        pages: pages || [],
+        properties
     }
 }
 
