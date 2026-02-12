@@ -20,6 +20,9 @@ export function mapNubyPropertyToLocal(
   const age = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('antigüedad'))?.valor
   const parking = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('garaje') || f.descripcion.toLowerCase().includes('parqueadero'))?.valor
 
+  const rawStatus = String(nubyProperty.estado ?? '').trim().toLowerCase()
+  const isActiveStatus = rawStatus === '1' || rawStatus === 'true' || rawStatus === 'activo' || rawStatus === 'active'
+
   return {
     organization_id: organizationId,
     external_id: nubyProperty.codigo,
@@ -30,7 +33,7 @@ export function mapNubyPropertyToLocal(
     description: nubyProperty.observaciones || '',
     property_type: nubyProperty.tipo_servicio_id,
     property_class: nubyProperty.clase_inmueble,
-    status: nubyProperty.estado === '1' ? 'active' : 'inactive',
+    status: isActiveStatus ? 'active' : 'inactive',
     
     price_rent: parseFloat(nubyProperty.valor_arriendo1) || null,
     price_sale: parseFloat(nubyProperty.valor_venta1) || null,
