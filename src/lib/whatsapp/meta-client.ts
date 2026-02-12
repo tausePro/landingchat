@@ -232,6 +232,69 @@ export class MetaCloudClient {
   }
 
   // ============================================
+  // Webhook Subscription
+  // ============================================
+
+  /**
+   * Suscribe el webhook de la app para recibir mensajes de WhatsApp.
+   * Usa el WABA ID para suscribir la app al objeto whatsapp_business_account.
+   *
+   * Docs: https://developers.facebook.com/docs/whatsapp/embedded-signup/manage-accounts#subscribe
+   */
+  async subscribeWebhook(
+    wabaId: string,
+    token: string
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/${wabaId}/subscribed_apps`,
+        {
+          method: "POST",
+          headers: this.getHeaders(token),
+        }
+      )
+
+      if (!response.ok) {
+        const error = await this.parseError(response)
+        console.error(`[MetaCloudClient] Error subscribing webhook for WABA ${wabaId}:`, error)
+        return false
+      }
+
+      const data = await response.json()
+      console.log(`[MetaCloudClient] Webhook subscribed for WABA ${wabaId}:`, data)
+      return data.success === true
+    } catch (error) {
+      console.error("[MetaCloudClient] Error subscribing webhook:", error)
+      return false
+    }
+  }
+
+  /**
+   * Verifica si la app está suscrita al webhook del WABA.
+   */
+  async checkWebhookSubscription(
+    wabaId: string,
+    token: string
+  ): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/${wabaId}/subscribed_apps`,
+        {
+          method: "GET",
+          headers: this.getHeaders(token),
+        }
+      )
+
+      if (!response.ok) return false
+
+      const data = await response.json()
+      return (data.data?.length || 0) > 0
+    } catch {
+      return false
+    }
+  }
+
+  // ============================================
   // OAuth / Token Exchange
   // ============================================
 
