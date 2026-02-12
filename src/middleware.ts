@@ -10,6 +10,29 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Cache en memoria para custom domains → slug (TTL 5 min)
+// Evita queries repetitivas a Supabase por cada request
+const domainCache = new Map<string, { slug: string | null; timestamp: number }>()
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutos
+
+function getCachedSlug(domain: string): string | null | undefined {
+    const cached = domainCache.get(domain)
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return cached.slug
+    }
+    domainCache.delete(domain)
+    return undefined // undefined = no en cache, null = dominio no encontrado
+}
+
+function setCachedSlug(domain: string, slug: string | null) {
+    domainCache.set(domain, { slug, timestamp: Date.now() })
+    // Limpiar cache si crece demasiado
+    if (domainCache.size > 100) {
+        const oldest = [...domainCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)
+        for (let i = 0; i < 50; i++) domainCache.delete(oldest[i][0])
+    }
+}
+
 export async function middleware(request: NextRequest) {
     const hostname = request.headers.get('host') || ''
     const pathname = request.nextUrl.pathname
@@ -21,6 +44,7 @@ export async function middleware(request: NextRequest) {
     if (
         pathname.startsWith('/_next') ||      // Archivos internos de Next.js
         pathname.startsWith('/api') ||        // Rutas de API
+        pathname.startsWith('/ingest') ||     // PostHog analytics proxy — NO debe consultar BD
         pathname.startsWith('/dashboard') ||  // Panel de administración
         pathname.startsWith('/admin') ||      // Panel de superadmin
         pathname.startsWith('/auth') ||       // Callbacks de autenticación
@@ -83,38 +107,35 @@ export async function middleware(request: NextRequest) {
     else {
         // Primero verificar si es un dominio personalizado
         if (!hostname.includes('landingchat.co')) {
-            // Es un dominio personalizado, buscar en la base de datos
-            console.log(`[MIDDLEWARE] Custom domain detected: ${hostname}`)
-            try {
-                const supabase = createServerClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                    {
-                        cookies: {
-                            getAll() { return [] },
-                            setAll() { }
+            // Es un dominio personalizado — primero buscar en cache
+            const cachedSlug = getCachedSlug(hostname)
+            if (cachedSlug !== undefined) {
+                slug = cachedSlug
+            } else {
+                try {
+                    const supabase = createServerClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                        {
+                            cookies: {
+                                getAll() { return [] },
+                                setAll() { }
+                            }
                         }
-                    }
-                )
+                    )
 
-                console.log(`[MIDDLEWARE] Querying database for custom_domain: ${hostname}`)
-                const { data: org, error } = await supabase
-                    .from("organizations")
-                    .select("slug")
-                    .eq("custom_domain", hostname)
-                    .single()
+                    const { data: org } = await supabase
+                        .from("organizations")
+                        .select("slug")
+                        .eq("custom_domain", hostname)
+                        .single()
 
-                console.log(`[MIDDLEWARE] Database query result:`, { org, error })
-
-                if (org) {
-                    slug = org.slug
-                    console.log(`[MIDDLEWARE] Found organization slug: ${slug}`)
-                } else {
-                    console.log(`[MIDDLEWARE] No organization found for domain: ${hostname}`)
+                    slug = org?.slug || null
+                    setCachedSlug(hostname, slug)
+                } catch (error) {
+                    console.error("[MIDDLEWARE] Error checking custom domain:", error)
+                    setCachedSlug(hostname, null) // Cachear error para no reintentar
                 }
-            } catch (error) {
-                console.error("[MIDDLEWARE] Error checking custom domain:", error)
-                // En caso de error, continuar con la lógica normal
             }
         } else {
             // Es un subdominio de landingchat.co
@@ -415,7 +436,7 @@ async function handleAuth(request: NextRequest) {
 // ============================================
 export const config = {
     matcher: [
-        // Excluir archivos estáticos y assets
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'
+        // Excluir archivos estáticos, assets y analytics proxy
+        '/((?!_next/static|_next/image|ingest|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'
     ],
 }
