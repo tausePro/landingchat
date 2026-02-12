@@ -50,16 +50,36 @@ export async function syncNubyProperties(
       throw new Error('Integración con Nuby no está conectada')
     }
 
-    // 2. Desencriptar credenciales
+    // 2. Obtener credenciales (intentar desencriptar token, si falla usar directo)
+    let token = integration.credentials.token || ''
+    try {
+      // Si el token parece encriptado (formato hex:hex:hex), desencriptar
+      if (token.includes(':') && token.split(':').length === 3) {
+        token = decrypt(token)
+      }
+    } catch (e) {
+      console.warn('No se pudo desencriptar token, usando valor directo')
+      token = integration.credentials.token || ''
+    }
+
     const credentials: NubyCredentials = {
       instance: integration.credentials.instance,
       clientId: integration.credentials.clientId,
       secretKey: integration.credentials.secretKey,
-      token: decrypt(integration.credentials.token)
+      token
     }
+
+    console.log('Nuby sync credentials:', {
+      instance: credentials.instance,
+      clientId: credentials.clientId ? '***' : 'EMPTY',
+      secretKey: credentials.secretKey ? '***' : 'EMPTY',
+      token: token ? `${token.substring(0, 10)}...` : 'EMPTY',
+      tokenLength: token.length
+    })
 
     // 3. Crear cliente de Nuby
     const nubyClient = new NubyClient(credentials)
+    const baseUrl = `https://${credentials.instance}.arrendasoft.co`
 
     // 4. Crear log de sincronización
     const { data: syncLog, error: logError } = await supabase
@@ -103,7 +123,7 @@ export async function syncNubyProperties(
     // 6. Procesar cada propiedad
     for (const nubyProperty of nubyProperties) {
       try {
-        const localProperty = mapNubyPropertyToLocal(nubyProperty, organizationId)
+        const localProperty = mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
 
         // Verificar si ya existe
         const { data: existing } = await supabase

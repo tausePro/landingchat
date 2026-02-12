@@ -3,9 +3,14 @@ import type { NubyProperty } from './types'
 /**
  * Convierte una propiedad de Nuby al formato de la BD local
  */
-export function mapNubyPropertyToLocal(nubyProperty: NubyProperty, organizationId: string) {
+export function mapNubyPropertyToLocal(
+  nubyProperty: NubyProperty,
+  organizationId: string,
+  baseUrl: string
+) {
   // Parsear coordenadas "lat:lng" a formato text "lat,lng"
-  const [lat, lng] = nubyProperty.coordenadas.split(':').map(parseFloat)
+  const coordinatesRaw = nubyProperty.coordenadas || ''
+  const [lat, lng] = coordinatesRaw.split(':').map(parseFloat)
   const coordinatesText = lat && lng ? `${lat},${lng}` : null
   
   // Extraer características numéricas
@@ -55,11 +60,21 @@ export function mapNubyPropertyToLocal(nubyProperty: NubyProperty, organizationI
       valueText: f.valor_texto
     })),
     
-    images: nubyProperty.imagenes.map(img => ({
-      position: parseInt(img.posicion),
-      url: img.imagen,
-      size: img.size
-    })),
+    images: nubyProperty.imagenes.map(img => {
+      const rawUrl = img.imagen || ''
+      let normalizedUrl = rawUrl
+
+      if (rawUrl && !rawUrl.startsWith('http')) {
+        normalizedUrl = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
+        normalizedUrl = `${baseUrl}${normalizedUrl}`
+      }
+
+      return {
+        position: parseInt(img.posicion),
+        url: normalizedUrl,
+        size: img.size
+      }
+    }),
     
     videos: nubyProperty.videos.map(v => ({
       position: parseInt(v.posicion),
