@@ -74,7 +74,8 @@ export async function POST(request: Request) {
     // Limpiar instancia: quitar .arrendasoft.co si el usuario lo incluyó
     let instance = integration.credentials.instance.trim().toLowerCase()
     instance = instance.replace('.arrendasoft.co', '').replace('.arrendasoft', '')
-    const url = `https://${instance}.arrendasoft.co/service/v2/public/properties`
+    const baseUrl = `https://${instance}.arrendasoft.co`
+    const url = `${baseUrl}/service/v2/public/properties`
 
     console.log('Fetching with https native:', url)
     console.log('Token:', token ? `${token.substring(0, 10)}...` : 'NO TOKEN')
@@ -87,7 +88,11 @@ export async function POST(request: Request) {
     let updated = 0
 
     for (const nubyProperty of properties) {
-      const localProperty = mapNubyPropertyToLocal(nubyProperty, profile.organization_id)
+      const localProperty = mapNubyPropertyToLocal(
+        nubyProperty,
+        profile.organization_id,
+        baseUrl
+      )
 
       const { data: existing } = await serviceClient
         .from('properties')
