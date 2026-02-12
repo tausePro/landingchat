@@ -15,6 +15,18 @@ export async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname
 
     // ============================================
+    // MODO EMERGENCIA: Cortar TODO el tráfico a Supabase
+    // Cambiar a false cuando la BD esté healthy
+    // ============================================
+    const EMERGENCY_MAINTENANCE = true
+    if (EMERGENCY_MAINTENANCE && !pathname.startsWith('/_next') && !pathname.includes('.')) {
+        return new NextResponse(
+            `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LandingChat - Mantenimiento</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;color:#334155}.c{text-align:center;padding:2rem;max-width:500px}h1{font-size:1.5rem;margin-bottom:1rem;color:#0f172a}p{color:#64748b;line-height:1.6;margin-bottom:.5rem}.icon{font-size:3rem;margin-bottom:1rem}</style></head><body><div class="c"><div class="icon">🔧</div><h1>Estamos en mantenimiento</h1><p>Estamos mejorando nuestros servidores para brindarte un mejor servicio.</p><p>Volveremos en unos minutos.</p></div></body></html>`,
+            { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '300' } }
+        )
+    }
+
+    // ============================================
     // RUTAS QUE NUNCA SE REESCRIBEN
     // Estas rutas pasan directo al manejador de autenticación
     // ============================================
