@@ -1013,7 +1013,7 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
     // Obtener datos de envío confirmados (del chat metadata o del último confirm_shipping)
     const { data: chat } = await supabase
         .from("chats")
-        .select("metadata, customer_id")
+        .select("metadata, customer_id, channel")
         .eq("id", context.chatId)
         .single()
 
@@ -1047,7 +1047,7 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
     // Obtener organización para el slug
     const { data: organization } = await supabase
         .from("organizations")
-        .select("id, slug, name")
+        .select("id, slug, name, custom_domain")
         .eq("id", context.organizationId)
         .single()
 
@@ -1064,11 +1064,15 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
             order_number: orderNumber,
             items: cart.items.map((item: any) => ({
                 product_id: item.product_id,
+                product_name: item.name,
                 name: item.name,
+                unit_price: item.price,
+                total_price: item.price * item.quantity,
                 price: item.price,
                 quantity: item.quantity,
                 image_url: item.image_url
             })),
+            source_channel: chat?.channel || 'web',
             subtotal: subtotal,
             shipping_cost: shippingCost,
             total: total,
@@ -1105,17 +1109,21 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
         .update({ status: "converted", converted_order_id: order.id })
         .eq("id", cart.id)
 
-    // Generar link de pago según el método
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    // Generar link de pago usando custom_domain o subdominio (igual que la web)
+    const customDomain = organization?.custom_domain
+    const storeBaseUrl = customDomain
+        ? `https://${customDomain}`
+        : `https://${organization.slug}.landingchat.co`
+
     let paymentUrl: string
     let paymentInstructions: string
 
     if (payment_method === "manual" || payment_method === "contraentrega") {
-        paymentUrl = `${baseUrl}/store/${organization.slug}/order/${order.id}`
+        paymentUrl = `${storeBaseUrl}/order/${order.id}`
         paymentInstructions = "Tu pedido ha sido registrado. Puedes pagar contra entrega o por transferencia."
     } else {
         // ePayco o Wompi - redirigir a página de checkout
-        paymentUrl = `${baseUrl}/store/${organization.slug}/checkout/epayco/${order.id}`
+        paymentUrl = `${storeBaseUrl}/checkout/epayco/${order.id}`
         paymentInstructions = "Haz clic en el enlace para completar tu pago de forma segura."
     }
 
