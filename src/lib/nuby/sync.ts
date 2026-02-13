@@ -120,48 +120,25 @@ export async function syncNubyProperties(
       throw new Error(`Error al conectar con Nuby: ${fetchError.message}`)
     }
 
-    // 6. Procesar cada propiedad
-    for (const nubyProperty of nubyProperties) {
-      try {
-        const localProperty = mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
+    // 6. Procesar propiedades en batch con upsert (1 query en vez de 2N)
+    const mappedProperties = nubyProperties.map((nubyProperty: any) =>
+      mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
+    )
 
-        // Verificar si ya existe
-        const { data: existing } = await supabase
-          .from('properties')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('external_id', localProperty.external_id)
-          .single()
+    if (mappedProperties.length > 0) {
+      const { data: upserted, error: upsertError } = await supabase
+        .from('properties')
+        .upsert(mappedProperties, {
+          onConflict: 'organization_id,external_id',
+          ignoreDuplicates: false
+        })
+        .select('id')
 
-        if (existing) {
-          // Actualizar
-          const { error: updateError } = await supabase
-            .from('properties')
-            .update(localProperty)
-            .eq('id', existing.id)
-
-          if (updateError) {
-            result.itemsFailed++
-            result.errors.push(`Error updating ${localProperty.external_code}: ${updateError.message}`)
-          } else {
-            result.itemsUpdated++
-          }
-        } else {
-          // Crear
-          const { error: insertError } = await supabase
-            .from('properties')
-            .insert(localProperty)
-
-          if (insertError) {
-            result.itemsFailed++
-            result.errors.push(`Error creating ${localProperty.external_code}: ${insertError.message}`)
-          } else {
-            result.itemsCreated++
-          }
-        }
-      } catch (error: any) {
-        result.itemsFailed++
-        result.errors.push(`Error processing property: ${error.message}`)
+      if (upsertError) {
+        result.itemsFailed = mappedProperties.length
+        result.errors.push(`Batch upsert error: ${upsertError.message}`)
+      } else {
+        result.itemsUpdated = upserted?.length || mappedProperties.length
       }
     }
 
