@@ -14,6 +14,7 @@ const importSchema = z.object({
 interface ImportResult {
     success: boolean
     imported: number
+    updated: number
     skipped: number
     total: number
     errors: string[]
@@ -43,10 +44,12 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
         consumerSecret: formData.get("consumerSecret"),
     }
 
+    const updateExisting = formData.get("updateExisting") === "true"
+
     // 1. Validate Input
     const validated = importSchema.safeParse(rawData)
     if (!validated.success) {
-        return { success: false, imported: 0, skipped: 0, total: 0, errors: [validated.error.issues[0]?.message || "Datos inválidos"] }
+        return { success: false, imported: 0, updated: 0, skipped: 0, total: 0, errors: [validated.error.issues[0]?.message || "Datos inválidos"] }
     }
 
     const { url, consumerKey, consumerSecret } = validated.data
@@ -98,6 +101,7 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
                 return {
                     success: false,
                     imported: 0,
+                    updated: 0,
                     skipped: 0,
                     total: 0,
                     errors: [`Error ${response.status}: ${response.statusText}. ${text.substring(0, 100)}`]
@@ -107,7 +111,7 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
             const wcProducts = await response.json()
 
             if (!Array.isArray(wcProducts)) {
-                return { success: false, imported: 0, skipped: 0, total: 0, errors: ["Formato de respuesta inválido de WooCommerce"] }
+                return { success: false, imported: 0, updated: 0, skipped: 0, total: 0, errors: ["Formato de respuesta inválido de WooCommerce"] }
             }
 
             allProducts = [...allProducts, ...wcProducts]
@@ -128,6 +132,7 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
         return {
             success: false,
             imported: 0,
+            updated: 0,
             skipped: 0,
             total: 0,
             errors: [`Error de conexión: ${errorMessage}`]
@@ -136,12 +141,13 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
 
     // 4. Process products
     let importedCount = 0
+    let updatedCount = 0
     let skippedCount = 0
 
     for (const p of allProducts) {
         try {
             // Check if product already exists by NAME or SKU
-            let existing = null
+            let existing: { id: string } | null = null
 
             // First check by SKU if available
             if (p.sku) {
@@ -165,8 +171,57 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
                 existing = data
             }
 
-            if (existing) {
+            if (existing && !updateExisting) {
                 skippedCount++
+                continue
+            }
+
+            // Actualizar producto existente
+            if (existing && updateExisting) {
+                const slug = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+                // Re-procesar imágenes (ahora hasta 20)
+                const imagePromises = (p.images || []).slice(0, 20).map(async (img) => {
+                    try {
+                        return await uploadImageToSupabase(img.src, organizationId, slug)
+                    } catch {
+                        return img.src
+                    }
+                })
+                const processedImages = await Promise.all(imagePromises)
+                const validImages = processedImages.filter(Boolean) as string[]
+
+                const variants = p.attributes?.map((attr) => ({
+                    type: attr.name,
+                    values: attr.options,
+                    hasPriceAdjustment: false,
+                    priceAdjustments: {}
+                })) || []
+
+                const price = parseFloat(p.regular_price || p.price || "0")
+                const salePrice = p.sale_price ? parseFloat(p.sale_price) : null
+                const categories = p.categories?.map(c => c.name) || ["General"]
+
+                const { error: updateError } = await supabase
+                    .from("products")
+                    .update({
+                        description: p.description || p.short_description || "",
+                        price,
+                        sale_price: salePrice,
+                        stock: p.stock_quantity ?? 0,
+                        image_url: validImages[0] || null,
+                        images: validImages,
+                        categories,
+                        variants,
+                        is_active: p.status === 'publish',
+                    })
+                    .eq("id", existing.id)
+
+                if (updateError) {
+                    errors.push(`${p.name}: ${updateError.message}`)
+                } else {
+                    updatedCount++
+                }
                 continue
             }
 
@@ -175,7 +230,7 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
             const slug = `${slugBase}-${Math.random().toString(36).substring(7)}`
 
             // Map Images & Upload
-            const imagePromises = (p.images || []).slice(0, 5).map(async (img, index) => {
+            const imagePromises = (p.images || []).slice(0, 20).map(async (img, index) => {
                 try {
                     return await uploadImageToSupabase(img.src, organizationId, slug)
                 } catch {
@@ -237,6 +292,7 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
     return {
         success: true,
         imported: importedCount,
+        updated: updatedCount,
         skipped: skippedCount,
         total: allProducts.length,
         errors

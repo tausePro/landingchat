@@ -250,6 +250,160 @@ export async function deleteProduct(id: string): Promise<ActionResult<void>> {
 }
 
 /**
+ * Obtiene todas las categorías únicas de los productos de la organización
+ * con el conteo de productos por categoría.
+ * No requiere tabla dedicada — agrega desde el campo JSONB categories.
+ */
+export async function getOrganizationCategories(): Promise<
+  ActionResult<Array<{ name: string; productCount: number }>>
+> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return failure("Unauthorized")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No organization found")
+
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("categories")
+      .eq("organization_id", profile.organization_id)
+
+    if (error) return failure(error.message)
+
+    // Agregar categorías únicas con conteo
+    const categoryMap = new Map<string, number>()
+    for (const product of products || []) {
+      const cats = (product.categories as string[]) || []
+      for (const cat of cats) {
+        categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1)
+      }
+    }
+
+    const categories = Array.from(categoryMap.entries())
+      .map(([name, productCount]) => ({ name, productCount }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+
+    return success(categories)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error fetching categories")
+  }
+}
+
+/**
+ * Renombra una categoría en todos los productos de la organización.
+ * Actualiza el array JSONB in-place.
+ */
+export async function renameCategory(
+  oldName: string,
+  newName: string
+): Promise<ActionResult<{ updated: number }>> {
+  try {
+    if (!oldName.trim() || !newName.trim()) return failure("Nombres inválidos")
+    if (oldName === newName) return failure("El nombre es igual")
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return failure("Unauthorized")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No organization found")
+
+    // Buscar productos que tienen esta categoría
+    const { data: products, error: fetchError } = await supabase
+      .from("products")
+      .select("id, categories")
+      .eq("organization_id", profile.organization_id)
+      .contains("categories", [oldName])
+
+    if (fetchError) return failure(fetchError.message)
+
+    let updated = 0
+    for (const product of products || []) {
+      const cats = (product.categories as string[]) || []
+      const newCats = cats.map(c => c === oldName ? newName : c)
+      // Eliminar duplicados en caso de que newName ya exista
+      const uniqueCats = [...new Set(newCats)]
+
+      const { error } = await supabase
+        .from("products")
+        .update({ categories: uniqueCats })
+        .eq("id", product.id)
+
+      if (!error) updated++
+    }
+
+    revalidatePath("/dashboard/products")
+    revalidatePath("/dashboard/categories")
+    return success({ updated })
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error renaming category")
+  }
+}
+
+/**
+ * Elimina una categoría de todos los productos de la organización.
+ */
+export async function deleteCategory(
+  categoryName: string
+): Promise<ActionResult<{ updated: number }>> {
+  try {
+    if (!categoryName.trim()) return failure("Nombre inválido")
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return failure("Unauthorized")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No organization found")
+
+    const { data: products, error: fetchError } = await supabase
+      .from("products")
+      .select("id, categories")
+      .eq("organization_id", profile.organization_id)
+      .contains("categories", [categoryName])
+
+    if (fetchError) return failure(fetchError.message)
+
+    let updated = 0
+    for (const product of products || []) {
+      const cats = (product.categories as string[]) || []
+      const newCats = cats.filter(c => c !== categoryName)
+
+      const { error } = await supabase
+        .from("products")
+        .update({ categories: newCats })
+        .eq("id", product.id)
+
+      if (!error) updated++
+    }
+
+    revalidatePath("/dashboard/products")
+    revalidatePath("/dashboard/categories")
+    return success({ updated })
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error deleting category")
+  }
+}
+
+/**
  * Uploads a product image to storage
  * @param file - Image file to upload
  * @param organizationId - Organization UUID
