@@ -7,7 +7,7 @@
 
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
-import { sendWhatsAppMessage, sendWhatsAppImage } from "@/lib/whatsapp"
+import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
 
 export type MessageChannel = "web" | "whatsapp" | "instagram" | "messenger"
 
@@ -146,15 +146,7 @@ async function sendWhatsAppResponse(
         if (actions && actions.length > 0) {
             for (const action of actions) {
                 try {
-                    if (action.type === "show_product") {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const product = action.data.product as any
-                        const imageUrl = product?.image_url || (Array.isArray(product?.images) ? product.images[0] : undefined)
-                        if (imageUrl && product?.name) {
-                            const caption = `${product.name}\n💰 $${Number(product.price || 0).toLocaleString()}`
-                            await sendWhatsAppImage(organizationId, phoneNumber, imageUrl, caption)
-                        }
-                    }
+                    await sendRichWhatsAppAction(organizationId, phoneNumber, action)
                 } catch (richError) {
                     // No fallar si el mensaje rico no se envía
                     console.error("[Unified Messaging] Error sending rich message:", richError)
@@ -163,6 +155,92 @@ async function sendWhatsAppResponse(
         }
     } catch (error) {
         console.error("[Unified Messaging] Error sending WhatsApp response:", error)
+    }
+}
+
+/**
+ * Envía un mensaje rico por WhatsApp basado en la acción del AI
+ */
+async function sendRichWhatsAppAction(
+    organizationId: string,
+    phoneNumber: string,
+    action: { type: string; data: Record<string, unknown> }
+): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = action.data as any
+
+    switch (action.type) {
+        case "show_product": {
+            const product = data.product
+            if (!product) return
+
+            // Enviar imagen del producto
+            const imageUrl = product.image_url || (Array.isArray(product.images) ? product.images[0] : undefined)
+            if (imageUrl) {
+                const caption = `${product.name}\n💰 *$${Number(product.price || 0).toLocaleString()}*`
+                await sendWhatsAppImage(organizationId, phoneNumber, imageUrl, caption)
+            }
+
+            // Enviar botones de acción
+            await sendWhatsAppButtons(
+                organizationId,
+                phoneNumber,
+                `¿Qué deseas hacer con *${product.name}*?`,
+                [
+                    { id: `add_${product.id}`, title: "Agregar al carrito" },
+                    { id: `more_options`, title: "Ver más opciones" },
+                ]
+            )
+            break
+        }
+
+        case "search_products": {
+            const products = data.products
+            if (!Array.isArray(products) || products.length < 2) return
+
+            // Enviar lista interactiva con los productos encontrados
+            await sendWhatsAppList(
+                organizationId,
+                phoneNumber,
+                `Encontré ${products.length} producto${products.length > 1 ? "s" : ""} para ti 🔍`,
+                "Ver productos",
+                [{
+                    title: "Resultados",
+                    rows: products.slice(0, 10).map((p: { id: string; name: string; price: number }) => ({
+                        id: `product_${p.id}`,
+                        title: p.name.substring(0, 24),
+                        description: `$${Number(p.price || 0).toLocaleString()}`
+                    }))
+                }]
+            )
+            break
+        }
+
+        case "add_to_cart": {
+            await sendWhatsAppButtons(
+                organizationId,
+                phoneNumber,
+                "Producto agregado al carrito ✅",
+                [
+                    { id: "continue_shopping", title: "Seguir comprando" },
+                    { id: "checkout", title: "Ir a pagar 💳" },
+                ]
+            )
+            break
+        }
+
+        case "render_checkout_summary": {
+            await sendWhatsAppButtons(
+                organizationId,
+                phoneNumber,
+                "Resumen de tu pedido listo 📋",
+                [
+                    { id: "confirm_checkout", title: "Confirmar datos" },
+                    { id: "modify_cart", title: "Modificar carrito" },
+                ]
+            )
+            break
+        }
     }
 }
 
