@@ -1,11 +1,19 @@
 /**
- * Webhook Handler para Meta WhatsApp Cloud API
+ * Webhook Handler para Meta Platform (WhatsApp, Instagram DM, Messenger)
  *
  * Maneja:
  * - GET: Verificación de webhook (challenge)
  * - POST: Mensajes entrantes y actualizaciones de estado
  *
- * Documentación: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks
+ * Soporta tres tipos de object:
+ * - whatsapp_business_account: WhatsApp Cloud API
+ * - instagram: Instagram DM
+ * - page: Facebook Messenger
+ *
+ * Documentación:
+ * - WhatsApp: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks
+ * - Instagram: https://developers.facebook.com/docs/instagram-api/guides/messaging
+ * - Messenger: https://developers.facebook.com/docs/messenger-platform/webhooks
  */
 
 import { NextRequest, NextResponse } from "next/server"
@@ -15,11 +23,15 @@ import type { MetaWebhookPayload, MetaWebhookMessage, MetaWebhookValue } from "@
 import {
     findOrCreateCustomer,
     findOrCreateChat,
+    findOrCreateCustomerBySocialId,
+    findOrCreateSocialChat,
     checkConversationLimit,
     logWebhook,
     updateWebhookLog,
     verifyMetaSignature,
 } from "@/lib/whatsapp/webhook-utils"
+import type { MetaSocialWebhookPayload, MetaSocialWebhookMessaging } from "@/lib/messaging/meta-social-types"
+import { findSocialChannelByPageId } from "@/lib/messaging/meta-social-client"
 import { logger } from "@/lib/logger"
 
 const log = logger("webhooks/whatsapp-meta")
@@ -92,68 +104,19 @@ export async function POST(request: NextRequest) {
             log.warn("No signature header received")
         }
 
-        const body = JSON.parse(bodyText) as MetaWebhookPayload
-
-        // Verificar que es un evento de WhatsApp Business Account
-        if (body.object !== "whatsapp_business_account") {
-            log.info("Ignoring non-WhatsApp event", { object: body.object })
-            return NextResponse.json({ received: true })
-        }
+        const body = JSON.parse(bodyText)
 
         const supabase = createServiceClient()
+        const headers: Record<string, string> = {}
+        request.headers.forEach((v, k) => { headers[k] = v })
 
-        // Procesar cada entry
-        for (const entry of body.entry) {
-            for (const change of entry.changes) {
-                if (change.field !== "messages") continue
-
-                const value = change.value
-                const phoneNumberId = value.metadata.phone_number_id
-
-                // Log del webhook
-                const headers: Record<string, string> = {}
-                request.headers.forEach((v, k) => { headers[k] = v })
-                await logWebhook(supabase, "whatsapp-meta", "messages", phoneNumberId, body, headers)
-
-                // Buscar instancia por meta_phone_number_id
-                const instance = await findInstanceByMetaPhoneNumberId(phoneNumberId)
-
-                if (!instance) {
-                    log.error("No instance found for phone_number_id", { phoneNumberId })
-                    await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, "warning", "Instance not found")
-                    continue
-                }
-
-                let processingResult: "success" | "warning" | "error" = "success"
-                let errorMessage: string | undefined
-
-                try {
-                    // Procesar mensajes entrantes
-                    if (value.messages && value.messages.length > 0) {
-                        await handleIncomingMessages(supabase, instance.organization_id, value)
-                    }
-
-                    // Procesar actualizaciones de estado
-                    if (value.statuses && value.statuses.length > 0) {
-                        await handleStatusUpdates(supabase, value)
-                    }
-
-                    // Procesar errores
-                    if (value.errors && value.errors.length > 0) {
-                        for (const error of value.errors) {
-                            log.error("Error from Meta", { code: error.code, title: error.title, message: error.message })
-                        }
-                        processingResult = "warning"
-                        errorMessage = value.errors.map(e => `${e.code}: ${e.title}`).join(", ")
-                    }
-                } catch (processingError) {
-                    processingResult = "error"
-                    errorMessage = processingError instanceof Error ? processingError.message : String(processingError)
-                    log.error("Processing error", { error: errorMessage })
-                }
-
-                await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, processingResult, errorMessage)
-            }
+        // Rutear según el tipo de plataforma
+        if (body.object === "whatsapp_business_account") {
+            await handleWhatsAppWebhook(supabase, body as MetaWebhookPayload, headers)
+        } else if (body.object === "instagram" || body.object === "page") {
+            await handleSocialWebhook(supabase, body as MetaSocialWebhookPayload, headers)
+        } else {
+            log.info("Ignoring unknown event type", { object: body.object })
         }
 
         // Meta requiere respuesta 200 rápida
@@ -166,7 +129,218 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================
-// Message handling
+// WhatsApp webhook handler
+// ============================================
+
+async function handleWhatsAppWebhook(
+    supabase: SupabaseClient,
+    body: MetaWebhookPayload,
+    headers: Record<string, string>
+) {
+    for (const entry of body.entry) {
+        for (const change of entry.changes) {
+            if (change.field !== "messages") continue
+
+            const value = change.value
+            const phoneNumberId = value.metadata.phone_number_id
+
+            await logWebhook(supabase, "whatsapp-meta", "messages", phoneNumberId, body, headers)
+
+            const instance = await findInstanceByMetaPhoneNumberId(phoneNumberId)
+
+            if (!instance) {
+                log.error("No instance found for phone_number_id", { phoneNumberId })
+                await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, "warning", "Instance not found")
+                continue
+            }
+
+            let processingResult: "success" | "warning" | "error" = "success"
+            let errorMessage: string | undefined
+
+            try {
+                if (value.messages && value.messages.length > 0) {
+                    await handleIncomingMessages(supabase, instance.organization_id, value)
+                }
+
+                if (value.statuses && value.statuses.length > 0) {
+                    await handleStatusUpdates(supabase, value)
+                }
+
+                if (value.errors && value.errors.length > 0) {
+                    for (const error of value.errors) {
+                        log.error("Error from Meta", { code: error.code, title: error.title, message: error.message })
+                    }
+                    processingResult = "warning"
+                    errorMessage = value.errors.map(e => `${e.code}: ${e.title}`).join(", ")
+                }
+            } catch (processingError) {
+                processingResult = "error"
+                errorMessage = processingError instanceof Error ? processingError.message : String(processingError)
+                log.error("Processing error", { error: errorMessage })
+            }
+
+            await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, processingResult, errorMessage)
+        }
+    }
+}
+
+// ============================================
+// Instagram / Messenger webhook handler
+// ============================================
+
+async function handleSocialWebhook(
+    supabase: SupabaseClient,
+    body: MetaSocialWebhookPayload,
+    headers: Record<string, string>
+) {
+    const platform = body.object === "instagram" ? "instagram" : "messenger"
+
+    for (const entry of body.entry) {
+        const pageId = entry.id
+
+        await logWebhook(supabase, platform, "messaging", pageId, body, headers)
+
+        // Buscar canal social por page ID
+        const channel = await findSocialChannelByPageId(pageId, platform)
+
+        if (!channel) {
+            log.error(`No ${platform} channel found for page_id`, { pageId })
+            await updateWebhookLog(supabase, platform, pageId, "warning", "Channel not found")
+            continue
+        }
+
+        let processingResult: "success" | "warning" | "error" = "success"
+        let errorMessage: string | undefined
+
+        try {
+            for (const messaging of entry.messaging || []) {
+                await handleSocialMessage(supabase, channel.organization_id, platform, messaging)
+            }
+        } catch (processingError) {
+            processingResult = "error"
+            errorMessage = processingError instanceof Error ? processingError.message : String(processingError)
+            log.error(`${platform} processing error`, { error: errorMessage })
+        }
+
+        await updateWebhookLog(supabase, platform, pageId, processingResult, errorMessage)
+    }
+}
+
+/**
+ * Procesa un mensaje individual de Instagram DM o Messenger
+ */
+async function handleSocialMessage(
+    supabase: SupabaseClient,
+    organizationId: string,
+    platform: "instagram" | "messenger",
+    messaging: MetaSocialWebhookMessaging
+) {
+    // Ignorar ecos (mensajes que nosotros enviamos)
+    if (messaging.message?.is_echo) return
+
+    // Ignorar read receipts
+    if (messaging.read) return
+
+    // Ignorar reacciones
+    if (messaging.reaction) {
+        log.debug(`${platform} reaction received`, { emoji: messaging.reaction.emoji })
+        return
+    }
+
+    const senderId = messaging.sender.id
+    let messageText = ""
+
+    if (messaging.message) {
+        const msg = messaging.message
+        if (msg.text) {
+            messageText = msg.text
+        } else if (msg.attachments && msg.attachments.length > 0) {
+            const attachment = msg.attachments[0]
+            switch (attachment.type) {
+                case "image":
+                    messageText = "[Imagen recibida]"
+                    break
+                case "video":
+                    messageText = "[Video recibido]"
+                    break
+                case "audio":
+                    messageText = "[Audio recibido]"
+                    break
+                case "story_mention":
+                    messageText = "Me mencionaste en tu historia"
+                    break
+                case "share":
+                    messageText = "[Publicación compartida]"
+                    break
+                default:
+                    messageText = `[${attachment.type} recibido]`
+            }
+        } else if (msg.quick_reply) {
+            messageText = msg.quick_reply.payload
+        }
+    } else if (messaging.postback) {
+        // Postback de botón
+        messageText = messaging.postback.payload || messaging.postback.title
+    } else if (messaging.referral) {
+        messageText = `Hola, vengo de ${messaging.referral.source}`
+    }
+
+    if (!messageText) {
+        log.debug(`${platform} message without extractable text, skipping`)
+        return
+    }
+
+    log.info(`${platform} message received`, { from: senderId, preview: messageText.substring(0, 50) })
+
+    // Buscar o crear cliente por social ID
+    const customer = await findOrCreateCustomerBySocialId(supabase, organizationId, platform, senderId)
+
+    // Verificar límite de conversaciones
+    const canContinue = await checkConversationLimit(supabase, organizationId)
+    if (!canContinue) {
+        log.warn("Conversation limit reached", { orgId: organizationId })
+        return
+    }
+
+    // Buscar o crear chat
+    const chat = await findOrCreateSocialChat(supabase, organizationId, customer.id, platform, senderId)
+
+    // Guardar mensaje
+    await supabase.from("messages").insert({
+        chat_id: chat.id,
+        sender_type: "user",
+        content: messageText,
+        metadata: {
+            social_message_id: messaging.message?.mid || messaging.postback?.mid,
+            platform_user_id: senderId,
+            platform,
+            message_type: messaging.message ? "message" : messaging.postback ? "postback" : "other",
+        },
+    })
+
+    // Procesar con agente IA
+    log.info(`Processing ${platform} message with AI agent`, { chatId: chat.id })
+    const { processIncomingMessage } = await import("@/lib/messaging/unified")
+    const result = await processIncomingMessage({
+        channel: platform,
+        chatId: chat.id,
+        content: messageText,
+        metadata: {
+            social_message_id: messaging.message?.mid,
+            platform_user_id: senderId,
+            platform,
+        },
+    })
+
+    if (result.success) {
+        log.info(`${platform} AI response sent`, { chatId: chat.id })
+    } else {
+        log.error(`${platform} AI processing failed`, { chatId: chat.id, error: result.error })
+    }
+}
+
+// ============================================
+// WhatsApp message handling
 // ============================================
 
 async function handleIncomingMessages(

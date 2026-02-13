@@ -22,6 +22,10 @@ export function CustomerJourney({ sourceChannel, chatId, utmData }: CustomerJour
                 return { icon: 'chat', label: 'Chat Conversacional', color: 'text-blue-500 bg-blue-50' }
             case 'whatsapp':
                 return { icon: 'smartphone', label: 'WhatsApp', color: 'text-green-500 bg-green-50' }
+            case 'instagram':
+                return { icon: 'photo_camera', label: 'Instagram DM', color: 'text-pink-500 bg-pink-50' }
+            case 'messenger':
+                return { icon: 'forum', label: 'Facebook Messenger', color: 'text-indigo-500 bg-indigo-50' }
             default:
                 return { icon: 'language', label: 'Web Directa', color: 'text-gray-500 bg-gray-50' }
         }

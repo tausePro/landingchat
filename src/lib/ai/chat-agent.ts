@@ -177,13 +177,19 @@ REGLAS DE FORMATO WHATSAPP:
 - Si el cliente quiere comprar, guíalo paso a paso por texto
 `
         } else if (channel === "instagram" || channel === "messenger") {
+            const channelName = channel === "instagram" ? "Instagram DM" : "Facebook Messenger"
             systemPrompt += `
-CANAL: Estás respondiendo por ${channel === "instagram" ? "Instagram DM" : "Facebook Messenger"}.
-REGLAS DE FORMATO:
-- Mensajes cortos y casuales
-- Usa emojis de forma natural
-- NO uses markdown complejo
-- Links directos para pagos
+CANAL: Estás respondiendo por ${channelName}.
+REGLAS DE FORMATO ${channelName.toUpperCase()}:
+- Mensajes CORTOS y conversacionales (máximo 2-3 párrafos)
+- Tono casual y cercano, como hablar con un amigo
+- Usa emojis de forma natural para dar vida al mensaje
+- NO uses markdown: nada de **negrita**, _cursiva_, [links](url), ## títulos
+- Para listas usa: 1. 2. 3. o viñetas con emoji (✨, 🌿, etc.)
+- Los links de pago envíalos como URL directa (se hacen clickeables automáticamente)
+- NO digas "mira la tarjeta del producto" — no hay tarjetas visuales aquí
+- Si el cliente quiere comprar, guíalo paso a paso por texto
+- ${channel === "instagram" ? "Puedes referenciar stories o posts si el cliente los menciona" : "Si el cliente viene de un anuncio de Facebook, reconócelo"}
 `
         }
 

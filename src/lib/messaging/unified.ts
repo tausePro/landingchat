@@ -8,6 +8,7 @@
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
+import { sendSocialMessage, sendSocialImage, sendSocialQuickReplies } from "@/lib/messaging/meta-social-client"
 
 export type MessageChannel = "web" | "whatsapp" | "instagram" | "messenger"
 
@@ -95,6 +96,8 @@ export async function processIncomingMessage(
         // Enviar respuesta según el canal
         if (message.channel === "whatsapp") {
             await sendWhatsAppResponse(chat.organization_id, message.chatId, result.response, result.actions)
+        } else if (message.channel === "instagram" || message.channel === "messenger") {
+            await sendSocialResponse(chat.organization_id, message.chatId, message.channel, result.response, result.actions)
         }
         // Para web, la respuesta se maneja en el frontend via polling/websockets
 
@@ -245,6 +248,142 @@ async function sendRichWhatsAppAction(
 }
 
 /**
+ * Envía una respuesta por Instagram DM o Messenger.
+ * Usa el Meta Social Client para enviar mensajes.
+ * Si hay actions del AI, envía mensajes ricos adaptados al canal.
+ */
+async function sendSocialResponse(
+    organizationId: string,
+    chatId: string,
+    platform: "instagram" | "messenger",
+    response: string,
+    actions?: Array<{ type: string; data: Record<string, unknown> }>
+): Promise<void> {
+    try {
+        const supabase = await createServiceClient()
+
+        // Obtener el social user ID del chat
+        const { data: chat } = await supabase
+            .from("chats")
+            .select("whatsapp_chat_id, metadata")
+            .eq("id", chatId)
+            .single()
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const recipientId = chat?.whatsapp_chat_id || (chat?.metadata as any)?.platform_user_id
+
+        if (!recipientId) {
+            console.error(`[Unified Messaging] No recipient ID in ${platform} chat:`, chatId)
+            return
+        }
+
+        // Enviar respuesta de texto principal
+        await sendSocialMessage(organizationId, platform, recipientId, response)
+
+        // Enviar mensajes ricos basados en las acciones del AI
+        if (actions && actions.length > 0) {
+            for (const action of actions) {
+                try {
+                    await sendRichSocialAction(organizationId, platform, recipientId, action)
+                } catch (richError) {
+                    console.error(`[Unified Messaging] Error sending ${platform} rich message:`, richError)
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`[Unified Messaging] Error sending ${platform} response:`, error)
+    }
+}
+
+/**
+ * Envía un mensaje rico por Instagram DM o Messenger basado en la acción del AI.
+ * Instagram soporta quick replies e imágenes.
+ * Messenger soporta templates genéricos, quick replies e imágenes.
+ */
+async function sendRichSocialAction(
+    organizationId: string,
+    platform: "instagram" | "messenger",
+    recipientId: string,
+    action: { type: string; data: Record<string, unknown> }
+): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = action.data as any
+
+    switch (action.type) {
+        case "show_product": {
+            const product = data.product
+            if (!product) return
+
+            // Enviar imagen del producto
+            const imageUrl = product.image_url || (Array.isArray(product.images) ? product.images[0] : undefined)
+            if (imageUrl) {
+                const caption = `${product.name}\n\u{1F4B0} $${Number(product.price || 0).toLocaleString()}`
+                await sendSocialImage(organizationId, platform, recipientId, imageUrl, caption)
+            }
+
+            // Quick replies para acciones
+            await sendSocialQuickReplies(
+                organizationId,
+                platform,
+                recipientId,
+                `\u00BFQu\u00E9 deseas hacer con ${product.name}?`,
+                [
+                    { id: `add_${product.id}`, title: "Agregar al carrito" },
+                    { id: "more_options", title: "Ver m\u00E1s opciones" },
+                ]
+            )
+            break
+        }
+
+        case "search_products": {
+            const products = data.products
+            if (!Array.isArray(products) || products.length < 2) return
+
+            // Quick replies con nombres de productos
+            await sendSocialQuickReplies(
+                organizationId,
+                platform,
+                recipientId,
+                `Encontr\u00E9 ${products.length} producto${products.length > 1 ? "s" : ""} \u{1F50D}`,
+                products.slice(0, 10).map((p: { id: string; name: string }) => ({
+                    id: `product_${p.id}`,
+                    title: p.name.substring(0, 20),
+                }))
+            )
+            break
+        }
+
+        case "add_to_cart": {
+            await sendSocialQuickReplies(
+                organizationId,
+                platform,
+                recipientId,
+                "Producto agregado al carrito \u2705",
+                [
+                    { id: "continue_shopping", title: "Seguir comprando" },
+                    { id: "checkout", title: "Ir a pagar \u{1F4B3}" },
+                ]
+            )
+            break
+        }
+
+        case "render_checkout_summary": {
+            await sendSocialQuickReplies(
+                organizationId,
+                platform,
+                recipientId,
+                "Resumen de tu pedido listo \u{1F4CB}",
+                [
+                    { id: "confirm_checkout", title: "Confirmar datos" },
+                    { id: "modify_cart", title: "Modificar carrito" },
+                ]
+            )
+            break
+        }
+    }
+}
+
+/**
  * Identifica o crea un cliente basado en su información de contacto
  */
 export async function identifyCustomer(
@@ -341,6 +480,8 @@ export async function sendResponse(
         // Enviar por el canal correspondiente
         if (chat.channel === "whatsapp") {
             await sendWhatsAppResponse(chat.organization_id, conversationId, response)
+        } else if (chat.channel === "instagram" || chat.channel === "messenger") {
+            await sendSocialResponse(chat.organization_id, conversationId, chat.channel, response)
         }
 
         return true
