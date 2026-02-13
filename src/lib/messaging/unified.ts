@@ -59,6 +59,20 @@ export async function processIncomingMessage(
             agentId = defaultAgent?.id
         }
 
+        // Fallback: si no hay agente default, buscar cualquier bot disponible
+        if (!agentId) {
+            const { data: anyAgent } = await supabase
+                .from("agents")
+                .select("id")
+                .eq("organization_id", chat.organization_id)
+                .eq("status", "available")
+                .eq("type", "bot")
+                .limit(1)
+                .single()
+
+            agentId = anyAgent?.id
+        }
+
         if (!agentId) {
             return {
                 success: false,
