@@ -12,6 +12,7 @@ import type {
   MetaSendTextPayload,
   MetaSendMediaPayload,
   MetaSendTemplatePayload,
+  MetaSendInteractivePayload,
   MetaMediaType,
   MetaBusinessProfile,
   MetaPhoneNumber,
@@ -117,6 +118,83 @@ export class MetaCloudClient {
         },
         components,
       },
+    }
+
+    return this.sendMessageWithRetry(phoneNumberId, token, payload)
+  }
+
+  /**
+   * Envía un mensaje interactivo con botones de respuesta rápida (máximo 3)
+   */
+  async sendInteractiveButtons(
+    phoneNumberId: string,
+    token: string,
+    to: string,
+    body: string,
+    buttons: Array<{ id: string; title: string }>,
+    header?: string,
+    footer?: string
+  ): Promise<MetaSendMessageResponse> {
+    const payload: MetaSendInteractivePayload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        ...(header ? { header: { type: "text", text: header } } : {}),
+        body: { text: body },
+        ...(footer ? { footer: { text: footer } } : {}),
+        action: {
+          buttons: buttons.slice(0, 3).map(b => ({
+            type: "reply",
+            reply: { id: b.id, title: b.title.substring(0, 20) }
+          }))
+        }
+      }
+    }
+
+    return this.sendMessageWithRetry(phoneNumberId, token, payload)
+  }
+
+  /**
+   * Envía un mensaje interactivo tipo lista (máximo 10 items)
+   */
+  async sendInteractiveList(
+    phoneNumberId: string,
+    token: string,
+    to: string,
+    body: string,
+    buttonText: string,
+    sections: Array<{
+      title: string
+      rows: Array<{ id: string; title: string; description?: string }>
+    }>,
+    header?: string,
+    footer?: string
+  ): Promise<MetaSendMessageResponse> {
+    const payload: MetaSendInteractivePayload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "list",
+        ...(header ? { header: { type: "text", text: header } } : {}),
+        body: { text: body },
+        ...(footer ? { footer: { text: footer } } : {}),
+        action: {
+          button: buttonText.substring(0, 20),
+          sections: sections.map(s => ({
+            title: s.title.substring(0, 24),
+            rows: s.rows.slice(0, 10).map(r => ({
+              id: r.id,
+              title: r.title.substring(0, 24),
+              ...(r.description ? { description: r.description.substring(0, 72) } : {})
+            }))
+          }))
+        }
+      }
     }
 
     return this.sendMessageWithRetry(phoneNumberId, token, payload)
@@ -353,7 +431,7 @@ export class MetaCloudClient {
   private async sendMessageWithRetry(
     phoneNumberId: string,
     token: string,
-    payload: MetaSendTextPayload | MetaSendMediaPayload | MetaSendTemplatePayload | Record<string, unknown>,
+    payload: MetaSendTextPayload | MetaSendMediaPayload | MetaSendTemplatePayload | MetaSendInteractivePayload | Record<string, unknown>,
     maxRetries = 3
   ): Promise<MetaSendMessageResponse> {
     let lastError: Error | null = null

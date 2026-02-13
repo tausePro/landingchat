@@ -8,6 +8,9 @@
 // Provider (punto de entrada principal)
 export {
   sendWhatsAppMessage,
+  sendWhatsAppImage,
+  sendWhatsAppButtons,
+  sendWhatsAppList,
   getMetaWhatsAppConfig,
   findInstanceByMetaPhoneNumberId,
 } from "./provider"

@@ -12,6 +12,7 @@ interface ProcessMessageInput {
     agentId: string
     customerId?: string
     currentProductId?: string
+    channel?: "web" | "whatsapp" | "instagram" | "messenger"
 }
 
 interface ProcessMessageOutput {
@@ -159,6 +160,73 @@ REGLAS CRÍTICAS DE INVENTARIO:
 5. Verifica siempre el stock disponible antes de prometer un producto.
 `
 
+        // Add channel-specific instructions
+        const channel = input.channel || "web"
+        if (channel === "whatsapp") {
+            systemPrompt += `
+CANAL: Estás respondiendo por WhatsApp.
+REGLAS DE FORMATO WHATSAPP:
+- Mensajes CORTOS y directos (máximo 3-4 párrafos)
+- Usa emojis con moderación para hacer el mensaje amigable
+- Usa formato nativo de WhatsApp: *negrita*, _cursiva_, ~tachado~
+- NO uses markdown estándar: nada de **doble asterisco**, [links](url), ## títulos
+- Para listas usa: 1. 2. 3. o • viñetas simples
+- Los links de pago envíalos como URL directa (WhatsApp los hace clickeables automáticamente)
+- NO digas "mira la tarjeta del producto" ni "haz clic en el botón" — no hay tarjetas visuales aquí
+- Resalta nombres de productos con *negrita* y precios con *negrita*
+- Si el cliente quiere comprar, guíalo paso a paso por texto
+`
+        } else if (channel === "instagram" || channel === "messenger") {
+            systemPrompt += `
+CANAL: Estás respondiendo por ${channel === "instagram" ? "Instagram DM" : "Facebook Messenger"}.
+REGLAS DE FORMATO:
+- Mensajes cortos y casuales
+- Usa emojis de forma natural
+- NO uses markdown complejo
+- Links directos para pagos
+`
+        }
+
+        // Load cross-channel context (recent interactions from other channels)
+        let crossChannelContext = ""
+        if (input.customerId) {
+            const { data: otherChats } = await supabase
+                .from("chats")
+                .select("id, channel, updated_at")
+                .eq("customer_id", input.customerId)
+                .neq("id", input.chatId)
+                .order("updated_at", { ascending: false })
+                .limit(3)
+
+            if (otherChats && otherChats.length > 0) {
+                // Cargar últimos mensajes de otros canales
+                const recentChannelMessages: string[] = []
+                for (const otherChat of otherChats) {
+                    const { data: recentMsgs } = await supabase
+                        .from("messages")
+                        .select("content, sender_type, created_at")
+                        .eq("chat_id", otherChat.id)
+                        .order("created_at", { ascending: false })
+                        .limit(3)
+
+                    if (recentMsgs && recentMsgs.length > 0) {
+                        const channelLabel = otherChat.channel === "web" ? "web chat" : otherChat.channel
+                        const summary = recentMsgs.reverse().map(m =>
+                            `${m.sender_type === "user" ? "Cliente" : "Agente"}: ${m.content.substring(0, 100)}`
+                        ).join("\n")
+                        recentChannelMessages.push(`[${channelLabel} - ${new Date(otherChat.updated_at).toLocaleDateString()}]\n${summary}`)
+                    }
+                }
+
+                if (recentChannelMessages.length > 0) {
+                    crossChannelContext = `
+CONTEXTO CROSS-CHANNEL (interacciones recientes del cliente en otros canales):
+${recentChannelMessages.join("\n\n")}
+INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viendo un producto en la web, puedes mencionarlo. No repitas información que ya se le dio.`
+                }
+            }
+        }
+
         // Add customer and cart context to system prompt
         let fullSystemPrompt = systemPrompt
         if (customer) {
@@ -169,6 +237,10 @@ REGLAS CRÍTICAS DE INVENTARIO:
 
         if (cart) {
             fullSystemPrompt += "\n\n" + buildCartContext(cart)
+        }
+
+        if (crossChannelContext) {
+            fullSystemPrompt += "\n\n" + crossChannelContext
         }
 
         // 8. Prepare message history

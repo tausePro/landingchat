@@ -7,10 +7,12 @@
 
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
-import { sendWhatsAppMessage } from "@/lib/whatsapp"
+import { sendWhatsAppMessage, sendWhatsAppImage } from "@/lib/whatsapp"
+
+export type MessageChannel = "web" | "whatsapp" | "instagram" | "messenger"
 
 interface IncomingMessage {
-    channel: "web" | "whatsapp"
+    channel: MessageChannel
     chatId: string
     content: string
     metadata?: Record<string, unknown>
@@ -87,11 +89,12 @@ export async function processIncomingMessage(
             organizationId: chat.organization_id,
             agentId: agentId,
             customerId: chat.customer_id,
+            channel: message.channel,
         })
 
         // Enviar respuesta según el canal
         if (message.channel === "whatsapp") {
-            await sendWhatsAppResponse(chat.organization_id, message.chatId, result.response)
+            await sendWhatsAppResponse(chat.organization_id, message.chatId, result.response, result.actions)
         }
         // Para web, la respuesta se maneja en el frontend via polling/websockets
 
@@ -110,12 +113,14 @@ export async function processIncomingMessage(
 
 /**
  * Envía una respuesta por WhatsApp
- * Usa el provider agnóstico que decide entre Meta Cloud API o Evolution API
+ * Usa el provider agnóstico que decide entre Meta Cloud API o Evolution API.
+ * Si hay actions del AI (show_product, etc.), envía mensajes ricos adicionales.
  */
 async function sendWhatsAppResponse(
     organizationId: string,
     chatId: string,
-    response: string
+    response: string,
+    actions?: Array<{ type: string; data: Record<string, unknown> }>
 ): Promise<void> {
     try {
         const supabase = await createServiceClient()
@@ -134,12 +139,28 @@ async function sendWhatsAppResponse(
             return
         }
 
-        console.log("[Unified Messaging] Sending WhatsApp message to:", phoneNumber)
-
-        // El provider decide automáticamente si usar Meta Cloud API o Evolution API
+        // Enviar respuesta de texto principal
         await sendWhatsAppMessage(organizationId, phoneNumber, response)
 
-        console.log("[Unified Messaging] WhatsApp message sent successfully to:", phoneNumber)
+        // Enviar mensajes ricos basados en las acciones del AI
+        if (actions && actions.length > 0) {
+            for (const action of actions) {
+                try {
+                    if (action.type === "show_product") {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const product = action.data.product as any
+                        const imageUrl = product?.image_url || (Array.isArray(product?.images) ? product.images[0] : undefined)
+                        if (imageUrl && product?.name) {
+                            const caption = `${product.name}\n💰 $${Number(product.price || 0).toLocaleString()}`
+                            await sendWhatsAppImage(organizationId, phoneNumber, imageUrl, caption)
+                        }
+                    }
+                } catch (richError) {
+                    // No fallar si el mensaje rico no se envía
+                    console.error("[Unified Messaging] Error sending rich message:", richError)
+                }
+            }
+        }
     } catch (error) {
         console.error("[Unified Messaging] Error sending WhatsApp response:", error)
     }
