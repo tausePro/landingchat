@@ -133,6 +133,126 @@ async function sendViaEvolution(
 }
 
 // ============================================
+// Mensajes ricos (solo Meta Cloud API)
+// ============================================
+
+/**
+ * Envía una imagen con caption por WhatsApp
+ */
+export async function sendWhatsAppImage(
+  organizationId: string,
+  to: string,
+  imageUrl: string,
+  caption?: string
+): Promise<{ messageId?: string }> {
+  const instance = await getConnectedInstance(organizationId)
+  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
+    // Fallback: enviar como texto con link
+    return sendViaMeta(instance, to, `${caption || ""}\n${imageUrl}`)
+  }
+
+  const client = new MetaCloudClient()
+  const response = await client.sendMediaMessage(
+    instance.meta_phone_number_id,
+    instance.meta_access_token,
+    to,
+    "image",
+    imageUrl,
+    caption
+  )
+
+  return { messageId: response.messages?.[0]?.id }
+}
+
+/**
+ * Envía un mensaje con botones interactivos por WhatsApp (máximo 3)
+ */
+export async function sendWhatsAppButtons(
+  organizationId: string,
+  to: string,
+  body: string,
+  buttons: Array<{ id: string; title: string }>,
+  header?: string
+): Promise<{ messageId?: string }> {
+  const instance = await getConnectedInstance(organizationId)
+  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
+    // Fallback: enviar como texto
+    const buttonText = buttons.map((b, i) => `${i + 1}. ${b.title}`).join("\n")
+    return sendViaMeta(instance, to, `${body}\n\n${buttonText}`)
+  }
+
+  const client = new MetaCloudClient()
+  const response = await client.sendInteractiveButtons(
+    instance.meta_phone_number_id,
+    instance.meta_access_token,
+    to,
+    body,
+    buttons,
+    header
+  )
+
+  return { messageId: response.messages?.[0]?.id }
+}
+
+/**
+ * Envía un mensaje tipo lista por WhatsApp (máximo 10 items)
+ */
+export async function sendWhatsAppList(
+  organizationId: string,
+  to: string,
+  body: string,
+  buttonText: string,
+  sections: Array<{
+    title: string
+    rows: Array<{ id: string; title: string; description?: string }>
+  }>,
+  header?: string
+): Promise<{ messageId?: string }> {
+  const instance = await getConnectedInstance(organizationId)
+  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
+    // Fallback: enviar como texto
+    const listText = sections.map(s =>
+      s.rows.map(r => `• ${r.title}${r.description ? ` - ${r.description}` : ""}`).join("\n")
+    ).join("\n")
+    return sendViaMeta(instance, to, `${body}\n\n${listText}`)
+  }
+
+  const client = new MetaCloudClient()
+  const response = await client.sendInteractiveList(
+    instance.meta_phone_number_id,
+    instance.meta_access_token,
+    to,
+    body,
+    buttonText,
+    sections,
+    header
+  )
+
+  return { messageId: response.messages?.[0]?.id }
+}
+
+/**
+ * Obtiene la instancia corporativa conectada (helper reutilizable)
+ */
+async function getConnectedInstance(organizationId: string): Promise<WhatsAppInstanceRow> {
+  const supabase = await createServiceClient()
+
+  const { data: instance, error } = await supabase
+    .from("whatsapp_instances")
+    .select("id, organization_id, instance_name, instance_type, provider, status, phone_number, meta_phone_number_id, meta_waba_id, meta_access_token")
+    .eq("organization_id", organizationId)
+    .eq("instance_type", "corporate")
+    .eq("status", "connected")
+    .single()
+
+  if (error || !instance) {
+    throw new Error("No hay instancia de WhatsApp conectada")
+  }
+
+  return instance as WhatsAppInstanceRow
+}
+
+// ============================================
 // Helpers
 // ============================================
 

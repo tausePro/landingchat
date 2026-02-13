@@ -214,9 +214,32 @@ async function handleSingleMessage(
             break
         case "interactive":
             if (message.interactive?.type === "button_reply") {
-                messageText = message.interactive.button_reply?.title || ""
+                const btnId = message.interactive.button_reply?.id || ""
+                const btnTitle = message.interactive.button_reply?.title || ""
+                // Pasar ID como contexto para que el AI sepa qué producto/acción eligió
+                if (btnId.startsWith("add_")) {
+                    messageText = `Quiero agregar al carrito el producto con ID: ${btnId.replace("add_", "")}`
+                } else if (btnId === "checkout") {
+                    messageText = "Quiero pagar"
+                } else if (btnId === "continue_shopping") {
+                    messageText = "Quiero seguir comprando"
+                } else if (btnId === "confirm_checkout") {
+                    messageText = "Confirmar mis datos de envío"
+                } else if (btnId === "modify_cart") {
+                    messageText = "Quiero modificar mi carrito"
+                } else if (btnId === "more_options") {
+                    messageText = "Quiero ver más opciones"
+                } else {
+                    messageText = btnTitle
+                }
             } else if (message.interactive?.type === "list_reply") {
-                messageText = message.interactive.list_reply?.title || ""
+                const listId = message.interactive.list_reply?.id || ""
+                const listTitle = message.interactive.list_reply?.title || ""
+                if (listId.startsWith("product_")) {
+                    messageText = `Quiero ver el producto: ${listTitle} (ID: ${listId.replace("product_", "")})`
+                } else {
+                    messageText = listTitle
+                }
             }
             break
         case "button":
