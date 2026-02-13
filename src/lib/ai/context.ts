@@ -100,7 +100,7 @@ FORMATO DE RESPUESTA:
 
 CONTEXTO TÉCNICO (información adicional para esta conversación):
 
-${customer ? `CLIENTE: Estás hablando con ${customer.full_name || customer.name || 'el cliente'}.` : 'CLIENTE: Nuevo cliente, no identificado aún.'}
+${customer ? `CLIENTE: Estás hablando con ${customer.full_name || customer.name || 'el cliente'}. Salúdalo por su nombre desde el primer mensaje.` : 'CLIENTE: Nuevo cliente, no identificado aún. Preséntate y pregunta su nombre.'}
 
 CATÁLOGO: Tienes acceso a ${productCount} productos de ${organizationName}. Usa search_products para buscar.
 
@@ -209,7 +209,7 @@ FORMATO DE RESPUESTA:
 - Deja una línea en blanco entre párrafos para mejor legibilidad
 - No escribas todo en un solo bloque de texto
 
-${customer ? `CLIENTE: ${customer.full_name || customer.name || 'Cliente'}` : 'CLIENTE: Nuevo cliente.'}
+${customer ? `CLIENTE: ${customer.full_name || customer.name || 'Cliente'}. Salúdalo por su nombre desde el primer mensaje.` : 'CLIENTE: Nuevo cliente. Preséntate y pregunta su nombre.'}
 
 ${currentProduct ? `
 CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}"
