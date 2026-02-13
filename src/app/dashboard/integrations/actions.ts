@@ -148,7 +148,10 @@ export async function disconnectIntegration(integrationId: string) {
 
 /**
  * Sincroniza propiedades desde Nuby
+ * Rate limit: máximo 1 sync cada 15 minutos por organización
  */
+const SYNC_COOLDOWN_MS = 15 * 60 * 1000 // 15 minutos
+
 export async function syncProperties(syncType: 'full' | 'incremental' = 'incremental') {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -162,6 +165,30 @@ export async function syncProperties(syncType: 'full' | 'incremental' = 'increme
     .single()
 
   if (!profile?.organization_id) throw new Error('No organization found')
+
+  // Rate limit: verificar última sincronización
+  const { data: integration } = await supabase
+    .from('integrations')
+    .select('last_sync_at')
+    .eq('organization_id', profile.organization_id)
+    .eq('provider', 'nuby')
+    .single()
+
+  if (integration?.last_sync_at) {
+    const lastSync = new Date(integration.last_sync_at).getTime()
+    const elapsed = Date.now() - lastSync
+    if (elapsed < SYNC_COOLDOWN_MS) {
+      const minutesLeft = Math.ceil((SYNC_COOLDOWN_MS - elapsed) / 60000)
+      return {
+        success: false,
+        itemsProcessed: 0,
+        itemsCreated: 0,
+        itemsUpdated: 0,
+        itemsFailed: 0,
+        errors: [`Sincronización en espera. Puedes sincronizar de nuevo en ${minutesLeft} minuto(s).`]
+      }
+    }
+  }
 
   const result = await syncNubyProperties(profile.organization_id, syncType)
 

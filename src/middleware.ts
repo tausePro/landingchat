@@ -10,6 +10,45 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// ============================================
+// CACHE EN MEMORIA + CIRCUIT BREAKER
+// Protege a Supabase de queries repetitivas
+// ============================================
+const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutos
+const CIRCUIT_BREAKER_TIMEOUT_MS = 3000 // 3 segundos máximo para queries del middleware
+
+// Cache genérico con TTL y limpieza automática
+const middlewareCache = new Map<string, { value: unknown; timestamp: number }>()
+
+function getCache<T>(key: string): T | undefined {
+    const cached = middlewareCache.get(key)
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        return cached.value as T
+    }
+    middlewareCache.delete(key)
+    return undefined
+}
+
+function setCache(key: string, value: unknown) {
+    middlewareCache.set(key, { value, timestamp: Date.now() })
+    // Limpiar cache si crece demasiado
+    if (middlewareCache.size > 200) {
+        const oldest = [...middlewareCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)
+        for (let i = 0; i < 100; i++) middlewareCache.delete(oldest[i][0])
+    }
+}
+
+// Circuit breaker: ejecuta una promesa con timeout
+// Si Supabase no responde en CIRCUIT_BREAKER_TIMEOUT_MS, retorna fallback
+async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((resolve) =>
+            setTimeout(() => resolve(fallback), CIRCUIT_BREAKER_TIMEOUT_MS)
+        )
+    ])
+}
+
 export async function middleware(request: NextRequest) {
     const hostname = request.headers.get('host') || ''
     const pathname = request.nextUrl.pathname
@@ -33,6 +72,7 @@ export async function middleware(request: NextRequest) {
     if (
         pathname.startsWith('/_next') ||      // Archivos internos de Next.js
         pathname.startsWith('/api') ||        // Rutas de API
+        pathname.startsWith('/ingest') ||     // PostHog analytics proxy — NO debe consultar BD
         pathname.startsWith('/dashboard') ||  // Panel de administración
         pathname.startsWith('/admin') ||      // Panel de superadmin
         pathname.startsWith('/auth') ||       // Callbacks de autenticación
@@ -95,38 +135,35 @@ export async function middleware(request: NextRequest) {
     else {
         // Primero verificar si es un dominio personalizado
         if (!hostname.includes('landingchat.co')) {
-            // Es un dominio personalizado, buscar en la base de datos
-            console.log(`[MIDDLEWARE] Custom domain detected: ${hostname}`)
-            try {
-                const supabase = createServerClient(
-                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                    {
-                        cookies: {
-                            getAll() { return [] },
-                            setAll() { }
+            // Es un dominio personalizado — primero buscar en cache
+            const cacheKey = `domain:${hostname}`
+            const cachedSlug = getCache<string | null>(cacheKey)
+            if (cachedSlug !== undefined) {
+                slug = cachedSlug
+            } else {
+                try {
+                    const supabase = createServerClient(
+                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                        {
+                            cookies: {
+                                getAll() { return [] },
+                                setAll() { }
+                            }
                         }
-                    }
-                )
+                    )
 
-                console.log(`[MIDDLEWARE] Querying database for custom_domain: ${hostname}`)
-                const { data: org, error } = await supabase
-                    .from("organizations")
-                    .select("slug")
-                    .eq("custom_domain", hostname)
-                    .single()
+                    const result = await withTimeout(
+                        Promise.resolve(supabase.from("organizations").select("slug").eq("custom_domain", hostname).single()),
+                        { data: null, error: null } as any
+                    )
 
-                console.log(`[MIDDLEWARE] Database query result:`, { org, error })
-
-                if (org) {
-                    slug = org.slug
-                    console.log(`[MIDDLEWARE] Found organization slug: ${slug}`)
-                } else {
-                    console.log(`[MIDDLEWARE] No organization found for domain: ${hostname}`)
+                    slug = result.data?.slug || null
+                    setCache(cacheKey, slug)
+                } catch (error) {
+                    console.error("[MIDDLEWARE] Error checking custom domain:", error)
+                    setCache(cacheKey, null)
                 }
-            } catch (error) {
-                console.error("[MIDDLEWARE] Error checking custom domain:", error)
-                // En caso de error, continuar con la lógica normal
             }
         } else {
             // Es un subdominio de landingchat.co
@@ -185,89 +222,93 @@ export async function middleware(request: NextRequest) {
     
     // Verificar si la tienda está en mantenimiento (solo para rutas públicas)
     if (slug && !pathname.startsWith('/dashboard') && !pathname.startsWith('/admin')) {
-        console.log(`[MIDDLEWARE] Checking maintenance mode for slug: ${slug}`)
         try {
-            // Cliente con service role para consultas de DB
-            const supabaseService = createServerClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                    cookies: {
-                        getAll() { return [] },
-                        setAll() { }
+            // Buscar en cache primero
+            const maintenanceCacheKey = `maintenance:${slug}`
+            let orgData = getCache<{ maintenance_mode: boolean; maintenance_message: string | null; id: string; maintenance_bypass_token: string | null }>(maintenanceCacheKey)
+
+            if (orgData === undefined) {
+                const supabaseService = createServerClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                    {
+                        cookies: {
+                            getAll() { return [] },
+                            setAll() { }
+                        }
                     }
-                }
-            )
+                )
 
-            const { data: org, error: orgError } = await supabaseService
-                .from("organizations")
-                .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
-                .eq("slug", slug)
-                .single()
+                const result = await withTimeout(
+                    Promise.resolve(supabaseService.from("organizations")
+                        .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
+                        .eq("slug", slug)
+                        .single()),
+                    { data: null, error: null } as any
+                )
 
-            console.log(`[MIDDLEWARE] Maintenance check result:`, { 
-                slug, 
-                maintenance_mode: org?.maintenance_mode, 
-                orgFound: !!org,
-                error: orgError?.message 
-            })
+                orgData = result.data
+                setCache(maintenanceCacheKey, orgData)
+            }
 
-            if (org?.maintenance_mode) {
-                console.log(`[MIDDLEWARE] Store ${slug} is in maintenance mode`)
+            if (orgData?.maintenance_mode) {
                 let canAccess = false
 
                 // MÉTODO 1: Verificar token de bypass en URL (?bypass=TOKEN)
-                // Este método funciona en CUALQUIER dominio sin necesidad de cookies
                 const bypassToken = request.nextUrl.searchParams.get('bypass')
-                if (bypassToken && org.maintenance_bypass_token && bypassToken === org.maintenance_bypass_token) {
+                if (bypassToken && orgData.maintenance_bypass_token && bypassToken === orgData.maintenance_bypass_token) {
                     canAccess = true
-                    console.log(`[MIDDLEWARE] Bypass token valid - granting access`)
                 }
 
                 // MÉTODO 2: Verificar si el usuario está autenticado (dueño o superadmin)
-                // Solo funciona si las cookies están disponibles (mismo dominio)
                 if (!canAccess) {
                     const supabaseAuth = createServerClient(
                         process.env.NEXT_PUBLIC_SUPABASE_URL!,
                         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
                         {
                             cookies: {
-                                getAll() {
-                                    return request.cookies.getAll()
-                                },
+                                getAll() { return request.cookies.getAll() },
                                 setAll() { }
                             }
                         }
                     )
 
-                    const { data: { user } } = await supabaseAuth.auth.getUser()
-                    console.log(`[MIDDLEWARE] Auth check - user found: ${!!user}`)
+                    const { data: { user } } = await withTimeout(
+                        supabaseAuth.auth.getUser(),
+                        { data: { user: null } } as any
+                    )
 
                     if (user) {
-                        const { data: profile } = await supabaseService
-                            .from("profiles")
-                            .select("organization_id, is_superadmin")
-                            .eq("id", user.id)
-                            .single()
+                        const supabaseService = createServerClient(
+                            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                            {
+                                cookies: {
+                                    getAll() { return [] },
+                                    setAll() { }
+                                }
+                            }
+                        )
 
-                        const isOwner = profile?.organization_id === org.id
-                        const isSuperadmin = profile?.is_superadmin
-                        canAccess = isSuperadmin || isOwner
-                        console.log(`[MIDDLEWARE] User access check - isOwner: ${isOwner}, isSuperadmin: ${isSuperadmin}, canAccess: ${canAccess}`)
+                        const { data: profile } = await withTimeout(
+                            Promise.resolve(supabaseService.from("profiles")
+                                .select("organization_id, is_superadmin")
+                                .eq("id", user.id)
+                                .single()),
+                            { data: null, error: null } as any
+                        )
+
+                        canAccess = profile?.is_superadmin || profile?.organization_id === orgData.id
                     }
                 }
 
                 if (!canAccess) {
-                    console.log(`[MIDDLEWARE] Blocking access - showing maintenance page for ${slug}`)
                     const maintenanceUrl = new URL(`/store/${slug}/maintenance`, request.url)
                     return NextResponse.rewrite(maintenanceUrl)
                 }
-                
-                console.log(`[MIDDLEWARE] Access granted for ${slug} - user is authorized`)
             }
         } catch (error) {
             console.error("[MIDDLEWARE] Error checking maintenance mode:", error)
-            // En caso de error, continuar normalmente
         }
     }
 
@@ -427,7 +468,7 @@ async function handleAuth(request: NextRequest) {
 // ============================================
 export const config = {
     matcher: [
-        // Excluir archivos estáticos y assets
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'
+        // Excluir archivos estáticos, assets y analytics proxy
+        '/((?!_next/static|_next/image|ingest|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'
     ],
 }

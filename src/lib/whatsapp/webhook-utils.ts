@@ -6,6 +6,7 @@
  */
 
 import crypto from "crypto"
+import { normalizePhone, getPhoneVariants } from "@/lib/utils/phone"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = any
@@ -15,7 +16,9 @@ type SupabaseClient = any
 // ============================================
 
 /**
- * Busca o crea un cliente por número de teléfono
+ * Busca o crea un cliente por número de teléfono.
+ * Usa variantes de teléfono para encontrar clientes registrados
+ * desde cualquier canal (web, WhatsApp, Instagram, etc.)
  */
 export async function findOrCreateCustomer(
   supabase: SupabaseClient,
@@ -23,31 +26,45 @@ export async function findOrCreateCustomer(
   phoneNumber: string,
   pushName?: string
 ) {
-  // Buscar cliente existente
-  const { data: existing } = await supabase
+  // Buscar cliente existente con variantes de teléfono
+  const variants = getPhoneVariants(phoneNumber)
+  const canonicalPhone = normalizePhone(phoneNumber)
+
+  const { data: existingCustomers } = await supabase
     .from("customers")
     .select("id, full_name, phone")
     .eq("organization_id", organizationId)
-    .eq("phone", phoneNumber)
-    .single()
+    .in("phone", variants)
+    .order("created_at", { ascending: true })
+    .limit(1)
+
+  const existing = existingCustomers?.[0]
 
   if (existing) {
     // Actualizar nombre si tenemos uno nuevo
+    const updates: Record<string, string> = {}
     if (pushName && !existing.full_name) {
+      updates.full_name = pushName
+    }
+    // Normalizar el teléfono almacenado al formato canónico
+    if (existing.phone !== canonicalPhone) {
+      updates.phone = canonicalPhone
+    }
+    if (Object.keys(updates).length > 0) {
       await supabase
         .from("customers")
-        .update({ full_name: pushName })
+        .update(updates)
         .eq("id", existing.id)
     }
     return { ...existing, name: existing.full_name }
   }
 
-  // Crear nuevo cliente
+  // Crear nuevo cliente con teléfono normalizado
   const { data: newCustomer, error } = await supabase
     .from("customers")
     .insert({
       organization_id: organizationId,
-      phone: phoneNumber,
+      phone: canonicalPhone,
       full_name: pushName || `WhatsApp ${phoneNumber.slice(-4)}`,
       metadata: { source: "whatsapp" },
     })

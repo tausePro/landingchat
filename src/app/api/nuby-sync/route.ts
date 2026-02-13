@@ -83,35 +83,27 @@ export async function POST(request: Request) {
     // Usar https nativo en lugar de fetch
     const properties = await httpsGet(url, token)
 
-    // Guardar propiedades
+    // Guardar propiedades en batch con upsert (1 query en vez de 2N)
+    const mappedProperties = properties.map((nubyProperty: any) =>
+      mapNubyPropertyToLocal(nubyProperty, profile.organization_id, baseUrl)
+    )
+
     let created = 0
     let updated = 0
 
-    for (const nubyProperty of properties) {
-      const localProperty = mapNubyPropertyToLocal(
-        nubyProperty,
-        profile.organization_id,
-        baseUrl
-      )
-
-      const { data: existing } = await serviceClient
+    if (mappedProperties.length > 0) {
+      const { data: upserted, error: upsertError } = await serviceClient
         .from('properties')
+        .upsert(mappedProperties, {
+          onConflict: 'organization_id,external_id',
+          ignoreDuplicates: false
+        })
         .select('id')
-        .eq('external_code', localProperty.external_code)
-        .eq('organization_id', profile.organization_id)
-        .single()
 
-      if (existing) {
-        await serviceClient
-          .from('properties')
-          .update(localProperty)
-          .eq('id', existing.id)
-        updated++
+      if (upsertError) {
+        console.error('Upsert error:', upsertError)
       } else {
-        await serviceClient
-          .from('properties')
-          .insert(localProperty)
-        created++
+        updated = upserted?.length || mappedProperties.length
       }
     }
 

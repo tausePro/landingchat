@@ -33,6 +33,7 @@ interface Product {
 interface Customer {
     id: string
     name?: string
+    full_name?: string
     email?: string
     phone?: string
     metadata?: Record<string, unknown>
@@ -99,7 +100,7 @@ FORMATO DE RESPUESTA:
 
 CONTEXTO TÉCNICO (información adicional para esta conversación):
 
-${customer ? `CLIENTE: Estás hablando con ${customer.name || 'el cliente'}.` : 'CLIENTE: Nuevo cliente, no identificado aún.'}
+${customer ? `CLIENTE: Estás hablando con ${customer.full_name || customer.name || 'el cliente'}. Salúdalo por su nombre desde el primer mensaje.` : 'CLIENTE: Nuevo cliente, no identificado aún. Preséntate y pregunta su nombre.'}
 
 CATÁLOGO: Tienes acceso a ${productCount} productos de ${organizationName}. Usa search_products para buscar.
 
@@ -208,7 +209,7 @@ FORMATO DE RESPUESTA:
 - Deja una línea en blanco entre párrafos para mejor legibilidad
 - No escribas todo en un solo bloque de texto
 
-${customer ? `CLIENTE: ${customer.name || 'Cliente'}` : 'CLIENTE: Nuevo cliente.'}
+${customer ? `CLIENTE: ${customer.full_name || customer.name || 'Cliente'}. Salúdalo por su nombre desde el primer mensaje.` : 'CLIENTE: Nuevo cliente. Preséntate y pregunta su nombre.'}
 
 ${currentProduct ? `
 CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}"
@@ -290,7 +291,7 @@ export function buildCustomerContext(customer?: Customer, orders?: Order[]): str
     if (!customer) return "Cliente no identificado. Si proporciona nombre y contacto, usa identify_customer."
 
     let context = `INFORMACIÓN DEL CLIENTE:\n`
-    context += `- Nombre: ${customer.name || 'No proporcionado'}\n`
+    context += `- Nombre: ${customer.full_name || customer.name || 'No proporcionado'}\n`
     context += `- Email: ${customer.email || 'No proporcionado'}\n`
     context += `- Teléfono: ${customer.phone || 'No proporcionado'}\n`
 

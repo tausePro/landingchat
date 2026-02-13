@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { normalizePhone, getPhoneVariants } from "@/lib/utils/phone"
 
 const identifySchema = z.object({
     name: z.string().min(1, "El nombre es requerido").max(100, "Nombre muy largo"),
@@ -27,34 +28,9 @@ export async function POST(
 
         const { name, phone } = validation.data
 
-        // Normalizar teléfono y generar variantes para búsqueda
-        const cleanPhone = phone.replace(/[^\d+]/g, "")
-
-        // Extraer solo dígitos (sin +)
-        const digitsOnly = phone.replace(/\D/g, "")
-
-        // Generar variantes de búsqueda para encontrar clientes con diferentes formatos
-        const phoneVariants: string[] = []
-
-        // Si tiene prefijo de país (57), generar variantes
-        if (digitsOnly.startsWith("57") && digitsOnly.length >= 12) {
-            // Formato: 573001234567 -> también buscar como 3001234567 y +573001234567
-            phoneVariants.push(digitsOnly)                    // 573001234567
-            phoneVariants.push(digitsOnly.substring(2))       // 3001234567 (sin código de país)
-            phoneVariants.push(`+${digitsOnly}`)             // +573001234567
-        } else if (digitsOnly.length >= 10 && digitsOnly.length <= 11) {
-            // Formato: 3001234567 -> también buscar como 573001234567 y +573001234567
-            phoneVariants.push(digitsOnly)                    // 3001234567
-            phoneVariants.push(`57${digitsOnly}`)            // 573001234567
-            phoneVariants.push(`+57${digitsOnly}`)           // +573001234567
-        } else {
-            // Fallback: usar el número limpio como está
-            phoneVariants.push(cleanPhone)
-            phoneVariants.push(digitsOnly)
-        }
-
-        // Eliminar duplicados
-        const uniqueVariants = [...new Set(phoneVariants.filter(p => p.length > 0))]
+        // Normalizar teléfono usando util compartido (mismo que WhatsApp webhook)
+        const canonicalPhone = normalizePhone(phone)
+        const phoneVariants = getPhoneVariants(phone)
 
         // Use service role key to bypass RLS
         const supabase = createClient(
@@ -78,16 +54,24 @@ export async function POST(
             .from("customers")
             .select("id, full_name, phone, email, total_orders, total_spent, created_at")
             .eq("organization_id", organization.id)
-            .in("phone", uniqueVariants)
-            .order("created_at", { ascending: true }) // El más antiguo primero (cliente original)
+            .in("phone", phoneVariants)
+            .order("created_at", { ascending: true })
             .limit(1)
 
         const existingCustomer = existingCustomers?.[0]
 
         if (existingCustomer) {
+            // Normalizar teléfono almacenado al formato canónico
+            const updates: Record<string, string> = {
+                updated_at: new Date().toISOString()
+            }
+            if (existingCustomer.phone !== canonicalPhone) {
+                updates.phone = canonicalPhone
+            }
+
             await supabase
                 .from("customers")
-                .update({ updated_at: new Date().toISOString() })
+                .update(updates)
                 .eq("id", existingCustomer.id)
 
             return NextResponse.json({
@@ -104,13 +88,13 @@ export async function POST(
             })
         }
 
-        // Crear nuevo cliente
+        // Crear nuevo cliente con teléfono normalizado
         const { data: newCustomer, error: createError } = await supabase
             .from("customers")
             .insert({
                 organization_id: organization.id,
                 full_name: name.trim(),
-                phone: cleanPhone,
+                phone: canonicalPhone,
                 metadata: {
                     source: "chat_gate",
                     first_visit: new Date().toISOString()
