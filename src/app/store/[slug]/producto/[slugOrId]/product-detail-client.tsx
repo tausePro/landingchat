@@ -334,16 +334,31 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                             </p>
                         )}
 
-                        {/* Testimonial Placeholder */}
-                        <div className="mt-8 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                                {product.name.charAt(0)}
-                            </div>
-                            <div>
-                                <p className="font-semibold text-slate-700 dark:text-slate-200">"Excelente calidad y servicio"</p>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">- Cliente verificado</p>
-                            </div>
-                        </div>
+                        {/* Testimonial - Datos reales de la organización */}
+                        {(() => {
+                            const testimonials = organization.settings?.storefront?.testimonials?.filter((t: any) => t.enabled) || []
+                            // Seleccionar testimonial basado en el ID del producto para que sea consistente
+                            const testimonial = testimonials.length > 0
+                                ? testimonials[product.id.charCodeAt(0) % testimonials.length]
+                                : null
+
+                            return (
+                                <div className="mt-8 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+                                        {testimonial?.name?.charAt(0) || product.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <p className="font-semibold text-slate-700 dark:text-slate-200">
+                                            &ldquo;{testimonial?.text || 'Excelente calidad y servicio'}&rdquo;
+                                        </p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            - {testimonial?.name || 'Cliente verificado'}
+                                            {testimonial?.role && <span className="ml-1 text-xs opacity-70">({testimonial.role})</span>}
+                                        </p>
+                                    </div>
+                                </div>
+                            )
+                        })()}
 
                         {/* Variants */}
                         <div className="mt-8 space-y-6">

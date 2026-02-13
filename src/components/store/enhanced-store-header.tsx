@@ -10,7 +10,7 @@ import { ShoppingBag, User, MessageCircle, Menu, X, ChevronDown as ChevronDownIc
 import { useEffect, useState, useRef } from "react"
 import { AnnouncementBar } from "./announcement-bar"
 import { SmartSearch } from "./smart-search"
-import { cn } from "@/lib/utils"
+import { cn, getContrastTextColor } from "@/lib/utils"
 
 interface MenuItem {
     id: string
@@ -218,7 +218,7 @@ export function EnhancedStoreHeader({
                         {!hideChatButton && (
                             <Button
                                 onClick={() => onStartChat()}
-                                style={{ backgroundColor: primaryColor }}
+                                style={{ backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) }}
                                 className="hidden md:flex font-bold shadow-lg text-sm px-6 h-10 rounded-full items-center gap-2"
                             >
                                 <MessageCircle className="w-4 h-4" />

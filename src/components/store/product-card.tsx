@@ -190,9 +190,16 @@ export function ProductCard({
 
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
                     {showPrices ? (
-                        <span className="font-bold text-lg" style={{ color: primaryColor }}>
-                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
-                        </span>
+                        <div className="flex items-baseline gap-2">
+                            <span className="font-bold text-lg" style={{ color: primaryColor }}>
+                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.sale_price || product.price)}
+                            </span>
+                            {product.sale_price && product.sale_price < product.price && (
+                                <span className="text-sm text-slate-400 line-through">
+                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
+                                </span>
+                            )}
+                        </div>
                     ) : (
                         <div></div>
                     )}
@@ -205,7 +212,7 @@ export function ProductCard({
                             backgroundColor: 'transparent'
                         }}
                     >
-                        ¿Me sirve?
+                        Ver más
                     </Link>
                 </div>
             </div>

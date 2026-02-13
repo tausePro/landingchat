@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { ArrowUp, ArrowDown, GripVertical, X } from "lucide-react"
 import { updateOrganization } from "../actions"
 
 interface ProductSectionEditorProps {
@@ -88,6 +89,17 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                 ...config.categories,
                 selected: newSelected
             }
+        })
+    }
+
+    const moveCategory = (index: number, direction: 'up' | 'down') => {
+        const selected = [...(config.categories.selected || [])]
+        const newIndex = direction === 'up' ? index - 1 : index + 1
+        if (newIndex < 0 || newIndex >= selected.length) return
+        ;[selected[index], selected[newIndex]] = [selected[newIndex], selected[index]]
+        setConfig({
+            ...config,
+            categories: { ...config.categories, selected }
         })
     }
 
@@ -238,7 +250,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                     </div>
 
                     {config.categories.enabled && categories.length > 0 && (
-                        <div className="pl-0 space-y-3">
+                        <div className="pl-0 space-y-4">
                             <p className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Selecciona las categorías a mostrar:</p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {categories.map((category) => (
@@ -258,6 +270,51 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                                     </label>
                                 ))}
                             </div>
+
+                            {(config.categories.selected || []).length > 0 && (
+                                <div className="space-y-2 mt-4">
+                                    <p className="text-sm font-medium text-[#1F2937] dark:text-gray-300">Orden de las categorías (así aparecerán en la tienda):</p>
+                                    <div className="space-y-1">
+                                        {(config.categories.selected || []).map((cat: string, idx: number) => (
+                                            <div
+                                                key={cat}
+                                                className="flex items-center gap-2 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50"
+                                            >
+                                                <GripVertical className="w-4 h-4 text-gray-400" />
+                                                <span className="flex-1 text-sm font-medium capitalize text-[#1F2937] dark:text-gray-300">
+                                                    {idx + 1}. {cat}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveCategory(idx, 'up')}
+                                                    disabled={idx === 0}
+                                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
+                                                    title="Subir"
+                                                >
+                                                    <ArrowUp className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => moveCategory(idx, 'down')}
+                                                    disabled={idx === (config.categories.selected || []).length - 1}
+                                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 transition-colors"
+                                                    title="Bajar"
+                                                >
+                                                    <ArrowDown className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleCategory(cat)}
+                                                    className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                    title="Quitar"
+                                                >
+                                                    <X className="w-4 h-4 text-red-500" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
