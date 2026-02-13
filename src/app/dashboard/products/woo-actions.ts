@@ -26,15 +26,42 @@ interface WooProduct {
     slug?: string
     sku?: string
     status: string
+    type?: string
     description?: string
     short_description?: string
     price?: string
     regular_price?: string
     sale_price?: string
+    stock_status?: string
     stock_quantity?: number | null
+    manage_stock?: boolean
     images?: Array<{ src: string }>
     categories?: Array<{ name: string }>
     attributes?: Array<{ name: string; options: string[] }>
+}
+
+/**
+ * Determina el stock real basándose en stock_quantity y stock_status de WooCommerce.
+ * Cuando WooCommerce dice "Hay existencias" pero no tiene cantidad, asignamos 999.
+ */
+function getStockFromWoo(p: WooProduct): number {
+    // Si tiene cantidad exacta, usarla
+    if (p.stock_quantity != null && p.stock_quantity >= 0) {
+        return p.stock_quantity
+    }
+    // Si no tiene cantidad pero dice "en stock", asignar 999
+    if (p.stock_status === 'instock' || p.stock_status === 'onbackorder') {
+        return 999
+    }
+    // Fuera de stock
+    if (p.stock_status === 'outofstock') {
+        return 0
+    }
+    // Fallback: si no gestiona stock y está publicado, asumir disponible
+    if (!p.manage_stock && p.status === 'publish') {
+        return 999
+    }
+    return 0
 }
 
 export async function importWooCommerceProducts(formData: FormData): Promise<ImportResult> {
@@ -139,137 +166,113 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
         }
     }
 
-    // 4. Process products
+    // 4. Process products in batches to prevent DB overload
     let importedCount = 0
     let updatedCount = 0
     let skippedCount = 0
+    const BATCH_SIZE = 5
+    const MAX_CONCURRENT_IMAGES = 3
 
-    for (const p of allProducts) {
-        try {
-            // Check if product already exists by NAME or SKU
-            let existing: { id: string } | null = null
+    // Helper: upload images with concurrency limit
+    async function uploadImagesWithLimit(images: Array<{ src: string }>, orgId: string, slug: string): Promise<string[]> {
+        const results: string[] = []
+        const limitedImages = images.slice(0, 20)
 
-            // First check by SKU if available
-            if (p.sku) {
-                const { data } = await supabase
-                    .from("products")
-                    .select("id")
-                    .eq("organization_id", organizationId)
-                    .eq("sku", p.sku)
-                    .maybeSingle()
-                existing = data
-            }
-
-            // If not found by SKU, check by name
-            if (!existing) {
-                const { data } = await supabase
-                    .from("products")
-                    .select("id")
-                    .eq("organization_id", organizationId)
-                    .eq("name", p.name)
-                    .maybeSingle()
-                existing = data
-            }
-
-            if (existing && !updateExisting) {
-                skippedCount++
-                continue
-            }
-
-            // Actualizar producto existente
-            if (existing && updateExisting) {
-                const slug = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-
-                // Re-procesar imágenes (ahora hasta 20)
-                const imagePromises = (p.images || []).slice(0, 20).map(async (img) => {
+        for (let i = 0; i < limitedImages.length; i += MAX_CONCURRENT_IMAGES) {
+            const batch = limitedImages.slice(i, i + MAX_CONCURRENT_IMAGES)
+            const batchResults = await Promise.all(
+                batch.map(async (img) => {
                     try {
-                        return await uploadImageToSupabase(img.src, organizationId, slug)
+                        return await uploadImageToSupabase(img.src, orgId, slug)
                     } catch {
                         return img.src
                     }
                 })
-                const processedImages = await Promise.all(imagePromises)
-                const validImages = processedImages.filter(Boolean) as string[]
+            )
+            results.push(...batchResults.filter(Boolean) as string[])
+        }
+        return results
+    }
 
-                const variants = p.attributes?.map((attr) => ({
-                    type: attr.name,
-                    values: attr.options,
-                    hasPriceAdjustment: false,
-                    priceAdjustments: {}
-                })) || []
+    // Helper: process a single product
+    async function processProduct(p: WooProduct) {
+        // Check if product already exists by SKU or name
+        let existing: { id: string } | null = null
 
-                const price = parseFloat(p.regular_price || p.price || "0")
-                const salePrice = p.sale_price ? parseFloat(p.sale_price) : null
-                const categories = p.categories?.map(c => c.name) || ["General"]
+        if (p.sku) {
+            const { data } = await supabase
+                .from("products")
+                .select("id")
+                .eq("organization_id", organizationId)
+                .eq("sku", p.sku)
+                .maybeSingle()
+            existing = data
+        }
 
-                const { error: updateError } = await supabase
-                    .from("products")
-                    .update({
-                        description: p.description || p.short_description || "",
-                        price,
-                        sale_price: salePrice,
-                        stock: p.stock_quantity ?? 0,
-                        image_url: validImages[0] || null,
-                        images: validImages,
-                        categories,
-                        variants,
-                        is_active: p.status === 'publish',
-                    })
-                    .eq("id", existing.id)
+        if (!existing) {
+            const { data } = await supabase
+                .from("products")
+                .select("id")
+                .eq("organization_id", organizationId)
+                .eq("name", p.name)
+                .maybeSingle()
+            existing = data
+        }
 
-                if (updateError) {
-                    errors.push(`${p.name}: ${updateError.message}`)
-                } else {
-                    updatedCount++
-                }
-                continue
+        if (existing && !updateExisting) {
+            skippedCount++
+            return
+        }
+
+        const slug = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+        const validImages = await uploadImagesWithLimit(p.images || [], organizationId, existing ? slug : `${slug}-${Math.random().toString(36).substring(7)}`)
+
+        const variants = p.attributes?.map((attr) => ({
+            type: attr.name,
+            values: attr.options,
+            hasPriceAdjustment: false,
+            priceAdjustments: {}
+        })) || []
+
+        const price = parseFloat(p.regular_price || p.price || "0")
+        const salePrice = p.sale_price ? parseFloat(p.sale_price) : null
+        const categories = p.categories?.map(c => c.name) || ["General"]
+
+        if (existing && updateExisting) {
+            const { error: updateError } = await supabase
+                .from("products")
+                .update({
+                    description: p.description || p.short_description || "",
+                    price,
+                    sale_price: salePrice,
+                    stock: getStockFromWoo(p),
+                    image_url: validImages[0] || null,
+                    images: validImages,
+                    categories,
+                    variants,
+                    is_active: p.status === 'publish',
+                })
+                .eq("id", existing.id)
+
+            if (updateError) {
+                errors.push(`${p.name}: ${updateError.message}`)
+            } else {
+                updatedCount++
             }
-
-            // Generate Slug
-            const slugBase = p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-            const slug = `${slugBase}-${Math.random().toString(36).substring(7)}`
-
-            // Map Images & Upload
-            const imagePromises = (p.images || []).slice(0, 20).map(async (img, index) => {
-                try {
-                    return await uploadImageToSupabase(img.src, organizationId, slug)
-                } catch {
-                    // Fallback to original URL if upload fails
-                    return img.src
-                }
-            })
-
-            const processedImages = await Promise.all(imagePromises)
-            const validImages = processedImages.filter(Boolean) as string[]
-
-            // Map Variants
-            const variants = p.attributes?.map((attr) => ({
-                type: attr.name,
-                values: attr.options,
-                hasPriceAdjustment: false,
-                priceAdjustments: {}
-            })) || []
-
-            // Map Price
-            const price = parseFloat(p.regular_price || p.price || "0")
-            const salePrice = p.sale_price ? parseFloat(p.sale_price) : undefined
-
-            // Map ALL categories (not just the first one)
-            const categories = p.categories?.map(c => c.name) || ["General"]
-
-            // Create Product with stock=0 if not defined (safer default)
+        } else {
+            const finalSlug = `${slug}-${Math.random().toString(36).substring(7)}`
             const { error: insertError } = await supabase.from("products").insert({
                 organization_id: organizationId,
                 name: p.name,
-                slug: slug,
+                slug: finalSlug,
                 description: p.description || p.short_description || "",
-                price: price,
-                sale_price: salePrice,
-                stock: p.stock_quantity ?? 0, // Changed from 999 to 0 for safety
+                price,
+                sale_price: salePrice || undefined,
+                stock: getStockFromWoo(p),
                 image_url: validImages[0] || null,
                 images: validImages,
-                categories: categories,
-                variants: variants,
+                categories,
+                variants,
                 is_active: p.status === 'publish',
                 options: [],
                 sku: p.sku || undefined
@@ -280,10 +283,23 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
             } else {
                 importedCount++
             }
+        }
+    }
 
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-            errors.push(`${p.name}: ${errorMessage}`)
+    // Process in batches
+    for (let i = 0; i < allProducts.length; i += BATCH_SIZE) {
+        const batch = allProducts.slice(i, i + BATCH_SIZE)
+        await Promise.all(batch.map(async (p) => {
+            try {
+                await processProduct(p)
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
+                errors.push(`${p.name}: ${errorMessage}`)
+            }
+        }))
+        // Small delay between batches to not overwhelm the DB
+        if (i + BATCH_SIZE < allProducts.length) {
+            await new Promise(resolve => setTimeout(resolve, 200))
         }
     }
 

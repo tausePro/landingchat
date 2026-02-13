@@ -362,39 +362,74 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
                         {/* Variants */}
                         <div className="mt-8 space-y-6">
-                            {product.variants?.map((variant: any, idx: number) => (
-                                <div key={idx}>
-                                    <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-2">
-                                        {variant.type}
-                                    </label>
-                                    <div className="flex gap-3 flex-wrap">
-                                        {variant.values.map((value: string, vIdx: number) => {
-                                            const isSelected = selectedVariants[variant.type] === value
-                                            return (
-                                                <button
-                                                    key={vIdx}
-                                                    onClick={() => handleVariantChange(variant.type, value)}
-                                                    className={`
-                                                        ${variant.type.toLowerCase().includes('color') ? 'w-10 h-10 rounded-full shadow-sm' : 'px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem]'}
-                                                        ${isSelected
-                                                            ? (variant.type.toLowerCase().includes('color') ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary')
-                                                            : (variant.type.toLowerCase().includes('color') ? 'ring-1 ring-slate-200 dark:ring-slate-700 hover:scale-105' : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400')
-                                                        }
-                                                        transition-all duration-200
-                                                    `}
-                                                    style={variant.type.toLowerCase().includes('color') ? { backgroundColor: getColorHex(value) } : {}}
-                                                    title={value}
-                                                >
-                                                    {!variant.type.toLowerCase().includes('color') && value}
-                                                    {/* Screen reader text for colors */}
-                                                    {variant.type.toLowerCase().includes('color') && <span className="sr-only">{value}</span>}
-                                                </button>
-                                            )
-
-                                        })}
+                            {product.variants?.map((variant: any, idx: number) => {
+                                const isColorVariant = variant.type.toLowerCase().includes('color')
+                                const hasMany = variant.values.length > 8
+                                return (
+                                    <div key={idx}>
+                                        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-3">
+                                            {variant.type}
+                                            {isColorVariant && selectedVariants[variant.type] && (
+                                                <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+                                                    — {selectedVariants[variant.type]}
+                                                </span>
+                                            )}
+                                        </label>
+                                        {isColorVariant ? (
+                                            <div className={`flex gap-2 flex-wrap ${hasMany ? '' : 'gap-3'}`}>
+                                                {variant.values.map((value: string, vIdx: number) => {
+                                                    const isSelected = selectedVariants[variant.type] === value
+                                                    return (
+                                                        <button
+                                                            key={vIdx}
+                                                            onClick={() => handleVariantChange(variant.type, value)}
+                                                            className={`
+                                                                flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200
+                                                                ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+                                                            `}
+                                                            title={value}
+                                                        >
+                                                            <span
+                                                                className={`
+                                                                    w-8 h-8 rounded-full shadow-sm border
+                                                                    ${isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'ring-1 ring-slate-200 dark:ring-slate-700'}
+                                                                `}
+                                                                style={{ backgroundColor: getColorHex(value) }}
+                                                            />
+                                                            <span className={`text-[10px] leading-tight text-center max-w-[60px] truncate ${isSelected ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                {value}
+                                                            </span>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-3 flex-wrap">
+                                                {variant.values.map((value: string, vIdx: number) => {
+                                                    const isSelected = selectedVariants[variant.type] === value
+                                                    return (
+                                                        <button
+                                                            key={vIdx}
+                                                            onClick={() => handleVariantChange(variant.type, value)}
+                                                            className={`
+                                                                px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem]
+                                                                ${isSelected
+                                                                    ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary'
+                                                                    : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400'
+                                                                }
+                                                                transition-all duration-200
+                                                            `}
+                                                            title={value}
+                                                        >
+                                                            {value}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
 
                         {/* Desktop CTA */}
