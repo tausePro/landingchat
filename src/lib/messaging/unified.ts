@@ -154,7 +154,13 @@ async function sendWhatsAppResponse(
             }
         }
     } catch (error) {
-        console.error("[Unified Messaging] Error sending WhatsApp response:", error)
+        const errorMsg = error instanceof Error ? error.message : String(error)
+        console.error("[Unified Messaging] FAILED to send WhatsApp response:", {
+            organizationId,
+            chatId,
+            error: errorMsg,
+            responseLength: response?.length,
+        })
     }
 }
 
