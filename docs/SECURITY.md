@@ -12,20 +12,18 @@
 - **Rutas test eliminadas** — `/api/test`, `/api/test-claude`, `/api/test-nuby`, `/api/debug/domain`, `/api/webhooks/whatsapp/test` (commit d20884e, 2026-02-17)
 - **Admin endpoints asegurados** — `/api/admin/whatsapp/force-sync` y `/sync` ahora requieren auth superadmin
 
-### ⚠️ Vulnerabilidades pendientes de verificación
-> Estas policies existen en las migraciones. Ejecutar `scripts/audit-database.sql` Query 3 para confirmar estado actual en producción.
+### ⚠️ Vulnerabilidades confirmadas (auditoría 2026-02-18)
+> Resultado de `scripts/audit-database.sql` Query 3 ejecutada en producción.
 
-| Tabla | Policy en migración | Riesgo | Migración fuente |
-|-------|---------------------|--------|------------------|
-| `carts` | `FOR ALL USING (true)` | CRÍTICO — lectura/escritura de carritos de todas las orgs | `20241125_update_schema_phase8_v3.sql` |
-| `orders` | `FOR SELECT USING (true)` | ALTO — ver pedidos de todas las orgs | `20241126_fix_orders_schema.sql` |
-| `customers` | `FOR SELECT USING (true)` | ALTO — ver clientes de todas las orgs | `20241128_fix_customers_table.sql` |
-| `agents` | `FOR SELECT USING (true)` | MEDIO — expone config de agentes IA | `20241126_fix_agents_table.sql` |
+| Tabla | Policy peligrosa | Operación | Fix |
+|-------|-----------------|-----------|-----|
+| `chats` | `Public can access chats` USING(true) | **ALL** (CRUD) | `migrations/20260218_fix_chats_messages_rls.sql` |
+| `messages` | `Public can access messages` USING(true) | **ALL** (CRUD) | `migrations/20260218_fix_chats_messages_rls.sql` |
 
-### ❓ Tablas por auditar (posiblemente sin RLS)
-- `properties` — no hay CREATE TABLE en migraciones
-- `integrations` — mismo caso
-- `integration_sync_logs` — mismo caso
+### ✅ Tablas que ya estaban corregidas (verificado en producción)
+- `carts`, `orders`, `customers`, `agents` — NO tienen policies USING(true)
+- Las 48 tablas públicas tienen RLS habilitado (0 sin RLS)
+- `properties`, `integrations`, `integration_sync_logs` — RLS ON, policies correctas
 
 ## Función helper
 
