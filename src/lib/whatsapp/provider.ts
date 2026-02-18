@@ -50,8 +50,8 @@ export async function sendWhatsAppMessage(
 ): Promise<{ messageId?: string }> {
   const supabase = await createServiceClient()
 
-  // Obtener instancia corporativa conectada
-  const { data: instance, error } = await supabase
+  // Obtener instancia conectada (intentar corporate primero, luego cualquiera)
+  let { data: instance, error } = await supabase
     .from("whatsapp_instances")
     .select("id, organization_id, instance_name, instance_type, provider, status, phone_number, meta_phone_number_id, meta_waba_id, meta_access_token")
     .eq("organization_id", organizationId)
@@ -59,8 +59,21 @@ export async function sendWhatsAppMessage(
     .eq("status", "connected")
     .single()
 
+  // Fallback: buscar cualquier instancia conectada (instance_type puede ser NULL para Meta)
   if (error || !instance) {
-    console.error("[WhatsApp Provider] No connected corporate instance for org:", organizationId)
+    const fallback = await supabase
+      .from("whatsapp_instances")
+      .select("id, organization_id, instance_name, instance_type, provider, status, phone_number, meta_phone_number_id, meta_waba_id, meta_access_token")
+      .eq("organization_id", organizationId)
+      .eq("status", "connected")
+      .single()
+
+    instance = fallback.data
+    error = fallback.error
+  }
+
+  if (error || !instance) {
+    console.error("[WhatsApp Provider] No connected instance for org:", organizationId, "error:", error?.message)
     throw new Error("No hay instancia de WhatsApp conectada")
   }
 
@@ -232,12 +245,14 @@ export async function sendWhatsAppList(
 }
 
 /**
- * Obtiene la instancia corporativa conectada (helper reutilizable)
+ * Obtiene la instancia conectada (helper reutilizable)
+ * Intenta corporate primero, luego fallback a cualquier instancia conectada
  */
 async function getConnectedInstance(organizationId: string): Promise<WhatsAppInstanceRow> {
   const supabase = await createServiceClient()
 
-  const { data: instance, error } = await supabase
+  // Intentar corporate primero
+  let { data: instance, error } = await supabase
     .from("whatsapp_instances")
     .select("id, organization_id, instance_name, instance_type, provider, status, phone_number, meta_phone_number_id, meta_waba_id, meta_access_token")
     .eq("organization_id", organizationId)
@@ -245,8 +260,21 @@ async function getConnectedInstance(organizationId: string): Promise<WhatsAppIns
     .eq("status", "connected")
     .single()
 
+  // Fallback: cualquier instancia conectada (instance_type puede ser NULL para Meta)
   if (error || !instance) {
-    throw new Error("No hay instancia de WhatsApp conectada")
+    const fallback = await supabase
+      .from("whatsapp_instances")
+      .select("id, organization_id, instance_name, instance_type, provider, status, phone_number, meta_phone_number_id, meta_waba_id, meta_access_token")
+      .eq("organization_id", organizationId)
+      .eq("status", "connected")
+      .single()
+
+    if (fallback.error || !fallback.data) {
+      console.error("[WhatsApp Provider] No connected instance for org:", organizationId, "error:", fallback.error?.message)
+      throw new Error("No hay instancia de WhatsApp conectada")
+    }
+
+    instance = fallback.data
   }
 
   return instance as WhatsAppInstanceRow

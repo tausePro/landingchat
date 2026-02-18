@@ -20,20 +20,26 @@ export function WooImportModal() {
     const [isOpen, setIsOpen] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [isMigrating, setIsMigrating] = useState(false)
+    const [updateExisting, setUpdateExisting] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setIsLoading(true)
 
         const formData = new FormData(e.currentTarget)
+        if (updateExisting) {
+            formData.set("updateExisting", "true")
+        }
 
         try {
             const result = await importWooCommerceProducts(formData)
 
             if (result.success) {
-                const message = result.skipped > 0
-                    ? `✅ ${result.imported} productos importados, ${result.skipped} omitidos (duplicados)`
-                    : `✅ ${result.imported} productos importados de ${result.total} encontrados`
+                const parts = []
+                if (result.imported > 0) parts.push(`${result.imported} importados`)
+                if (result.updated > 0) parts.push(`${result.updated} actualizados`)
+                if (result.skipped > 0) parts.push(`${result.skipped} omitidos`)
+                const message = `✅ ${parts.join(", ")} (${result.total} encontrados)`
 
                 toast.success(message)
 
@@ -103,6 +109,19 @@ export function WooImportModal() {
                     <div className="grid gap-2">
                         <Label htmlFor="consumerSecret">Consumer Secret (cs_...)</Label>
                         <Input id="consumerSecret" name="consumerSecret" type="password" placeholder="cs_xxxxxxxxxxxx" required />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            id="updateExisting"
+                            checked={updateExisting}
+                            onChange={(e) => setUpdateExisting(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-[#96588a] focus:ring-[#96588a]"
+                        />
+                        <Label htmlFor="updateExisting" className="text-sm font-normal cursor-pointer">
+                            Actualizar productos existentes (imágenes, precios, stock, categorías)
+                        </Label>
                     </div>
 
                     <DialogFooter className="flex-col gap-2 sm:flex-row">

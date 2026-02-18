@@ -8,6 +8,7 @@ import Image from "next/image"
 import { ShoppingBag, MessageCircle, Truck, ShieldCheck, Instagram, Facebook } from "lucide-react"
 import { ProductCard } from "@/components/store/product-card"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { getContrastTextColor } from "@/lib/utils"
 
 // Custom icons for TikTok and WhatsApp if not in lucide
 const TikTokIcon = ({ className }: { className?: string }) => (
@@ -238,22 +239,37 @@ export function CompleteTemplate({
                                     <Button
                                         onClick={() => onStartChat()}
                                         size="lg"
-                                        style={{ backgroundColor: primaryColor }}
-                                        className="w-full sm:w-auto text-base px-8 h-14 shadow-xl hover:scale-105 transition-transform"
+                                        style={{ backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) }}
+                                        className="w-full sm:w-auto text-base font-bold px-8 h-14 shadow-xl hover:scale-105 transition-transform"
                                     >
                                         {chatButtonText}
                                     </Button>
                                     <Button
                                         variant="outline"
                                         size="lg"
-                                        className={`w-full sm:w-auto text-base h-14 ${heroBackgroundImage ? 'border-white text-white bg-transparent hover:bg-white/10 hover:text-white' : ''}`}
+                                        className={`w-full sm:w-auto text-base font-bold h-14 ${heroBackgroundImage ? 'border-white text-white bg-transparent hover:bg-white/10 hover:text-white' : ''}`}
                                         onClick={() => {
                                             const productsUrl = getStoreLink('/productos', isSubdomain, organization.slug)
                                             window.location.href = productsUrl
                                         }}
                                     >
-                                        Ver Catálogo
+                                        {heroSettings.catalogButtonText || 'Ver Catálogo'}
                                     </Button>
+                                    {heroSettings.whatsappButton?.enabled && organization.settings?.whatsapp?.phone && (
+                                        <a
+                                            href={`https://wa.me/${organization.settings.whatsapp.phone.replace(/\D/g, '')}?text=${encodeURIComponent(heroSettings.whatsappButton.message || 'Hola, quiero más información')}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto text-base font-bold h-14 px-8 rounded-md transition-transform hover:scale-105 ${
+                                                heroBackgroundImage
+                                                    ? 'bg-green-500 text-white hover:bg-green-600'
+                                                    : 'bg-green-500 text-white hover:bg-green-600'
+                                            }`}
+                                        >
+                                            <WhatsAppIcon className="w-5 h-5" />
+                                            {heroSettings.whatsappButton.text || 'WhatsApp'}
+                                        </a>
+                                    )}
                                 </div>
                             )}
 
@@ -459,8 +475,8 @@ export function CompleteTemplate({
                                     <Button
                                         variant={selectedCategory === null ? undefined : "outline"}
                                         onClick={() => setSelectedCategory(null)}
-                                        className="rounded-full"
-                                        style={selectedCategory === null ? { backgroundColor: primaryColor } : {}}
+                                        className="rounded-full font-bold"
+                                        style={selectedCategory === null ? { backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) } : {}}
                                     >
                                         Todos
                                     </Button>
@@ -469,8 +485,8 @@ export function CompleteTemplate({
                                             key={cat}
                                             variant={selectedCategory === cat ? undefined : "outline"}
                                             onClick={() => setSelectedCategory(cat)}
-                                            className="rounded-full capitalize"
-                                            style={selectedCategory === cat ? { backgroundColor: primaryColor } : {}}
+                                            className="rounded-full capitalize font-bold"
+                                            style={selectedCategory === cat ? { backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) } : {}}
                                         >
                                             {cat}
                                         </Button>
@@ -613,9 +629,10 @@ export function CompleteTemplate({
                         size="lg"
                         style={{
                             backgroundColor: primaryColor,
+                            color: getContrastTextColor(primaryColor),
                             fontFamily: typographyConfig.fontFamily
                         }}
-                        className="text-lg px-10 h-16 shadow-2xl hover:scale-105 transition-transform"
+                        className="text-lg font-bold px-10 h-16 shadow-2xl hover:scale-105 transition-transform"
                     >
                         {chatButtonText}
                     </Button>

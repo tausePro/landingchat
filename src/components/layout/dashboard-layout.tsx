@@ -28,6 +28,7 @@ import {
     FileText,
     Ticket,
     Truck,
+    Tag,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -42,6 +43,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
     conversations: MessageSquare,
     chats: MessageSquare,
     products: Package,
+    categories: Tag,
     orders: ShoppingCart,
     customers: Users,
     marketing: Megaphone,
@@ -78,6 +80,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 const MODULE_TO_NAV: Record<string, NavItem> = {
     conversations: { slug: "conversations", label: "Chats", href: "/dashboard/chats/console", icon: MessageSquare },
     products: { slug: "products", label: "Productos", href: "/dashboard/products", icon: Package },
+    categories: { slug: "categories", label: "Categorías", href: "/dashboard/categories", icon: Tag },
     orders: { slug: "orders", label: "Pedidos", href: "/dashboard/orders", icon: ShoppingCart },
     customers: { slug: "customers", label: "Clientes", href: "/dashboard/customers", icon: Users },
     agent: { slug: "agent", label: "Agente IA", href: "/dashboard/agents", icon: Bot },
@@ -164,6 +167,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         for (const mod of modules) {
             if (MODULE_TO_NAV[mod]) {
                 items.push(MODULE_TO_NAV[mod])
+                // Categorías aparece automáticamente con productos
+                if (mod === "products" && MODULE_TO_NAV["categories"]) {
+                    items.push(MODULE_TO_NAV["categories"])
+                }
             }
         }
 

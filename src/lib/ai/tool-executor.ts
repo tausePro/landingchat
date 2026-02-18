@@ -17,7 +17,10 @@ import {
     GetCustomerHistorySchema,
     ConfirmShippingDetailsSchema,
     CreatePaymentLinkSchema,
-    EscalateToHumanSchema
+    EscalateToHumanSchema,
+    ScheduleAppointmentSchema,
+    SearchPropertiesSchema,
+    ShowPropertySchema
 } from "./tools"
 
 interface ToolContext {
@@ -96,6 +99,15 @@ export async function executeTool(
 
             case "escalate_to_human":
                 return await escalateToHuman(supabase, input, context)
+
+            case "schedule_appointment":
+                return await scheduleAppointment(supabase, input, context)
+
+            case "search_properties":
+                return await searchProperties(supabase, input, context)
+
+            case "show_property":
+                return await showProperty(supabase, input, context)
 
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` }
@@ -1143,6 +1155,324 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
             paymentUrl: paymentUrl,
             message: customer_message || "¡Gracias por tu compra!",
             instructions: paymentInstructions
+        }
+    }
+}
+
+// ==================== CITAS ====================
+
+async function scheduleAppointment(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    console.log("[scheduleAppointment] Raw input:", JSON.stringify(input))
+    console.log("[scheduleAppointment] Context:", { chatId: context.chatId, orgId: context.organizationId, customerId: context.customerId })
+
+    let validated
+    try {
+        validated = ScheduleAppointmentSchema.parse(input)
+    } catch (zodError: any) {
+        console.error("[scheduleAppointment] Zod validation error:", zodError.message)
+        return { success: false, error: `Datos incompletos para agendar: ${zodError.message}. Necesito al menos: título, fecha/hora y nombre del cliente.` }
+    }
+
+    console.log("[scheduleAppointment] Validated:", validated)
+
+    // Parsear y validar la fecha propuesta
+    const proposedDate = new Date(validated.proposed_date)
+    if (isNaN(proposedDate.getTime())) {
+        console.error("[scheduleAppointment] Invalid date:", validated.proposed_date)
+        return { success: false, error: "Fecha inválida. Usa formato ISO 8601 (ej: 2025-02-20T10:00:00)" }
+    }
+
+    // Validar que no sea más de 24h en el pasado (permitir citas de hoy)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    if (proposedDate < yesterday) {
+        console.error("[scheduleAppointment] Date in the past:", proposedDate.toISOString())
+        return { success: false, error: "No se puede agendar una cita en el pasado. Por favor sugiere una fecha futura." }
+    }
+
+    // Calcular fecha de fin
+    const endDate = new Date(proposedDate.getTime() + (validated.duration_minutes * 60 * 1000))
+
+    // Verificar si hay conflictos de horario
+    const { data: conflicts } = await supabase
+        .from("appointments")
+        .select("id, title, proposed_date, proposed_end_date")
+        .eq("organization_id", context.organizationId)
+        .in("status", ["pending", "confirmed"])
+        .lt("proposed_date", endDate.toISOString())
+        .gt("proposed_end_date", proposedDate.toISOString())
+
+    if (conflicts && conflicts.length > 0) {
+        const conflictInfo = conflicts.map((c: any) => {
+            const d = new Date(c.proposed_date)
+            return `"${c.title}" el ${d.toLocaleDateString('es-CO')} a las ${d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+        }).join(", ")
+        return {
+            success: false,
+            error: `Hay un conflicto de horario con: ${conflictInfo}. Por favor sugiere otra hora.`
+        }
+    }
+
+    // Crear la cita
+    const { data: appointment, error } = await supabase
+        .from("appointments")
+        .insert({
+            organization_id: context.organizationId,
+            customer_id: context.customerId || null,
+            chat_id: context.chatId,
+            title: validated.title,
+            appointment_type: validated.appointment_type,
+            status: "pending",
+            proposed_date: proposedDate.toISOString(),
+            proposed_end_date: endDate.toISOString(),
+            duration_minutes: validated.duration_minutes,
+            customer_name: validated.customer_name,
+            customer_phone: validated.customer_phone || null,
+            customer_email: validated.customer_email || null,
+            location: validated.location || null,
+            location_type: validated.location_type,
+            notes: validated.notes || null,
+            metadata: {}
+        })
+        .select()
+        .single()
+
+    if (error) {
+        console.error("[scheduleAppointment] Error:", error)
+        return { success: false, error: `Error agendando la cita: ${error.message}` }
+    }
+
+    // Formatear la respuesta
+    const dateFormatted = proposedDate.toLocaleDateString('es-CO', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    })
+    const timeFormatted = proposedDate.toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+
+    const typeLabels: Record<string, string> = {
+        visit: "Visita presencial",
+        consultation: "Consulta",
+        call: "Llamada",
+        meeting: "Reunión"
+    }
+
+    return {
+        success: true,
+        data: {
+            ui_component: "appointment_confirmation",
+            appointment: {
+                id: appointment.id,
+                title: validated.title,
+                type: typeLabels[validated.appointment_type] || validated.appointment_type,
+                date: dateFormatted,
+                time: timeFormatted,
+                duration: `${validated.duration_minutes} minutos`,
+                location: validated.location || "Por confirmar",
+                locationType: validated.location_type,
+                customerName: validated.customer_name,
+                status: "pending"
+            },
+            message: `Cita agendada: "${validated.title}" para el ${dateFormatted} a las ${timeFormatted}.`,
+            nextStep: "La cita queda pendiente de confirmación. El equipo se comunicará para confirmar."
+        }
+    }
+}
+
+// ==================== PROPIEDADES (INMOBILIARIO) ====================
+
+async function searchProperties(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const validated = SearchPropertiesSchema.parse(input)
+    let { query, property_type, city, neighborhood, min_price, max_price, bedrooms, property_class, limit = 5 } = validated
+
+    // Auto-extraer filtros estructurados del query libre
+    const queryLower = (query || "").toLowerCase()
+    const stopwords = ["busco", "quiero", "necesito", "en", "de", "un", "una", "el", "la", "los", "las", "con", "para", "por", "que", "me", "mi", "al", "del", "y", "o", "a", "su"]
+
+    const classMap: Record<string, string> = {
+        "apartamento": "Apartamento", "apto": "Apartamento", "aptos": "Apartamento",
+        "casa": "Casa", "casas": "Casa",
+        "local": "Local", "locales": "Local",
+        "oficina": "Oficina", "oficinas": "Oficina",
+        "bodega": "Bodega", "bodegas": "Bodega",
+        "lote": "Lote", "lotes": "Lote",
+        "finca": "Finca", "fincas": "Finca"
+    }
+
+    // Detectar clase de propiedad del query si no viene como param
+    if (!property_class) {
+        for (const [keyword, cls] of Object.entries(classMap)) {
+            if (queryLower.includes(keyword)) {
+                property_class = cls
+                break
+            }
+        }
+    }
+
+    // Detectar tipo (arriendo/venta) del query si no viene como param
+    if (!property_type) {
+        if (queryLower.includes("arriendo") || queryLower.includes("arrendar") || queryLower.includes("alquiler")) {
+            property_type = "arriendo"
+        } else if (queryLower.includes("venta") || queryLower.includes("comprar") || queryLower.includes("compra")) {
+            property_type = "venta"
+        }
+    }
+
+    console.log("[searchProperties] Input:", { query, property_type, city, neighborhood, min_price, max_price, bedrooms, property_class, limit })
+    console.log("[searchProperties] Auto-detected: property_class=", property_class, "property_type=", property_type)
+
+    const buildQuery = (applyTextFilter: boolean) => {
+        let q = supabase
+            .from("properties")
+            .select("id, title, property_type, property_class, city, neighborhood, address, bedrooms, bathrooms, area_m2, price_sale, price_rent, price_admin, images, stratum, status")
+            .eq("organization_id", context.organizationId)
+            .eq("status", "active")
+
+        // Filtro por texto libre: dividir en palabras clave relevantes
+        if (applyTextFilter && query) {
+            const keywords = query.toLowerCase().split(/\s+/)
+                .filter(w => w.length > 2 && !stopwords.includes(w))
+                .filter(w => !classMap[w] && !["arriendo", "arrendar", "venta", "comprar", "alquiler", "compra"].includes(w))
+
+            if (keywords.length > 0) {
+                const orConditions = keywords.map(kw =>
+                    `title.ilike.%${kw}%,neighborhood.ilike.%${kw}%,address.ilike.%${kw}%,city.ilike.%${kw}%`
+                ).join(",")
+                q = q.or(orConditions)
+                console.log("[searchProperties] Text filter keywords:", keywords)
+            }
+        }
+
+        // Filtro por tipo (arriendo/venta) — usa campos de precio, no property_type column
+        if (property_type) {
+            if (property_type.toLowerCase().includes("arriendo")) {
+                q = q.not("price_rent", "is", null).gt("price_rent", 0)
+            } else if (property_type.toLowerCase().includes("venta")) {
+                q = q.not("price_sale", "is", null).gt("price_sale", 0)
+            }
+        }
+
+        if (city) q = q.ilike("city", `%${city}%`)
+        if (neighborhood) q = q.ilike("neighborhood", `%${neighborhood}%`)
+        if (bedrooms) q = q.gte("bedrooms", bedrooms)
+        if (property_class) q = q.ilike("property_class", `%${property_class}%`)
+
+        if (max_price) {
+            if (property_type?.toLowerCase().includes("arriendo")) q = q.lte("price_rent", max_price)
+            else if (property_type?.toLowerCase().includes("venta")) q = q.lte("price_sale", max_price)
+        }
+        if (min_price) {
+            if (property_type?.toLowerCase().includes("arriendo")) q = q.gte("price_rent", min_price)
+            else if (property_type?.toLowerCase().includes("venta")) q = q.gte("price_sale", min_price)
+        }
+
+        return q
+    }
+
+    // Intentar con filtros de texto primero
+    let { data: properties, error } = await buildQuery(true).limit(limit)
+    console.log("[searchProperties] Results with text filter:", properties?.length || 0, error ? `Error: ${error.message}` : "")
+
+    // Fallback: si no hay resultados, intentar sin filtro de texto
+    if ((!properties || properties.length === 0) && !error) {
+        const fallback = await buildQuery(false).limit(limit)
+        properties = fallback.data
+        error = fallback.error
+        console.log("[searchProperties] Fallback without text filter:", properties?.length || 0)
+    }
+
+    if (error) {
+        console.error("[searchProperties] Error:", error)
+        return { success: false, error: error.message }
+    }
+
+    const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
+
+    return {
+        success: true,
+        data: {
+            properties: (properties || []).map((p: any) => ({
+                id: p.id,
+                title: p.title,
+                type: p.property_type,
+                class: p.property_class,
+                location: `${p.neighborhood || ''}, ${p.city || ''}`.replace(/^, |, $/g, ''),
+                address: p.address,
+                bedrooms: p.bedrooms,
+                bathrooms: p.bathrooms,
+                area: p.area_m2 ? `${p.area_m2} m²` : null,
+                stratum: p.stratum,
+                priceRent: p.price_rent ? formatPrice(p.price_rent) : null,
+                priceSale: p.price_sale ? formatPrice(p.price_sale) : null,
+                priceAdmin: p.price_admin ? formatPrice(p.price_admin) : null,
+                image_url: p.images?.[0]?.url || null
+            })),
+            totalFound: properties?.length || 0,
+            tip: "Usa show_property con el ID para mostrar la ficha completa al cliente."
+        }
+    }
+}
+
+async function showProperty(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { property_id } = ShowPropertySchema.parse(input)
+
+    const { data: property, error } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("id", property_id)
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    if (error || !property) {
+        return { success: false, error: "Propiedad no encontrada" }
+    }
+
+    const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
+
+    // Extraer características relevantes
+    const features = (property.features || [])
+        .filter((f: any) => f.value && f.value !== "0" && f.value !== "No")
+        .map((f: any) => `${f.description}: ${f.valueText || f.value}`)
+
+    return {
+        success: true,
+        data: {
+            ui_component: "property_card",
+            property: {
+                id: property.id,
+                title: property.title,
+                description: property.description,
+                type: property.property_type,
+                class: property.property_class,
+                status: property.status,
+                location: {
+                    city: property.city,
+                    neighborhood: property.neighborhood,
+                    address: property.address,
+                    department: property.department,
+                    stratum: property.stratum
+                },
+                specs: {
+                    bedrooms: property.bedrooms,
+                    bathrooms: property.bathrooms,
+                    area: property.area_m2 ? `${property.area_m2} m²` : null,
+                    parking: property.parking_spots,
+                    floor: property.floor_number,
+                    age: property.age_years ? `${property.age_years} años` : null
+                },
+                prices: {
+                    rent: property.price_rent ? formatPrice(property.price_rent) : null,
+                    sale: property.price_sale ? formatPrice(property.price_sale) : null,
+                    admin: property.price_admin ? formatPrice(property.price_admin) : null
+                },
+                images: (property.images || []).slice(0, 10).map((img: any) => img.url),
+                features: features.slice(0, 15),
+                is_featured: property.is_featured,
+                external_code: property.external_code
+            }
         }
     }
 }

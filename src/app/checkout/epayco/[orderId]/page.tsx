@@ -1,6 +1,6 @@
 /**
- * Página de Checkout de ePayco para dominios personalizados
- * Esta página carga el script oficial de ePayco y abre el checkout automáticamente
+ * Página de Checkout de ePayco
+ * Soporta tanto dominios personalizados como subdominios de landingchat.co
  * Los datos de pago NUNCA pasan por nuestros servidores - van directo a ePayco
  */
 
@@ -23,15 +23,39 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
     const headersList = await headers()
     const host = headersList.get("host") || ""
 
-    // 1. Buscar la organización por dominio personalizado
-    const { data: org, error: orgError } = await supabase
+    // 1. Buscar la organización: primero por custom_domain, luego por subdominio
+    let org: { id: string; name: string; slug: string; custom_domain: string | null } | null = null
+
+    // Intento 1: Dominio personalizado (ej: tienda.miempresa.com)
+    const { data: orgByDomain } = await supabase
         .from("organizations")
         .select("id, name, slug, custom_domain")
         .eq("custom_domain", host)
         .single()
 
-    if (orgError || !org) {
-        console.error("[EpaycoCheckout] Organization not found for domain:", host)
+    if (orgByDomain) {
+        org = orgByDomain
+    } else {
+        // Intento 2: Subdominio de landingchat.co (ej: tez.landingchat.co)
+        const parts = host.split(".")
+        const isSubdomain = parts.length >= 3 && host.includes("landingchat.co")
+        const isLocalSubdomain = parts.length > 1 && (host.includes("localhost") || host.includes("127.0.0.1"))
+
+        const slug = isSubdomain ? parts[0] : isLocalSubdomain ? parts[0] : null
+
+        if (slug) {
+            const { data: orgBySlug } = await supabase
+                .from("organizations")
+                .select("id, name, slug, custom_domain")
+                .eq("slug", slug)
+                .single()
+
+            org = orgBySlug
+        }
+    }
+
+    if (!org) {
+        console.error("[EpaycoCheckout] Organization not found for host:", host)
         notFound()
     }
 
@@ -66,8 +90,10 @@ export default async function EpaycoCheckoutPage({ params }: PageProps) {
         redirect(`/order/${orderId}/error?reason=gateway_not_configured`)
     }
 
-    // 5. Construir la URL base (dominio personalizado)
-    const baseUrl = `https://${org.custom_domain}`
+    // 5. Construir la URL base (custom domain o subdominio)
+    const baseUrl = org.custom_domain
+        ? `https://${org.custom_domain}`
+        : `https://${org.slug}.landingchat.co`
 
     // 6. Preparar datos para el checkout de ePayco
     const checkoutData = {
