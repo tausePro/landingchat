@@ -120,25 +120,43 @@ export async function syncNubyProperties(
       throw new Error(`Error al conectar con Nuby: ${fetchError.message}`)
     }
 
-    // 6. Procesar propiedades en batch con upsert (1 query en vez de 2N)
+    // 6. Procesar propiedades en chunks pequeños para no saturar la BD
+    const CHUNK_SIZE = 50
+    const CHUNK_DELAY_MS = 500
+
     const mappedProperties = nubyProperties.map((nubyProperty: any) =>
       mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
     )
 
     if (mappedProperties.length > 0) {
-      const { data: upserted, error: upsertError } = await supabase
-        .from('properties')
-        .upsert(mappedProperties, {
-          onConflict: 'organization_id,external_id',
-          ignoreDuplicates: false
-        })
-        .select('id')
+      const totalChunks = Math.ceil(mappedProperties.length / CHUNK_SIZE)
+      console.log(`Procesando ${mappedProperties.length} propiedades en ${totalChunks} chunks de ${CHUNK_SIZE}`)
 
-      if (upsertError) {
-        result.itemsFailed = mappedProperties.length
-        result.errors.push(`Batch upsert error: ${upsertError.message}`)
-      } else {
-        result.itemsUpdated = upserted?.length || mappedProperties.length
+      for (let i = 0; i < mappedProperties.length; i += CHUNK_SIZE) {
+        const chunk = mappedProperties.slice(i, i + CHUNK_SIZE)
+        const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1
+
+        const { data: upserted, error: upsertError } = await supabase
+          .from('properties')
+          .upsert(chunk, {
+            onConflict: 'organization_id,external_id',
+            ignoreDuplicates: false
+          })
+          .select('id')
+
+        if (upsertError) {
+          result.itemsFailed += chunk.length
+          result.errors.push(`Chunk ${chunkIndex}/${totalChunks} error: ${upsertError.message}`)
+          console.error(`Chunk ${chunkIndex}/${totalChunks} failed:`, upsertError.message)
+        } else {
+          result.itemsUpdated += upserted?.length || chunk.length
+          console.log(`Chunk ${chunkIndex}/${totalChunks} OK: ${upserted?.length || chunk.length} propiedades`)
+        }
+
+        // Delay entre chunks para no saturar la BD (noisy neighbor prevention)
+        if (i + CHUNK_SIZE < mappedProperties.length) {
+          await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY_MS))
+        }
       }
     }
 

@@ -4,11 +4,22 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { EvolutionClient } from "@/lib/evolution"
 
 export async function POST(request: NextRequest) {
     try {
+        // Verificar autenticación y permisos de superadmin
+        const authClient = await createClient()
+        const { data: { user } } = await authClient.auth.getUser()
+        if (!user) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+        const { data: profile } = await authClient.from("profiles").select("is_superadmin").eq("id", user.id).single()
+        if (!profile?.is_superadmin) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         const { instanceName } = await request.json()
 
         if (!instanceName) {
