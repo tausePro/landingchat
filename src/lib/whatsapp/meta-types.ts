@@ -1,5 +1,5 @@
 /**
- * Tipos para Meta WhatsApp Cloud API (Graph API v21.0)
+ * Tipos para Meta WhatsApp Cloud API (Graph API v24.0)
  *
  * Ref: https://developers.facebook.com/docs/whatsapp/cloud-api
  */

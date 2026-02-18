@@ -38,7 +38,7 @@ export default async function SettingsPage() {
                             <TabsTrigger value="taxes">Impuestos</TabsTrigger>
                             <TabsTrigger value="payments">Pagos</TabsTrigger>
                             <TabsTrigger value="shipping">Envíos</TabsTrigger>
-                            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+                            <TabsTrigger value="channels">Canales</TabsTrigger>
                         </TabsList>
                         <TabsContent value="profile">
                             <ProfileForm profile={data.profile} />
@@ -111,15 +111,15 @@ export default async function SettingsPage() {
                                 </div>
                             </div>
                         </TabsContent>
-                        <TabsContent value="whatsapp">
+                        <TabsContent value="channels">
                             <div className="text-sm text-muted-foreground">
-                                <p>Conecta WhatsApp para atender clientes y recibir notificaciones.</p>
+                                <p>Conecta WhatsApp, Instagram y Messenger para atender clientes con IA.</p>
                                 <div className="mt-4">
                                     <Link
-                                        href="/dashboard/settings/whatsapp"
+                                        href="/dashboard/settings/channels"
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                                     >
-                                        Ir a Configuración de WhatsApp
+                                        Ir a Configuración de Canales
                                         <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>

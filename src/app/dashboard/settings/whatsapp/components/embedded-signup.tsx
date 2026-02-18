@@ -60,7 +60,7 @@ export function EmbeddedSignup({ appId, configId, onSuccess }: EmbeddedSignupPro
                 appId,
                 cookie: true,
                 xfbml: true,
-                version: "v21.0",
+                version: "v24.0",
             })
             setSdkLoaded(true)
         }

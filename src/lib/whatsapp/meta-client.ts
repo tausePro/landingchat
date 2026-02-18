@@ -1,5 +1,5 @@
 /**
- * Cliente para Meta WhatsApp Cloud API (Graph API v21.0)
+ * Cliente para Meta WhatsApp Cloud API (Graph API v24.0)
  *
  * Documentación: https://developers.facebook.com/docs/whatsapp/cloud-api
  *
@@ -21,7 +21,7 @@ import type {
   TokenExchangeResponse,
 } from "./meta-types"
 
-const META_GRAPH_API_BASE = "https://graph.facebook.com/v21.0"
+const META_GRAPH_API_BASE = "https://graph.facebook.com/v24.0"
 
 export class MetaCloudClient {
   private baseUrl: string

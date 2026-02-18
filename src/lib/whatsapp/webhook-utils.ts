@@ -215,7 +215,7 @@ export async function incrementConversationCount(
  */
 export async function logWebhook(
   supabase: SupabaseClient,
-  webhookType: "whatsapp" | "whatsapp-meta",
+  webhookType: "whatsapp" | "whatsapp-meta" | "instagram" | "messenger",
   eventType: string,
   instanceName: string | undefined,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -294,6 +294,121 @@ export function verifyMetaSignature(
 /**
  * Verifica firma de Evolution API webhook
  */
+// ============================================
+// Social channel customer management (Instagram/Messenger)
+// ============================================
+
+/**
+ * Busca o crea un cliente por su ID de plataforma social (IGSID o PSID).
+ * A diferencia de WhatsApp que usa teléfono, IG y Messenger usan IDs opacos.
+ */
+export async function findOrCreateCustomerBySocialId(
+  supabase: SupabaseClient,
+  organizationId: string,
+  platform: "instagram" | "messenger",
+  platformUserId: string,
+  displayName?: string
+) {
+  const idColumn = platform === "instagram" ? "instagram_id" : "messenger_id"
+
+  // Buscar cliente existente por social ID
+  const { data: existing } = await supabase
+    .from("customers")
+    .select("id, full_name, phone, instagram_id, messenger_id")
+    .eq("organization_id", organizationId)
+    .eq(idColumn, platformUserId)
+    .single()
+
+  if (existing) {
+    // Actualizar nombre si tenemos uno nuevo
+    if (displayName && !existing.full_name) {
+      await supabase
+        .from("customers")
+        .update({ full_name: displayName })
+        .eq("id", existing.id)
+    }
+    return { ...existing, name: existing.full_name }
+  }
+
+  // Crear nuevo cliente
+  const { data: newCustomer, error } = await supabase
+    .from("customers")
+    .insert({
+      organization_id: organizationId,
+      [idColumn]: platformUserId,
+      full_name: displayName || `${platform === "instagram" ? "IG" : "FB"} User ${platformUserId.slice(-4)}`,
+      metadata: { source: platform },
+    })
+    .select("id, full_name, phone, instagram_id, messenger_id")
+    .single()
+
+  if (error) {
+    console.error(`[Webhook Utils] Error creating ${platform} customer:`, error)
+    throw error
+  }
+
+  return { ...newCustomer, name: newCustomer.full_name }
+}
+
+/**
+ * Busca o crea un chat para un canal social (Instagram/Messenger).
+ * Usa el social user ID como identificador del chat en vez de teléfono.
+ */
+export async function findOrCreateSocialChat(
+  supabase: SupabaseClient,
+  organizationId: string,
+  customerId: string,
+  platform: "instagram" | "messenger",
+  platformUserId: string
+) {
+  // Buscar chat activo existente (últimas 24 horas)
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: existing } = await supabase
+    .from("chats")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("customer_id", customerId)
+    .eq("channel", platform)
+    .gte("updated_at", twentyFourHoursAgo)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  if (existing) {
+    await supabase
+      .from("chats")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", existing.id)
+    return existing
+  }
+
+  // Crear nuevo chat
+  const { data: newChat, error } = await supabase
+    .from("chats")
+    .insert({
+      organization_id: organizationId,
+      customer_id: customerId,
+      channel: platform,
+      // Guardar social user ID en whatsapp_chat_id (campo genérico para ID externo)
+      whatsapp_chat_id: platformUserId,
+      status: "active",
+      metadata: { platform_user_id: platformUserId },
+    })
+    .select("id")
+    .single()
+
+  if (error) {
+    console.error(`[Webhook Utils] Error creating ${platform} chat:`, error)
+    throw error
+  }
+
+  // Incrementar contador de conversaciones
+  await incrementConversationCount(supabase, organizationId)
+
+  return newChat
+}
+
 export function verifyEvolutionSignature(
   body: string,
   signature: string | null,
