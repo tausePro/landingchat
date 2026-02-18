@@ -106,12 +106,13 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
 
     let allProducts: WooProduct[] = []
     let page = 1
-    let hasMore = true
+    let totalPages = 1
+    let totalProducts = 0
     const errors: string[] = []
 
     try {
-        // Fetch all pages of products
-        while (hasMore) {
+        // Fetch all pages of products using WooCommerce pagination headers
+        while (page <= totalPages) {
             const response = await fetch(
                 `${baseUrl}wp-json/wc/v3/products?per_page=100&page=${page}&status=publish`,
                 {
@@ -135,6 +136,12 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
                 }
             }
 
+            // Use WooCommerce headers for reliable pagination
+            if (page === 1) {
+                totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '1', 10)
+                totalProducts = parseInt(response.headers.get('X-WP-Total') || '0', 10)
+            }
+
             const wcProducts = await response.json()
 
             if (!Array.isArray(wcProducts)) {
@@ -142,14 +149,11 @@ export async function importWooCommerceProducts(formData: FormData): Promise<Imp
             }
 
             allProducts = [...allProducts, ...wcProducts]
-
-            // Check if there are more pages
-            hasMore = wcProducts.length === 100
             page++
 
-            // Safety limit: max 10 pages (1000 products)
-            if (page > 10) {
-                errors.push("Se alcanzó el límite de 1000 productos. Algunos productos no fueron importados.")
+            // Safety limit: max 20 pages (2000 products)
+            if (page > 20) {
+                errors.push(`Se alcanzó el límite de 2000 productos. Total en WooCommerce: ${totalProducts}.`)
                 break
             }
         }

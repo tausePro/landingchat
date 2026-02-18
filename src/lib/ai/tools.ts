@@ -325,6 +325,120 @@ export const tools: Anthropic.Tool[] = [
         }
     },
 
+    // ==================== PROPIEDADES (INMOBILIARIO) ====================
+    {
+        name: "search_properties",
+        description: "Busca propiedades inmobiliarias (apartamentos, casas, locales, oficinas) según los criterios del cliente. Usar cuando el cliente describe qué tipo de inmueble busca, su presupuesto, zona o características.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                query: {
+                    type: "string",
+                    description: "Descripción libre de lo que busca (ej: 'apartamento en Laureles con 3 habitaciones')"
+                },
+                property_type: {
+                    type: "string",
+                    description: "Tipo: 'arriendo', 'venta' o ambos"
+                },
+                city: {
+                    type: "string",
+                    description: "Ciudad (ej: 'Medellín', 'Bogotá')"
+                },
+                neighborhood: {
+                    type: "string",
+                    description: "Barrio o zona (ej: 'Laureles', 'El Poblado')"
+                },
+                min_price: {
+                    type: "number",
+                    description: "Precio mínimo en COP"
+                },
+                max_price: {
+                    type: "number",
+                    description: "Precio máximo en COP"
+                },
+                bedrooms: {
+                    type: "number",
+                    description: "Número de habitaciones deseadas"
+                },
+                property_class: {
+                    type: "string",
+                    description: "Clase: 'Apartamento', 'Casa', 'Local', 'Oficina', 'Bodega', 'Lote'"
+                },
+                limit: {
+                    type: "number",
+                    description: "Cantidad de resultados (default 5)"
+                }
+            },
+            required: ["query"]
+        }
+    },
+    {
+        name: "show_property",
+        description: "Muestra la ficha completa de una propiedad específica con fotos, características y precios. Usar cuando el cliente quiere ver más detalles de un inmueble.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                property_id: {
+                    type: "string",
+                    description: "ID de la propiedad a mostrar"
+                }
+            },
+            required: ["property_id"]
+        }
+    },
+
+    // ==================== CITAS ====================
+    {
+        name: "schedule_appointment",
+        description: "Agenda una cita o visita con el cliente. Usar cuando el cliente quiere agendar una visita a una propiedad, una consulta, una llamada o una reunión. Recolecta fecha, hora y tipo de cita.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                title: {
+                    type: "string",
+                    description: "Título de la cita (ej: 'Visita apartamento Laureles', 'Consulta de arriendo')"
+                },
+                proposed_date: {
+                    type: "string",
+                    description: "Fecha y hora propuesta en formato ISO 8601 (ej: '2026-02-17T10:00:00'). Si el cliente dice 'mañana a las 10', calcula la fecha correcta usando la fecha actual del sistema."
+                },
+                duration_minutes: {
+                    type: "number",
+                    description: "Duración en minutos (default 60)"
+                },
+                appointment_type: {
+                    type: "string",
+                    description: "Tipo: 'visit' (visita presencial), 'consultation' (consulta), 'call' (llamada), 'meeting' (reunión)"
+                },
+                location: {
+                    type: "string",
+                    description: "Ubicación de la cita (dirección, nombre del lugar, o 'virtual')"
+                },
+                location_type: {
+                    type: "string",
+                    description: "Modalidad: 'in_person', 'video_call', 'phone_call'"
+                },
+                customer_name: {
+                    type: "string",
+                    description: "Nombre del cliente"
+                },
+                customer_phone: {
+                    type: "string",
+                    description: "Teléfono del cliente"
+                },
+                customer_email: {
+                    type: "string",
+                    description: "Email del cliente (opcional)"
+                },
+                notes: {
+                    type: "string",
+                    description: "Notas adicionales sobre la cita"
+                }
+            },
+            required: ["title", "proposed_date", "customer_name"]
+        }
+    },
+
     // ==================== ESCALAMIENTO ====================
     {
         name: "escalate_to_human",
@@ -436,4 +550,33 @@ export const CreatePaymentLinkSchema = z.object({
 export const EscalateToHumanSchema = z.object({
     reason: z.string(),
     priority: z.string().optional().default("medium")
+})
+
+export const ScheduleAppointmentSchema = z.object({
+    title: z.string(),
+    proposed_date: z.string(),
+    duration_minutes: z.coerce.number().optional().default(60),
+    appointment_type: z.string().optional().default("visit"),
+    location: z.string().optional(),
+    location_type: z.string().optional().default("in_person"),
+    customer_name: z.string(),
+    customer_phone: z.string().optional(),
+    customer_email: z.string().optional(),
+    notes: z.string().optional()
+})
+
+export const SearchPropertiesSchema = z.object({
+    query: z.string(),
+    property_type: z.string().optional(),
+    city: z.string().optional(),
+    neighborhood: z.string().optional(),
+    min_price: z.coerce.number().optional(),
+    max_price: z.coerce.number().optional(),
+    bedrooms: z.coerce.number().optional(),
+    property_class: z.string().optional(),
+    limit: z.coerce.number().optional().default(5)
+})
+
+export const ShowPropertySchema = z.object({
+    property_id: z.string()
 })

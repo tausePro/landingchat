@@ -74,6 +74,13 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .eq("organization_id", input.organizationId)
             .eq("is_active", true)
 
+        // 3.0 Get property count (for real estate orgs)
+        const { count: propertyCount } = await supabase
+            .from("properties")
+            .select("*", { count: "exact", head: true })
+            .eq("organization_id", input.organizationId)
+            .eq("status", "active")
+
         // 3.1 Load current product context if available
         let currentProduct = null
         if (input.currentProductId) {
@@ -149,8 +156,37 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             currentProduct || undefined
         )
 
-        // Add strict rules about inventory and variants
-        systemPrompt += `
+        // Add property/real-estate tools if org has properties
+        if (propertyCount && propertyCount > 0) {
+            systemPrompt += `
+
+MODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.
+FECHA Y HORA ACTUAL: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+HERRAMIENTAS DE PROPIEDADES (USAR ESTAS, NO search_products):
+- search_properties: Buscar propiedades por ciudad, barrio, tipo (arriendo/venta), habitaciones, precio, clase (Apartamento/Casa/Local/etc). ÚSALA SIEMPRE que el cliente pregunte por inmuebles.
+- show_property: Mostrar ficha completa de una propiedad con fotos y detalles. Úsala cuando el cliente quiera ver más detalles.
+- schedule_appointment: Agendar una visita o cita. Recolecta: título, fecha/hora, nombre y teléfono del cliente. Úsala cuando el cliente quiera ver un inmueble en persona.
+
+FLUJO INMOBILIARIO:
+1. Cliente describe qué busca → usa 'search_properties' con los filtros mencionados
+2. Presenta las opciones encontradas con precio, ubicación y características
+3. Si le interesa una → usa 'show_property' para mostrar la ficha completa
+4. Si quiere visitarla → usa 'schedule_appointment' para agendar la visita
+5. Pregunta siempre: ciudad, presupuesto, número de habitaciones, tipo (arriendo/venta)
+
+PARA AGENDAR CITAS:
+- Si el cliente dice "mañana", calcula la fecha correcta basándote en la fecha actual.
+- Usa formato ISO 8601 para proposed_date (ej: 2026-02-17T10:00:00).
+- Si el cliente no especifica hora, sugiere 10:00 AM.
+- Si no da su nombre, usa el nombre que ya conoces del cliente identificado.
+- NO inventes datos — pregunta lo que falte.
+
+IMPORTANTE: NO uses search_products para buscar inmuebles. Usa search_properties.
+`
+        } else {
+            // Add strict rules about inventory and variants (ecommerce)
+            systemPrompt += `
         
 REGLAS CRÍTICAS DE INVENTARIO:
 1. ANTES de confirmar cualquier compra o agregar al carrito, DEBES verificar si el producto tiene variantes (talla, color).
@@ -159,6 +195,7 @@ REGLAS CRÍTICAS DE INVENTARIO:
 4. Si el cliente pide una variante que no existe, dile amablemente que no está disponible y ofrece las que sí hay.
 5. Verifica siempre el stock disponible antes de prometer un producto.
 `
+        }
 
         // Add channel-specific instructions
         const channel = input.channel || "web"
