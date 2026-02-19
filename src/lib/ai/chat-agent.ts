@@ -5,7 +5,7 @@ import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHist
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 
-const AI_MODEL = "claude-3-5-haiku-latest"
+const AI_MODEL = "claude-haiku-4-5-latest"
 
 interface ProcessMessageInput {
     message: string
@@ -425,7 +425,7 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             response: "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",
             actions: [],
             metadata: {
-                model: "claude-3-5-haiku-latest",
+                model: AI_MODEL,
                 latency_ms: Date.now() - startTime,
                 tools_used: toolsUsed
             }
