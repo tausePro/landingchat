@@ -5,6 +5,8 @@ import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHist
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 
+const AI_MODEL = "claude-3-5-haiku-latest"
+
 interface ProcessMessageInput {
     message: string
     chatId: string
@@ -302,7 +304,7 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             console.log(`[processMessage] Loop ${loopCount}, calling Claude...`)
 
             const response = await createMessage({
-                model: "claude-3-5-haiku-latest",
+                model: AI_MODEL,
                 max_tokens: 1024,
                 system: fullSystemPrompt,
                 messages: currentMessages,
@@ -376,7 +378,7 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             sender_type: "bot",
             content: finalResponseText,
             metadata: {
-                model: "claude-3-5-haiku-latest",
+                model: AI_MODEL,
                 tools_used: toolsUsed,
                 latency_ms: Date.now() - startTime
             }
@@ -404,7 +406,7 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             response: finalResponseText,
             actions,
             metadata: {
-                model: "claude-sonnet-4-20250514",
+                model: AI_MODEL,
                 latency_ms: Date.now() - startTime,
                 tools_used: toolsUsed
             }
