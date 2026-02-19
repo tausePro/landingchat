@@ -1,6 +1,8 @@
 import { getPlatformWompiConfig } from "./actions"
 import { WompiConfigForm } from "./components/wompi-config-form"
 
+export const dynamic = 'force-dynamic'
+
 export default async function PlatformPaymentsPage() {
     const result = await getPlatformWompiConfig()
 
