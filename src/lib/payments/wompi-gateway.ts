@@ -41,65 +41,35 @@ export class WompiGateway implements PaymentGateway {
 
     async createTransaction(input: TransactionInput): Promise<TransactionResult> {
         try {
-            // Obtener token de aceptación
-            const acceptanceToken = await this.getAcceptanceToken()
+            // Wompi usa el Widget de Checkout del lado del cliente (checkout.wompi.co/widget.js)
+            // Similar a ePayco: redirigimos a una página interna que carga el widget
+            // La firma de integridad se genera server-side en la página de checkout
+            
+            const redirectUrl = input.redirectUrl || ""
+            let checkoutUrl: string
 
-            const body: Record<string, unknown> = {
-                amount_in_cents: input.amount,
-                currency: input.currency,
-                reference: input.reference,
-                customer_email: input.customerEmail,
-                acceptance_token: acceptanceToken,
-                redirect_url: input.redirectUrl,
-            }
-
-            // Configurar según método de pago
-            if (input.paymentMethod === "card" && input.cardToken) {
-                body.payment_method = {
-                    type: "CARD",
-                    token: input.cardToken,
-                    installments: 1,
-                }
-            } else if (input.paymentMethod === "pse" && input.bankCode) {
-                body.payment_method = {
-                    type: "PSE",
-                    user_type: input.personType === "juridica" ? 1 : 0,
-                    user_legal_id_type: input.customerDocumentType || "CC",
-                    user_legal_id: input.customerDocument,
-                    financial_institution_code: input.bankCode,
-                    payment_description: `Pago ${input.reference}`,
-                }
-            } else if (input.paymentMethod === "nequi") {
-                body.payment_method = {
-                    type: "NEQUI",
-                    phone_number: input.customerPhone,
-                }
-            }
-
-            const response = await fetch(`${this.baseUrl}/transactions`, {
-                method: "POST",
-                headers: this.getHeaders(),
-                body: JSON.stringify(body),
-            })
-
-            const data = await response.json()
-
-            if (!response.ok) {
-                return {
-                    success: false,
-                    status: "error",
-                    error: data.error?.message || "Error al crear transacción",
-                    rawResponse: data,
-                }
+            // Detectar si es dominio personalizado (no contiene /store/)
+            if (redirectUrl.includes("/store/")) {
+                const urlParts = redirectUrl.match(/(.+)\/store\/([^/]+)\/order\//)
+                const baseUrl = urlParts?.[1] || process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
+                const slug = urlParts?.[2] || ""
+                checkoutUrl = `${baseUrl}/store/${slug}/checkout/wompi/${input.reference}`
+            } else {
+                const urlParts = redirectUrl.match(/(.+)\/order\//)
+                const baseUrl = urlParts?.[1] || ""
+                checkoutUrl = `${baseUrl}/checkout/wompi/${input.reference}`
             }
 
             return {
                 success: true,
-                transactionId: data.data.id,
-                providerTransactionId: data.data.id,
-                status: this.mapStatus(data.data.status),
-                redirectUrl: data.data.redirect_url,
-                rawResponse: data,
+                transactionId: input.reference,
+                providerTransactionId: input.reference,
+                status: "pending",
+                redirectUrl: checkoutUrl,
+                rawResponse: {
+                    message: "Redirect to Wompi checkout widget page",
+                    checkoutUrl,
+                },
             }
         } catch (error) {
             return {
@@ -108,6 +78,21 @@ export class WompiGateway implements PaymentGateway {
                 error: error instanceof Error ? error.message : "Error desconocido",
             }
         }
+    }
+
+    /**
+     * Genera la firma de integridad SHA256 requerida por el Widget de Wompi
+     * Concatena: reference + amountInCents + currency + integritySecret
+     */
+    generateIntegritySignature(reference: string, amountInCents: number, currency: string): string {
+        if (!this.config.integritySecret) {
+            throw new Error("Integrity secret no configurado")
+        }
+        const concatenated = `${reference}${amountInCents}${currency}${this.config.integritySecret}`
+        return crypto
+            .createHash("sha256")
+            .update(concatenated)
+            .digest("hex")
     }
 
     async getTransaction(transactionId: string): Promise<TransactionDetails> {
