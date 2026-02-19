@@ -8,6 +8,8 @@ import { StorefrontForm } from "./components/storefront-form"
 import { CustomDomainForm } from "./components/custom-domain-form"
 import { StoreMaintenanceToggle } from "./components/store-maintenance-toggle"
 import { TaxSettingsForm } from "./components/tax-settings-form"
+import { PaymentSettingsPanel } from "./payments/components/payment-settings-panel"
+import { ChannelsSettingsPanel } from "./channels/components/channels-settings-panel"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
@@ -80,20 +82,7 @@ export default async function SettingsPage() {
                             <TaxSettingsForm organization={data.organization} />
                         </TabsContent>
                         <TabsContent value="payments">
-                            <div className="text-sm text-muted-foreground">
-                                <p>Configura tus pasarelas de pago para recibir pagos de tus clientes.</p>
-                                <div className="mt-4">
-                                    <Link
-                                        href="/dashboard/settings/payments"
-                                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                                    >
-                                        Ir a Configuración de Pagos
-                                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </Link>
-                                </div>
-                            </div>
+                            <PaymentSettingsPanel />
                         </TabsContent>
                         <TabsContent value="shipping">
                             <div className="text-sm text-muted-foreground">
@@ -112,20 +101,7 @@ export default async function SettingsPage() {
                             </div>
                         </TabsContent>
                         <TabsContent value="channels">
-                            <div className="text-sm text-muted-foreground">
-                                <p>Conecta WhatsApp, Instagram y Messenger para atender clientes con IA.</p>
-                                <div className="mt-4">
-                                    <Link
-                                        href="/dashboard/settings/channels"
-                                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-                                    >
-                                        Ir a Configuración de Canales
-                                        <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </Link>
-                                </div>
-                            </div>
+                            <ChannelsSettingsPanel />
                         </TabsContent>
                     </Tabs>
                 </div>
