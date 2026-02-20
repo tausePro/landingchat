@@ -208,7 +208,7 @@ export async function getShippingConfig(slug: string) {
             return {
                 success: true,
                 config: {
-                    default_shipping_rate: 5000, // Default 5000 COP
+                    default_shipping_rate: 0,
                     free_shipping_enabled: false,
                     free_shipping_min_amount: null,
                     free_shipping_zones: null

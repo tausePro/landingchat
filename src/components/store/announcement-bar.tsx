@@ -5,7 +5,8 @@ import { Zap } from "lucide-react"
 interface AnnouncementBarProps {
     shippingConfig?: {
         free_shipping_enabled: boolean
-        free_shipping_min_amount?: number
+        free_shipping_min_amount?: number | null
+        free_shipping_zones?: string[] | null
         default_shipping_rate?: number
     }
     primaryColor: string
@@ -21,6 +22,10 @@ export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBa
 
         // Si el envío gratis está habilitado
         if (shippingConfig.free_shipping_enabled) {
+            const zones = shippingConfig.free_shipping_zones
+            const hasZones = zones && zones.length > 0
+            const zonesText = hasZones ? ` a ${zones.join(", ")}` : ""
+
             // Si hay un monto mínimo configurado
             if (shippingConfig.free_shipping_min_amount && shippingConfig.free_shipping_min_amount > 0) {
                 const formattedAmount = new Intl.NumberFormat('es-CO', {
@@ -29,10 +34,12 @@ export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBa
                     minimumFractionDigits: 0
                 }).format(shippingConfig.free_shipping_min_amount)
 
-                return `Envío gratis a partir de ${formattedAmount}`
+                return `Envío gratis${zonesText} a partir de ${formattedAmount}`
             } else {
                 // Envío gratis sin monto mínimo
-                return "¡Envío gratis en todos los pedidos!"
+                return hasZones
+                    ? `¡Envío gratis${zonesText}!`
+                    : "¡Envío gratis en todos los pedidos!"
             }
         } else {
             // Envío gratis no habilitado, mostrar mensaje por defecto

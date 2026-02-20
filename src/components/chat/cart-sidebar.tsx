@@ -7,6 +7,7 @@ import { useState } from "react"
 interface ShippingConfig {
     free_shipping_enabled: boolean
     free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
     default_shipping_rate: number
 }
 
@@ -26,11 +27,15 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
 
     const currentTotal = total()
     
-    // Calcular envío gratis solo si está habilitado y tiene un monto mínimo
-    const freeShippingEnabled = shippingConfig?.free_shipping_enabled && shippingConfig?.free_shipping_min_amount
+    // Envío gratis: habilitado si free_shipping_enabled es true
+    // null min_amount = sin mínimo requerido (siempre gratis)
+    const freeShippingEnabled = shippingConfig?.free_shipping_enabled || false
+    const hasMinAmount = freeShippingEnabled && shippingConfig?.free_shipping_min_amount && shippingConfig.free_shipping_min_amount > 0
     const shippingThreshold = shippingConfig?.free_shipping_min_amount || 0
-    const progress = freeShippingEnabled ? Math.min((currentTotal / shippingThreshold) * 100, 100) : 0
-    const remainingForFreeShipping = freeShippingEnabled ? Math.max(shippingThreshold - currentTotal, 0) : 0
+    const progress = hasMinAmount ? Math.min((currentTotal / shippingThreshold) * 100, 100) : (freeShippingEnabled ? 100 : 0)
+    const remainingForFreeShipping = hasMinAmount ? Math.max(shippingThreshold - currentTotal, 0) : 0
+    const zones = shippingConfig?.free_shipping_zones
+    const zonesText = zones && zones.length > 0 ? ` a ${zones.join(", ")}` : ""
 
     const formatPrice = (price: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -86,9 +91,9 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 {freeShippingEnabled && (
                     <div className="bg-white dark:bg-gray-800 p-4 border-b border-gray-100 dark:border-gray-700">
                         <div className="flex justify-between items-end mb-1">
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Envío Gratis</span>
+                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Envío Gratis{zonesText}</span>
                             <span className="text-[10px] font-bold" style={{ color: primaryColor }}>
-                                {remainingForFreeShipping > 0 
+                                {hasMinAmount && remainingForFreeShipping > 0 
                                     ? `${formatPrice(remainingForFreeShipping)} más`
                                     : "¡Conseguido!"}
                             </span>
@@ -100,7 +105,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                             ></div>
                         </div>
                         <p className="text-[10px] text-gray-400 mt-1 text-right">
-                            {remainingForFreeShipping > 0 ? "¡Casi lo tienes!" : "¡Envío gratis activado!"}
+                            {hasMinAmount && remainingForFreeShipping > 0 ? "¡Casi lo tienes!" : `¡Envío gratis${zonesText} activado!`}
                         </p>
                     </div>
                 )}

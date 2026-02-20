@@ -248,7 +248,7 @@ export async function getShippingConfig(slug: string) {
     // 2. Obtener configuración de envío de la tabla shipping_settings
     const { data: shippingSettings, error: shippingError } = await supabase
         .from("shipping_settings")
-        .select("free_shipping_enabled, free_shipping_min_amount, default_shipping_rate")
+        .select("free_shipping_enabled, free_shipping_min_amount, free_shipping_zones, default_shipping_rate")
         .eq("organization_id", org.id)
         .single()
 
@@ -257,13 +257,15 @@ export async function getShippingConfig(slug: string) {
         return {
             free_shipping_enabled: false,
             free_shipping_min_amount: null,
-            default_shipping_rate: 5000
+            free_shipping_zones: null,
+            default_shipping_rate: 0
         }
     }
 
     return {
         free_shipping_enabled: shippingSettings.free_shipping_enabled || false,
         free_shipping_min_amount: shippingSettings.free_shipping_min_amount,
-        default_shipping_rate: shippingSettings.default_shipping_rate || 5000
+        free_shipping_zones: shippingSettings.free_shipping_zones || null,
+        default_shipping_rate: shippingSettings.default_shipping_rate ?? 0
     }
 }

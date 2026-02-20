@@ -24,7 +24,7 @@ interface CheckoutModalProps {
 
 
 import { getAvailablePaymentGateways, getShippingConfig, getManualPaymentInfo, calculateOrderSummary } from "../actions"
-import { calculateShippingCost } from "@/lib/utils/shipping"
+import { calculateShippingCost, getShippingAvailability } from "@/lib/utils/shipping"
 import { useEffect } from "react"
 
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
@@ -60,7 +60,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                 } else {
                     // Default shipping config
                     setShippingConfig({
-                        default_shipping_rate: 5000,
+                        default_shipping_rate: 0,
                         free_shipping_enabled: false,
                         free_shipping_min_amount: null,
                         free_shipping_zones: null
@@ -109,7 +109,8 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'epayco' | 'manual' | 'contraentrega'>('manual')
 
     const subtotal = total()
-    const shippingCost = shippingConfig ? calculateShippingCost(shippingConfig, subtotal, formData.city) : 0
+    const shippingAvailability = shippingConfig ? getShippingAvailability(shippingConfig, subtotal, formData.city) : { available: true, cost: 0 }
+    const shippingCost = shippingAvailability.cost
 
     // Order Summary Calculation
     const [orderSummary, setOrderSummary] = useState<{
@@ -178,6 +179,12 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
 
         if (!formData.state) {
             toast.error("Por favor selecciona tu departamento")
+            return
+        }
+
+        // Check shipping availability to customer's city
+        if (!shippingAvailability.available) {
+            toast.error(shippingAvailability.message || "No realizamos envíos a tu ciudad por el momento")
             return
         }
 
@@ -421,9 +428,15 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         value={formData.city}
                                         onChange={handleInputChange}
                                         placeholder="Ciudad"
-                                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                        className={`h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm ${!shippingAvailability.available && formData.city ? 'border-red-400 dark:border-red-500' : ''}`}
                                     />
                                 </div>
+                                {!shippingAvailability.available && formData.city && (
+                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                        <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">local_shipping</span>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300">{shippingAvailability.message}</p>
+                                    </div>
+                                )}
                                 <Input
                                     id="address"
                                     name="address"
