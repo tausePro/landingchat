@@ -195,6 +195,7 @@ export function ProductSectionEditor({ organization }: ProductSectionEditorProps
                         </SelectTrigger>
                         <SelectContent className="z-[9999] bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                             <SelectItem value="recent">Más recientes</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
                             <SelectItem value="price_asc">Precio menor</SelectItem>
                             <SelectItem value="price_desc">Precio mayor</SelectItem>
                             <SelectItem value="best_selling">Más vendidos</SelectItem>

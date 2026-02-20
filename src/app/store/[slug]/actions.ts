@@ -29,7 +29,9 @@ export async function getStoreData(slug: string, limit?: number) {
         .eq("organization_id", org.id)
 
     // Apply ordering based on configuration
-    if (orderBy === "price_asc") {
+    if (orderBy === "custom") {
+        query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false })
+    } else if (orderBy === "price_asc") {
         query = query.order("price", { ascending: true })
     } else if (orderBy === "price_desc") {
         query = query.order("price", { ascending: false })

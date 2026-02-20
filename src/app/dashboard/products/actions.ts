@@ -436,3 +436,44 @@ export async function uploadProductImage(
     return failure(err instanceof Error ? err.message : "Unknown error uploading image")
   }
 }
+
+/**
+ * Updates display_order for multiple products at once
+ * @param orderedIds - Array of product IDs in desired display order
+ */
+export async function updateProductOrder(orderedIds: string[]): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return failure("Unauthorized")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No organization found")
+
+    // Update each product's display_order based on its position in the array
+    const updates = orderedIds.map((id, index) =>
+      supabase
+        .from("products")
+        .update({ display_order: index + 1 })
+        .eq("id", id)
+        .eq("organization_id", profile.organization_id)
+    )
+
+    const results = await Promise.all(updates)
+    const firstError = results.find(r => r.error)
+    if (firstError?.error) {
+      return failure(firstError.error.message)
+    }
+
+    revalidatePath("/dashboard/products")
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Unknown error updating product order")
+  }
+}
