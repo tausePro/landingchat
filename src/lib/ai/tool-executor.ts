@@ -636,25 +636,32 @@ async function getShippingOptions(supabase: any, input: any, context: ToolContex
 async function applyDiscount(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { code } = ApplyDiscountSchema.parse(input)
 
-    const { data: discount, error } = await supabase
-        .from("discounts")
+    const { data: coupon, error } = await supabase
+        .from("coupons")
         .select("*")
         .eq("organization_id", context.organizationId)
         .eq("code", code.toUpperCase())
         .eq("is_active", true)
         .single()
 
-    if (error || !discount) {
+    if (error || !coupon) {
         return { success: false, error: "Código de descuento inválido o expirado" }
     }
 
-    // Verificar vigencia
     const now = new Date()
-    if (discount.valid_until && new Date(discount.valid_until) < now) {
+
+    // Verificar valid_from
+    if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+        return { success: false, error: "Este código aún no está vigente" }
+    }
+
+    // Verificar valid_until
+    if (coupon.valid_until && new Date(coupon.valid_until) < now) {
         return { success: false, error: "Este código ha expirado" }
     }
 
-    if (discount.max_uses && discount.used_count >= discount.max_uses) {
+    // Verificar límite de usos totales
+    if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) {
         return { success: false, error: "Este código ya alcanzó su límite de usos" }
     }
 
@@ -668,27 +675,47 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
 
     const subtotal = cart?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
 
-    if (discount.min_purchase && subtotal < discount.min_purchase) {
+    // Verificar compra mínima
+    if (coupon.min_purchase_amount && subtotal < Number(coupon.min_purchase_amount)) {
         return {
             success: false,
-            error: `Este código requiere una compra mínima de $${discount.min_purchase.toLocaleString()}`
+            error: `Este código requiere una compra mínima de $${Number(coupon.min_purchase_amount).toLocaleString()}`
         }
     }
 
     let discountAmount = 0
-    if (discount.type === "percentage") {
-        discountAmount = subtotal * (discount.value / 100)
-    } else {
-        discountAmount = discount.value
+    if (coupon.type === "percentage") {
+        discountAmount = subtotal * (Number(coupon.value) / 100)
+        // Aplicar tope máximo de descuento si existe
+        if (coupon.max_discount_amount && discountAmount > Number(coupon.max_discount_amount)) {
+            discountAmount = Number(coupon.max_discount_amount)
+        }
+    } else if (coupon.type === "fixed") {
+        discountAmount = Number(coupon.value)
+    } else if (coupon.type === "free_shipping") {
+        return {
+            success: true,
+            data: {
+                code: coupon.code,
+                type: "free_shipping",
+                value: 0,
+                discountAmount: 0,
+                freeShipping: true,
+                message: `¡Cupón ${coupon.code} aplicado! Envío gratis en tu compra.`,
+                newTotal: subtotal
+            }
+        }
     }
 
     return {
         success: true,
         data: {
-            code: discount.code,
-            type: discount.type,
-            value: discount.value,
+            code: coupon.code,
+            type: coupon.type,
+            value: Number(coupon.value),
             discountAmount,
+            freeShipping: false,
+            message: `¡Cupón ${coupon.code} aplicado! Descuento de $${discountAmount.toLocaleString()}`,
             newTotal: subtotal - discountAmount
         }
     }
