@@ -190,9 +190,27 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 className="object-cover"
                                 priority
                             />
-                            {/* Badges Overlay */}
+                            {/* Badges Overlay — only show badge assigned to this product or matching automatic rules */}
                             <div className="absolute top-4 left-4 flex flex-col gap-2">
-                                {badges.map(badge => (
+                                {badges
+                                    .filter(badge => {
+                                        // Manual badge: must match product.badge_id
+                                        if (badge.type === 'manual' || !badge.type) {
+                                            return badge.id === product.badge_id
+                                        }
+                                        // Automatic badge: check rules
+                                        if (badge.type === 'automatic' && badge.rules) {
+                                            if (badge.rules.discount_greater_than && product.sale_price) {
+                                                const discount = ((product.price - product.sale_price) / product.price) * 100
+                                                if (discount >= badge.rules.discount_greater_than) return true
+                                            }
+                                            if (badge.rules.category && product.categories?.includes(badge.rules.category)) return true
+                                            if (badge.rules.stock_status === 'low' && product.stock > 0 && product.stock <= 5) return true
+                                            if (badge.rules.stock_status === 'out' && product.stock === 0) return true
+                                        }
+                                        return false
+                                    })
+                                    .map(badge => (
                                     <div
                                         key={badge.id}
                                         className="px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"
