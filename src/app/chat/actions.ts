@@ -483,14 +483,18 @@ export async function createOrder(params: CreateOrderParams) {
                 .eq("id", org.id)
                 .single()
 
-            // Construir la URL base: usar dominio personalizado si existe, sino landingchat.co
+            // Construir la URL base según el tipo de dominio
             let baseUrl: string
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'
             if (orgDetails?.custom_domain) {
                 // Dominio personalizado: https://tez.com.co
                 baseUrl = `https://${orgDetails.custom_domain}`
+            } else if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
+                // Desarrollo local: http://localhost:3000/store/slug
+                baseUrl = `${appUrl}/store/${params.slug}`
             } else {
-                // Subdominio de landingchat: https://landingchat.co/store/slug
-                baseUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}`
+                // Producción: usar subdominio → https://qp.landingchat.co
+                baseUrl = `https://${params.slug}.landingchat.co`
             }
 
             const paymentResult = await paymentService.initiatePayment({

@@ -53,7 +53,13 @@ export async function retryPayment(orderId: string, slug: string) {
             customerDocument: customerInfo?.document_number || '',
             customerDocumentType: customerInfo?.document_type || 'CC',
             customerPhone: customerInfo?.phone || '',
-            returnUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${slug}/order/${order.id}`,
+            returnUrl: (() => {
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'
+                if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
+                    return `${appUrl}/store/${slug}/order/${order.id}`
+                }
+                return `https://${slug}.landingchat.co/order/${order.id}`
+            })(),
             paymentMethod: order.payment_method as "wompi" | "epayco"
         })
 
