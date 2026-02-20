@@ -83,7 +83,7 @@ export function EpaycoCheckoutClient({ data }: EpaycoCheckoutClientProps) {
                 
                 // Configuración del checkout
                 autoclick: "true", // Abre automáticamente
-                method_confirmation: "GET",
+                method_confirmation: "POST",
             })
         } catch (err) {
             console.error("[ePayco] Error opening checkout:", err)
