@@ -32,6 +32,8 @@ interface CreateOrderParams {
     shippingCost: number
     total: number
     paymentMethod: string
+    couponCode?: string
+    discountAmount?: number
     // Tracking fields
     sourceChannel?: "web" | "chat" | "whatsapp"
     chatId?: string
@@ -208,7 +210,7 @@ export async function getShippingConfig(slug: string) {
             return {
                 success: true,
                 config: {
-                    default_shipping_rate: 5000, // Default 5000 COP
+                    default_shipping_rate: 0,
                     free_shipping_enabled: false,
                     free_shipping_min_amount: null,
                     free_shipping_zones: null
@@ -308,6 +310,95 @@ export async function getManualPaymentInfo(slug: string) {
     }
 }
 
+
+/**
+ * Validate a coupon code for a given organization and subtotal
+ */
+export async function validateCoupon(slug: string, code: string, subtotal: number) {
+    const supabase = await createServiceClient()
+
+    try {
+        const { data: org } = await supabase
+            .from("organizations")
+            .select("id")
+            .eq("slug", slug)
+            .single()
+
+        if (!org) return { success: false, error: "Organización no encontrada" }
+
+        const { data: coupon, error } = await supabase
+            .from("coupons")
+            .select("*")
+            .eq("organization_id", org.id)
+            .eq("code", code.toUpperCase())
+            .eq("is_active", true)
+            .single()
+
+        if (error || !coupon) {
+            return { success: false, error: "Código de descuento inválido" }
+        }
+
+        const now = new Date()
+
+        if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+            return { success: false, error: "Este código aún no está vigente" }
+        }
+
+        if (coupon.valid_until && new Date(coupon.valid_until) < now) {
+            return { success: false, error: "Este código ha expirado" }
+        }
+
+        if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) {
+            return { success: false, error: "Este código ya alcanzó su límite de usos" }
+        }
+
+        if (coupon.min_purchase_amount && subtotal < Number(coupon.min_purchase_amount)) {
+            return {
+                success: false,
+                error: `Compra mínima de $${Number(coupon.min_purchase_amount).toLocaleString()} requerida`
+            }
+        }
+
+        let discountAmount = 0
+        if (coupon.type === "percentage") {
+            discountAmount = subtotal * (Number(coupon.value) / 100)
+            if (coupon.max_discount_amount && discountAmount > Number(coupon.max_discount_amount)) {
+                discountAmount = Number(coupon.max_discount_amount)
+            }
+        } else if (coupon.type === "fixed") {
+            discountAmount = Number(coupon.value)
+        } else if (coupon.type === "free_shipping") {
+            return {
+                success: true,
+                coupon: {
+                    code: coupon.code,
+                    type: coupon.type as string,
+                    value: 0,
+                    discountAmount: 0,
+                    freeShipping: true,
+                    description: coupon.description || "Envío gratis"
+                }
+            }
+        }
+
+        discountAmount = Math.round(discountAmount)
+
+        return {
+            success: true,
+            coupon: {
+                code: coupon.code,
+                type: coupon.type as string,
+                value: Number(coupon.value),
+                discountAmount,
+                freeShipping: false,
+                description: coupon.description || `Descuento de $${discountAmount.toLocaleString()}`
+            }
+        }
+    } catch (error) {
+        console.error("[validateCoupon] Error:", error)
+        return { success: false, error: "Error al validar cupón" }
+    }
+}
 
 export async function createOrder(params: CreateOrderParams) {
     // ⚠️ Security: Use service client to bypass RLS restrictions on orders/customers table
@@ -430,11 +521,13 @@ export async function createOrder(params: CreateOrderParams) {
         // But we must correct the 'total' with our calculated tax and fees for security.
 
         let finalTotal = params.subtotal
+        const discountAmount = params.discountAmount || 0
 
         if (!orgSettings?.prices_include_tax) {
             finalTotal += calculatedTax
         }
 
+        finalTotal -= discountAmount
         finalTotal += params.shippingCost + paymentMethodFee
 
         // If there's a small difference (rounding) vs frontend, prefer backend calc? 
@@ -449,7 +542,9 @@ export async function createOrder(params: CreateOrderParams) {
                 order_number: orderNumber,
                 customer_info: {
                     ...params.customerInfo,
-                    payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined
+                    payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined,
+                    coupon_code: params.couponCode || undefined,
+                    discount_amount: discountAmount > 0 ? discountAmount : undefined
                 },
                 items: orderItems,
                 subtotal: params.subtotal,
@@ -470,6 +565,28 @@ export async function createOrder(params: CreateOrderParams) {
         if (orderError) {
             console.error("[createOrder] Error creating order:", orderError)
             return { success: false, error: "Error al crear la orden" }
+        }
+
+        // Increment coupon usage if coupon was applied
+        if (params.couponCode) {
+            try {
+                // Get current coupon to increment
+                const { data: couponData } = await supabase
+                    .from("coupons")
+                    .select("id, current_uses")
+                    .eq("organization_id", org.id)
+                    .eq("code", params.couponCode.toUpperCase())
+                    .single()
+
+                if (couponData) {
+                    await supabase
+                        .from("coupons")
+                        .update({ current_uses: (couponData.current_uses || 0) + 1 })
+                        .eq("id", couponData.id)
+                }
+            } catch (e) {
+                console.error("[createOrder] Error incrementing coupon usage:", e)
+            }
         }
 
         // 7. If payment method requires online gateway, initiate payment

@@ -544,6 +544,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             cartItemCount={items.length}
             activeProducts={activeProducts} // Living Sidebar Data
             recommendedProducts={recommendedProducts}
+            shippingConfig={shippingConfig}
             customHeader={
                 <StoreHeader
                     slug={slug}

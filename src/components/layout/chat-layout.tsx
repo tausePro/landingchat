@@ -29,6 +29,12 @@ interface ChatLayoutProps {
     recommendedProducts?: any[]
     rightSidebar?: React.ReactNode
     primaryColor?: string
+    shippingConfig?: {
+        free_shipping_enabled: boolean
+        free_shipping_min_amount?: number | null
+        free_shipping_zones?: string[] | null
+        default_shipping_rate?: number
+    } | null
 }
 
 export function ChatLayout({
@@ -47,7 +53,8 @@ export function ChatLayout({
     activeProducts = [],
     recommendedProducts = [],
     rightSidebar,
-    primaryColor = "#3B82F6"
+    primaryColor = "#3B82F6",
+    shippingConfig
 }: ChatLayoutProps) {
     const [activeTab, setActiveTab] = React.useState<'para-ti' | 'historial'>('para-ti')
 
@@ -224,13 +231,20 @@ export function ChatLayout({
                                     )}
 
                                     {/* Active Offers */}
-                                    <section>
-                                        <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Ofertas Activas</h4>
-                                        <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
-                                            <p className="text-sm font-semibold" style={{ color: primaryColor }}>¡Envío gratis en pedidos superiores a $120.000!</p>
-                                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Aplica automáticamente en tu carrito.</p>
-                                        </div>
-                                    </section>
+                                    {shippingConfig?.free_shipping_enabled && (
+                                        <section>
+                                            <h4 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary mb-3">Ofertas Activas</h4>
+                                            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                                                <p className="text-sm font-semibold" style={{ color: primaryColor }}>
+                                                    {shippingConfig.free_shipping_min_amount && shippingConfig.free_shipping_min_amount > 0
+                                                        ? `¡Envío gratis${shippingConfig.free_shipping_zones?.length ? ` a ${shippingConfig.free_shipping_zones.join(", ")}` : ""} en pedidos desde $${shippingConfig.free_shipping_min_amount.toLocaleString()}!`
+                                                        : `¡Envío gratis${shippingConfig.free_shipping_zones?.length ? ` a ${shippingConfig.free_shipping_zones.join(", ")}` : " en todos los pedidos"}!`
+                                                    }
+                                                </p>
+                                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Aplica automáticamente en tu carrito.</p>
+                                            </div>
+                                        </section>
+                                    )}
 
                                     {/* FAQ */}
                                     <section>

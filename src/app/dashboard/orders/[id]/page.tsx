@@ -241,6 +241,17 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                         </span>
                                     </div>
                                 )}
+                                {order.customer_info?.discount_amount && order.customer_info.discount_amount > 0 && (
+                                    <div className="flex justify-between text-sm text-green-600">
+                                        <span className="flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-sm">confirmation_number</span>
+                                            Cupón {order.customer_info.coupon_code && <span className="font-mono text-xs">({order.customer_info.coupon_code})</span>}
+                                        </span>
+                                        <span className="font-medium">
+                                            -{formatCurrency(order.customer_info.discount_amount)}
+                                        </span>
+                                    </div>
+                                )}
 
                                 <div className="pt-3 border-t border-border-light dark:border-border-dark flex justify-between">
                                     <span className="font-bold text-text-light-primary dark:text-text-dark-primary">Total</span>

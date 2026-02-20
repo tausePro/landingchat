@@ -8,6 +8,7 @@ import { getStoreLink } from "@/lib/utils/store-urls"
 interface MinimalTemplateProps {
     organization: any
     products: any[]
+    badges?: any[]
     primaryColor: string
     heroSettings: any
     onStartChat: (productId?: string) => void
@@ -17,6 +18,7 @@ interface MinimalTemplateProps {
 export function MinimalTemplate({
     organization,
     products,
+    badges = [],
     primaryColor,
     heroSettings,
     onStartChat,
@@ -116,6 +118,7 @@ export function MinimalTemplate({
                                     key={product.id}
                                     product={product}
                                     productUrl={productUrl}
+                                    badges={badges}
                                     primaryColor={primaryColor}
                                 />
                             )

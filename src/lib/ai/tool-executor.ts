@@ -552,59 +552,116 @@ async function startCheckout(supabase: any, input: any, context: ToolContext): P
 async function getShippingOptions(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { city } = GetShippingOptionsSchema.parse(input)
 
-    // Por ahora, opciones fijas. Después se pueden configurar por organización
-    const options = [
-        {
+    // Leer configuración de envío de la organización
+    const { data: shippingSettings } = await supabase
+        .from("shipping_settings")
+        .select("*")
+        .eq("organization_id", context.organizationId)
+        .single()
+
+    const defaultRate = Number(shippingSettings?.default_shipping_rate) || 0
+    const freeShippingEnabled = shippingSettings?.free_shipping_enabled || false
+    const freeShippingMinAmount = Number(shippingSettings?.free_shipping_min_amount) || 0
+    const freeShippingZones: string[] = shippingSettings?.free_shipping_zones || []
+    const estimatedDays = shippingSettings?.estimated_delivery_days || 3
+
+    const options: Array<{ id: string; name: string; price: number; days: string }> = []
+
+    // Verificar si la ciudad está en las zonas configuradas (accent-insensitive)
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const cityNorm = normalize(city || "")
+    const hasZones = freeShippingZones.length > 0
+    const cityMatchesZone = !hasZones || freeShippingZones.some((zone: string) =>
+        cityNorm.includes(normalize(zone))
+    )
+
+    // Si hay zonas, la ciudad no coincide, y default_rate es 0 → no envían a esa ciudad
+    if (hasZones && !cityMatchesZone && defaultRate === 0) {
+        return {
+            success: true,
+            data: {
+                available: false,
+                options: [],
+                city,
+                message: `Por el momento solo realizamos envíos a ${freeShippingZones.join(", ")}. Pronto llegaremos a más ciudades.`,
+                availableZones: freeShippingZones
+            }
+        }
+    }
+
+    if (freeShippingEnabled && cityMatchesZone) {
+        options.push({
+            id: "free",
+            name: freeShippingMinAmount
+                ? `Envío Gratis (compras desde $${freeShippingMinAmount.toLocaleString()})`
+                : "Envío Gratis",
+            price: 0,
+            days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
+        })
+    }
+
+    // Tarifa estándar si tiene una configurada (para ciudades fuera de zonas gratis)
+    if (defaultRate > 0 && (!cityMatchesZone || !freeShippingEnabled)) {
+        options.push({
             id: "standard",
             name: "Envío Estándar",
-            price: 10000,
-            days: "3-5 días hábiles"
-        },
-        {
-            id: "express",
-            name: "Envío Express",
-            price: 20000,
-            days: "1-2 días hábiles"
-        }
-    ]
+            price: defaultRate,
+            days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
+        })
+    }
 
-    if (city?.toLowerCase().includes("bogota") || city?.toLowerCase().includes("bogotá")) {
+    // Si no hay opciones configuradas
+    if (options.length === 0) {
         options.push({
-            id: "same_day",
-            name: "Mismo Día",
-            price: 15000,
-            days: "Hoy"
+            id: "standard",
+            name: "Envío Estándar",
+            price: 0,
+            days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
         })
     }
 
     return {
         success: true,
-        data: { options, city }
+        data: {
+            available: true,
+            options,
+            city,
+            freeShippingEnabled,
+            freeShippingMinAmount,
+            freeShippingZones
+        }
     }
 }
 
 async function applyDiscount(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { code } = ApplyDiscountSchema.parse(input)
 
-    const { data: discount, error } = await supabase
-        .from("discounts")
+    const { data: coupon, error } = await supabase
+        .from("coupons")
         .select("*")
         .eq("organization_id", context.organizationId)
         .eq("code", code.toUpperCase())
         .eq("is_active", true)
         .single()
 
-    if (error || !discount) {
+    if (error || !coupon) {
         return { success: false, error: "Código de descuento inválido o expirado" }
     }
 
-    // Verificar vigencia
     const now = new Date()
-    if (discount.valid_until && new Date(discount.valid_until) < now) {
+
+    // Verificar valid_from
+    if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+        return { success: false, error: "Este código aún no está vigente" }
+    }
+
+    // Verificar valid_until
+    if (coupon.valid_until && new Date(coupon.valid_until) < now) {
         return { success: false, error: "Este código ha expirado" }
     }
 
-    if (discount.max_uses && discount.used_count >= discount.max_uses) {
+    // Verificar límite de usos totales
+    if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) {
         return { success: false, error: "Este código ya alcanzó su límite de usos" }
     }
 
@@ -618,27 +675,47 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
 
     const subtotal = cart?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
 
-    if (discount.min_purchase && subtotal < discount.min_purchase) {
+    // Verificar compra mínima
+    if (coupon.min_purchase_amount && subtotal < Number(coupon.min_purchase_amount)) {
         return {
             success: false,
-            error: `Este código requiere una compra mínima de $${discount.min_purchase.toLocaleString()}`
+            error: `Este código requiere una compra mínima de $${Number(coupon.min_purchase_amount).toLocaleString()}`
         }
     }
 
     let discountAmount = 0
-    if (discount.type === "percentage") {
-        discountAmount = subtotal * (discount.value / 100)
-    } else {
-        discountAmount = discount.value
+    if (coupon.type === "percentage") {
+        discountAmount = subtotal * (Number(coupon.value) / 100)
+        // Aplicar tope máximo de descuento si existe
+        if (coupon.max_discount_amount && discountAmount > Number(coupon.max_discount_amount)) {
+            discountAmount = Number(coupon.max_discount_amount)
+        }
+    } else if (coupon.type === "fixed") {
+        discountAmount = Number(coupon.value)
+    } else if (coupon.type === "free_shipping") {
+        return {
+            success: true,
+            data: {
+                code: coupon.code,
+                type: "free_shipping",
+                value: 0,
+                discountAmount: 0,
+                freeShipping: true,
+                message: `¡Cupón ${coupon.code} aplicado! Envío gratis en tu compra.`,
+                newTotal: subtotal
+            }
+        }
     }
 
     return {
         success: true,
         data: {
-            code: discount.code,
-            type: discount.type,
-            value: discount.value,
+            code: coupon.code,
+            type: coupon.type,
+            value: Number(coupon.value),
             discountAmount,
+            freeShipping: false,
+            message: `¡Cupón ${coupon.code} aplicado! Descuento de $${discountAmount.toLocaleString()}`,
             newTotal: subtotal - discountAmount
         }
     }
@@ -965,9 +1042,11 @@ async function renderCheckoutSummary(supabase: any, input: any, context: ToolCon
         .eq("organization_id", context.organizationId)
         .single()
 
-    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 120000
-    const defaultShipping = shippingSettings?.default_shipping_rate || 10000
-    const qualifiesForFreeShipping = subtotal >= freeShippingThreshold
+    const freeShippingEnabled = shippingSettings?.free_shipping_enabled || false
+    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 0
+    const defaultShipping = shippingSettings?.default_shipping_rate ?? 0
+    // null/0 min_amount = sin mínimo requerido (siempre gratis)
+    const qualifiesForFreeShipping = freeShippingEnabled && (!freeShippingThreshold || subtotal >= freeShippingThreshold)
 
     return {
         success: true,
@@ -1052,8 +1131,10 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
         .eq("organization_id", context.organizationId)
         .single()
 
-    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 120000
-    const shippingCost = subtotal >= freeShippingThreshold ? 0 : (shippingSettings?.default_shipping_rate || 7000)
+    const freeShippingEnabled = shippingSettings?.free_shipping_enabled || false
+    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 0
+    const qualifiesFreeShipping = freeShippingEnabled && (!freeShippingThreshold || subtotal >= freeShippingThreshold)
+    const shippingCost = qualifiesFreeShipping ? 0 : (shippingSettings?.default_shipping_rate ?? 0)
     const total = subtotal + shippingCost
 
     // Obtener organización para el slug

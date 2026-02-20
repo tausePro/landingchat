@@ -23,12 +23,12 @@ interface CheckoutModalProps {
 }
 
 
-import { getAvailablePaymentGateways, getShippingConfig, getManualPaymentInfo, calculateOrderSummary } from "../actions"
-import { calculateShippingCost } from "@/lib/utils/shipping"
+import { getAvailablePaymentGateways, getShippingConfig, getManualPaymentInfo, calculateOrderSummary, validateCoupon } from "../actions"
+import { calculateShippingCost, getShippingAvailability } from "@/lib/utils/shipping"
 import { useEffect } from "react"
 
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
-    const { items, total, clearCart } = useCartStore()
+    const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackInitiateCheckout } = useTracking()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
@@ -47,6 +47,11 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         cod_additional_cost?: number
     } | null>(null)
 
+    // Coupon state (appliedCoupon comes from cart store, shared with CartSidebar)
+    const [couponCode, setCouponCode] = useState("")
+    const [couponLoading, setCouponLoading] = useState(false)
+    const [couponError, setCouponError] = useState<string | null>(null)
+
     useEffect(() => {
         if (isOpen) {
             // Track InitiateCheckout event when modal opens
@@ -60,7 +65,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                 } else {
                     // Default shipping config
                     setShippingConfig({
-                        default_shipping_rate: 5000,
+                        default_shipping_rate: 0,
                         free_shipping_enabled: false,
                         free_shipping_min_amount: null,
                         free_shipping_zones: null
@@ -109,7 +114,8 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const [paymentMethod, setPaymentMethod] = useState<'wompi' | 'epayco' | 'manual' | 'contraentrega'>('manual')
 
     const subtotal = total()
-    const shippingCost = shippingConfig ? calculateShippingCost(shippingConfig, subtotal, formData.city) : 0
+    const shippingAvailability = shippingConfig ? getShippingAvailability(shippingConfig, subtotal, formData.city) : { available: true, cost: 0 }
+    const shippingCost = shippingAvailability.cost
 
     // Order Summary Calculation
     const [orderSummary, setOrderSummary] = useState<{
@@ -156,8 +162,13 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const localFee = (paymentMethod === 'contraentrega' && manualPaymentInfo?.cod_additional_cost) ? manualPaymentInfo.cod_additional_cost : 0
     const displayFee = orderSummary?.paymentMethodFee ?? localFee
 
+    // Coupon discount
+    const couponDiscount = appliedCoupon?.discountAmount || 0
+    const couponFreeShipping = appliedCoupon?.freeShipping || false
+
     // Final total for display and submission
-    const finalTotal = orderSummary?.total ?? (subtotal + shippingCost + localFee)
+    const baseTotal = orderSummary?.total ?? (subtotal + shippingCost + localFee)
+    const finalTotal = Math.max(0, baseTotal - couponDiscount - (couponFreeShipping ? displayShipping : 0))
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -165,6 +176,33 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
 
     const handleSelectChange = (name: string, value: string) => {
         setFormData({ ...formData, [name]: value })
+    }
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return
+        setCouponLoading(true)
+        setCouponError(null)
+        try {
+            const result = await validateCoupon(slug, couponCode.trim(), subtotal)
+            if (result.success && result.coupon) {
+                setAppliedCoupon(result.coupon)
+                setCouponCode("")
+                toast.success(`¡Cupón ${result.coupon.code} aplicado!`)
+            } else {
+                setCouponError(result.error || "Cupón inválido")
+                setAppliedCoupon(null)
+            }
+        } catch {
+            setCouponError("Error al validar cupón")
+        } finally {
+            setCouponLoading(false)
+        }
+    }
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null)
+        setCouponError(null)
+        setCouponCode("")
     }
 
     const handleSubmitContact = (e: React.FormEvent) => {
@@ -178,6 +216,12 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
 
         if (!formData.state) {
             toast.error("Por favor selecciona tu departamento")
+            return
+        }
+
+        // Check shipping availability to customer's city
+        if (!shippingAvailability.available) {
+            toast.error(shippingAvailability.message || "No realizamos envíos a tu ciudad por el momento")
             return
         }
 
@@ -200,9 +244,11 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                 customerInfo: formData,
                 items,
                 subtotal,
-                shippingCost,
+                shippingCost: couponFreeShipping ? 0 : shippingCost,
                 total: finalTotal,
                 paymentMethod,
+                couponCode: appliedCoupon?.code,
+                discountAmount: couponDiscount,
                 // Tracking fields
                 sourceChannel: sourceChannel || trackingParams.source_channel,
                 chatId: chatId,
@@ -421,9 +467,15 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         value={formData.city}
                                         onChange={handleInputChange}
                                         placeholder="Ciudad"
-                                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                        className={`h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm ${!shippingAvailability.available && formData.city ? 'border-red-400 dark:border-red-500' : ''}`}
                                     />
                                 </div>
+                                {!shippingAvailability.available && formData.city && (
+                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                                        <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">local_shipping</span>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300">{shippingAvailability.message}</p>
+                                    </div>
+                                )}
                                 <Input
                                     id="address"
                                     name="address"
@@ -450,6 +502,46 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
 
                     {step === 'payment' && (
                         <div className="space-y-6 py-4">
+                            {/* Coupon Input */}
+                            <div className="space-y-2">
+                                {appliedCoupon ? (
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
+                                        <div className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-green-600 text-lg">confirmation_number</span>
+                                            <div>
+                                                <span className="font-mono font-bold text-green-700 dark:text-green-300 text-sm">{appliedCoupon.code}</span>
+                                                <p className="text-xs text-green-600 dark:text-green-400">{appliedCoupon.description}</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={handleRemoveCoupon} className="text-red-500 hover:text-red-700 p-1">
+                                            <span className="material-symbols-outlined text-sm">close</span>
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="Código de cupón"
+                                            value={couponCode}
+                                            onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(null) }}
+                                            className="h-10 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
+                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleApplyCoupon())}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={handleApplyCoupon}
+                                            disabled={couponLoading || !couponCode.trim()}
+                                            className="h-10 px-4 shrink-0 text-sm"
+                                        >
+                                            {couponLoading ? "..." : "Aplicar"}
+                                        </Button>
+                                    </div>
+                                )}
+                                {couponError && (
+                                    <p className="text-xs text-red-500">{couponError}</p>
+                                )}
+                            </div>
+
                             {/* Order Summary */}
                             <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-2 text-sm">
                                 <div className="flex justify-between">
@@ -458,7 +550,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-slate-500 dark:text-slate-400">Envío</span>
-                                    <span>{formatPrice(displayShipping)}</span>
+                                    <span>{couponFreeShipping ? <span className="line-through text-slate-400 mr-1">{formatPrice(displayShipping)}</span> : null}{formatPrice(couponFreeShipping ? 0 : displayShipping)}</span>
                                 </div>
                                 {displayTax > 0 && (
                                     <div className="flex justify-between">
@@ -470,6 +562,12 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                     <div className="flex justify-between text-amber-600">
                                         <span>Costo Contraentrega</span>
                                         <span>{formatPrice(displayFee)}</span>
+                                    </div>
+                                )}
+                                {couponDiscount > 0 && (
+                                    <div className="flex justify-between text-green-600">
+                                        <span>Descuento ({appliedCoupon?.code})</span>
+                                        <span>-{formatPrice(couponDiscount)}</span>
                                     </div>
                                 )}
                                 <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-bold text-base">

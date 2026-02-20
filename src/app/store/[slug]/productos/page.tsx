@@ -19,7 +19,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
 
     if (!data) return notFound()
 
-    const { organization, products } = data
+    const { organization, products, badges } = data
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
 
@@ -55,7 +55,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
         : null
 
     return (
-        <StoreLayoutClient slug={slug} organization={organization} products={products}>
+        <StoreLayoutClient slug={slug} organization={organization} products={products} badges={badges}>
             {/* Track ViewCategory event */}
             <CategoryTracker
                 categoryId={categoria || "all-products"}
@@ -109,6 +109,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                                     product={product}
                                     productUrl={productUrl}
                                     primaryColor={primaryColor}
+                                    badges={badges}
                                 />
                             )
                         })}

@@ -29,7 +29,9 @@ export async function getStoreData(slug: string, limit?: number) {
         .eq("organization_id", org.id)
 
     // Apply ordering based on configuration
-    if (orderBy === "price_asc") {
+    if (orderBy === "custom") {
+        query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false })
+    } else if (orderBy === "price_asc") {
         query = query.order("price", { ascending: true })
     } else if (orderBy === "price_desc") {
         query = query.order("price", { ascending: false })
@@ -73,7 +75,13 @@ export async function getStoreData(slug: string, limit?: number) {
         properties = props || []
     }
 
-    // 6. Get WhatsApp phone from connected instance if not in settings
+    // 6. Fetch Badges for product cards
+    const { data: badges } = await supabase
+        .from("badges")
+        .select("*")
+        .eq("organization_id", org.id)
+
+    // 7. Get WhatsApp phone from connected instance if not in settings
     let whatsappPhone = org.settings?.whatsapp?.phone || org.settings?.contact?.phone
     if (!whatsappPhone) {
         const { data: whatsappInstance } = await supabase
@@ -105,7 +113,8 @@ export async function getStoreData(slug: string, limit?: number) {
         organization: enrichedOrg,
         products: products || [],
         pages: pages || [],
-        properties
+        properties,
+        badges: badges || []
     }
 }
 
@@ -248,7 +257,7 @@ export async function getShippingConfig(slug: string) {
     // 2. Obtener configuración de envío de la tabla shipping_settings
     const { data: shippingSettings, error: shippingError } = await supabase
         .from("shipping_settings")
-        .select("free_shipping_enabled, free_shipping_min_amount, default_shipping_rate")
+        .select("free_shipping_enabled, free_shipping_min_amount, free_shipping_zones, default_shipping_rate")
         .eq("organization_id", org.id)
         .single()
 
@@ -257,13 +266,15 @@ export async function getShippingConfig(slug: string) {
         return {
             free_shipping_enabled: false,
             free_shipping_min_amount: null,
-            default_shipping_rate: 5000
+            free_shipping_zones: null,
+            default_shipping_rate: 0
         }
     }
 
     return {
         free_shipping_enabled: shippingSettings.free_shipping_enabled || false,
         free_shipping_min_amount: shippingSettings.free_shipping_min_amount,
-        default_shipping_rate: shippingSettings.default_shipping_rate || 5000
+        free_shipping_zones: shippingSettings.free_shipping_zones || null,
+        default_shipping_rate: shippingSettings.default_shipping_rate ?? 0
     }
 }

@@ -1,9 +1,10 @@
 import { getProducts } from "./actions"
 import { ProductList } from "./components/product-list"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import Link from "next/link" // Added Link import
+import Link from "next/link"
 import { WooImportModal } from "./components/woo-import-modal"
 import { DeleteProductButton } from "./components/delete-product-button"
+import { ProductReorderToggle } from "./components/product-reorder-toggle"
 export const dynamic = 'force-dynamic'
 
 // Helper function for currency formatting (assuming it's needed for the new code)
@@ -32,6 +33,7 @@ export default async function ProductsPage() {
                         <p className="text-text-light-secondary dark:text-text-dark-secondary text-base font-normal leading-normal mt-1">Añade, edita y gestiona todos los productos de tu tienda.</p>
                     </div>
                     <div className="flex gap-3">
+                        <ProductReorderToggle products={products} />
                         <WooImportModal />
                         <Link href="/dashboard/products/new" className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 text-white text-sm font-bold shadow-sm hover:bg-primary/90">
                             <span className="material-symbols-outlined text-lg">add_circle</span>
