@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/hooks/use-media-query"
 interface ShippingConfig {
     free_shipping_enabled: boolean
     free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
     default_shipping_rate: number
 }
 
