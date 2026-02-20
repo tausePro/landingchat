@@ -567,11 +567,12 @@ async function getShippingOptions(supabase: any, input: any, context: ToolContex
 
     const options: Array<{ id: string; name: string; price: number; days: string }> = []
 
-    // Verificar si la ciudad está en las zonas configuradas
-    const cityLower = city?.toLowerCase() || ""
+    // Verificar si la ciudad está en las zonas configuradas (accent-insensitive)
+    const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const cityNorm = normalize(city || "")
     const hasZones = freeShippingZones.length > 0
     const cityMatchesZone = !hasZones || freeShippingZones.some((zone: string) =>
-        cityLower.includes(zone.toLowerCase())
+        cityNorm.includes(normalize(zone))
     )
 
     // Si hay zonas, la ciudad no coincide, y default_rate es 0 → no envían a esa ciudad

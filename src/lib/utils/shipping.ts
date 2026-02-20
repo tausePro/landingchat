@@ -2,6 +2,11 @@
  * Shipping utilities
  */
 
+// Normalize string: remove accents and lowercase for comparison
+function normalize(str: string): string {
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 export interface ShippingResult {
     available: boolean
     cost: number
@@ -30,7 +35,7 @@ export function getShippingAvailability(
 
     // Check if city matches any configured zone
     const cityMatchesZone = !hasZones || (customerCity && zones!.some((zone: string) =>
-        customerCity.toLowerCase().includes(zone.toLowerCase())
+        normalize(customerCity).includes(normalize(zone))
     ))
 
     // If org has zones and city doesn't match
