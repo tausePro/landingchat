@@ -10,7 +10,7 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
         return notFound()
     }
 
-    const { organization, products, pages, properties } = data
+    const { organization, products, pages, properties, badges } = data
 
     return (
         <StoreLayoutClient
@@ -19,6 +19,7 @@ export default async function StorePage({ params }: { params: Promise<{ slug: st
             products={products}
             pages={pages}
             properties={properties}
+            badges={badges}
         />
     )
 }

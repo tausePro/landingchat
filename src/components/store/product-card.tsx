@@ -12,6 +12,7 @@ interface ProductCardProps {
     product: any
     productUrl: string
     primaryColor: string
+    badges?: any[]
     showDescription?: boolean
     showPrices?: boolean
     showAddToCart?: boolean
@@ -52,6 +53,7 @@ export function ProductCard({
     product, 
     productUrl, 
     primaryColor, 
+    badges = [],
     showDescription = true,
     showPrices = true,
     showAddToCart = true,
@@ -160,8 +162,34 @@ export function ProductCard({
                     </button>
                 )}
 
+                {/* Product Marketing Badge */}
+                {(() => {
+                    const productBadge = badges.find(b => {
+                        if (b.type === 'manual' || !b.type) return b.id === product.badge_id
+                        if (b.type === 'automatic' && b.rules) {
+                            if (b.rules.discount_greater_than && product.sale_price) {
+                                const discount = ((product.price - product.sale_price) / product.price) * 100
+                                if (discount >= b.rules.discount_greater_than) return true
+                            }
+                            if (b.rules.category && product.categories?.includes(b.rules.category)) return true
+                            if (b.rules.stock_status === 'low' && product.stock > 0 && product.stock <= 5) return true
+                            if (b.rules.stock_status === 'out' && product.stock === 0) return true
+                        }
+                        return false
+                    })
+                    return productBadge ? (
+                        <div
+                            className="absolute top-2 left-2 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1 z-10"
+                            style={{ backgroundColor: productBadge.background_color, color: productBadge.text_color }}
+                        >
+                            {productBadge.icon && <span className="material-symbols-outlined text-[12px]">{productBadge.icon}</span>}
+                            {productBadge.display_text}
+                        </div>
+                    ) : null
+                })()}
+
                 {/* AI Recommended Badge */}
-                {showAIRecommended && (
+                {showAIRecommended && !product.badge_id && (
                     <div className="absolute top-2 left-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm">
                         ✨ IA
                     </div>
@@ -169,7 +197,7 @@ export function ProductCard({
 
                 {/* Badge for quantity in cart if > 0 */}
                 {quantity > 0 && !justAdded && (
-                    <div className="absolute top-2 left-2 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm">
+                    <div className={`absolute top-2 ${product.badge_id ? 'left-2 top-9' : 'left-2'} bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm`}>
                         {quantity} en carrito
                     </div>
                 )}

@@ -9,6 +9,7 @@ interface TemplateRendererProps {
     organization: any
     products: any[]
     properties?: any[]
+    badges?: any[]
     pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
@@ -21,6 +22,7 @@ export function TemplateRenderer({
     organization,
     products,
     properties = [],
+    badges = [],
     pages = [],
     primaryColor,
     heroSettings,
@@ -30,6 +32,7 @@ export function TemplateRenderer({
     const templateProps = {
         organization,
         products,
+        badges,
         pages,
         primaryColor,
         heroSettings,

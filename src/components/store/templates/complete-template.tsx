@@ -26,6 +26,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 interface CompleteTemplateProps {
     organization: any
     products: any[]
+    badges?: any[]
     pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
@@ -72,6 +73,7 @@ function CriticalImagePreloader({ heroImage, logoUrl }: { heroImage?: string, lo
 export function CompleteTemplate({
     organization,
     products,
+    badges = [],
     pages = [],
     primaryColor,
     heroSettings,
@@ -503,6 +505,7 @@ export function CompleteTemplate({
                                         key={product.id}
                                         product={product}
                                         productUrl={productUrl}
+                                        badges={badges}
                                         primaryColor={primaryColor}
                                         showPrices={productConfig.showPrices}
                                         showAddToCart={productConfig.showAddToCart}

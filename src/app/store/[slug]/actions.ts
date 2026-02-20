@@ -73,7 +73,13 @@ export async function getStoreData(slug: string, limit?: number) {
         properties = props || []
     }
 
-    // 6. Get WhatsApp phone from connected instance if not in settings
+    // 6. Fetch Badges for product cards
+    const { data: badges } = await supabase
+        .from("badges")
+        .select("*")
+        .eq("organization_id", org.id)
+
+    // 7. Get WhatsApp phone from connected instance if not in settings
     let whatsappPhone = org.settings?.whatsapp?.phone || org.settings?.contact?.phone
     if (!whatsappPhone) {
         const { data: whatsappInstance } = await supabase
@@ -105,7 +111,8 @@ export async function getStoreData(slug: string, limit?: number) {
         organization: enrichedOrg,
         products: products || [],
         pages: pages || [],
-        properties
+        properties,
+        badges: badges || []
     }
 }
 
