@@ -3,6 +3,7 @@
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { uploadProductImage } from "../actions"
+import { MediaSelectorModal } from "../../media/components/MediaSelectorModal"
 
 interface ImageUploadProps {
     organizationId: string
@@ -13,6 +14,7 @@ interface ImageUploadProps {
 export function ImageUpload({ organizationId, images, onImagesChange }: ImageUploadProps) {
     const [uploading, setUploading] = useState(false)
     const [dragActive, setDragActive] = useState(false)
+    const [mediaModalOpen, setMediaModalOpen] = useState(false)
     const inputRef = useRef<HTMLInputElement>(null)
 
     const handleDrag = (e: React.DragEvent) => {
@@ -74,10 +76,18 @@ export function ImageUpload({ organizationId, images, onImagesChange }: ImageUpl
         onImagesChange(newImages)
     }
 
+    const handleMediaSelect = (urls: string[]) => {
+        // Agregar solo URLs que no estén ya en la lista
+        const newUrls = urls.filter((url) => !images.includes(url))
+        if (newUrls.length > 0) {
+            onImagesChange([...images, ...newUrls])
+        }
+    }
+
     return (
         <div className="space-y-4">
             <div
-                className={`relative w-full h-48 flex justify-center items-center border-2 border-dashed rounded-lg cursor-pointer transition-colors ${dragActive
+                className={`relative w-full h-36 flex justify-center items-center border-2 border-dashed rounded-lg cursor-pointer transition-colors ${dragActive
                         ? "border-primary bg-primary/5"
                         : "border-border-light dark:border-border-dark hover:border-primary"
                     }`}
@@ -97,17 +107,27 @@ export function ImageUpload({ organizationId, images, onImagesChange }: ImageUpl
                     disabled={uploading}
                 />
                 <div className="flex flex-col items-center text-center text-muted-foreground">
-                    <span className="material-symbols-outlined text-4xl">
+                    <span className="material-symbols-outlined text-3xl">
                         {uploading ? "sync" : "cloud_upload"}
                     </span>
                     <p className="text-sm mt-1">
                         {uploading ? "Subiendo..." : (
-                            <>Arrastra y suelta o <span className="text-primary font-semibold">haz clic para subir</span></>
+                            <>Arrastra o <span className="text-primary font-semibold">haz clic para subir</span></>
                         )}
                     </p>
                     <p className="text-xs mt-1">PNG, JPG, GIF hasta 10MB</p>
                 </div>
             </div>
+
+            {/* Botón para seleccionar desde Media Manager */}
+            <button
+                type="button"
+                onClick={() => setMediaModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-border-light dark:border-border-dark text-text-light-primary dark:text-text-dark-primary hover:bg-background-light dark:hover:bg-background-dark transition-colors"
+            >
+                <span className="material-symbols-outlined text-lg text-primary">perm_media</span>
+                Seleccionar de Media
+            </button>
 
             {images.length > 0 && (
                 <div className="grid grid-cols-3 gap-4">
@@ -129,6 +149,16 @@ export function ImageUpload({ organizationId, images, onImagesChange }: ImageUpl
                     ))}
                 </div>
             )}
+
+            {/* Media Selector Modal */}
+            <MediaSelectorModal
+                open={mediaModalOpen}
+                onClose={() => setMediaModalOpen(false)}
+                onSelect={handleMediaSelect}
+                multiple
+                selectedUrls={images}
+                acceptTypes={["image"]}
+            />
         </div>
     )
 }
