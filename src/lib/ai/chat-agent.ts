@@ -5,7 +5,7 @@ import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHist
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 
-const AI_MODEL = "claude-haiku-4-5-latest"
+const AI_MODEL = "claude-haiku-4-5-20251001"
 
 interface ProcessMessageInput {
     message: string
