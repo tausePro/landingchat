@@ -160,7 +160,27 @@ export async function syncNubyProperties(
       }
     }
 
-    // 7. Actualizar integración
+    // 7. Soft-delete: marcar como inactive las propiedades que ya no vienen de la API
+    // Solo en sync full para evitar falsos positivos en incremental
+    if (syncType === 'full' && mappedProperties.length > 0) {
+      const syncedExternalIds = mappedProperties.map((p: any) => p.external_id)
+      const { data: deactivated, error: deactivateError } = await supabase
+        .from('properties')
+        .update({ status: 'inactive', status_detail: 'No encontrada en última sincronización' })
+        .eq('organization_id', organizationId)
+        .eq('status', 'active')
+        .not('external_id', 'in', `(${syncedExternalIds.join(',')})`)
+        .select('id')
+
+      if (deactivateError) {
+        console.error('Soft-delete error:', deactivateError.message)
+        result.errors.push(`Soft-delete error: ${deactivateError.message}`)
+      } else if (deactivated && deactivated.length > 0) {
+        console.log(`Soft-delete: ${deactivated.length} propiedades marcadas como inactive`)
+      }
+    }
+
+    // 8. Actualizar integración
     await supabase
       .from('integrations')
       .update({

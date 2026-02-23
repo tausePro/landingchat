@@ -172,8 +172,8 @@ export class NubyClient {
   async syncAllProperties(): Promise<NubyProperty[]> {
     const allProperties: NubyProperty[] = []
     let page = 1
-    const limit = 50 // Máximo recomendado
-    const maxPages = 2
+    const limit = 50
+    const maxPages = 20 // Hasta 1000 propiedades
 
     while (true) {
       const properties = await this.listProperties({ page, limit })
@@ -200,7 +200,7 @@ export class NubyClient {
     const seenCodes = new Set<string>()
     let page = 1
     const limit = 50
-    const maxPages = 2
+    const maxPages = 20 // Hasta 1000 propiedades
 
     while (true) {
       let properties: NubyProperty[] = []
