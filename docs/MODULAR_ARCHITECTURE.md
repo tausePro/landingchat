@@ -1,17 +1,17 @@
 # Arquitectura Modular — LandingChat
 
 > Documento de referencia para la transformación modular de la plataforma.
-> Última actualización: Febrero 2026
+> Última actualización: 20 Febrero 2026 (verificado con SQL en producción)
 
 ---
 
 ## 1. Estado Actual de Producción
 
-### 1.1 Infraestructura de módulos existente
+### 1.1 Infraestructura de módulos existente (verificado 20-Feb-2026)
 
 | Componente | Estado | Ubicación |
-|-----------|--------|-----------|
-| `module_definitions` (BD) | ✅ 13 módulos definidos | Tabla Supabase |
+|-----------|--------|----------|
+| `module_definitions` (BD) | ✅ 13 módulos, 9 columnas básicas | Tabla Supabase |
 | `organizations.enabled_modules` | ✅ text[] por org | Columna en organizations |
 | `organizations.vertical_config` | ✅ jsonb disponible | Columna en organizations |
 | `organizations.industry` | ✅ ecommerce/real_estate/other | Columna en organizations |
@@ -19,8 +19,47 @@
 | `subscriptions.features` | ✅ jsonb con flags boolean | Columna en subscriptions |
 | `src/types/industry.ts` | ✅ Tipos, enums, helpers | Código TypeScript |
 | `dashboard-layout.tsx` | ✅ Menú dinámico por módulos | Componente React |
-| `marketplace_items` (BD) | ⚠️ Tabla vacía | Tabla Supabase |
-| `plans` (BD) | ⚠️ Tabla vacía (0 filas) | Tabla Supabase |
+| `marketplace_items` (BD) | ⚠️ Tabla vacía, schema viejo | Tabla Supabase |
+| `plans` (BD) | ✅ 6 planes (4 activos, 2 inactivos) | Tabla Supabase |
+| `org_modules` (BD) | ❌ NO EXISTE | — |
+| `src/lib/modules/` | ❌ NO EXISTE | — |
+
+#### Columnas actuales de `module_definitions` (verificado SQL)
+```
+id (uuid), slug (text), name (text), description (text), icon (text),
+menu_path (text), menu_order (integer), is_core (boolean), created_at (timestamptz)
+```
+**Faltan:** category, min_plan_tier, monthly_price, is_marketplace_visible, config_schema, dependencies, ai_tools, status
+
+#### Plans en producción (verificado SQL)
+| Plan | Slug | Precio COP | Activo | Founding Tier |
+|------|------|-----------|--------|---------------|
+| Plan Gratuito | free | $0 | ✅ | — |
+| Starter | starter | $149.000 | ✅ | starter |
+| Pro | pro | $249.000 | ❌ | — |
+| Growth | growth | $299.000 | ✅ | growth |
+| Premium | premium | $499.000 | ✅ | premium |
+| Enterprise | enterprise | $599.000 | ❌ | — |
+
+### 1.1.1 Estado de Seguridad (verificado 20-Feb-2026)
+
+#### RLS en chats/messages — ✅ CORREGIDO
+Policies peligrosas `USING (true)` eliminadas. Policies actuales:
+- **chats:** 5 policies (SELECT org, SELECT anon 24h, INSERT public, UPDATE org, Agents SELECT public)
+- **messages:** 4 policies (SELECT org, SELECT anon chat, INSERT public, Agents SELECT public)
+- ⚠️ Policies "Agents can view..." con roles `{public}` — revisar USING clause
+
+#### RLS faltante — ❌ CRÍTICO
+- `carts` — **0 policies** (RLS habilitado pero sin policies = acceso denegado a todos)
+- `payment_transactions` — **0 policies** 
+- `usage_metrics` — **0 policies**
+
+#### Índices organization_id — ✅ 26 índices aplicados
+Todas las tablas multi-tenant tienen índice en `organization_id`.
+
+#### Rutas debug — ❌ PENDIENTE eliminar
+- `src/app/api/fix-customers-table/`
+- `src/app/api/fix-security-policies/`
 
 ### 1.2 Módulos actuales en `module_definitions`
 

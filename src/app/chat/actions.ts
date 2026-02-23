@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
+import { calculateTaxForItems, buildProductTaxMap, type OrgTaxSettings } from "@/lib/utils/tax"
 
 interface CreateOrderParams {
     slug: string
@@ -70,43 +71,22 @@ export async function calculateOrderSummary(params: {
 
         if (orgError || !org) return { success: false, error: "Organización no encontrada" }
 
-        // 2. Get Product Tax Rates
+        // 2. Get Product Tax Rates & Calculate Tax
         const productIds = params.items.map(item => item.id)
         const { data: products } = await supabase
             .from("products")
             .select("id, tax_rate")
             .in("id", productIds)
 
-        const productTaxMap = new Map()
-        products?.forEach(p => productTaxMap.set(p.id, p.tax_rate))
+        const productTaxMap = buildProductTaxMap(products)
+        const taxResult = calculateTaxForItems(
+            params.items,
+            productTaxMap,
+            { tax_enabled: org.tax_enabled, tax_rate: org.tax_rate, prices_include_tax: org.prices_include_tax }
+        )
+        const calculatedTax = taxResult.totalTax
 
-        // 3. Calculate Tax
-        let calculatedTax = 0
-
-        params.items.forEach(item => {
-            let itemTaxRate = 0
-            const productTaxRate = productTaxMap.get(item.id)
-
-            if (productTaxRate !== null && productTaxRate !== undefined) {
-                itemTaxRate = Number(productTaxRate)
-            } else if (org.tax_enabled) {
-                itemTaxRate = Number(org.tax_rate || 0)
-            }
-
-            if (itemTaxRate > 0) {
-                const itemTotal = item.price * item.quantity
-                if (org.prices_include_tax) {
-                    const basePrice = itemTotal / (1 + (itemTaxRate / 100))
-                    calculatedTax += itemTotal - basePrice
-                } else {
-                    calculatedTax += itemTotal * (itemTaxRate / 100)
-                }
-            }
-        })
-
-        calculatedTax = Math.round(calculatedTax * 100) / 100
-
-        // 4. Calculate Payment Fee
+        // 3. Calculate Payment Fee
         let paymentMethodFee = 0
         if (params.paymentMethod === 'contraentrega' || params.paymentMethod === 'cash_on_delivery') {
             const { data: manualPayment } = await supabase
@@ -120,12 +100,12 @@ export async function calculateOrderSummary(params: {
             }
         }
 
-        // 5. Calculate Final Total
-        let subtotal = params.items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+        // 4. Calculate Final Total
+        const subtotal = params.items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
         let total = subtotal
 
-        // If prices exclude tax, add calculated tax to total
-        // If prices include tax, tax is already in subtotal, so don't add
+        // Si precios NO incluyen IVA, sumar el impuesto al total
+        // Si precios incluyen IVA, el tax ya está en el subtotal
         if (!org.prices_include_tax) {
             total += calculatedTax
         }
@@ -135,6 +115,7 @@ export async function calculateOrderSummary(params: {
         return {
             success: true,
             subtotal,
+            baseSubtotal: taxResult.baseSubtotal,
             tax: calculatedTax,
             shipping: params.shippingCost || 0,
             paymentMethodFee,
@@ -447,9 +428,7 @@ export async function createOrder(params: CreateOrderParams) {
         // 3. Generate unique order number
         const orderNumber = generateOrderNumber()
 
-        // 4. Calculate tax 
         // 4. Calculate Taxes and Fees
-        let calculatedTax = 0
         let paymentMethodFee = 0
 
         // 4.1 Get Organization Tax Settings
@@ -467,47 +446,21 @@ export async function createOrder(params: CreateOrderParams) {
             }
         }
 
-        // 4.3 Calculate Tax per Item
-        // We need to fetch product tax rates to be accurate
+        // 4.3 Calculate Tax per Item (función centralizada)
         const productIds = params.items.map(item => item.id)
         const { data: products } = await supabase
             .from("products")
             .select("id, tax_rate")
             .in("id", productIds)
 
-        const productTaxMap = new Map()
-        products?.forEach(p => productTaxMap.set(p.id, p.tax_rate))
-
-        params.items.forEach(item => {
-            let itemTaxRate = 0
-
-            // Determine tax rate for this item
-            const productTaxRate = productTaxMap.get(item.id)
-
-            if (productTaxRate !== null && productTaxRate !== undefined) {
-                // Product has override (can be 0 for exempt)
-                itemTaxRate = Number(productTaxRate)
-            } else if (orgSettings?.tax_enabled) {
-                // Fallback to global rate
-                itemTaxRate = Number(orgSettings.tax_rate || 0)
-            }
-
-            if (itemTaxRate > 0) {
-                const itemTotal = item.price * item.quantity
-
-                if (orgSettings?.prices_include_tax) {
-                    // Price includes tax: Tax = Price - (Price / (1 + Rate))
-                    const basePrice = itemTotal / (1 + (itemTaxRate / 100))
-                    calculatedTax += itemTotal - basePrice
-                } else {
-                    // Price excludes tax: Tax = Price * Rate
-                    calculatedTax += itemTotal * (itemTaxRate / 100)
-                }
-            }
-        })
-
-        // Round tax to 2 decimals
-        calculatedTax = Math.round(calculatedTax * 100) / 100
+        const productTaxMap = buildProductTaxMap(products)
+        const orgTaxSettings: OrgTaxSettings = {
+            tax_enabled: orgSettings?.tax_enabled ?? false,
+            tax_rate: orgSettings?.tax_rate ?? 0,
+            prices_include_tax: orgSettings?.prices_include_tax ?? false,
+        }
+        const taxResult = calculateTaxForItems(params.items, productTaxMap, orgTaxSettings)
+        const calculatedTax = taxResult.totalTax
 
         // 5. Transform cart items to order items format
         const orderItems = transformCartItemsToOrderItems(params.items)
