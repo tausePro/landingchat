@@ -2,8 +2,8 @@
 
 import { useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
-import { validateCoupon } from "@/app/chat/actions"
+import { useState, useEffect } from "react"
+import { validateCoupon, calculateOrderSummary } from "@/app/chat/actions"
 
 interface ShippingConfig {
     free_shipping_enabled: boolean
@@ -27,8 +27,35 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
     const [couponCode, setCouponCode] = useState("")
     const [couponLoading, setCouponLoading] = useState(false)
     const [couponError, setCouponError] = useState<string | null>(null)
+    const [taxInfo, setTaxInfo] = useState<{ tax: number; baseSubtotal: number; pricesIncludeTax: boolean } | null>(null)
 
     const currentTotal = total()
+
+    // Calcular impuestos cuando cambian los items
+    useEffect(() => {
+        if (items.length === 0) {
+            setTaxInfo(null)
+            return
+        }
+
+        const fetchTax = async () => {
+            const result = await calculateOrderSummary({
+                slug,
+                items: items.map(i => ({ id: i.id, price: i.price, quantity: i.quantity })),
+            })
+            if (result.success && result.tax !== undefined && result.tax > 0) {
+                setTaxInfo({
+                    tax: result.tax,
+                    baseSubtotal: result.baseSubtotal || result.subtotal || currentTotal,
+                    pricesIncludeTax: result.pricesIncludeTax || false,
+                })
+            } else {
+                setTaxInfo(null)
+            }
+        }
+
+        fetchTax()
+    }, [items, slug, currentTotal])
 
     const handleApplyCoupon = async () => {
         if (!couponCode.trim()) return
@@ -268,9 +295,19 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 <div className="p-5 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-30 shrink-0">
                     <div className="space-y-1.5 mb-4">
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                            <span>Subtotal</span>
-                            <span className="font-medium text-gray-900 dark:text-white">{formatPrice(currentTotal)}</span>
+                            <span>{taxInfo ? 'Base gravable' : 'Subtotal'}</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                                {formatPrice(taxInfo ? taxInfo.baseSubtotal : currentTotal)}
+                            </span>
                         </div>
+                        {taxInfo && taxInfo.tax > 0 && (
+                            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                <span>IVA{taxInfo.pricesIncludeTax ? ' (incluido)' : ''}</span>
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                    {taxInfo.pricesIncludeTax ? '' : '+'}{formatPrice(taxInfo.tax)}
+                                </span>
+                            </div>
+                        )}
                         {(appliedCoupon?.discountAmount || 0) > 0 && (
                             <div className="flex justify-between text-xs text-green-600">
                                 <span>Descuento ({appliedCoupon?.code})</span>

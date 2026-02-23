@@ -120,6 +120,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     // Order Summary Calculation
     const [orderSummary, setOrderSummary] = useState<{
         subtotal: number
+        baseSubtotal: number
         tax: number
         shipping: number
         paymentMethodFee: number
@@ -141,6 +142,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
             if (result.success && result.subtotal !== undefined) {
                 setOrderSummary({
                     subtotal: result.subtotal,
+                    baseSubtotal: result.baseSubtotal || result.subtotal,
                     tax: result.tax || 0,
                     shipping: result.shipping || 0,
                     paymentMethodFee: result.paymentMethodFee || 0,
@@ -155,7 +157,12 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     }, [items, slug, paymentMethod, shippingCost])
 
     // Fallback totals if summary is loading or failed
-    const displaySubtotal = orderSummary?.subtotal ?? subtotal
+    // Si IVA incluido: mostrar base gravable como subtotal para discriminar
+    // Si +IVA: mostrar precio tal cual como subtotal
+    const pricesIncludeTax = orderSummary?.pricesIncludeTax ?? false
+    const displaySubtotal = (pricesIncludeTax && orderSummary?.baseSubtotal)
+        ? orderSummary.baseSubtotal
+        : (orderSummary?.subtotal ?? subtotal)
     const displayShipping = orderSummary?.shipping ?? shippingCost
     const displayTax = orderSummary?.tax ?? 0
     // Calculate local fallback fee
@@ -545,19 +552,23 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                             {/* Order Summary */}
                             <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-2 text-sm">
                                 <div className="flex justify-between">
-                                    <span className="text-slate-500 dark:text-slate-400">Subtotal ({items.length} items)</span>
-                                    <span>{formatPrice(subtotal)}</span>
+                                    <span className="text-slate-500 dark:text-slate-400">
+                                        {displayTax > 0 ? 'Base gravable' : `Subtotal (${items.length} items)`}
+                                    </span>
+                                    <span>{formatPrice(displaySubtotal)}</span>
                                 </div>
+                                {displayTax > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500 dark:text-slate-400">
+                                            IVA{pricesIncludeTax ? ' (incluido)' : ''}
+                                        </span>
+                                        <span>{pricesIncludeTax ? '' : '+'}{formatPrice(displayTax)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between">
                                     <span className="text-slate-500 dark:text-slate-400">Envío</span>
                                     <span>{couponFreeShipping ? <span className="line-through text-slate-400 mr-1">{formatPrice(displayShipping)}</span> : null}{formatPrice(couponFreeShipping ? 0 : displayShipping)}</span>
                                 </div>
-                                {displayTax > 0 && (
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-500 dark:text-slate-400">Impuestos</span>
-                                        <span>{formatPrice(displayTax)}</span>
-                                    </div>
-                                )}
                                 {displayFee > 0 && (
                                     <div className="flex justify-between text-amber-600">
                                         <span>Costo Contraentrega</span>
@@ -608,14 +619,16 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                             </div>
                                         ))}
 
-                                        {/* Always show manual payment option */}
-                                        <div
-                                            className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                            onClick={() => setPaymentMethod('manual')}
-                                        >
-                                            <span className="font-bold">Transferencia</span>
-                                            <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
-                                        </div>
+                                        {/* Show manual payment only if bank_transfer_enabled */}
+                                        {manualPaymentInfo?.bank_transfer_enabled && (
+                                            <div
+                                                className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                onClick={() => setPaymentMethod('manual')}
+                                            >
+                                                <span className="font-bold">Transferencia</span>
+                                                <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
+                                            </div>
+                                        )}
 
                                         {/* Show COD option if enabled */}
                                         {manualPaymentInfo?.cod_enabled && (

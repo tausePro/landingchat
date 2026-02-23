@@ -133,34 +133,13 @@ export async function createProduct(
     const slugs = existingSlugs?.map(p => p.slug) || []
     const slug = generateUniqueSlug(baseSlug, slugs)
 
-    // 5. Insert product
+    // 5. Insert product (spread parsed.data para incluir TODOS los campos validados)
     const { data, error } = await supabase
       .from("products")
       .insert({
+        ...parsed.data,
         organization_id: profile.organization_id,
-        name: parsed.data.name,
-        slug: slug,
-        description: parsed.data.description,
-        price: parsed.data.price,
-        image_url: parsed.data.image_url,
-        stock: parsed.data.stock ?? 0,
-        sku: parsed.data.sku,
-        categories: parsed.data.categories ?? [],
-        images: parsed.data.images ?? [],
-        variants: parsed.data.variants ?? [],
-        options: parsed.data.options ?? [],
-        is_active: parsed.data.is_active ?? true,
-        is_subscription: parsed.data.is_subscription ?? false,
-        is_configurable: parsed.data.is_configurable ?? false,
-        subscription_config: parsed.data.subscription_config ?? null,
-        configurable_options: parsed.data.configurable_options ?? null,
-        sale_price: parsed.data.sale_price ?? null,
-        badge_id: parsed.data.badge_id ?? null,
-        // Bundle fields
-        is_bundle: parsed.data.is_bundle ?? false,
-        bundle_items: parsed.data.bundle_items ?? [],
-        bundle_discount_type: parsed.data.bundle_discount_type ?? null,
-        bundle_discount_value: parsed.data.bundle_discount_value ?? 0,
+        slug,
       })
       .select()
       .single()

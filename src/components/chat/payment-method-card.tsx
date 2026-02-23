@@ -18,6 +18,7 @@ interface PaymentMethodCardProps {
     shippingCost: number
     className?: string
     loading?: boolean
+    manualPaymentEnabled?: boolean
 }
 
 export function PaymentMethodCard({
@@ -27,7 +28,8 @@ export function PaymentMethodCard({
     subtotal,
     shippingCost,
     className,
-    loading = false
+    loading = false,
+    manualPaymentEnabled = false
 }: PaymentMethodCardProps) {
     const [selectedMethod, setSelectedMethod] = useState<string>("")
     const total = subtotal + shippingCost
@@ -36,10 +38,10 @@ export function PaymentMethodCard({
     useEffect(() => {
         if (availableGateways.length > 0 && !selectedMethod) {
             setSelectedMethod(availableGateways[0].provider)
-        } else if (availableGateways.length === 0 && !selectedMethod) {
+        } else if (availableGateways.length === 0 && manualPaymentEnabled && !selectedMethod) {
             setSelectedMethod("manual")
         }
-    }, [availableGateways, selectedMethod])
+    }, [availableGateways, selectedMethod, manualPaymentEnabled])
 
     const formatPrice = (price: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -151,28 +153,30 @@ export function PaymentMethodCard({
                         )
                     })}
 
-                    {/* Manual payment always available */}
-                    <button
-                        type="button"
-                        onClick={() => setSelectedMethod("manual")}
-                        className={cn(
-                            "w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
-                            selectedMethod === "manual"
-                                ? "border-primary bg-primary/5"
-                                : "border-slate-200 dark:border-slate-700 hover:border-slate-300"
-                        )}
-                    >
-                        <span className="text-2xl">🏦</span>
-                        <div className="flex-1">
-                            <p className="font-medium text-slate-900 dark:text-white">
-                                Transferencia Manual
-                            </p>
-                            <p className="text-xs text-slate-500">Bancolombia, Nequi, Daviplata</p>
-                        </div>
-                        {selectedMethod === "manual" && (
-                            <span className="material-symbols-outlined text-primary">check_circle</span>
-                        )}
-                    </button>
+                    {/* Show manual payment only if enabled */}
+                    {manualPaymentEnabled && (
+                        <button
+                            type="button"
+                            onClick={() => setSelectedMethod("manual")}
+                            className={cn(
+                                "w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
+                                selectedMethod === "manual"
+                                    ? "border-primary bg-primary/5"
+                                    : "border-slate-200 dark:border-slate-700 hover:border-slate-300"
+                            )}
+                        >
+                            <span className="text-2xl">🏦</span>
+                            <div className="flex-1">
+                                <p className="font-medium text-slate-900 dark:text-white">
+                                    Transferencia Manual
+                                </p>
+                                <p className="text-xs text-slate-500">Bancolombia, Nequi, Daviplata</p>
+                            </div>
+                            {selectedMethod === "manual" && (
+                                <span className="material-symbols-outlined text-primary">check_circle</span>
+                            )}
+                        </button>
+                    )}
                 </div>
 
                 {/* Actions */}
