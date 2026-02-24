@@ -70,6 +70,7 @@ export async function getStoreData(slug: string, limit?: number) {
             .select('*')
             .eq('organization_id', org.id)
             .eq('status', 'active')
+            .order('is_featured', { ascending: false })
             .order('created_at', { ascending: false })
         
         properties = props || []

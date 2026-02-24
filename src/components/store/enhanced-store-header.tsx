@@ -30,6 +30,7 @@ interface EnhancedStoreHeaderProps {
     menuItems?: MenuItem[]
     className?: string
     hideChatButton?: boolean
+    isRealEstate?: boolean
     shippingConfig?: {
         free_shipping_enabled: boolean
         free_shipping_min_amount?: number
@@ -47,6 +48,7 @@ export function EnhancedStoreHeader({
     menuItems = [],
     className = "",
     hideChatButton = false,
+    isRealEstate = false,
     shippingConfig
 }: EnhancedStoreHeaderProps) {
     const router = useRouter()
@@ -87,11 +89,13 @@ export function EnhancedStoreHeader({
 
     return (
         <div className={`sticky top-0 z-50 w-full ${hideOnMobile ? 'hidden md:block' : ''} ${className}`}>
-            {/* Barra superior de anuncios */}
-            <AnnouncementBar
-                shippingConfig={shippingConfig}
-                primaryColor={primaryColor}
-            />
+            {/* Barra superior de anuncios (solo e-commerce, no inmobiliarias) */}
+            {!isRealEstate && (
+                <AnnouncementBar
+                    shippingConfig={shippingConfig}
+                    primaryColor={primaryColor}
+                />
+            )}
 
             {/* Header principal */}
             <header className="w-full border-b bg-white/95 backdrop-blur-md">
@@ -200,19 +204,21 @@ export function EnhancedStoreHeader({
                             <User className="w-5 h-5" />
                         </a>
 
-                        {/* Cart Button */}
-                        <button
-                            onClick={() => toggleCart()}
-                            className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
-                            aria-label="Ver carrito"
-                        >
-                            <ShoppingBag className="w-5 h-5" />
-                            {mounted && cartCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center border-2 border-white">
-                                    {cartCount}
-                                </span>
-                            )}
-                        </button>
+                        {/* Cart Button (oculto para inmobiliarias) */}
+                        {!isRealEstate && (
+                            <button
+                                onClick={() => toggleCart()}
+                                className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                                aria-label="Ver carrito"
+                            >
+                                <ShoppingBag className="w-5 h-5" />
+                                {mounted && cartCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center border-2 border-white">
+                                        {cartCount}
+                                    </span>
+                                )}
+                            </button>
+                        )}
 
                         {/* Chat Button - Desktop */}
                         {!hideChatButton && (
@@ -222,7 +228,7 @@ export function EnhancedStoreHeader({
                                 className="hidden md:flex font-bold shadow-lg text-sm px-6 h-10 rounded-full items-center gap-2"
                             >
                                 <MessageCircle className="w-4 h-4" />
-                                Iniciar Chat
+                                {isRealEstate ? "Agenda tu visita" : "Iniciar Chat"}
                             </Button>
                         )}
                     </div>

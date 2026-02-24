@@ -4,6 +4,7 @@ import { useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { validateCoupon, calculateOrderSummary } from "@/app/chat/actions"
+import { calculateCouponDiscount } from "@/lib/utils/coupon"
 
 interface ShippingConfig {
     free_shipping_enabled: boolean
@@ -30,6 +31,10 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
     const [taxInfo, setTaxInfo] = useState<{ tax: number; baseSubtotal: number; pricesIncludeTax: boolean } | null>(null)
 
     const currentTotal = total()
+
+    // Descuento reactivo: recalcular cada vez que cambia el carrito
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, currentTotal)
+    const couponFreeShipping = appliedCoupon?.freeShipping || false
 
     // Calcular impuestos cuando cambian los items
     useEffect(() => {
@@ -308,10 +313,10 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                 </span>
                             </div>
                         )}
-                        {(appliedCoupon?.discountAmount || 0) > 0 && (
+                        {couponDiscount > 0 && (
                             <div className="flex justify-between text-xs text-green-600">
                                 <span>Descuento ({appliedCoupon?.code})</span>
-                                <span className="font-medium">-{formatPrice(appliedCoupon!.discountAmount)}</span>
+                                <span className="font-medium">-{formatPrice(couponDiscount)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -322,7 +327,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                         </div>
                         <div className="pt-3 mt-1 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-end">
                             <span className="text-sm font-bold text-gray-900 dark:text-white">Total a Pagar</span>
-                            <span className="text-lg font-extrabold" style={{ color: primaryColor }}>{formatPrice(Math.max(0, currentTotal - (appliedCoupon?.discountAmount || 0)))}</span>
+                            <span className="text-lg font-extrabold" style={{ color: primaryColor }}>{formatPrice(Math.max(0, currentTotal - couponDiscount))}</span>
                         </div>
                     </div>
                     <button 

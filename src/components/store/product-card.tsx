@@ -3,7 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { CheckCircle2, ShoppingBag, Plus, Check } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useCartStore } from "@/store/cart-store"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { toast } from "sonner"
@@ -63,6 +63,9 @@ export function ProductCard({
     const { trackAddToCart } = useTracking()
     const [isAdding, setIsAdding] = useState(false)
     const [justAdded, setJustAdded] = useState(false)
+    const [hasMounted, setHasMounted] = useState(false)
+
+    useEffect(() => { setHasMounted(true) }, [])
 
     // Check if product is already in cart
     const inCart = items.find(i => i.id === product.id)
@@ -195,8 +198,8 @@ export function ProductCard({
                     </div>
                 )}
 
-                {/* Badge for quantity in cart if > 0 */}
-                {quantity > 0 && !justAdded && (
+                {/* Badge for quantity in cart if > 0 (solo después de hidratación para evitar mismatch con Zustand persist) */}
+                {hasMounted && quantity > 0 && !justAdded && (
                     <div className={`absolute top-2 ${product.badge_id ? 'left-2 top-9' : 'left-2'} bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm`}>
                         {quantity} en carrito
                     </div>

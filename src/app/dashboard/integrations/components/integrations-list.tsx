@@ -17,8 +17,10 @@ export function IntegrationsList({ integrations }: IntegrationsListProps) {
   const router = useRouter()
   const [isNubyDialogOpen, setIsNubyDialogOpen] = useState(false)
   const [syncing, setSyncing] = useState<string | null>(null)
+  const [connectingGcal, setConnectingGcal] = useState(false)
 
   const nubyIntegration = integrations.find(i => i.provider === 'nuby')
+  const gcalIntegration = integrations.find(i => i.provider === 'google_calendar')
 
   const handleSync = async (provider: string, syncType: 'full' | 'incremental') => {
     setSyncing(provider)
@@ -144,6 +146,95 @@ export function IntegrationsList({ integrations }: IntegrationsListProps) {
                   onClick={() => setIsNubyDialogOpen(true)}
                 >
                   Conectar Nuby
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Google Calendar Integration Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="size-12 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <span className="text-2xl">📅</span>
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Google Calendar</CardTitle>
+                  <CardDescription>Sincroniza citas automáticamente</CardDescription>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {gcalIntegration && gcalIntegration.status === 'connected' ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estado</span>
+                  <Badge variant="default">Conectado</Badge>
+                </div>
+
+                {gcalIntegration.config?.connected_at && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Conectado desde</span>
+                    <span className="text-sm" suppressHydrationWarning>
+                      {new Date(gcalIntegration.config.connected_at).toLocaleDateString('es-ES')}
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Las citas agendadas por el agente AI se crean automáticamente en tu Google Calendar.
+                </p>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-red-600"
+                  onClick={() => handleDisconnect(gcalIntegration.id)}
+                >
+                  Desconectar
+                </Button>
+              </>
+            ) : gcalIntegration && gcalIntegration.status === 'error' ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Estado</span>
+                  <Badge variant="destructive">Error</Badge>
+                </div>
+                {gcalIntegration.error_message && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                    <p className="text-sm text-red-600 dark:text-red-400">
+                      {gcalIntegration.error_message}
+                    </p>
+                  </div>
+                )}
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setConnectingGcal(true)
+                    window.location.href = '/api/integrations/google-calendar/connect'
+                  }}
+                  disabled={connectingGcal}
+                >
+                  {connectingGcal ? 'Redirigiendo...' : 'Reconectar'}
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Conecta tu Google Calendar para sincronizar citas agendadas por el agente AI automáticamente.
+                </p>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setConnectingGcal(true)
+                    window.location.href = '/api/integrations/google-calendar/connect'
+                  }}
+                  disabled={connectingGcal}
+                >
+                  {connectingGcal ? 'Redirigiendo a Google...' : 'Conectar Google Calendar'}
                 </Button>
               </>
             )}

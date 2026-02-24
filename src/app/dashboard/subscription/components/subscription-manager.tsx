@@ -383,6 +383,24 @@ export function SubscriptionManager({
                                                 {plan.max_monthly_conversations === -1 ? "Conv. ilimitadas" : `${plan.max_monthly_conversations.toLocaleString("es-CO")} conv/mes`}
                                             </span>
                                         </li>
+                                        {plan.features?.ecommerce && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500" />
+                                                <span>Módulo E-Commerce</span>
+                                            </li>
+                                        )}
+                                        {plan.features?.real_estate && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500" />
+                                                <span>Módulo Inmobiliario</span>
+                                            </li>
+                                        )}
+                                        {plan.features?.appointments && (
+                                            <li className="flex items-center gap-2">
+                                                <Check className="size-4 text-green-500" />
+                                                <span>Agendamiento de Citas</span>
+                                            </li>
+                                        )}
                                         {plan.features?.crm_integration && (
                                             <li className="flex items-center gap-2">
                                                 <Check className="size-4 text-green-500" />

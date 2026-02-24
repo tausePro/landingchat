@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-properties",
+      "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/subscriptions/process-trials",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

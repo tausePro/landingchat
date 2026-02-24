@@ -313,12 +313,32 @@ async function getProductAvailability(supabase: any, input: any, context: ToolCo
         return { success: false, error: "Producto no encontrado" }
     }
 
+    // Verificar stock por variante si alguna variante lo tiene habilitado
+    const variantStock: Record<string, Record<string, number>> = {}
+    let hasVariantStock = false
+
+    if (product.variants && Array.isArray(product.variants)) {
+        for (const v of product.variants) {
+            if (v.hasStockByVariant && v.stockByVariant) {
+                hasVariantStock = true
+                variantStock[v.type] = {}
+                for (const [val, qty] of Object.entries(v.stockByVariant)) {
+                    variantStock[v.type][val] = qty as number
+                }
+            }
+        }
+    }
+
     return {
         success: true,
         data: {
             available: product.stock > 0,
             quantity: product.stock,
-            productName: product.name
+            productName: product.name,
+            ...(hasVariantStock && {
+                stockByVariant: variantStock,
+                note: "Este producto tiene inventario por variante. Verifica disponibilidad de la variante específica antes de agregar al carrito."
+            })
         }
     }
 }
@@ -326,10 +346,10 @@ async function getProductAvailability(supabase: any, input: any, context: ToolCo
 async function addToCart(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { product_id, quantity = 1, variant } = input
 
-    // Obtener producto
+    // Obtener producto (incluir variants para validar stock por variante)
     const { data: product, error: productError } = await supabase
         .from("products")
-        .select("id, name, price, image_url, stock")
+        .select("id, name, price, image_url, stock, variants")
         .eq("id", product_id)
         .eq("organization_id", context.organizationId)
         .single()
@@ -338,6 +358,28 @@ async function addToCart(supabase: any, input: any, context: ToolContext): Promi
         return { success: false, error: "Producto no encontrado" }
     }
 
+    // Validar stock por variante si aplica
+    if (variant && product.variants && Array.isArray(product.variants)) {
+        for (const v of product.variants) {
+            if (v.hasStockByVariant && v.stockByVariant) {
+                // Buscar si el variant solicitado coincide con algún valor de esta variante
+                const variantValue = typeof variant === "string" ? variant : variant[v.type]
+                if (variantValue && variantValue in v.stockByVariant) {
+                    const available = v.stockByVariant[variantValue] as number
+                    if (available < quantity) {
+                        return {
+                            success: false,
+                            error: available === 0
+                                ? `${product.name} en ${v.type} "${variantValue}" está agotado.`
+                                : `Solo hay ${available} unidades de ${product.name} en ${v.type} "${variantValue}".`
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: validar stock general del producto
     if (product.stock < quantity) {
         return {
             success: false,
@@ -691,7 +733,7 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
             discountAmount = Number(coupon.max_discount_amount)
         }
     } else if (coupon.type === "fixed") {
-        discountAmount = Number(coupon.value)
+        discountAmount = Math.min(Number(coupon.value), subtotal)
     } else if (coupon.type === "free_shipping") {
         return {
             success: true,
@@ -700,12 +742,15 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
                 type: "free_shipping",
                 value: 0,
                 discountAmount: 0,
+                maxDiscountAmount: null,
                 freeShipping: true,
                 message: `¡Cupón ${coupon.code} aplicado! Envío gratis en tu compra.`,
                 newTotal: subtotal
             }
         }
     }
+
+    discountAmount = Math.round(discountAmount)
 
     return {
         success: true,
@@ -714,6 +759,7 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
             type: coupon.type,
             value: Number(coupon.value),
             discountAmount,
+            maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
             freeShipping: false,
             message: `¡Cupón ${coupon.code} aplicado! Descuento de $${discountAmount.toLocaleString()}`,
             newTotal: subtotal - discountAmount
@@ -1320,6 +1366,30 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
     if (error) {
         console.error("[scheduleAppointment] Error:", error)
         return { success: false, error: `Error agendando la cita: ${error.message}` }
+    }
+
+    // Sync con Google Calendar (si está conectado, non-blocking)
+    try {
+        const { createCalendarEvent } = await import("@/lib/calendar/google-calendar")
+        const googleEventId = await createCalendarEvent(context.organizationId, {
+            title: validated.title,
+            description: `Cita con ${validated.customer_name}${validated.notes ? ` — ${validated.notes}` : ""}`,
+            startDate: proposedDate,
+            endDate: endDate,
+            location: validated.location,
+            attendeeEmail: validated.customer_email,
+        })
+
+        if (googleEventId) {
+            await supabase
+                .from("appointments")
+                .update({ google_event_id: googleEventId })
+                .eq("id", appointment.id)
+            console.log("[scheduleAppointment] Google Calendar event created:", googleEventId)
+        }
+    } catch (gcalError) {
+        // No bloquear la cita si GCal falla
+        console.warn("[scheduleAppointment] Google Calendar sync failed (non-blocking):", gcalError)
     }
 
     // Formatear la respuesta

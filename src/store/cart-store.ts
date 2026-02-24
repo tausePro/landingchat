@@ -16,7 +16,8 @@ export interface AppliedCoupon {
     code: string
     type: string
     value: number
-    discountAmount: number
+    discountAmount: number // Legacy: snapshot al momento de aplicar. Usar calculateCouponDiscount() para valor reactivo
+    maxDiscountAmount?: number | null
     freeShipping: boolean
     description: string
 }
