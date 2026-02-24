@@ -212,13 +212,37 @@ export async function deleteProduct(id: string): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient()
 
-    const { error } = await supabase
+    // 1. Verificar autenticación
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return failure("No autenticado")
+    }
+
+    // 2. Verificar que el producto pertenece a la org del usuario
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return failure("No se encontró organización")
+    }
+
+    // 3. Eliminar con .select() para confirmar que realmente se borró
+    const { data: deleted, error } = await supabase
       .from("products")
       .delete()
       .eq("id", id)
+      .eq("organization_id", profile.organization_id)
+      .select("id")
 
     if (error) {
       return failure(error.message)
+    }
+
+    if (!deleted || deleted.length === 0) {
+      return failure("No se pudo eliminar el producto. Verifica que tengas permisos.")
     }
 
     revalidatePath("/dashboard/products")
