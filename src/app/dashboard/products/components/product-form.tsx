@@ -39,7 +39,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
         type: string; values: string[];
         hasPriceAdjustment?: boolean; priceAdjustments?: Record<string, number>;
         hasStockByVariant?: boolean; stockByVariant?: Record<string, number>;
-        hasImageMapping?: boolean; images?: Record<string, string>;
+        hasImageMapping?: boolean; images?: Record<string, string | string[]>;
     }>>(initialData?.variants || [])
     const [isSubscription, setIsSubscription] = useState(initialData?.is_subscription ?? false)
     const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable ?? false)
@@ -139,7 +139,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 minimum_quantity: hasQuantityPricing ? minimumQuantity : undefined,
 
                 // Tax override
-                tax_rate: taxRate !== "" ? parseFloat(taxRate) : undefined,
+                tax_rate: taxRate !== "" ? parseFloat(taxRate) : null,
                 // SEO fields
                 meta_title: metaTitle.trim() || undefined,
                 meta_description: metaDescription.trim() || undefined,

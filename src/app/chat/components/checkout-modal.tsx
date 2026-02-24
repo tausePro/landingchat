@@ -24,6 +24,7 @@ interface CheckoutModalProps {
 
 
 import { getAvailablePaymentGateways, getShippingConfig, getManualPaymentInfo, calculateOrderSummary, validateCoupon } from "../actions"
+import { calculateCouponDiscount } from "@/lib/utils/coupon"
 import { calculateShippingCost, getShippingAvailability } from "@/lib/utils/shipping"
 import { useEffect } from "react"
 
@@ -169,8 +170,8 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const localFee = (paymentMethod === 'contraentrega' && manualPaymentInfo?.cod_additional_cost) ? manualPaymentInfo.cod_additional_cost : 0
     const displayFee = orderSummary?.paymentMethodFee ?? localFee
 
-    // Coupon discount
-    const couponDiscount = appliedCoupon?.discountAmount || 0
+    // Coupon discount - reactivo basado en subtotal actual
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, subtotal)
     const couponFreeShipping = appliedCoupon?.freeShipping || false
 
     // Final total for display and submission

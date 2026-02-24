@@ -347,7 +347,7 @@ export async function validateCoupon(slug: string, code: string, subtotal: numbe
                 discountAmount = Number(coupon.max_discount_amount)
             }
         } else if (coupon.type === "fixed") {
-            discountAmount = Number(coupon.value)
+            discountAmount = Math.min(Number(coupon.value), subtotal)
         } else if (coupon.type === "free_shipping") {
             return {
                 success: true,
@@ -356,6 +356,7 @@ export async function validateCoupon(slug: string, code: string, subtotal: numbe
                     type: coupon.type as string,
                     value: 0,
                     discountAmount: 0,
+                    maxDiscountAmount: null,
                     freeShipping: true,
                     description: coupon.description || "Envío gratis"
                 }
@@ -371,6 +372,7 @@ export async function validateCoupon(slug: string, code: string, subtotal: numbe
                 type: coupon.type as string,
                 value: Number(coupon.value),
                 discountAmount,
+                maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
                 freeShipping: false,
                 description: coupon.description || `Descuento de $${discountAmount.toLocaleString()}`
             }

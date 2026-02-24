@@ -733,7 +733,7 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
             discountAmount = Number(coupon.max_discount_amount)
         }
     } else if (coupon.type === "fixed") {
-        discountAmount = Number(coupon.value)
+        discountAmount = Math.min(Number(coupon.value), subtotal)
     } else if (coupon.type === "free_shipping") {
         return {
             success: true,
@@ -742,12 +742,15 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
                 type: "free_shipping",
                 value: 0,
                 discountAmount: 0,
+                maxDiscountAmount: null,
                 freeShipping: true,
                 message: `¡Cupón ${coupon.code} aplicado! Envío gratis en tu compra.`,
                 newTotal: subtotal
             }
         }
     }
+
+    discountAmount = Math.round(discountAmount)
 
     return {
         success: true,
@@ -756,6 +759,7 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
             type: coupon.type,
             value: Number(coupon.value),
             discountAmount,
+            maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
             freeShipping: false,
             message: `¡Cupón ${coupon.code} aplicado! Descuento de $${discountAmount.toLocaleString()}`,
             newTotal: subtotal - discountAmount
