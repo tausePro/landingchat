@@ -19,11 +19,56 @@ import { Switch } from "@/components/ui/switch"
 import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge } from "./actions"
 import { ImageUploader } from "@/components/shared/image-uploader"
 
-interface AgentConfigProps {
-    agent: any
+interface OrgContextData {
+    industry: string | null
+    features: Record<string, boolean> | null
+    planName: string | null
 }
 
-export function AgentConfig({ agent }: AgentConfigProps) {
+interface AgentConfigProps {
+    agent: any
+    orgContext: OrgContextData
+}
+
+// Mapeo de features a info visual para la UI de módulos
+const MODULE_INFO: Record<string, { label: string; icon: string; description: string; tools: string[] }> = {
+    ecommerce: {
+        label: "E-Commerce",
+        icon: "shopping_cart",
+        description: "Búsqueda de productos, carrito, checkout, cupones y envíos",
+        tools: ["search_products", "show_product", "get_product_availability", "add_to_cart", "get_cart", "remove_from_cart", "update_cart_quantity", "start_checkout", "get_shipping_options", "apply_discount"],
+    },
+    real_estate: {
+        label: "Inmobiliario",
+        icon: "apartment",
+        description: "Búsqueda de propiedades, filtros avanzados y agendamiento de visitas",
+        tools: ["search_properties", "show_property", "schedule_appointment"],
+    },
+    appointments: {
+        label: "Agendamiento de Citas",
+        icon: "calendar_month",
+        description: "Programación de citas y gestión de disponibilidad",
+        tools: ["schedule_appointment"],
+    },
+}
+
+const SHARED_MODULE = {
+    label: "Compartidas",
+    icon: "hub",
+    description: "Identificación de clientes, historial, info de tienda, estado de órdenes",
+    tools: ["identify_customer", "get_store_info", "get_order_status", "get_customer_history", "escalate_to_human"],
+}
+
+function getActiveMode(orgContext: OrgContextData): string {
+    if (orgContext.features?.real_estate && orgContext.features?.ecommerce) return "hybrid"
+    if (orgContext.features?.real_estate) return "real_estate"
+    if (orgContext.features?.ecommerce) return "ecommerce"
+    if (orgContext.industry === "real_estate") return "real_estate"
+    if (orgContext.industry === "ecommerce") return "ecommerce"
+    return "ecommerce"
+}
+
+export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
     const router = useRouter()
     const [activeTab, setActiveTab] = useState("general")
     const [loading, setLoading] = useState(false)
@@ -88,6 +133,7 @@ export function AgentConfig({ agent }: AgentConfigProps) {
     const tabs = [
         { id: "general", label: "General", icon: "settings" },
         { id: "personality", label: "Personalidad", icon: "psychology" },
+        { id: "modules", label: "Módulos", icon: "extension" },
         { id: "knowledge", label: "Conocimiento", icon: "menu_book" },
         { id: "schedule", label: "Horarios", icon: "schedule" },
     ]
@@ -215,6 +261,105 @@ export function AgentConfig({ agent }: AgentConfigProps) {
                                         {loading ? "Guardando..." : "Guardar Cambios"}
                                     </Button>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === "modules" && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Módulos del Agente</CardTitle>
+                                <CardDescription>
+                                    Capacidades activas según tu plan{orgContext.planName ? ` (${orgContext.planName})` : ""}.
+                                    Los módulos determinan qué herramientas tiene disponibles el agente AI.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {/* Modo activo */}
+                                <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                                    <span className="material-symbols-outlined text-primary">auto_awesome</span>
+                                    <div>
+                                        <p className="font-semibold text-sm">Modo: <span className="capitalize">{getActiveMode(orgContext).replace("_", " ")}</span></p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {getActiveMode(orgContext) === "hybrid"
+                                                ? "Combina herramientas de e-commerce e inmobiliario"
+                                                : getActiveMode(orgContext) === "real_estate"
+                                                    ? "Herramientas especializadas para inmobiliarias"
+                                                    : "Herramientas de tienda en línea y ventas"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Módulo compartido (siempre activo) */}
+                                <div className="p-4 border border-border-light dark:border-border-dark rounded-xl">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                            <span className="material-symbols-outlined">{SHARED_MODULE.icon}</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-semibold">{SHARED_MODULE.label}</p>
+                                                <Badge variant="secondary" className="text-xs">Siempre activo</Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">{SHARED_MODULE.description}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 mt-3">
+                                        {SHARED_MODULE.tools.map(tool => (
+                                            <Badge key={tool} variant="outline" className="text-xs font-mono">{tool}</Badge>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Módulos verticales */}
+                                {Object.entries(MODULE_INFO).map(([key, mod]) => {
+                                    const isActive = key === "appointments"
+                                        ? orgContext.features?.appointments === true
+                                        : getActiveMode(orgContext) === key || getActiveMode(orgContext) === "hybrid"
+                                    return (
+                                        <div
+                                            key={key}
+                                            className={`p-4 border rounded-xl transition-all ${
+                                                isActive
+                                                    ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20"
+                                                    : "border-border-light dark:border-border-dark opacity-50"
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className={`p-2 rounded-lg ${
+                                                    isActive
+                                                        ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                                                        : "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                                                }`}>
+                                                    <span className="material-symbols-outlined">{mod.icon}</span>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-semibold">{mod.label}</p>
+                                                        {isActive ? (
+                                                            <Badge className="bg-green-500 hover:bg-green-600 text-white text-xs">Activo</Badge>
+                                                        ) : (
+                                                            <Badge variant="secondary" className="text-xs">No incluido</Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm text-muted-foreground">{mod.description}</p>
+                                                </div>
+                                            </div>
+                                            {isActive && (
+                                                <div className="flex flex-wrap gap-1.5 mt-3">
+                                                    {mod.tools.map(tool => (
+                                                        <Badge key={tool} variant="outline" className="text-xs font-mono">{tool}</Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {!isActive && (
+                                                <p className="text-xs text-muted-foreground mt-2">
+                                                    Actualiza tu plan para habilitar este módulo.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )
+                                })}
                             </CardContent>
                         </Card>
                     )}

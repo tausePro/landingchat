@@ -2,6 +2,7 @@
 
 > Documento de referencia para la transformación modular de la plataforma.
 > Última actualización: 20 Febrero 2026 (verificado con SQL en producción)
+> Agent-factory integrado con planes: Julio 2025
 
 ---
 
@@ -377,7 +378,51 @@ chat-agent.ts
   → skill/executor.ts (específico)     ← Cada skill ejecuta sus tools
 ```
 
-### 4.4 Fallback de compatibilidad
+### 4.4 Implementación actual (completada)
+
+El agent-factory ya está modularizado e integrado con el sistema de planes:
+
+**Archivos de modo:**
+```
+src/lib/ai/
+├── modes/
+│   ├── shared.ts           → 5 tools compartidas (identify, escalate, store_info, order_status, history)
+│   ├── ecommerce.ts        → 10 tools de e-commerce + prompt addendum
+│   └── real-estate.ts      → 3 tools inmobiliarias + prompt addendum
+├── agent-factory.ts        → Compone tools y prompts por modo (OrgContext)
+├── chat-agent.ts           → Orquestador (carga industry + features + conteos)
+├── tool-executor.ts        → Dispatcher unificado (sin cambios)
+└── tools.ts                → Monolítico original (fallback de seguridad)
+```
+
+**Cadena de prioridad para determinar OrgMode:**
+```
+1. subscription.features    → { ecommerce: true, real_estate: true } (más confiable)
+2. organization.industry    → "ecommerce" | "real_estate" | "other"
+3. Conteo de filas          → productCount / propertyCount (fallback legacy)
+```
+
+**Interface OrgContext:**
+```typescript
+interface OrgContext {
+    industry?: string | null          // organization.industry
+    features?: Record<string, boolean> | null  // subscription.features
+    productCount?: number             // fallback
+    propertyCount?: number            // fallback
+}
+```
+
+**Features de verticales en planes (AVAILABLE_FEATURES en admin):**
+- `ecommerce` → Habilita tools de e-commerce
+- `real_estate` → Habilita tools inmobiliarias
+- `appointments` → Habilita agendamiento de citas
+
+**UI Admin de agentes:**
+- Nueva pestaña "Módulos" en `/dashboard/agents/[id]/config`
+- Muestra modo activo, tools compartidas, y módulos verticales activos/inactivos
+- Read-only (determinado por plan, no configurable por agente aún)
+
+### 4.5 Fallback de compatibilidad
 
 ```typescript
 async function getActiveModules(orgId: string): Promise<ModuleDefinition[]> {
