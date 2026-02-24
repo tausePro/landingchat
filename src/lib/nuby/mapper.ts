@@ -20,21 +20,23 @@ export function mapNubyPropertyToLocal(
   const age = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('antigüedad'))?.valor
   const parking = nubyProperty.caracteristicas.find(f => f.descripcion.toLowerCase().includes('garaje') || f.descripcion.toLowerCase().includes('parqueadero'))?.valor
 
-  const rawStatus = String(nubyProperty.estado ?? '').trim().toLowerCase()
-  // Activo por defecto — solo marcar inactivo si explícitamente dice inactivo/0/false
-  const isInactive = rawStatus === '0' || rawStatus === 'false' || rawStatus === 'inactivo' || rawStatus === 'inactive' || rawStatus === 'deshabilitado'
+  // Estados Arrendasoft: 1=Activa, 0=Arrendada, 2=Inactiva, 3=Vendida
+  // Solo estado '1' es activa, todo lo demás es inactive
+  const rawStatus = String(nubyProperty.estado ?? '').trim()
+  const isActive = rawStatus === '1'
 
   return {
     organization_id: organizationId,
     external_id: nubyProperty.codigo,
     external_code: nubyProperty.codigo,
-    external_url: `https://${nubyProperty.codigo}.arrendasoft.co`, // Ajustar según URL real
+    external_url: `https://${nubyProperty.codigo}.arrendasoft.co`,
     
     title: nubyProperty.titulo,
     description: nubyProperty.observaciones || '',
     property_type: nubyProperty.tipo_servicio_id,
     property_class: nubyProperty.clase_inmueble,
-    status: isInactive ? 'inactive' : 'active',
+    status: isActive ? 'active' : 'inactive',
+    status_detail: nubyProperty.estado_texto || null,
     
     price_rent: parseFloat(nubyProperty.valor_arriendo1) || null,
     price_sale: parseFloat(nubyProperty.valor_venta1) || null,

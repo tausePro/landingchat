@@ -133,34 +133,13 @@ export async function createProduct(
     const slugs = existingSlugs?.map(p => p.slug) || []
     const slug = generateUniqueSlug(baseSlug, slugs)
 
-    // 5. Insert product
+    // 5. Insert product (spread parsed.data para incluir TODOS los campos validados)
     const { data, error } = await supabase
       .from("products")
       .insert({
+        ...parsed.data,
         organization_id: profile.organization_id,
-        name: parsed.data.name,
-        slug: slug,
-        description: parsed.data.description,
-        price: parsed.data.price,
-        image_url: parsed.data.image_url,
-        stock: parsed.data.stock ?? 0,
-        sku: parsed.data.sku,
-        categories: parsed.data.categories ?? [],
-        images: parsed.data.images ?? [],
-        variants: parsed.data.variants ?? [],
-        options: parsed.data.options ?? [],
-        is_active: parsed.data.is_active ?? true,
-        is_subscription: parsed.data.is_subscription ?? false,
-        is_configurable: parsed.data.is_configurable ?? false,
-        subscription_config: parsed.data.subscription_config ?? null,
-        configurable_options: parsed.data.configurable_options ?? null,
-        sale_price: parsed.data.sale_price ?? null,
-        badge_id: parsed.data.badge_id ?? null,
-        // Bundle fields
-        is_bundle: parsed.data.is_bundle ?? false,
-        bundle_items: parsed.data.bundle_items ?? [],
-        bundle_discount_type: parsed.data.bundle_discount_type ?? null,
-        bundle_discount_value: parsed.data.bundle_discount_value ?? 0,
+        slug,
       })
       .select()
       .single()
@@ -233,13 +212,37 @@ export async function deleteProduct(id: string): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient()
 
-    const { error } = await supabase
+    // 1. Verificar autenticación
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return failure("No autenticado")
+    }
+
+    // 2. Verificar que el producto pertenece a la org del usuario
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return failure("No se encontró organización")
+    }
+
+    // 3. Eliminar con .select() para confirmar que realmente se borró
+    const { data: deleted, error } = await supabase
       .from("products")
       .delete()
       .eq("id", id)
+      .eq("organization_id", profile.organization_id)
+      .select("id")
 
     if (error) {
       return failure(error.message)
+    }
+
+    if (!deleted || deleted.length === 0) {
+      return failure("No se pudo eliminar el producto. Verifica que tengas permisos.")
     }
 
     revalidatePath("/dashboard/products")

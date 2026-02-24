@@ -1,17 +1,18 @@
 # Arquitectura Modular — LandingChat
 
 > Documento de referencia para la transformación modular de la plataforma.
-> Última actualización: Febrero 2026
+> Última actualización: 23 Febrero 2026
+> Agent-factory integrado con planes + Skills configurables: Feb 2026
 
 ---
 
 ## 1. Estado Actual de Producción
 
-### 1.1 Infraestructura de módulos existente
+### 1.1 Infraestructura de módulos existente (verificado 20-Feb-2026)
 
 | Componente | Estado | Ubicación |
-|-----------|--------|-----------|
-| `module_definitions` (BD) | ✅ 13 módulos definidos | Tabla Supabase |
+|-----------|--------|----------|
+| `module_definitions` (BD) | ✅ 13 módulos, 9 columnas básicas | Tabla Supabase |
 | `organizations.enabled_modules` | ✅ text[] por org | Columna en organizations |
 | `organizations.vertical_config` | ✅ jsonb disponible | Columna en organizations |
 | `organizations.industry` | ✅ ecommerce/real_estate/other | Columna en organizations |
@@ -19,8 +20,47 @@
 | `subscriptions.features` | ✅ jsonb con flags boolean | Columna en subscriptions |
 | `src/types/industry.ts` | ✅ Tipos, enums, helpers | Código TypeScript |
 | `dashboard-layout.tsx` | ✅ Menú dinámico por módulos | Componente React |
-| `marketplace_items` (BD) | ⚠️ Tabla vacía | Tabla Supabase |
-| `plans` (BD) | ⚠️ Tabla vacía (0 filas) | Tabla Supabase |
+| `marketplace_items` (BD) | ⚠️ Tabla vacía, schema viejo | Tabla Supabase |
+| `plans` (BD) | ✅ 6 planes (4 activos, 2 inactivos) | Tabla Supabase |
+| `org_modules` (BD) | ❌ NO EXISTE | — |
+| `src/lib/modules/` | ❌ NO EXISTE | — |
+
+#### Columnas actuales de `module_definitions` (verificado SQL)
+```
+id (uuid), slug (text), name (text), description (text), icon (text),
+menu_path (text), menu_order (integer), is_core (boolean), created_at (timestamptz)
+```
+**Faltan:** category, min_plan_tier, monthly_price, is_marketplace_visible, config_schema, dependencies, ai_tools, status
+
+#### Plans en producción (verificado SQL)
+| Plan | Slug | Precio COP | Activo | Founding Tier |
+|------|------|-----------|--------|---------------|
+| Plan Gratuito | free | $0 | ✅ | — |
+| Starter | starter | $149.000 | ✅ | starter |
+| Pro | pro | $249.000 | ❌ | — |
+| Growth | growth | $299.000 | ✅ | growth |
+| Premium | premium | $499.000 | ✅ | premium |
+| Enterprise | enterprise | $599.000 | ❌ | — |
+
+### 1.1.1 Estado de Seguridad (verificado 20-Feb-2026)
+
+#### RLS en chats/messages — ✅ CORREGIDO
+Policies peligrosas `USING (true)` eliminadas. Policies actuales:
+- **chats:** 5 policies (SELECT org, SELECT anon 24h, INSERT public, UPDATE org, Agents SELECT public)
+- **messages:** 4 policies (SELECT org, SELECT anon chat, INSERT public, Agents SELECT public)
+- ⚠️ Policies "Agents can view..." con roles `{public}` — revisar USING clause
+
+#### RLS faltante — ❌ CRÍTICO
+- `carts` — **0 policies** (RLS habilitado pero sin policies = acceso denegado a todos)
+- `payment_transactions` — **0 policies** 
+- `usage_metrics` — **0 policies**
+
+#### Índices organization_id — ✅ 26 índices aplicados
+Todas las tablas multi-tenant tienen índice en `organization_id`.
+
+#### Rutas debug — ❌ PENDIENTE eliminar
+- `src/app/api/fix-customers-table/`
+- `src/app/api/fix-security-policies/`
 
 ### 1.2 Módulos actuales en `module_definitions`
 
@@ -338,7 +378,107 @@ chat-agent.ts
   → skill/executor.ts (específico)     ← Cada skill ejecuta sus tools
 ```
 
-### 4.4 Fallback de compatibilidad
+### 4.4 Implementación actual (completada)
+
+El agent-factory ya está modularizado e integrado con el sistema de planes:
+
+**Archivos de modo:**
+```
+src/lib/ai/
+├── modes/
+│   ├── shared.ts           → 5 tools compartidas (identify, escalate, store_info, order_status, history)
+│   ├── ecommerce.ts        → 10 tools de e-commerce + prompt addendum
+│   └── real-estate.ts      → 3 tools inmobiliarias + prompt addendum
+├── agent-factory.ts        → Compone tools y prompts por modo (OrgContext)
+├── chat-agent.ts           → Orquestador (carga industry + features + conteos)
+├── tool-executor.ts        → Dispatcher unificado (sin cambios)
+└── tools.ts                → Monolítico original (fallback de seguridad)
+```
+
+**Cadena de prioridad para determinar OrgMode:**
+```
+1. subscription.features    → { ecommerce: true, real_estate: true } (más confiable)
+2. organization.industry    → "ecommerce" | "real_estate" | "other"
+3. Conteo de filas          → productCount / propertyCount (fallback legacy)
+```
+
+**Interface OrgContext:**
+```typescript
+interface OrgContext {
+    industry?: string | null          // organization.industry
+    features?: Record<string, boolean> | null  // subscription.features
+    productCount?: number             // fallback
+    propertyCount?: number            // fallback
+}
+```
+
+**Features de verticales en planes (AVAILABLE_FEATURES en admin):**
+- `ecommerce` → Habilita tools de e-commerce
+- `real_estate` → Habilita tools inmobiliarias
+- `appointments` → Habilita agendamiento de citas
+
+**UI Admin de agentes (`/dashboard/agents/[id]/config` → pestaña "Módulos"):**
+- Muestra modo activo, tools compartidas, y módulos verticales activos/inactivos
+- **Skills editables**: toggle on/off + editor de instrucciones por agente
+- Botón "Restaurar default" para volver a las instrucciones base
+- Se guarda en `agents.configuration.skills` (jsonb)
+
+### 4.5 Sistema de Skills (implementado)
+
+**Concepto:** Las instrucciones procedurales del agente (antes hardcodeadas) ahora son configurables por agente.
+
+**Archivos:**
+```
+src/lib/ai/
+├── skills.ts              → Definiciones de skills con defaults
+├── agent-factory.ts       → getModePromptAddendum() usa composeSkillsPrompt()
+└── chat-agent.ts          → Pasa agent.configuration.skills al factory
+```
+
+**Skills base (incluidos en el plan):**
+
+| Skill ID | Modo | Instrucciones |
+|----------|------|---------------|
+| `inventory_rules` | ecommerce | Verificar variantes/stock antes de vender |
+| `property_search_flow` | real_estate | Guiar búsqueda de propiedades |
+| `appointment_booking` | real_estate | Recolectar datos y agendar visitas |
+
+**Flujo en runtime:**
+```
+chat-agent.ts
+  → getOrgMode(features, industry, conteos)
+  → getToolsForMode(mode)
+  → getModePromptAddendum(mode, count, agentSkillsConfig)
+      → composeSkillsPrompt(mode, config)
+          → Para cada skill del modo:
+              - deshabilitado → omite
+              - customInstructions → usa override del admin
+              - default → usa SKILL_DEFINITIONS
+```
+
+**Modelo de cobro (Opción C — Híbrida):**
+- Skills **base** → incluidos en el plan por modo (los 3 actuales)
+- Skills **premium** → addons cobrables en el marketplace
+
+**Skills premium planificados:**
+
+| Skill | Vertical | Tipo | Descripción |
+|-------|----------|------|-------------|
+| `skin_analysis` | Beauty/Ecommerce | Premium | Diagnóstico de piel + rutina personalizada |
+| `size_advisor` | Fashion/Ecommerce | Premium | Asesor inteligente de tallas |
+| `nutrition_advisor` | Health/Ecommerce | Premium | Recomendaciones nutricionales |
+| `property_valuation` | Real Estate | Premium | Estimación de valor de propiedad |
+| `virtual_tour_guide` | Real Estate | Premium | Tour virtual guiado con IA |
+| `smart_upsell` | Cualquiera | Premium | Upsell/cross-sell inteligente |
+| `proactive_agent` | Cualquiera | Premium | Mensajes proactivos por comportamiento |
+
+**Para implementar cobro de skills premium:**
+1. `plan.features` incluye skills base del modo
+2. `org_addons` (tabla nueva) registra skills premium comprados
+3. `composeSkillsPrompt()` consulta: plan + addons
+4. UI de skills muestra candado en premium no comprados
+
+### 4.6 Fallback de compatibilidad
 
 ```typescript
 async function getActiveModules(orgId: string): Promise<ModuleDefinition[]> {
@@ -472,12 +612,22 @@ async function getActiveModules(orgId: string): Promise<ModuleDefinition[]> {
 - Actualizar `chat-agent.ts` → filtrar tools por módulos activos
 - `buildDashboardMenu()` → usar `module_definitions` con nuevas columnas
 
-### Fase 4 — Marketplace público (1 semana, riesgo BAJO)
+### Fase 4 — Marketplace público + Skills Premium (1-2 semanas, riesgo BAJO)
+
+**BD:**
+- `CREATE TABLE org_addons` (org_id, skill_id, status, purchased_at, expires_at)
+- Skills premium en `SKILL_DEFINITIONS` con flag `is_premium: true`
 
 **UI:**
-- `/dashboard/marketplace/page.tsx` → Grid de módulos disponibles
+- `/dashboard/marketplace/page.tsx` → Grid de módulos y skills disponibles
+- Categorías: Canales | Pasarelas | Agent Skills | Addons
+- Skills premium con precio mensual y botón de compra
 - Server actions para activar/desactivar
 - Sync con `organizations.enabled_modules`
+
+**Billing:**
+- Integración con Wompi recurrente para cobro de addons
+- `composeSkillsPrompt()` → consulta plan + org_addons
 
 ### Fase 5 — Canales Meta unificados (2 semanas, riesgo MEDIO)
 

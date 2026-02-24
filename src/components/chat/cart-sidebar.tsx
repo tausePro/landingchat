@@ -2,7 +2,9 @@
 
 import { useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { validateCoupon, calculateOrderSummary } from "@/app/chat/actions"
+import { calculateCouponDiscount } from "@/lib/utils/coupon"
 
 interface ShippingConfig {
     free_shipping_enabled: boolean
@@ -21,12 +23,65 @@ interface CartSidebarProps {
 }
 
 export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", recommendations = [], onClose, onCheckout }: CartSidebarProps) {
-    const { items, removeItem, updateQuantity, total, addItem } = useCartStore()
+    const { items, removeItem, updateQuantity, total, addItem, appliedCoupon, setAppliedCoupon } = useCartStore()
     const [showCouponInput, setShowCouponInput] = useState(false)
     const [couponCode, setCouponCode] = useState("")
+    const [couponLoading, setCouponLoading] = useState(false)
+    const [couponError, setCouponError] = useState<string | null>(null)
+    const [taxInfo, setTaxInfo] = useState<{ tax: number; baseSubtotal: number; pricesIncludeTax: boolean } | null>(null)
 
     const currentTotal = total()
-    
+
+    // Descuento reactivo: recalcular cada vez que cambia el carrito
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, currentTotal)
+    const couponFreeShipping = appliedCoupon?.freeShipping || false
+
+    // Calcular impuestos cuando cambian los items
+    useEffect(() => {
+        if (items.length === 0) {
+            setTaxInfo(null)
+            return
+        }
+
+        const fetchTax = async () => {
+            const result = await calculateOrderSummary({
+                slug,
+                items: items.map(i => ({ id: i.id, price: i.price, quantity: i.quantity })),
+            })
+            if (result.success && result.tax !== undefined && result.tax > 0) {
+                setTaxInfo({
+                    tax: result.tax,
+                    baseSubtotal: result.baseSubtotal || result.subtotal || currentTotal,
+                    pricesIncludeTax: result.pricesIncludeTax || false,
+                })
+            } else {
+                setTaxInfo(null)
+            }
+        }
+
+        fetchTax()
+    }, [items, slug, currentTotal])
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return
+        setCouponLoading(true)
+        setCouponError(null)
+        try {
+            const result = await validateCoupon(slug, couponCode.trim(), currentTotal)
+            if (result.success && result.coupon) {
+                setAppliedCoupon(result.coupon)
+                setCouponCode("")
+                setShowCouponInput(false)
+            } else {
+                setCouponError(result.error || "Cupón inválido")
+            }
+        } catch {
+            setCouponError("Error al validar cupón")
+        } finally {
+            setCouponLoading(false)
+        }
+    }
+
     // Envío gratis: habilitado si free_shipping_enabled es true
     // null min_amount = sin mínimo requerido (siempre gratis)
     const freeShippingEnabled = shippingConfig?.free_shipping_enabled || false
@@ -187,7 +242,20 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
 
                     {/* Coupon Button */}
                     <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-                        {!showCouponInput ? (
+                        {appliedCoupon ? (
+                            <div className="flex items-center justify-between p-2.5 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-green-600 text-[16px]">confirmation_number</span>
+                                    <div>
+                                        <span className="font-mono font-bold text-green-700 dark:text-green-300 text-xs">{appliedCoupon.code}</span>
+                                        <p className="text-[10px] text-green-600 dark:text-green-400">{appliedCoupon.description}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => { setAppliedCoupon(null); setCouponError(null) }} className="text-red-500 hover:text-red-700 p-0.5">
+                                    <span className="material-symbols-outlined text-[14px]">close</span>
+                                </button>
+                            </div>
+                        ) : !showCouponInput ? (
                             <button 
                                 onClick={() => setShowCouponInput(true)}
                                 className="flex items-center gap-2 text-xs font-bold hover:opacity-80 transition-opacity w-full"
@@ -197,34 +265,32 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                 Aplicar Cupón de descuento
                             </button>
                         ) : (
-                            <div className="flex gap-2">
-                                <input 
-                                    type="text"
-                                    value={couponCode}
-                                    onChange={(e) => setCouponCode(e.target.value)}
-                                    placeholder="Código"
-                                    className="flex-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-                                />
-                                <button 
-                                    className="px-3 py-1.5 text-white rounded-lg text-xs font-bold shadow-sm"
-                                    style={{ backgroundColor: primaryColor }}
-                                    onClick={() => {
-                                        // Mock application
-                                        if (couponCode) {
-                                            alert("Funcionalidad de cupón simulada: Código " + couponCode + " recibido.")
-                                            setShowCouponInput(false)
-                                            setCouponCode("")
-                                        }
-                                    }}
-                                >
-                                    Aplicar
-                                </button>
-                                <button 
-                                    onClick={() => setShowCouponInput(false)}
-                                    className="p-1.5 text-gray-400 hover:text-gray-600"
-                                >
-                                    <span className="material-symbols-outlined text-[16px]">close</span>
-                                </button>
+                            <div className="space-y-1.5">
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text"
+                                        value={couponCode}
+                                        onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(null) }}
+                                        placeholder="Código"
+                                        className="flex-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none font-mono"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                                    />
+                                    <button 
+                                        className="px-3 py-1.5 text-white rounded-lg text-xs font-bold shadow-sm disabled:opacity-50"
+                                        style={{ backgroundColor: primaryColor }}
+                                        disabled={couponLoading || !couponCode.trim()}
+                                        onClick={handleApplyCoupon}
+                                    >
+                                        {couponLoading ? "..." : "Aplicar"}
+                                    </button>
+                                    <button 
+                                        onClick={() => { setShowCouponInput(false); setCouponError(null) }}
+                                        className="p-1.5 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <span className="material-symbols-outlined text-[16px]">close</span>
+                                    </button>
+                                </div>
+                                {couponError && <p className="text-[10px] text-red-500">{couponError}</p>}
                             </div>
                         )}
                     </div>
@@ -234,13 +300,25 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 <div className="p-5 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-30 shrink-0">
                     <div className="space-y-1.5 mb-4">
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                            <span>Subtotal</span>
-                            <span className="font-medium text-gray-900 dark:text-white">{formatPrice(currentTotal)}</span>
+                            <span>{taxInfo ? 'Base gravable' : 'Subtotal'}</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                                {formatPrice(taxInfo ? taxInfo.baseSubtotal : currentTotal)}
+                            </span>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                            <span>Descuentos</span>
-                            <span className="font-medium text-gray-900 dark:text-white">-$0</span>
-                        </div>
+                        {taxInfo && taxInfo.tax > 0 && (
+                            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                <span>IVA{taxInfo.pricesIncludeTax ? ' (incluido)' : ''}</span>
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                    {taxInfo.pricesIncludeTax ? '' : '+'}{formatPrice(taxInfo.tax)}
+                                </span>
+                            </div>
+                        )}
+                        {couponDiscount > 0 && (
+                            <div className="flex justify-between text-xs text-green-600">
+                                <span>Descuento ({appliedCoupon?.code})</span>
+                                <span className="font-medium">-{formatPrice(couponDiscount)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                             <span>Envío estimado</span>
                             <span className={cn("font-medium", freeShippingEnabled && remainingForFreeShipping <= 0 ? "text-green-600" : "text-gray-900 dark:text-white")}>
@@ -249,7 +327,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                         </div>
                         <div className="pt-3 mt-1 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-end">
                             <span className="text-sm font-bold text-gray-900 dark:text-white">Total a Pagar</span>
-                            <span className="text-lg font-extrabold" style={{ color: primaryColor }}>{formatPrice(currentTotal)}</span>
+                            <span className="text-lg font-extrabold" style={{ color: primaryColor }}>{formatPrice(Math.max(0, currentTotal - couponDiscount))}</span>
                         </div>
                     </div>
                     <button 

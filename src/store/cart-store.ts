@@ -12,11 +12,23 @@ export interface CartItem extends Product {
     quantity: number
 }
 
+export interface AppliedCoupon {
+    code: string
+    type: string
+    value: number
+    discountAmount: number // Legacy: snapshot al momento de aplicar. Usar calculateCouponDiscount() para valor reactivo
+    maxDiscountAmount?: number | null
+    freeShipping: boolean
+    description: string
+}
+
 interface CartState {
     items: CartItem[]
     organizationSlug: string | null
     setOrganizationSlug: (slug: string) => void
     isOpen: boolean
+    appliedCoupon: AppliedCoupon | null
+    setAppliedCoupon: (coupon: AppliedCoupon | null) => void
     addItem: (product: Product, quantity?: number) => void
     removeItem: (productId: string) => void
     updateQuantity: (productId: string, quantity: number) => void
@@ -32,6 +44,8 @@ export const useCartStore = create<CartState>()(
             items: [],
             organizationSlug: null,
             isOpen: false,
+            appliedCoupon: null,
+            setAppliedCoupon: (coupon) => set({ appliedCoupon: coupon }),
             setOrganizationSlug: (slug) => {
                 const currentSlug = get().organizationSlug
                 // If slug changes OR is initialized from null (legacy state), clear cart
@@ -75,7 +89,7 @@ export const useCartStore = create<CartState>()(
                     ),
                 })
             },
-            clearCart: () => set({ items: [] }),
+            clearCart: () => set({ items: [], appliedCoupon: null }),
             toggleCart: () => set({ isOpen: !get().isOpen }),
             setIsOpen: (isOpen) => set({ isOpen }),
             total: () => {

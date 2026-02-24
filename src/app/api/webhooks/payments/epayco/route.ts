@@ -53,31 +53,47 @@ interface EpaycoWebhookPayload {
     x_extra3?: string
 }
 
+/**
+ * GET handler — fallback para transacciones creadas con method_confirmation=GET
+ */
+export async function GET(request: Request) {
+    const url = new URL(request.url)
+    const params = Object.fromEntries(url.searchParams.entries()) as unknown as EpaycoWebhookPayload & { org?: string }
+    
+    // Construir un request-like object para reusar la lógica
+    log.info("GET webhook received, forwarding to handler", { org: params.org, ref: params.x_ref_payco })
+    return handleEpaycoWebhook(params.org || null, params)
+}
+
 export async function POST(request: Request) {
+    const url = new URL(request.url)
+    const orgSlug = url.searchParams.get("org")
+
+    // ePayco envía datos como form-urlencoded o JSON
+    const contentType = request.headers.get("content-type") || ""
+    let payload: EpaycoWebhookPayload
+
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+        const formData = await request.formData()
+        payload = Object.fromEntries(formData.entries()) as unknown as EpaycoWebhookPayload
+    } else {
+        payload = await request.json()
+    }
+
+    return handleEpaycoWebhook(orgSlug, payload)
+}
+
+async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhookPayload) {
     const supabase = createServiceClient()
     const startTime = Date.now()
     
     try {
-        const url = new URL(request.url)
-        const orgSlug = url.searchParams.get("org")
-
         if (!orgSlug) {
             await logWebhook(supabase, null, "epayco", "error", null, { error: "Missing org parameter" })
             return NextResponse.json(
                 { error: "Missing org parameter" },
                 { status: 400 }
             )
-        }
-
-        // ePayco envía datos como form-urlencoded o JSON
-        const contentType = request.headers.get("content-type") || ""
-        let payload: EpaycoWebhookPayload
-
-        if (contentType.includes("application/x-www-form-urlencoded")) {
-            const formData = await request.formData()
-            payload = Object.fromEntries(formData.entries()) as unknown as EpaycoWebhookPayload
-        } else {
-            payload = await request.json()
         }
 
         // Obtener la organización y su configuración de pago

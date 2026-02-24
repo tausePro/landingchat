@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
+import { calculateTaxForItems, buildProductTaxMap, type OrgTaxSettings } from "@/lib/utils/tax"
 
 interface CreateOrderParams {
     slug: string
@@ -32,6 +33,8 @@ interface CreateOrderParams {
     shippingCost: number
     total: number
     paymentMethod: string
+    couponCode?: string
+    discountAmount?: number
     // Tracking fields
     sourceChannel?: "web" | "chat" | "whatsapp"
     chatId?: string
@@ -68,43 +71,22 @@ export async function calculateOrderSummary(params: {
 
         if (orgError || !org) return { success: false, error: "Organización no encontrada" }
 
-        // 2. Get Product Tax Rates
+        // 2. Get Product Tax Rates & Calculate Tax
         const productIds = params.items.map(item => item.id)
         const { data: products } = await supabase
             .from("products")
             .select("id, tax_rate")
             .in("id", productIds)
 
-        const productTaxMap = new Map()
-        products?.forEach(p => productTaxMap.set(p.id, p.tax_rate))
+        const productTaxMap = buildProductTaxMap(products)
+        const taxResult = calculateTaxForItems(
+            params.items,
+            productTaxMap,
+            { tax_enabled: org.tax_enabled, tax_rate: org.tax_rate, prices_include_tax: org.prices_include_tax }
+        )
+        const calculatedTax = taxResult.totalTax
 
-        // 3. Calculate Tax
-        let calculatedTax = 0
-
-        params.items.forEach(item => {
-            let itemTaxRate = 0
-            const productTaxRate = productTaxMap.get(item.id)
-
-            if (productTaxRate !== null && productTaxRate !== undefined) {
-                itemTaxRate = Number(productTaxRate)
-            } else if (org.tax_enabled) {
-                itemTaxRate = Number(org.tax_rate || 0)
-            }
-
-            if (itemTaxRate > 0) {
-                const itemTotal = item.price * item.quantity
-                if (org.prices_include_tax) {
-                    const basePrice = itemTotal / (1 + (itemTaxRate / 100))
-                    calculatedTax += itemTotal - basePrice
-                } else {
-                    calculatedTax += itemTotal * (itemTaxRate / 100)
-                }
-            }
-        })
-
-        calculatedTax = Math.round(calculatedTax * 100) / 100
-
-        // 4. Calculate Payment Fee
+        // 3. Calculate Payment Fee
         let paymentMethodFee = 0
         if (params.paymentMethod === 'contraentrega' || params.paymentMethod === 'cash_on_delivery') {
             const { data: manualPayment } = await supabase
@@ -118,12 +100,12 @@ export async function calculateOrderSummary(params: {
             }
         }
 
-        // 5. Calculate Final Total
-        let subtotal = params.items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+        // 4. Calculate Final Total
+        const subtotal = params.items.reduce((acc, item) => acc + (item.price * item.quantity), 0)
         let total = subtotal
 
-        // If prices exclude tax, add calculated tax to total
-        // If prices include tax, tax is already in subtotal, so don't add
+        // Si precios NO incluyen IVA, sumar el impuesto al total
+        // Si precios incluyen IVA, el tax ya está en el subtotal
         if (!org.prices_include_tax) {
             total += calculatedTax
         }
@@ -133,6 +115,7 @@ export async function calculateOrderSummary(params: {
         return {
             success: true,
             subtotal,
+            baseSubtotal: taxResult.baseSubtotal,
             tax: calculatedTax,
             shipping: params.shippingCost || 0,
             paymentMethodFee,
@@ -309,6 +292,97 @@ export async function getManualPaymentInfo(slug: string) {
 }
 
 
+/**
+ * Validate a coupon code for a given organization and subtotal
+ */
+export async function validateCoupon(slug: string, code: string, subtotal: number) {
+    const supabase = await createServiceClient()
+
+    try {
+        const { data: org } = await supabase
+            .from("organizations")
+            .select("id")
+            .eq("slug", slug)
+            .single()
+
+        if (!org) return { success: false, error: "Organización no encontrada" }
+
+        const { data: coupon, error } = await supabase
+            .from("coupons")
+            .select("*")
+            .eq("organization_id", org.id)
+            .eq("code", code.toUpperCase())
+            .eq("is_active", true)
+            .single()
+
+        if (error || !coupon) {
+            return { success: false, error: "Código de descuento inválido" }
+        }
+
+        const now = new Date()
+
+        if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+            return { success: false, error: "Este código aún no está vigente" }
+        }
+
+        if (coupon.valid_until && new Date(coupon.valid_until) < now) {
+            return { success: false, error: "Este código ha expirado" }
+        }
+
+        if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) {
+            return { success: false, error: "Este código ya alcanzó su límite de usos" }
+        }
+
+        if (coupon.min_purchase_amount && subtotal < Number(coupon.min_purchase_amount)) {
+            return {
+                success: false,
+                error: `Compra mínima de $${Number(coupon.min_purchase_amount).toLocaleString()} requerida`
+            }
+        }
+
+        let discountAmount = 0
+        if (coupon.type === "percentage") {
+            discountAmount = subtotal * (Number(coupon.value) / 100)
+            if (coupon.max_discount_amount && discountAmount > Number(coupon.max_discount_amount)) {
+                discountAmount = Number(coupon.max_discount_amount)
+            }
+        } else if (coupon.type === "fixed") {
+            discountAmount = Math.min(Number(coupon.value), subtotal)
+        } else if (coupon.type === "free_shipping") {
+            return {
+                success: true,
+                coupon: {
+                    code: coupon.code,
+                    type: coupon.type as string,
+                    value: 0,
+                    discountAmount: 0,
+                    maxDiscountAmount: null,
+                    freeShipping: true,
+                    description: coupon.description || "Envío gratis"
+                }
+            }
+        }
+
+        discountAmount = Math.round(discountAmount)
+
+        return {
+            success: true,
+            coupon: {
+                code: coupon.code,
+                type: coupon.type as string,
+                value: Number(coupon.value),
+                discountAmount,
+                maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
+                freeShipping: false,
+                description: coupon.description || `Descuento de $${discountAmount.toLocaleString()}`
+            }
+        }
+    } catch (error) {
+        console.error("[validateCoupon] Error:", error)
+        return { success: false, error: "Error al validar cupón" }
+    }
+}
+
 export async function createOrder(params: CreateOrderParams) {
     // ⚠️ Security: Use service client to bypass RLS restrictions on orders/customers table
     // Since we blocked public anonymity access in production
@@ -356,9 +430,7 @@ export async function createOrder(params: CreateOrderParams) {
         // 3. Generate unique order number
         const orderNumber = generateOrderNumber()
 
-        // 4. Calculate tax 
         // 4. Calculate Taxes and Fees
-        let calculatedTax = 0
         let paymentMethodFee = 0
 
         // 4.1 Get Organization Tax Settings
@@ -376,47 +448,21 @@ export async function createOrder(params: CreateOrderParams) {
             }
         }
 
-        // 4.3 Calculate Tax per Item
-        // We need to fetch product tax rates to be accurate
+        // 4.3 Calculate Tax per Item (función centralizada)
         const productIds = params.items.map(item => item.id)
         const { data: products } = await supabase
             .from("products")
             .select("id, tax_rate")
             .in("id", productIds)
 
-        const productTaxMap = new Map()
-        products?.forEach(p => productTaxMap.set(p.id, p.tax_rate))
-
-        params.items.forEach(item => {
-            let itemTaxRate = 0
-
-            // Determine tax rate for this item
-            const productTaxRate = productTaxMap.get(item.id)
-
-            if (productTaxRate !== null && productTaxRate !== undefined) {
-                // Product has override (can be 0 for exempt)
-                itemTaxRate = Number(productTaxRate)
-            } else if (orgSettings?.tax_enabled) {
-                // Fallback to global rate
-                itemTaxRate = Number(orgSettings.tax_rate || 0)
-            }
-
-            if (itemTaxRate > 0) {
-                const itemTotal = item.price * item.quantity
-
-                if (orgSettings?.prices_include_tax) {
-                    // Price includes tax: Tax = Price - (Price / (1 + Rate))
-                    const basePrice = itemTotal / (1 + (itemTaxRate / 100))
-                    calculatedTax += itemTotal - basePrice
-                } else {
-                    // Price excludes tax: Tax = Price * Rate
-                    calculatedTax += itemTotal * (itemTaxRate / 100)
-                }
-            }
-        })
-
-        // Round tax to 2 decimals
-        calculatedTax = Math.round(calculatedTax * 100) / 100
+        const productTaxMap = buildProductTaxMap(products)
+        const orgTaxSettings: OrgTaxSettings = {
+            tax_enabled: orgSettings?.tax_enabled ?? false,
+            tax_rate: orgSettings?.tax_rate ?? 0,
+            prices_include_tax: orgSettings?.prices_include_tax ?? false,
+        }
+        const taxResult = calculateTaxForItems(params.items, productTaxMap, orgTaxSettings)
+        const calculatedTax = taxResult.totalTax
 
         // 5. Transform cart items to order items format
         const orderItems = transformCartItemsToOrderItems(params.items)
@@ -430,11 +476,13 @@ export async function createOrder(params: CreateOrderParams) {
         // But we must correct the 'total' with our calculated tax and fees for security.
 
         let finalTotal = params.subtotal
+        const discountAmount = params.discountAmount || 0
 
         if (!orgSettings?.prices_include_tax) {
             finalTotal += calculatedTax
         }
 
+        finalTotal -= discountAmount
         finalTotal += params.shippingCost + paymentMethodFee
 
         // If there's a small difference (rounding) vs frontend, prefer backend calc? 
@@ -449,7 +497,9 @@ export async function createOrder(params: CreateOrderParams) {
                 order_number: orderNumber,
                 customer_info: {
                     ...params.customerInfo,
-                    payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined
+                    payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined,
+                    coupon_code: params.couponCode || undefined,
+                    discount_amount: discountAmount > 0 ? discountAmount : undefined
                 },
                 items: orderItems,
                 subtotal: params.subtotal,
@@ -470,6 +520,28 @@ export async function createOrder(params: CreateOrderParams) {
         if (orderError) {
             console.error("[createOrder] Error creating order:", orderError)
             return { success: false, error: "Error al crear la orden" }
+        }
+
+        // Increment coupon usage if coupon was applied
+        if (params.couponCode) {
+            try {
+                // Get current coupon to increment
+                const { data: couponData } = await supabase
+                    .from("coupons")
+                    .select("id, current_uses")
+                    .eq("organization_id", org.id)
+                    .eq("code", params.couponCode.toUpperCase())
+                    .single()
+
+                if (couponData) {
+                    await supabase
+                        .from("coupons")
+                        .update({ current_uses: (couponData.current_uses || 0) + 1 })
+                        .eq("id", couponData.id)
+                }
+            } catch (e) {
+                console.error("[createOrder] Error incrementing coupon usage:", e)
+            }
         }
 
         // 7. If payment method requires online gateway, initiate payment

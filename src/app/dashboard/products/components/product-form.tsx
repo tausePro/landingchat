@@ -35,7 +35,12 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [salePrice, setSalePrice] = useState(initialData?.sale_price?.toString() || "")
     const [images, setImages] = useState<string[]>(initialData?.images || [])
     const [categories, setCategories] = useState<string[]>(initialData?.categories || [])
-    const [variants, setVariants] = useState<Array<{ type: string; values: string[] }>>(initialData?.variants || [])
+    const [variants, setVariants] = useState<Array<{
+        type: string; values: string[];
+        hasPriceAdjustment?: boolean; priceAdjustments?: Record<string, number>;
+        hasStockByVariant?: boolean; stockByVariant?: Record<string, number>;
+        hasImageMapping?: boolean; images?: Record<string, string | string[]>;
+    }>>(initialData?.variants || [])
     const [isSubscription, setIsSubscription] = useState(initialData?.is_subscription ?? false)
     const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable ?? false)
     const [isActive, setIsActive] = useState(initialData?.is_active ?? true)
@@ -134,7 +139,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 minimum_quantity: hasQuantityPricing ? minimumQuantity : undefined,
 
                 // Tax override
-                tax_rate: taxRate !== "" ? parseFloat(taxRate) : undefined,
+                tax_rate: taxRate !== "" ? parseFloat(taxRate) : null,
                 // SEO fields
                 meta_title: metaTitle.trim() || undefined,
                 meta_description: metaDescription.trim() || undefined,

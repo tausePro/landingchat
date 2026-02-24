@@ -59,13 +59,19 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         if (images.length > 0) setSelectedImage(images[0])
     }, [product])
 
-    // Initialize default variants
+    // Initialize default variants (skip out-of-stock values)
     useEffect(() => {
         if (product.variants) {
             const defaults: Record<string, string> = {}
             product.variants.forEach((v: any) => {
                 if (v.values && v.values.length > 0) {
-                    defaults[v.type] = v.values[0]
+                    // Si tiene stock por variante, elegir el primer valor con stock > 0
+                    if (v.hasStockByVariant && v.stockByVariant) {
+                        const available = v.values.find((val: string) => (v.stockByVariant[val] ?? 0) > 0)
+                        defaults[v.type] = available || v.values[0]
+                    } else {
+                        defaults[v.type] = v.values[0]
+                    }
                 }
             })
             setSelectedVariants(defaults)
@@ -121,7 +127,10 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         // Update image if this variant has a mapping for the selected value
         const variant = product.variants?.find((v: any) => v.type === type)
         if (variant?.hasImageMapping && variant?.images?.[value]) {
-            setSelectedImage(variant.images[value])
+            const imgData = variant.images[value]
+            // Soportar string legacy o array de imágenes
+            const firstImg = Array.isArray(imgData) ? imgData[0] : imgData
+            if (firstImg) setSelectedImage(firstImg)
         }
     }
 
@@ -173,6 +182,29 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const freeShippingThreshold = organization.settings?.shipping?.free_shipping_threshold || 100000 // Default to 100k if not set
     const hasFreeShipping = product.free_shipping_enabled || (currentPrice >= freeShippingThreshold)
 
+    // Mapa de imágenes → variante (para sync thumbnail → color selector)
+    // y set de imágenes agotadas (para overlay "Agotado")
+    const outOfStockImages = new Set<string>()
+    const imageToVariant = new Map<string, { type: string; value: string }>()
+    if (product.variants) {
+        product.variants.forEach((v: any) => {
+            if (v.hasImageMapping && v.images) {
+                Object.entries(v.images).forEach(([valueName, imgData]) => {
+                    // Soportar string o array de strings
+                    const urls = Array.isArray(imgData) ? imgData : [imgData]
+                    urls.forEach((url: string) => {
+                        imageToVariant.set(url, { type: v.type, value: valueName })
+                        if (v.hasStockByVariant && v.stockByVariant) {
+                            const stock = v.stockByVariant[valueName] ?? 0
+                            if (stock === 0) outOfStockImages.add(url)
+                        }
+                    })
+                })
+            }
+        })
+    }
+    const isSelectedImageOOS = outOfStockImages.has(selectedImage)
+
     return (
         <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -187,9 +219,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 src={selectedImage}
                                 alt={`${product.name}${product.brand ? ` - ${product.brand}` : ''} | ${organization.name}`}
                                 fill
-                                className="object-cover"
+                                className={`object-cover ${isSelectedImageOOS ? 'grayscale opacity-60' : ''}`}
                                 priority
                             />
+                            {isSelectedImageOOS && (
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                                    <span className="bg-red-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg">
+                                        Color agotado
+                                    </span>
+                                </div>
+                            )}
                             {/* Badges Overlay — only show badge assigned to this product or matching automatic rules */}
                             <div className="absolute top-4 left-4 flex flex-col gap-2">
                                 {badges
@@ -236,15 +275,30 @@ export function ProductDetailClient({ product, organization, badges, promotions,
 
                         {images.length > 1 && (
                             <div className="grid grid-cols-5 gap-3 w-full">
-                                {images.map((img: string, idx: number) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => setSelectedImage(img)}
-                                        className={`w-full relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${selectedImage === img ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
-                                    >
-                                        <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
-                                    </button>
-                                ))}
+                                {images.map((img: string, idx: number) => {
+                                    const isOOS = outOfStockImages.has(img)
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                setSelectedImage(img)
+                                                // Sync: si la imagen corresponde a un color, seleccionarlo
+                                                const mapped = imageToVariant.get(img)
+                                                if (mapped && !isOOS) {
+                                                    handleVariantChange(mapped.type, mapped.value)
+                                                }
+                                            }}
+                                            className={`w-full relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${isOOS ? 'opacity-50' : ''} ${selectedImage === img ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
+                                        >
+                                            <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
+                                            {isOOS && (
+                                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                                    <span className="text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded">Agotado</span>
+                                                </div>
+                                            )}
+                                        </button>
+                                    )
+                                })}
                             </div>
                         )}
                     </div>
@@ -383,6 +437,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                             {product.variants?.map((variant: any, idx: number) => {
                                 const isColorVariant = variant.type.toLowerCase().includes('color')
                                 const hasMany = variant.values.length > 8
+                                const hasVariantStock = variant.hasStockByVariant && variant.stockByVariant
                                 return (
                                     <div key={idx}>
                                         <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-3">
@@ -397,25 +452,34 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                             <div className={`flex gap-2 flex-wrap ${hasMany ? '' : 'gap-3'}`}>
                                                 {variant.values.map((value: string, vIdx: number) => {
                                                     const isSelected = selectedVariants[variant.type] === value
+                                                    const isOutOfStock = hasVariantStock && (variant.stockByVariant[value] ?? 0) === 0
                                                     return (
                                                         <button
                                                             key={vIdx}
-                                                            onClick={() => handleVariantChange(variant.type, value)}
+                                                            onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
+                                                            disabled={isOutOfStock}
                                                             className={`
-                                                                flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200
-                                                                ${isSelected ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+                                                                flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200 relative
+                                                                ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}
+                                                                ${isSelected && !isOutOfStock ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : isOutOfStock ? '' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
                                                             `}
-                                                            title={value}
+                                                            title={isOutOfStock ? `${value} — Agotado` : value}
                                                         >
                                                             <span
                                                                 className={`
-                                                                    w-8 h-8 rounded-full shadow-sm border
-                                                                    ${isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'ring-1 ring-slate-200 dark:ring-slate-700'}
+                                                                    w-8 h-8 rounded-full shadow-sm border relative overflow-hidden
+                                                                    ${isOutOfStock ? 'ring-1 ring-red-300 dark:ring-red-700' : isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'ring-1 ring-slate-200 dark:ring-slate-700'}
                                                                 `}
                                                                 style={{ backgroundColor: getColorHex(value) }}
-                                                            />
-                                                            <span className={`text-[10px] leading-tight text-center max-w-[60px] truncate ${isSelected ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                                {value}
+                                                            >
+                                                                {isOutOfStock && (
+                                                                    <span className="absolute inset-0 flex items-center justify-center">
+                                                                        <span className="block w-[140%] h-[2px] bg-red-500 rotate-45 rounded" />
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <span className={`text-[10px] leading-tight text-center max-w-[60px] truncate ${isOutOfStock ? 'line-through text-red-400 dark:text-red-500' : isSelected ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                {isOutOfStock ? 'Agotado' : value}
                                                             </span>
                                                         </button>
                                                     )
@@ -425,21 +489,30 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                             <div className="flex gap-3 flex-wrap">
                                                 {variant.values.map((value: string, vIdx: number) => {
                                                     const isSelected = selectedVariants[variant.type] === value
+                                                    const isOutOfStock = hasVariantStock && (variant.stockByVariant[value] ?? 0) === 0
                                                     return (
                                                         <button
                                                             key={vIdx}
-                                                            onClick={() => handleVariantChange(variant.type, value)}
+                                                            onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
+                                                            disabled={isOutOfStock}
                                                             className={`
-                                                                px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem]
-                                                                ${isSelected
-                                                                    ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary'
-                                                                    : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400'
+                                                                px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem] relative
+                                                                ${isOutOfStock
+                                                                    ? 'border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-600 cursor-not-allowed line-through'
+                                                                    : isSelected
+                                                                        ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary'
+                                                                        : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400'
                                                                 }
                                                                 transition-all duration-200
                                                             `}
-                                                            title={value}
+                                                            title={isOutOfStock ? `${value} — Agotado` : value}
                                                         >
                                                             {value}
+                                                            {isOutOfStock && (
+                                                                <span className="absolute -top-2 -right-2 text-[9px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1 rounded font-medium">
+                                                                    Agotado
+                                                                </span>
+                                                            )}
                                                         </button>
                                                     )
                                                 })}

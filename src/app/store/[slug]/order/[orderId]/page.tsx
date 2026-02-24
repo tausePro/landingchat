@@ -222,6 +222,12 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
                                         <span>Envío</span>
                                         <span>{order.shipping_cost === 0 ? 'Gratis' : formatCurrency(order.shipping_cost)}</span>
                                     </div>
+                                    {order.customer_info?.discount_amount > 0 && (
+                                        <div className="flex justify-between text-green-600">
+                                            <span>Descuento {order.customer_info?.coupon_code && <span className="font-mono text-xs">({order.customer_info.coupon_code})</span>}</span>
+                                            <span>-{formatCurrency(order.customer_info.discount_amount)}</span>
+                                        </div>
+                                    )}
                                     <div className="pt-2 mt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between font-bold text-slate-900 dark:text-slate-100 text-lg">
                                         <span>Total</span>
                                         <span>{formatCurrency(order.total)}</span>

@@ -1,20 +1,27 @@
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+import { BookingPanel } from "./booking-panel"
+import { PhotoGallery } from "./photo-gallery"
 
-export default async function PropertyDetailPage({ 
-  params 
-}: { 
-  params: Promise<{ slug: string; code: string }> 
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
+
+const isValidImageUrl = (url?: string | null) =>
+  Boolean(url && url.startsWith("http") && !url.includes("arrendasoft.coimg"))
+
+const shouldBypassOptimization = (url?: string | null) =>
+  Boolean(url && url.includes("arrendasoft.co"))
+
+export default async function PropertyDetailPage({
+  params
+}: {
+  params: Promise<{ slug: string; code: string }>
 }) {
   const { slug, code } = await params
   const supabase = await createClient()
 
-  // Obtener organización
   const { data: org } = await supabase
     .from("organizations")
     .select("id, name, slug, logo_url, settings, primary_color")
@@ -23,221 +30,292 @@ export default async function PropertyDetailPage({
 
   if (!org) return notFound()
 
-  // Obtener propiedad
-  const { data: property } = await supabase
+  // Usar service client para acceso público (subdominios)
+  const serviceClient = createServiceClient()
+  const { data: property } = await serviceClient
     .from("properties")
     .select("*")
     .eq("organization_id", org.id)
     .eq("external_code", code)
+    .eq("status", "active")
     .single()
 
   if (!property) return notFound()
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-    }).format(price)
-  }
-
   const price = property.price_sale || property.price_rent || 0
-  const priceLabel = property.price_rent ? 'Arriendo' : 'Venta'
-  const images = property.images || []
+  const isRent = !!property.price_rent
+  const priceLabel = isRent ? "Arriendo" : "Venta"
+  const images = (property.images || []).sort((a: any, b: any) => a.position - b.position)
   const features = property.features || []
+  const primaryColor = org.settings?.branding?.primaryColor || "#1a3a3a"
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href={`/store/${slug}`} className="flex items-center gap-2">
-            {org.logo_url && (
-              <Image src={org.logo_url} alt={org.name} width={40} height={40} className="rounded" />
-            )}
-            <span className="font-semibold">{org.name}</span>
-          </Link>
-          <Link href={`/chat/${slug}?property=${code}`}>
-            <Button>Consultar esta propiedad</Button>
-          </Link>
+    <div className="bg-[#f8fafc] text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* ═══════════════════ HEADER ═══════════════════ */}
+      <header className="sticky top-0 z-50 bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            <Link href={`/store/${slug}`} className="flex items-center gap-3">
+              {org.logo_url && (
+                <Image src={org.logo_url} alt={org.name} width={40} height={40} className="rounded" />
+              )}
+              <span className="text-xl font-bold tracking-tight text-slate-900">{org.name}</span>
+            </Link>
+            <nav className="hidden md:flex gap-8 items-center">
+              <Link href={`/store/${slug}`} className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Propiedades</Link>
+              <Link
+                href={`/chat/${slug}?property=${code}`}
+                className="text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:brightness-90 transition-all"
+                style={{ backgroundColor: primaryColor }}
+              >
+                Consultar Inmueble
+              </Link>
+            </nav>
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Galería de imágenes */}
-          <div className="lg:col-span-2">
-            {images.length > 0 ? (
-              <div className="space-y-4">
-                {/* Imagen principal */}
-                <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-200">
-                  <Image
-                    src={images[0]?.url}
-                    alt={property.title}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                {/* Miniaturas */}
-                {images.length > 1 && (
-                  <div className="grid grid-cols-4 gap-2">
-                    {images.slice(1, 5).map((img: any, idx: number) => (
-                      <div key={idx} className="relative aspect-video rounded overflow-hidden bg-gray-200">
-                        <Image
-                          src={img.url}
-                          alt={`${property.title} - ${idx + 2}`}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    ))}
-                    {images.length > 5 && (
-                      <div className="relative aspect-video rounded overflow-hidden bg-gray-800 flex items-center justify-center text-white">
-                        +{images.length - 5} fotos
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* ═══════════════════ BREADCRUMBS ═══════════════════ */}
+        <nav aria-label="Breadcrumb" className="flex text-sm text-slate-500 mb-6">
+          <ol className="flex items-center space-x-2">
+            <li><Link href={`/store/${slug}`} className="hover:text-slate-900">Inicio</Link></li>
+            <li className="flex items-center space-x-2">
+              <span className="material-symbols-outlined text-sm">chevron_right</span>
+              <span className="capitalize">{priceLabel}</span>
+            </li>
+            <li className="flex items-center space-x-2">
+              <span className="material-symbols-outlined text-sm">chevron_right</span>
+              <span className="text-slate-900 font-medium line-clamp-1">{property.title}</span>
+            </li>
+          </ol>
+        </nav>
+
+        {/* ═══════════════════ EDITORIAL GALLERY GRID ═══════════════════ */}
+        <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-3 h-[500px] mb-8 overflow-hidden rounded-xl">
+          {/* Main image — 2x2 */}
+          <div className="md:col-span-2 md:row-span-2 relative group">
+            <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-all z-10" />
+            {isValidImageUrl(images[0]?.url) ? (
+              <Image
+                src={images[0].url}
+                alt={property.title}
+                fill
+                className="object-cover"
+                priority
+                unoptimized={shouldBypassOptimization(images[0]?.url)}
+              />
             ) : (
-              <div className="aspect-video bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
-                Sin imágenes
+              <div className="w-full h-full bg-slate-200 flex items-center justify-center">
+                <span className="material-symbols-outlined text-slate-400" style={{ fontSize: 64 }}>home</span>
               </div>
-            )}
-
-            {/* Descripción */}
-            <Card className="mt-6">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-semibold mb-4">Observaciones</h2>
-                <p className="text-gray-700 whitespace-pre-line">
-                  {property.description || 'Sin descripción disponible'}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Características */}
-            {features.length > 0 && (
-              <Card className="mt-6">
-                <CardContent className="p-6">
-                  <h2 className="text-xl font-semibold mb-4">Comodidades del inmueble</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {features.map((feature: any, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-green-600">✓</span>
-                        <span className="text-sm">
-                          {feature.descripcion}: {feature.valor}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
             )}
           </div>
+          {/* Secondary images — 4 slots */}
+          {[1, 2, 3].map((idx) => (
+            <div key={idx} className="md:col-span-1 md:row-span-1 relative">
+              {isValidImageUrl(images[idx]?.url) ? (
+                <Image
+                  src={images[idx].url}
+                  alt={`${property.title} - ${idx + 1}`}
+                  fill
+                  className="object-cover"
+                  unoptimized={shouldBypassOptimization(images[idx]?.url)}
+                />
+              ) : (
+                <div className="w-full h-full bg-slate-100" />
+              )}
+            </div>
+          ))}
+          {/* Last slot with "Ver X fotos" button */}
+          <div className="md:col-span-1 md:row-span-1 relative">
+            {isValidImageUrl(images[4]?.url) ? (
+              <Image
+                src={images[4].url}
+                alt={`${property.title} - 5`}
+                fill
+                className="object-cover"
+                unoptimized={shouldBypassOptimization(images[4]?.url)}
+              />
+            ) : (
+              <div className="w-full h-full bg-slate-100" />
+            )}
+            <PhotoGallery images={images} title={property.title} primaryColor={primaryColor} />
+          </div>
+        </div>
 
-          {/* Sidebar con info */}
-          <div className="space-y-6">
-            {/* Info del asesor */}
-            <Card>
-              <CardContent className="p-6 text-center">
-                <div className="w-20 h-20 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                  <span className="text-4xl text-gray-400">👤</span>
+        {/* ═══════════════════ MAIN PROPERTY LAYOUT ═══════════════════ */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
+          {/* ─── Left Column: Details (2/3) ──────────────────────── */}
+          <div className="lg:col-span-2 space-y-10">
+            {/* Title Section */}
+            <div className="border-b border-slate-200 pb-8">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase"
+                  style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+                >
+                  {isRent ? "En Arriendo" : "En Venta"}
+                </span>
+                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-medium">
+                  Código: {property.external_code}
+                </span>
+              </div>
+              <h1 className="text-4xl font-extrabold text-slate-900 mb-2 leading-tight">{property.title}</h1>
+              <div className="flex items-center text-slate-500 gap-1 mb-6">
+                <span className="material-symbols-outlined text-lg">location_on</span>
+                <span className="text-base">
+                  {[property.address, property.neighborhood, property.city].filter(Boolean).join(", ")}
+                </span>
+              </div>
+              <div className="text-4xl font-black" style={{ color: primaryColor }}>
+                {formatPrice(price)}
+                {isRent && <span className="text-sm font-normal text-slate-500"> / mes</span>}
+                {!isRent && <span className="text-sm font-normal text-slate-500"> COP</span>}
+              </div>
+              {property.price_admin && (
+                <p className="text-sm text-slate-500 mt-1">Administración: {formatPrice(property.price_admin)}</p>
+              )}
+            </div>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 py-6 bg-white rounded-2xl border border-slate-100 p-8 shadow-sm">
+              {property.bedrooms != null && property.bedrooms > 0 && (
+                <div className="flex flex-col gap-1 items-center text-center">
+                  <span className="material-symbols-outlined text-3xl" style={{ color: primaryColor }}>bed</span>
+                  <span className="text-slate-900 font-bold">{property.bedrooms} Habitaciones</span>
                 </div>
-                <h3 className="font-semibold">Asesor: {org.name}</h3>
-                {org.settings?.contact?.phone && (
-                  <p className="text-sm text-gray-600 mt-2">
-                    📞 {org.settings.contact.phone}
-                  </p>
-                )}
-                {org.settings?.contact?.email && (
-                  <p className="text-sm text-gray-600">
-                    ✉️ {org.settings.contact.email}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Detalles de la propiedad */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Código:</span>
-                    <span className="font-semibold">{property.external_code}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Área:</span>
-                    <span className="font-semibold">{property.area_m2} M²</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Tipo:</span>
-                    <span className="font-semibold">{property.property_class}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Servicio:</span>
-                    <span className="font-semibold">{priceLabel}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Valor {priceLabel}:</span>
-                    <span className="font-semibold text-blue-600">{formatPrice(price)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Departamento:</span>
-                    <span className="font-semibold">{property.department}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Municipio:</span>
-                    <span className="font-semibold">{property.city}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Barrio:</span>
-                    <span className="font-semibold">{property.neighborhood}</span>
-                  </div>
-                  {property.stratum && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Estrato:</span>
-                      <span className="font-semibold">{property.stratum}</span>
-                    </div>
-                  )}
+              )}
+              {property.bathrooms != null && property.bathrooms > 0 && (
+                <div className="flex flex-col gap-1 items-center text-center">
+                  <span className="material-symbols-outlined text-3xl" style={{ color: primaryColor }}>bathtub</span>
+                  <span className="text-slate-900 font-bold">{property.bathrooms} Baños</span>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Características rápidas */}
-            <Card>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  {property.bedrooms && (
-                    <div>
-                      <p className="text-2xl font-bold">{property.bedrooms}</p>
-                      <p className="text-xs text-gray-500">Habitaciones</p>
-                    </div>
-                  )}
-                  {property.bathrooms && (
-                    <div>
-                      <p className="text-2xl font-bold">{property.bathrooms}</p>
-                      <p className="text-xs text-gray-500">Baños</p>
-                    </div>
-                  )}
-                  {property.parking_spots && (
-                    <div>
-                      <p className="text-2xl font-bold">{property.parking_spots}</p>
-                      <p className="text-xs text-gray-500">Parqueaderos</p>
-                    </div>
-                  )}
+              )}
+              {property.area_m2 != null && property.area_m2 > 0 && (
+                <div className="flex flex-col gap-1 items-center text-center">
+                  <span className="material-symbols-outlined text-3xl" style={{ color: primaryColor }}>square_foot</span>
+                  <span className="text-slate-900 font-bold">{property.area_m2} m²</span>
+                  <span className="text-xs text-slate-500">Área construida</span>
                 </div>
-              </CardContent>
-            </Card>
+              )}
+              {property.parking_spots != null && property.parking_spots > 0 && (
+                <div className="flex flex-col gap-1 items-center text-center">
+                  <span className="material-symbols-outlined text-3xl" style={{ color: primaryColor }}>directions_car</span>
+                  <span className="text-slate-900 font-bold">{property.parking_spots} Garajes</span>
+                </div>
+              )}
+              {property.stratum && (
+                <div className="flex flex-col gap-1 items-center text-center">
+                  <span className="material-symbols-outlined text-3xl" style={{ color: primaryColor }}>apartment</span>
+                  <span className="text-slate-900 font-bold">Estrato {property.stratum}</span>
+                </div>
+              )}
+            </div>
 
-            {/* CTA */}
-            <Link href={`/chat/${slug}?property=${code}`} className="block">
-              <Button className="w-full" size="lg">
-                💬 Chatear sobre esta propiedad
-              </Button>
-            </Link>
+            {/* Description */}
+            {property.description && (
+              <div>
+                <h3 className="text-2xl font-bold text-slate-900 mb-4">Descripción</h3>
+                <div className="text-slate-600 leading-relaxed text-lg whitespace-pre-line">
+                  {property.description}
+                </div>
+              </div>
+            )}
+
+            {/* Features / Amenities */}
+            {features.length > 0 && (
+              <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200">
+                <h3 className="text-xl font-bold text-slate-900 mb-4">Comodidades del Inmueble</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {features.map((feature: any, idx: number) => (
+                    <div key={idx} className="flex gap-3 text-slate-600">
+                      <span className="material-symbols-outlined text-[#10b981] font-bold">check_circle</span>
+                      <span>{feature.description || feature.descripcion}: {feature.valueText || feature.valor_texto || feature.value || feature.valor}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Property Details Table */}
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Detalles del Inmueble</h3>
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                  <div className="divide-y divide-slate-100">
+                    <DetailRow label="Código" value={property.external_code} />
+                    <DetailRow label="Tipo Inmueble" value={property.property_class} />
+                    <DetailRow label="Servicio" value={priceLabel} />
+                    <DetailRow label="Departamento" value={property.department} />
+                    <DetailRow label="Municipio" value={property.city} />
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    <DetailRow label="Barrio" value={property.neighborhood} />
+                    <DetailRow label="Dirección" value={property.address} />
+                    {property.stratum && <DetailRow label="Estrato" value={property.stratum} />}
+                    {property.age_years && <DetailRow label="Antigüedad" value={`${property.age_years} años`} />}
+                    {property.floor_number && <DetailRow label="Piso" value={String(property.floor_number)} />}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Location */}
+            <div>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">Ubicación</h3>
+              <div className="rounded-2xl overflow-hidden h-72 w-full shadow-inner border border-slate-200 relative bg-slate-100">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="inline-flex p-4 rounded-full border animate-pulse mb-2" style={{ backgroundColor: `${primaryColor}20`, borderColor: `${primaryColor}40` }}>
+                      <div className="size-4 rounded-full" style={{ backgroundColor: primaryColor }} />
+                    </div>
+                    <p className="text-sm text-slate-500">
+                      {[property.neighborhood, property.city].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ─── Right Column: Booking Panel (1/3) ───────────────── */}
+          <div className="lg:col-span-1">
+            <BookingPanel
+              slug={slug}
+              propertyCode={code}
+              propertyTitle={property.title}
+              primaryColor={primaryColor}
+              orgName={org.name}
+            />
           </div>
         </div>
       </main>
+
+      {/* ═══════════════════ FOOTER ═══════════════════ */}
+      <footer className="bg-white border-t border-slate-200 mt-20 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 mb-6">
+            {org.logo_url && (
+              <Image src={org.logo_url} alt={org.name} width={32} height={32} className="rounded" />
+            )}
+            <span className="text-lg font-bold tracking-tight text-slate-900">{org.name}</span>
+          </div>
+          <div className="pt-8 border-t border-slate-100 text-center text-xs text-slate-400">
+            &copy; {new Date().getFullYear()} {org.name}. Todos los derechos reservados.
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null
+  return (
+    <div className="flex justify-between px-6 py-3">
+      <span className="text-slate-500 text-sm">{label}</span>
+      <span className="text-slate-900 font-semibold text-sm">{value}</span>
     </div>
   )
 }

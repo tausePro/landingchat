@@ -29,6 +29,7 @@ import {
     Ticket,
     Truck,
     Tag,
+    ImageIcon,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -61,6 +62,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
     coupons: Ticket,
     shipping: Truck,
     payments: CreditCard,
+    // Media
+    media: ImageIcon,
 }
 
 interface NavItem {
@@ -89,6 +92,8 @@ const MODULE_TO_NAV: Record<string, NavItem> = {
     leads: { slug: "leads", label: "Leads", href: "/dashboard/leads", icon: UserPlus },
     appointments: { slug: "appointments", label: "Citas", href: "/dashboard/appointments", icon: Calendar },
     documents: { slug: "documents", label: "Documentos", href: "/dashboard/documents", icon: FileText },
+    // Media
+    media: { slug: "media", label: "Media", href: "/dashboard/media", icon: ImageIcon },
     // Ecommerce extras (agrupados en marketing)
     shipping: { slug: "shipping", label: "Envíos", href: "/dashboard/marketing/shipping", icon: Truck },
     coupons: { slug: "coupons", label: "Cupones", href: "/dashboard/marketing/coupons", icon: Ticket },
@@ -167,9 +172,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         for (const mod of modules) {
             if (MODULE_TO_NAV[mod]) {
                 items.push(MODULE_TO_NAV[mod])
-                // Categorías aparece automáticamente con productos
-                if (mod === "products" && MODULE_TO_NAV["categories"]) {
-                    items.push(MODULE_TO_NAV["categories"])
+                // Categorías y Media aparecen automáticamente con productos
+                if (mod === "products") {
+                    if (MODULE_TO_NAV["categories"]) items.push(MODULE_TO_NAV["categories"])
+                    if (MODULE_TO_NAV["media"]) items.push(MODULE_TO_NAV["media"])
                 }
             }
         }

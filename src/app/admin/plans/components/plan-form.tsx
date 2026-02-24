@@ -30,7 +30,13 @@ interface PlanFormProps {
 }
 
 const AVAILABLE_FEATURES = [
+    // Verticales (determinan tools del agente AI)
+    { key: "ecommerce", label: "Módulo E-Commerce" },
+    { key: "real_estate", label: "Módulo Inmobiliario" },
+    { key: "appointments", label: "Agendamiento de Citas" },
+    // Canales
     { key: "whatsapp", label: "WhatsApp" },
+    // Plataforma
     { key: "analytics", label: "Analytics" },
     { key: "custom_domain", label: "Dominio Personalizado" },
     { key: "api_access", label: "Acceso API" },

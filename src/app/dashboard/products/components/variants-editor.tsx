@@ -16,8 +16,10 @@ interface Variant {
     values: string[]
     hasPriceAdjustment?: boolean
     priceAdjustments?: Record<string, number> // { "S": 0, "XL": 5000 }
+    hasStockByVariant?: boolean
+    stockByVariant?: Record<string, number> // { "S": 10, "M": 5, "L": 0 }
     hasImageMapping?: boolean
-    images?: Record<string, string> // { "Rojo": "url_to_red_image", "Azul": "url_to_blue_image" }
+    images?: Record<string, string | string[]> // { "Rojo": ["url1", "url2"] } o legacy { "Rojo": "url" }
 }
 
 interface VariantsEditorProps {
@@ -116,6 +118,30 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
         return price > 0 ? `+$${price.toLocaleString()}` : `-$${Math.abs(price).toLocaleString()}`
     }
 
+    const handleStockToggle = (index: number, enabled: boolean) => {
+        const newVariants = [...variants]
+        newVariants[index] = { ...newVariants[index], hasStockByVariant: enabled }
+        if (!enabled) {
+            newVariants[index].stockByVariant = {}
+        } else {
+            // Inicializar stock en 0 para cada valor
+            const initialStock: Record<string, number> = {}
+            newVariants[index].values.forEach(v => {
+                initialStock[v] = newVariants[index].stockByVariant?.[v] || 0
+            })
+            newVariants[index].stockByVariant = initialStock
+        }
+        onChange(newVariants)
+    }
+
+    const handleStockChange = (variantIndex: number, valueName: string, stock: string) => {
+        const newVariants = [...variants]
+        const stockMap = { ...(newVariants[variantIndex].stockByVariant || {}) }
+        stockMap[valueName] = parseInt(stock) || 0
+        newVariants[variantIndex] = { ...newVariants[variantIndex], stockByVariant: stockMap }
+        onChange(newVariants)
+    }
+
     const handleImageMappingToggle = (index: number, enabled: boolean) => {
         const newVariants = [...variants]
         newVariants[index] = { ...newVariants[index], hasImageMapping: enabled }
@@ -129,11 +155,23 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
         const newVariants = [...variants]
         const images = { ...(newVariants[variantIndex].images || {}) }
 
-        // Toggle selection: if already selected, remove it
-        if (images[valueName] === imageUrl) {
+        // Normalizar a array
+        const current = images[valueName]
+        const currentArr: string[] = Array.isArray(current) ? [...current] : current ? [current] : []
+
+        // Toggle: agregar o quitar
+        const idx = currentArr.indexOf(imageUrl)
+        if (idx >= 0) {
+            currentArr.splice(idx, 1)
+        } else {
+            currentArr.push(imageUrl)
+        }
+
+        // Guardar como array (o eliminar si vacío)
+        if (currentArr.length === 0) {
             delete images[valueName]
         } else {
-            images[valueName] = imageUrl
+            images[valueName] = currentArr
         }
 
         newVariants[variantIndex] = { ...newVariants[variantIndex], images }
@@ -229,6 +267,48 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
                                 </div>
                             )}
 
+                            {/* Stock by Variant Toggle */}
+                            <div className="flex items-center gap-3 pt-2 border-t">
+                                <Checkbox
+                                    id={`stock-toggle-${index}`}
+                                    checked={variant.hasStockByVariant || false}
+                                    onCheckedChange={(checked) => handleStockToggle(index, checked as boolean)}
+                                />
+                                <Label htmlFor={`stock-toggle-${index}`} className="cursor-pointer text-sm font-normal">
+                                    Inventario por variante
+                                </Label>
+                            </div>
+
+                            {/* Stock Inputs per Value */}
+                            {variant.hasStockByVariant && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg">
+                                    {variant.values.map((val) => {
+                                        const stock = variant.stockByVariant?.[val] ?? 0
+                                        return (
+                                            <div key={val} className="flex flex-col gap-1">
+                                                <Label className="text-xs text-muted-foreground">{val}</Label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                                        <span className="material-symbols-outlined text-sm">inventory_2</span>
+                                                    </span>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        className={`pl-8 h-8 text-sm ${stock === 0 ? 'border-red-300 dark:border-red-700' : ''}`}
+                                                        value={stock}
+                                                        onChange={(e) => handleStockChange(index, val, e.target.value)}
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                    <p className="col-span-full text-xs text-muted-foreground mt-1">
+                                        Unidades disponibles por cada valor. Las variantes con 0 se mostrarán como agotadas.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Image Mapping Toggle */}
                             <div className="flex items-center gap-3 pt-2 border-t">
                                 <Checkbox
@@ -249,43 +329,54 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
                                             Debes subir imágenes al producto primero para poder asignarlas.
                                         </p>
                                     ) : (
-                                        variant.values.map((val) => (
-                                            <div key={val} className="flex flex-col gap-2">
-                                                <Label className="text-sm font-medium">{val}</Label>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {productImages.map((img, imgIdx) => {
-                                                        const isSelected = variant.images?.[val] === img
-                                                        return (
-                                                            <div
-                                                                key={imgIdx}
-                                                                onClick={() => handleImageSelect(index, val, img)}
-                                                                className={`
-                                                                    relative w-12 h-12 rounded-md overflow-hidden cursor-pointer border-2 transition-all
-                                                                    ${isSelected
-                                                                        ? 'border-primary ring-2 ring-primary/20'
-                                                                        : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
-                                                                    }
-                                                                `}
-                                                            >
-                                                                <img
-                                                                    src={img}
-                                                                    alt={`Opción para ${val}`}
-                                                                    className="w-full h-full object-cover"
-                                                                />
-                                                                {isSelected && (
-                                                                    <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                                                                        <span className="material-symbols-outlined text-white text-sm font-bold shadow-sm">check</span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    })}
+                                        variant.values.map((val) => {
+                                            const currentImgs = variant.images?.[val]
+                                            const selectedArr: string[] = Array.isArray(currentImgs) ? currentImgs : currentImgs ? [currentImgs] : []
+                                            return (
+                                                <div key={val} className="flex flex-col gap-2">
+                                                    <Label className="text-sm font-medium">
+                                                        {val}
+                                                        {selectedArr.length > 0 && (
+                                                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                                                ({selectedArr.length} {selectedArr.length === 1 ? 'imagen' : 'imágenes'})
+                                                            </span>
+                                                        )}
+                                                    </Label>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {productImages.map((img, imgIdx) => {
+                                                            const isSelected = selectedArr.includes(img)
+                                                            return (
+                                                                <div
+                                                                    key={imgIdx}
+                                                                    onClick={() => handleImageSelect(index, val, img)}
+                                                                    className={`
+                                                                        relative w-12 h-12 rounded-md overflow-hidden cursor-pointer border-2 transition-all
+                                                                        ${isSelected
+                                                                            ? 'border-primary ring-2 ring-primary/20'
+                                                                            : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                                                                        }
+                                                                    `}
+                                                                >
+                                                                    <img
+                                                                        src={img}
+                                                                        alt={`Opción para ${val}`}
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                    {isSelected && (
+                                                                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                                                                            <span className="material-symbols-outlined text-white text-sm font-bold shadow-sm">check</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            )
+                                        })
                                     )}
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        Selecciona la imagen que corresponde a cada valor de la variante.
+                                        Selecciona las imágenes que corresponden a cada valor. Puedes elegir varias por color.
                                     </p>
                                 </div>
                             )}
