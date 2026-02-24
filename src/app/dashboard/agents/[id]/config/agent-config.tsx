@@ -16,8 +16,10 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge } from "./actions"
+import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge, updateAgentSkills } from "./actions"
 import { ImageUploader } from "@/components/shared/image-uploader"
+import { SKILL_DEFINITIONS, getSkillsForMode, type SkillsConfig } from "@/lib/ai/skills"
+import type { OrgMode } from "@/lib/ai/agent-factory"
 
 interface OrgContextData {
     industry: string | null
@@ -90,6 +92,22 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
     // Knowledge form state
     const [productKnowledge, setProductKnowledge] = useState(agent.configuration?.knowledge?.product_knowledge !== false)
 
+    // Skills form state
+    const activeMode = getActiveMode(orgContext) as OrgMode
+    const modeSkills = getSkillsForMode(activeMode)
+    const [skillsConfig, setSkillsConfig] = useState<SkillsConfig>(() => {
+        const saved = agent.configuration?.skills || {}
+        const initial: SkillsConfig = {}
+        for (const skill of modeSkills) {
+            initial[skill.id] = {
+                enabled: saved[skill.id]?.enabled ?? true,
+                customInstructions: saved[skill.id]?.customInstructions ?? null,
+            }
+        }
+        return initial
+    })
+    const [editingSkill, setEditingSkill] = useState<string | null>(null)
+
     if (!isMounted) {
         return null
     }
@@ -125,6 +143,19 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
             router.refresh()
         } catch (error) {
             alert("Error al guardar base de conocimiento")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSaveSkills = async () => {
+        setLoading(true)
+        try {
+            await updateAgentSkills(agent.id, skillsConfig)
+            setEditingSkill(null)
+            router.refresh()
+        } catch (error) {
+            alert("Error al guardar skills")
         } finally {
             setLoading(false)
         }
@@ -266,6 +297,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                     )}
 
                     {activeTab === "modules" && (
+                        <>
                         <Card>
                             <CardHeader>
                                 <CardTitle>Módulos del Agente</CardTitle>
@@ -362,6 +394,127 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                 })}
                             </CardContent>
                         </Card>
+
+                        {/* Skills configurables */}
+                        {modeSkills.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Skills del Agente</CardTitle>
+                                    <CardDescription>
+                                        Instrucciones procedurales que determinan cómo actúa el agente.
+                                        Puedes personalizar cada skill o deshabilitarlo.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {modeSkills.map(skill => {
+                                        const config = skillsConfig[skill.id]
+                                        const isEnabled = config?.enabled !== false
+                                        const isEditing = editingSkill === skill.id
+                                        const hasCustom = !!config?.customInstructions
+
+                                        return (
+                                            <div
+                                                key={skill.id}
+                                                className={`p-4 border rounded-xl transition-all ${
+                                                    isEnabled
+                                                        ? "border-border-light dark:border-border-dark"
+                                                        : "border-border-light dark:border-border-dark opacity-50"
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
+                                                            <span className="material-symbols-outlined text-lg">psychology</span>
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="font-semibold text-sm">{skill.name}</p>
+                                                                <Badge variant="outline" className="text-[10px] capitalize">{skill.mode}</Badge>
+                                                                {hasCustom && (
+                                                                    <Badge className="bg-violet-500 hover:bg-violet-600 text-white text-[10px]">Personalizado</Badge>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs text-muted-foreground">{skill.description}</p>
+                                                        </div>
+                                                    </div>
+                                                    <Switch
+                                                        checked={isEnabled}
+                                                        onCheckedChange={(checked) => {
+                                                            setSkillsConfig(prev => ({
+                                                                ...prev,
+                                                                [skill.id]: { ...prev[skill.id], enabled: checked }
+                                                            }))
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                {isEnabled && (
+                                                    <div className="mt-3">
+                                                        {isEditing ? (
+                                                            <div className="space-y-2">
+                                                                <Textarea
+                                                                    value={config?.customInstructions || skill.defaultInstructions}
+                                                                    onChange={(e) => {
+                                                                        setSkillsConfig(prev => ({
+                                                                            ...prev,
+                                                                            [skill.id]: {
+                                                                                ...prev[skill.id],
+                                                                                customInstructions: e.target.value
+                                                                            }
+                                                                        }))
+                                                                    }}
+                                                                    rows={6}
+                                                                    className="font-mono text-xs resize-none bg-slate-50 dark:bg-slate-900/50"
+                                                                />
+                                                                <div className="flex gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => {
+                                                                            setSkillsConfig(prev => ({
+                                                                                ...prev,
+                                                                                [skill.id]: { ...prev[skill.id], customInstructions: null }
+                                                                            }))
+                                                                            setEditingSkill(null)
+                                                                        }}
+                                                                    >
+                                                                        Restaurar default
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        onClick={() => setEditingSkill(null)}
+                                                                    >
+                                                                        Cerrar
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setEditingSkill(skill.id)}
+                                                                className="w-full text-left p-3 rounded-lg bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700 hover:border-primary/50 transition-colors cursor-pointer"
+                                                            >
+                                                                <p className="text-xs text-muted-foreground line-clamp-3 font-mono whitespace-pre-wrap">
+                                                                    {config?.customInstructions || skill.defaultInstructions}
+                                                                </p>
+                                                                <p className="text-xs text-primary mt-1 font-medium">Click para editar</p>
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+
+                                    <div className="flex justify-end pt-2">
+                                        <Button onClick={handleSaveSkills} disabled={loading}>
+                                            {loading ? "Guardando..." : "Guardar Skills"}
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                        </>
                     )}
 
                     {activeTab === "knowledge" && (

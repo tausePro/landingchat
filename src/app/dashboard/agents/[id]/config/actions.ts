@@ -125,6 +125,34 @@ export async function updateAgentPersonality(id: string, personality: {
     return { success: true }
 }
 
+export async function updateAgentSkills(id: string, skills: Record<string, { enabled: boolean; customInstructions?: string | null }>) {
+    const supabase = await createClient()
+
+    const { data: agent } = await supabase
+        .from("agents")
+        .select("configuration")
+        .eq("id", id)
+        .single()
+
+    const updatedConfig = {
+        ...(agent?.configuration || {}),
+        skills
+    }
+
+    const { error } = await supabase
+        .from("agents")
+        .update({ configuration: updatedConfig })
+        .eq("id", id)
+
+    if (error) {
+        console.error("Error updating skills:", error)
+        throw new Error("Failed to update skills")
+    }
+
+    revalidatePath(`/dashboard/agents/${id}/config`)
+    return { success: true }
+}
+
 export async function updateAgentKnowledge(id: string, knowledge: {
     documents?: string[]
     faqs?: any[]

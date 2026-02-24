@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { tools } from "./tools"
 import { sharedTools } from "./modes/shared"
-import { ecommerceTools, getEcommercePromptAddendum } from "./modes/ecommerce"
+import { ecommerceTools } from "./modes/ecommerce"
 import { realEstateTools, getRealEstatePromptAddendum } from "./modes/real-estate"
+import { composeSkillsPrompt, type SkillsConfig } from "./skills"
 
 // ═══════════════════════════════════════════════════════════════════
 // Agent Factory — Compone tools y prompts desde archivos de modo separados
@@ -12,10 +13,16 @@ import { realEstateTools, getRealEstatePromptAddendum } from "./modes/real-estat
 //   2. organization.industry  → vertical de la org (ecommerce, real_estate, other)
 //   3. Conteo de filas        → fallback legacy (productCount, propertyCount)
 //
+// Skills (instrucciones del prompt):
+//   skills.ts              → definiciones con defaults
+//   agent.configuration    → overrides por agente (customInstructions, enabled)
+//   composeSkillsPrompt()  → combina defaults + overrides
+//
 // Arquitectura de archivos:
 //   modes/shared.ts      → tools compartidas (identify, escalate, etc.)
-//   modes/ecommerce.ts   → tools + prompt de e-commerce
-//   modes/real-estate.ts → tools + prompt inmobiliario
+//   modes/ecommerce.ts   → tools de e-commerce
+//   modes/real-estate.ts → tools inmobiliarias
+//   skills.ts            → instrucciones procedurales configurables
 //
 // tool-executor.ts sigue unificado (es solo un dispatcher de implementaciones)
 // tools.ts sigue intacto (se usa como fallback de seguridad)
@@ -93,20 +100,35 @@ export function getToolsForMode(mode: OrgMode): Anthropic.Tool[] {
 }
 
 /**
- * Compone el addendum del system prompt desde los archivos de modo.
+ * Compone el addendum del system prompt combinando:
+ *   1. Contexto del modo (propertyCount, fecha para inmobiliarias)
+ *   2. Skills: instrucciones procedurales (defaults + overrides del agente)
+ *
+ * @param agentSkillsConfig - overrides de skills del agente (de agent.configuration.skills)
  */
 export function getModePromptAddendum(
     mode: OrgMode,
-    propertyCount: number
+    propertyCount: number,
+    agentSkillsConfig?: SkillsConfig | null
 ): string {
     let addendum = ""
 
+    // Contexto inmobiliario (metadata que no es un skill)
     if (mode === "real_estate" || mode === "hybrid") {
-        addendum += getRealEstatePromptAddendum(propertyCount)
+        const now = new Date().toLocaleString("es-CO", {
+            timeZone: "America/Bogota",
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        })
+        addendum += `\nMODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.\nFECHA Y HORA ACTUAL: ${now}\n`
     }
-    if (mode === "ecommerce" || mode === "hybrid") {
-        addendum += getEcommercePromptAddendum()
-    }
+
+    // Skills: instrucciones procedurales configurables
+    addendum += composeSkillsPrompt(mode, agentSkillsConfig)
 
     return addendum
 }

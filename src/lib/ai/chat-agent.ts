@@ -177,8 +177,9 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             productCount: productCount || 0,
             propertyCount: propertyCount || 0,
         })
+        const agentSkillsConfig = agent.configuration?.skills || null
         console.log(`[processMessage] Org mode: ${orgMode} (industry: ${organization?.industry}, features: ${JSON.stringify(planFeatures)}, products: ${productCount}, properties: ${propertyCount})`)
-        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0)
+        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig)
 
         // Add channel-specific instructions
         const channel = input.channel || "web"

@@ -74,6 +74,11 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     // Branding settings
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
 
+    // Detectar vertical de la org
+    const isRealEstate = organization.settings?.industry === 'real_estate' ||
+        organization.storefront_template === 'real-estate' ||
+        organization.settings?.storefront?.template === 'real-estate'
+
     // Storefront customization settings
     const storefrontSettings = organization.settings?.storefront || {}
     const heroSettings = storefrontSettings.hero || {}
@@ -81,10 +86,18 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const headerSettings = storefrontSettings.header || {}
     const selectedTemplate = storefrontSettings.template || "minimal"
     const showStoreName = headerSettings.showStoreName ?? true
-    const menuItems = headerSettings.menuItems || [
-        { id: "home", label: "Inicio", url: "/" },
-        { id: "products", label: "Productos", url: "/productos" }
-    ]
+
+    // Defaults de menú según vertical (el admin puede personalizar)
+    const defaultMenuItems = isRealEstate
+        ? [
+            { id: "home", label: "Inicio", url: "/" },
+            { id: "properties", label: "Propiedades", url: "/" }
+        ]
+        : [
+            { id: "home", label: "Inicio", url: "/" },
+            { id: "products", label: "Productos", url: "/productos" }
+        ]
+    const menuItems = headerSettings.menuItems || defaultMenuItems
 
     // Typography
     const fontFamily = typographySettings.fontFamily || "Inter"
@@ -204,6 +217,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     menuItems={menuItems}
                     hideOnMobile={hideHeaderOnMobile}
                     shippingConfig={shippingConfig}
+                    isRealEstate={isRealEstate}
                 />
             )}
 
@@ -233,22 +247,27 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                 onIdentified={handleCustomerIdentified}
             />
 
-            <CartDrawer
-                slug={slug}
-                primaryColor={primaryColor}
-                shippingConfig={shippingConfig}
-                onCheckout={() => {
-                    setCartOpen(false)
-                    setIsCheckoutOpen(true)
-                }}
-            />
+            {/* Cart y Checkout solo para e-commerce */}
+            {!isRealEstate && (
+                <>
+                    <CartDrawer
+                        slug={slug}
+                        primaryColor={primaryColor}
+                        shippingConfig={shippingConfig}
+                        onCheckout={() => {
+                            setCartOpen(false)
+                            setIsCheckoutOpen(true)
+                        }}
+                    />
 
-            {isCheckoutOpen && (
-                <CheckoutModal
-                    isOpen={isCheckoutOpen}
-                    onClose={() => setIsCheckoutOpen(false)}
-                    slug={slug}
-                />
+                    {isCheckoutOpen && (
+                        <CheckoutModal
+                            isOpen={isCheckoutOpen}
+                            onClose={() => setIsCheckoutOpen(false)}
+                            slug={slug}
+                        />
+                    )}
+                </>
             )}
 
             {/* Presence Tracking */}
