@@ -106,13 +106,15 @@ export function useMetaPixel() {
             })
         },
         trackPurchase: (value: number, currency = "COP", contentIds?: string[], orderId?: string) => {
-            trackEvent("Purchase", {
-                value: value,
-                currency: currency,
-                content_ids: contentIds,
-                content_type: "product",
-                order_id: orderId,
-            })
+            if (typeof window !== "undefined" && window.fbq) {
+                window.fbq("track", "Purchase", {
+                    value: value,
+                    currency: currency,
+                    content_ids: contentIds,
+                    content_type: "product",
+                    order_id: orderId,
+                }, { eventID: orderId ? `purchase_${orderId}` : undefined })
+            }
         },
         trackViewCategory: (categoryId: string, categoryName: string) => {
             trackEvent("ViewCategory", {

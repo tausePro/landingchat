@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
             }, { status: 400 })
         }
 
-        // Obtener parámetro de rango de fechas
+        // Obtener parámetros de rango de fechas
         const searchParams = request.nextUrl.searchParams
         const datePreset = searchParams.get("date_preset") || "last_7d"
+        const dateStart = searchParams.get("date_start") // YYYY-MM-DD
+        const dateEnd = searchParams.get("date_end")     // YYYY-MM-DD
 
         // Obtener resumen de campañas
         const result = await getCampaignsSummary(
@@ -52,7 +54,8 @@ export async function GET(request: NextRequest) {
                 accessToken: trackingConfig.meta_access_token,
                 adAccountId: trackingConfig.meta_ad_account_id,
             },
-            datePreset
+            datePreset,
+            dateStart && dateEnd ? { dateStart, dateEnd } : undefined
         )
 
         if (!result.success) {

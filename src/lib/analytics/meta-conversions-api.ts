@@ -207,7 +207,7 @@ export async function trackServerPurchase(
         const lastName = nameParts.slice(1).join(" ")
 
         const eventData: PurchaseEventData = {
-            eventId: `purchase_${order.id}_${Date.now()}`,
+            eventId: `purchase_${order.id}`,
             eventTime: Math.floor(Date.now() / 1000),
             eventSourceUrl,
             userData: {
