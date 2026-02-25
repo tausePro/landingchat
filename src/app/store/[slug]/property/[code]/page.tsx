@@ -64,7 +64,7 @@ export default async function PropertyDetailPage({
             <nav className="hidden md:flex gap-8 items-center">
               <Link href={`/store/${slug}`} className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Propiedades</Link>
               <Link
-                href={`/chat/${slug}?property=${code}`}
+                href={`/chat/${slug}/asesor?property=${code}`}
                 className="text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:brightness-90 transition-all"
                 style={{ backgroundColor: primaryColor }}
               >

@@ -154,6 +154,13 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
             }
 
             if (result && !result.success) {
+                // Mostrar detalle de qué campos fallaron la validación
+                if (result.fieldErrors) {
+                    const details = Object.entries(result.fieldErrors)
+                        .map(([field, errors]) => `${field}: ${(errors as string[]).join(", ")}`)
+                        .join("\n")
+                    throw new Error(`${result.error}\n\nCampos con error:\n${details}`)
+                }
                 throw new Error(result.error || "Error desconocido")
             }
 

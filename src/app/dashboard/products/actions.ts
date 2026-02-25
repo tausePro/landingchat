@@ -95,6 +95,7 @@ export async function createProduct(
   // 1. Validate input with Zod
   const parsed = createProductSchema.safeParse(productData)
   if (!parsed.success) {
+    console.error("[createProduct] Zod validation failed:", JSON.stringify(parsed.error.flatten(), null, 2))
     return {
       success: false,
       error: "Validation failed",
