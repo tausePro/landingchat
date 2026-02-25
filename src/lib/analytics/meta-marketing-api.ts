@@ -186,7 +186,8 @@ export async function getCampaignInsights(
  */
 export async function getCampaignsSummary(
     config: MetaAdsConfig,
-    datePreset: string = 'last_7d'
+    datePreset: string = 'last_7d',
+    options?: { dateStart?: string; dateEnd?: string }
 ): Promise<{
     success: boolean
     data?: {
@@ -200,7 +201,10 @@ export async function getCampaignsSummary(
     }
     error?: string
 }> {
-    const insightsResult = await getCampaignInsights(config, { datePreset: datePreset as any })
+    const insightOptions = options?.dateStart && options?.dateEnd
+        ? { dateStart: options.dateStart, dateEnd: options.dateEnd }
+        : { datePreset: datePreset as any }
+    const insightsResult = await getCampaignInsights(config, insightOptions)
     
     if (!insightsResult.success || !insightsResult.data) {
         return { success: false, error: insightsResult.error }

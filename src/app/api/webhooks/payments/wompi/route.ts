@@ -262,40 +262,79 @@ async function processOrderUpdate(
                     id,
                     order_number,
                     total,
-                    customers!inner(name),
+                    customer_info,
+                    customers(name, email, phone),
                     order_items(
                         quantity,
-                        products!inner(name)
+                        product_id,
+                        products(name)
                     )
                 `)
                 .eq("id", orderId)
                 .single()
 
             if (order) {
-                const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                const customer = order.customers as { name?: string } | null
+                const customer = order.customers as { name?: string; email?: string; phone?: string } | null
                 const orderItems = order.order_items as Array<{
                     quantity: number
+                    product_id: string
                     products: { name?: string } | null
                 }>
+                const customerInfo = order.customer_info as {
+                    name?: string
+                    email?: string
+                    phone?: string
+                    city?: string
+                } | null
 
-                await sendSaleNotification(
-                    { organizationId },
-                    {
-                        id: order.order_number || order.id,
-                        total: order.total,
-                        customerName: customer?.name || "Cliente",
-                        items: orderItems?.map((item) => ({
-                            name: item.products?.name || "Producto",
-                            quantity: item.quantity,
-                        })) || [],
-                    }
-                )
-                console.log(`[Wompi Webhook] Sale notification sent for order ${order.order_number}`)
+                // 1. Enviar notificación de venta por WhatsApp
+                try {
+                    const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
+                    await sendSaleNotification(
+                        { organizationId },
+                        {
+                            id: order.order_number || order.id,
+                            total: order.total,
+                            customerName: customer?.name || customerInfo?.name || "Cliente",
+                            items: orderItems?.map((item) => ({
+                                name: item.products?.name || "Producto",
+                                quantity: item.quantity,
+                            })) || [],
+                        }
+                    )
+                    console.log(`[Wompi Webhook] Sale notification sent for order ${order.order_number}`)
+                } catch (notifError) {
+                    console.error("[Wompi Webhook] Error sending sale notification:", notifError)
+                }
+
+                // 2. Enviar evento Purchase a Meta Conversions API (server-side tracking)
+                try {
+                    const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
+                    await trackServerPurchase(
+                        organizationId,
+                        {
+                            id: order.id,
+                            orderNumber: order.order_number,
+                            total: order.total,
+                            currency: "COP",
+                            items: orderItems?.map((item) => ({
+                                productId: item.product_id,
+                                quantity: item.quantity,
+                            })),
+                            customerEmail: customer?.email || customerInfo?.email,
+                            customerPhone: customer?.phone || customerInfo?.phone,
+                            customerName: customer?.name || customerInfo?.name,
+                            customerCity: customerInfo?.city,
+                        },
+                        supabase
+                    )
+                    console.log(`[Wompi Webhook] Meta CAPI Purchase event sent for order ${order.order_number}`)
+                } catch (capiError) {
+                    console.error("[Wompi Webhook] Error sending Meta CAPI event:", capiError)
+                }
             }
-        } catch (notifError) {
-            console.error("[Wompi Webhook] Error sending sale notification:", notifError)
-            // No fallar el webhook si la notificación falla
+        } catch (err) {
+            console.error("[Wompi Webhook] Error in post-payment processing:", err)
         }
     }
 }
