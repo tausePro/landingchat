@@ -41,8 +41,9 @@ async function getAnalyticsData() {
     // Filtrar por status válidos (mismo criterio que dashboard-actions.ts)
     const validStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "completed"]
 
-    // Fetch org, orders, chats, products, and messages in parallel
-    const [orgResult, ordersResult, chatsResult, productsResult, messagesResult] = await Promise.all([
+    // Fetch org, orders, chats, and products in parallel
+    // Messages se fetchean después en batches (necesitan chatIds primero)
+    const [orgResult, ordersResult, chatsResult, productsResult] = await Promise.all([
         supabase
             .from("organizations")
             .select("id, name, slug, tracking_config")
@@ -65,14 +66,6 @@ async function getAnalyticsData() {
             .select("id, name, stock, image_url, is_active")
             .eq("organization_id", orgId)
             .eq("is_active", true),
-        supabase
-            .from("messages")
-            .select("id, chat_id, sender_type, tool_name, created_at")
-            .in("chat_id", (() => {
-                // Subconsulta: IDs de chats de esta org en los últimos 30 días
-                // Se filtrará después, pero limitamos la cantidad
-                return [] // Se llenará post-query
-            })())
     ])
 
     const org = orgResult.data
@@ -208,7 +201,7 @@ async function getAnalyticsData() {
     // AI Performance: mensajes por chat (query adicional)
     // ============================================================
     const chatIds = chats?.map(c => c.id) || []
-    let messagesData: Array<{ chat_id: string; sender_type: string; tool_name: string | null }> = []
+    let messagesData: Array<{ chat_id: string; sender_type: string; metadata: Record<string, unknown> | null }> = []
     if (chatIds.length > 0) {
         // Fetch messages en batches si hay muchos chats
         const batchSize = 100
@@ -216,17 +209,18 @@ async function getAnalyticsData() {
             const batch = chatIds.slice(i, i + batchSize)
             const { data } = await supabase
                 .from("messages")
-                .select("chat_id, sender_type, tool_name")
+                .select("chat_id, sender_type, metadata")
                 .in("chat_id", batch)
             if (data) messagesData = messagesData.concat(data)
         }
     }
 
     const totalMessages = messagesData.length
+    // sender_type reales: "user" (cliente), "bot" (agente AI), "agent" (humano desde dashboard)
     const messagesByType = {
         user: messagesData.filter(m => m.sender_type === 'user' || m.sender_type === 'customer').length,
-        assistant: messagesData.filter(m => m.sender_type === 'assistant' || m.sender_type === 'ai').length,
-        tool: messagesData.filter(m => m.sender_type === 'tool' || m.tool_name).length,
+        assistant: messagesData.filter(m => m.sender_type === 'bot' || m.sender_type === 'agent').length,
+        tool: 0, // Se calcula abajo desde metadata.tools_used
     }
     const avgMessagesPerChat = totalChats > 0 ? Math.round(totalMessages / totalChats) : 0
 
@@ -234,13 +228,21 @@ async function getAnalyticsData() {
     const chatIdsWithOrder = new Set(orders?.filter(o => o.chat_id).map(o => o.chat_id) || [])
     const chatsWithOrder = chatIdsWithOrder.size
 
-    // Top herramientas usadas
+    // Top herramientas usadas (extraer de metadata.tools_used en mensajes del bot)
     const toolCounts: Record<string, number> = {}
+    let totalToolCalls = 0
     messagesData.forEach(m => {
-        if (m.tool_name) {
-            toolCounts[m.tool_name] = (toolCounts[m.tool_name] || 0) + 1
+        if (m.sender_type === 'bot' && m.metadata) {
+            const toolsUsed = m.metadata.tools_used as string[] | undefined
+            if (toolsUsed && Array.isArray(toolsUsed)) {
+                toolsUsed.forEach(tool => {
+                    toolCounts[tool] = (toolCounts[tool] || 0) + 1
+                    totalToolCalls++
+                })
+            }
         }
     })
+    messagesByType.tool = totalToolCalls
     const topTools = Object.entries(toolCounts)
         .map(([tool, count]) => ({ tool, count }))
         .sort((a, b) => b.count - a.count)
