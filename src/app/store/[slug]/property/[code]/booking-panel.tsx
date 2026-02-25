@@ -40,7 +40,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
     params.set("property", propertyCode)
     params.set("context", context)
 
-    window.location.href = `/chat/${slug}?${params.toString()}`
+    window.location.href = `/chat/${slug}/asesor?${params.toString()}`
   }
 
   return (
@@ -152,7 +152,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
       {/* Alternative: Chat link */}
       <div className="mt-6 pt-6 border-t border-slate-100 text-center">
         <Link
-          href={`/chat/${slug}?property=${propertyCode}`}
+          href={`/chat/${slug}/asesor?property=${propertyCode}`}
           className="text-sm font-semibold hover:underline"
           style={{ color: primaryColor }}
         >

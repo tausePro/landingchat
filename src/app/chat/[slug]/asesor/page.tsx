@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, use, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { getAdvisorData } from "./actions"
 import { getStoredUUID, getStoredString, setStoredUUID } from "@/lib/utils/storage"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
@@ -52,6 +52,9 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
     const { slug } = use(params)
     const isSubdomain = useIsSubdomain()
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const contextParam = searchParams.get("context")
+    const contextSentRef = useRef(false)
 
     const [customerId, setCustomerId] = useState<string | null>(null)
     const [customerName, setCustomerName] = useState<string | null>(null)
@@ -67,6 +70,7 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
     const [error, setError] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
+    const [pendingContext, setPendingContext] = useState<string | null>(null)
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -96,7 +100,13 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                 setOrganization(data.organization)
                 setPropertyCount(data.propertyCount)
                 if (data.agent) setAgent(data.agent)
-                initializeChat(storedCustomerId, storedChatId)
+                await initializeChat(storedCustomerId, storedChatId)
+
+                // Si viene contexto del BookingPanel en el URL, marcarlo como pendiente
+                if (contextParam && !contextSentRef.current) {
+                    contextSentRef.current = true
+                    setPendingContext(contextParam)
+                }
             } else {
                 setError("No se pudo cargar la información.")
                 setIsInitializing(false)
@@ -106,6 +116,14 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
             setIsInitializing(false)
         })
     }, [slug, router])
+
+    // Auto-enviar contexto del BookingPanel cuando el chat esté listo
+    useEffect(() => {
+        if (pendingContext && chatId && customerId && !isLoading && !isInitializing) {
+            setPendingContext(null)
+            handleSend(pendingContext)
+        }
+    }, [pendingContext, chatId, customerId, isLoading, isInitializing])
 
     const initializeChat = async (custId: string, existingChatId: string | null) => {
         let currentChatId: string | null = null
