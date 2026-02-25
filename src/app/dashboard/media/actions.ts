@@ -27,10 +27,15 @@ function getFileType(name: string): "image" | "video" {
   return "image"
 }
 
+interface OrgInfo {
+  id: string
+  slug: string
+}
+
 /**
- * Obtiene el organization_id del usuario actual
+ * Obtiene el organization_id y slug del usuario actual
  */
-async function getCurrentOrgId(): Promise<ActionResult<string>> {
+async function getCurrentOrg(): Promise<ActionResult<OrgInfo>> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -44,7 +49,16 @@ async function getCurrentOrgId(): Promise<ActionResult<string>> {
 
   if (!profile?.organization_id) return failure("No se encontró organización")
 
-  return success(profile.organization_id)
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("slug")
+    .eq("id", profile.organization_id)
+    .single()
+
+  return success({
+    id: profile.organization_id,
+    slug: org?.slug || "",
+  })
 }
 
 /**
@@ -52,47 +66,74 @@ async function getCurrentOrgId(): Promise<ActionResult<string>> {
  */
 export async function listMediaFiles(): Promise<ActionResult<MediaFile[]>> {
   try {
-    const orgResult = await getCurrentOrgId()
+    const orgResult = await getCurrentOrg()
     if (!orgResult.success) return failure(orgResult.error)
-    const orgId = orgResult.data
+    const { id: orgId, slug } = orgResult.data
 
     const supabase = await createClient()
 
-    const { data: files, error } = await supabase.storage
+    // Listar archivos por UUID (path estándar)
+    const { data: filesByUuid, error: errorUuid } = await supabase.storage
       .from(BUCKET_NAME)
       .list(orgId, {
         limit: 500,
         sortBy: { column: "created_at", order: "desc" },
       })
 
-    if (error) return failure(`Error listando archivos: ${error.message}`)
+    if (errorUuid) return failure(`Error listando archivos: ${errorUuid.message}`)
 
-    // Filtrar solo archivos válidos (excluir carpetas vacías y .emptyFolderPlaceholder)
-    const mediaFiles: MediaFile[] = (files || [])
-      .filter((f) => {
-        if (!f.name || f.name === ".emptyFolderPlaceholder") return false
-        const ext = f.name.split(".").pop()?.toLowerCase() || ""
-        return ALL_EXTENSIONS.includes(ext)
-      })
-      .map((f) => {
-        const fullPath = `${orgId}/${f.name}`
-        const { data: { publicUrl } } = supabase.storage
-          .from(BUCKET_NAME)
-          .getPublicUrl(fullPath)
+    // También listar por slug (algunas orgs tienen archivos bajo slug/ en vez de uuid/)
+    let filesBySlug: typeof filesByUuid = []
+    if (slug && slug !== orgId) {
+      const { data } = await supabase.storage
+        .from(BUCKET_NAME)
+        .list(slug, {
+          limit: 500,
+          sortBy: { column: "created_at", order: "desc" },
+        })
+      filesBySlug = data || []
+    }
 
-        return {
-          id: f.id || fullPath,
-          name: f.name,
-          fullPath,
-          publicUrl,
-          type: getFileType(f.name),
-          size: f.metadata?.size ?? null,
-          createdAt: f.created_at || null,
-          updatedAt: f.updated_at || null,
-        }
-      })
+    // Mapear archivos a MediaFile, indicando el prefijo correcto para cada uno
+    const mapFiles = (rawFiles: typeof filesByUuid, prefix: string): MediaFile[] =>
+      (rawFiles || [])  
+        .filter((f) => {
+          if (!f.name || f.name === ".emptyFolderPlaceholder") return false
+          const ext = f.name.split(".").pop()?.toLowerCase() || ""
+          return ALL_EXTENSIONS.includes(ext)
+        })
+        .map((f) => {
+          const fullPath = `${prefix}/${f.name}`
+          const { data: { publicUrl } } = supabase.storage
+            .from(BUCKET_NAME)
+            .getPublicUrl(fullPath)
 
-    return success(mediaFiles)
+          return {
+            id: f.id || fullPath,
+            name: f.name,
+            fullPath,
+            publicUrl,
+            type: getFileType(f.name),
+            size: f.metadata?.size ?? null,
+            createdAt: f.created_at || null,
+            updatedAt: f.updated_at || null,
+          }
+        })
+
+    const allFiles = [
+      ...mapFiles(filesByUuid, orgId),
+      ...mapFiles(filesBySlug, slug),
+    ]
+
+    // Deduplicar por nombre (si un archivo existe en ambas carpetas)
+    const seen = new Set<string>()
+    const dedupedFiles = allFiles.filter((f) => {
+      if (seen.has(f.name)) return false
+      seen.add(f.name)
+      return true
+    })
+
+    return success(dedupedFiles)
   } catch (err) {
     return failure(err instanceof Error ? err.message : "Error desconocido listando media")
   }
@@ -105,9 +146,9 @@ export async function uploadMediaFile(
   file: File
 ): Promise<ActionResult<MediaFile>> {
   try {
-    const orgResult = await getCurrentOrgId()
+    const orgResult = await getCurrentOrg()
     if (!orgResult.success) return failure(orgResult.error)
-    const orgId = orgResult.data
+    const orgId = orgResult.data.id
 
     // Validar extensión
     const ext = file.name.split(".").pop()?.toLowerCase() || ""
@@ -171,12 +212,13 @@ export async function renameMediaFile(
   newName: string
 ): Promise<ActionResult<MediaFile>> {
   try {
-    const orgResult = await getCurrentOrgId()
+    const orgResult = await getCurrentOrg()
     if (!orgResult.success) return failure(orgResult.error)
-    const orgId = orgResult.data
+    const { id: orgId, slug } = orgResult.data
 
-    // Seguridad: verificar que el path pertenece a la org
-    if (!fullPath.startsWith(`${orgId}/`)) {
+    // Seguridad: verificar que el path pertenece a la org (por UUID o slug)
+    const prefix = fullPath.split("/")[0]
+    if (prefix !== orgId && prefix !== slug) {
       return failure("No tienes permiso para renombrar este archivo")
     }
 
@@ -200,7 +242,8 @@ export async function renameMediaFile(
     // Agregar extensión si el usuario no la incluyó
     const hasExtension = sanitized.endsWith(`.${originalExt}`)
     const newFileName = hasExtension ? sanitized : `${sanitized}.${originalExt}`
-    const newPath = `${orgId}/${newFileName}`
+    // Mantener el mismo prefijo (slug o uuid) del archivo original
+    const newPath = `${prefix}/${newFileName}`
 
     // No hacer nada si el nombre es el mismo
     if (newPath === fullPath) return failure("El nombre es igual al actual")
@@ -259,12 +302,13 @@ export async function deleteMediaFile(
   fullPath: string
 ): Promise<ActionResult<void>> {
   try {
-    const orgResult = await getCurrentOrgId()
+    const orgResult = await getCurrentOrg()
     if (!orgResult.success) return failure(orgResult.error)
-    const orgId = orgResult.data
+    const { id: orgId, slug } = orgResult.data
 
-    // Seguridad: verificar que el path pertenece a la org del usuario
-    if (!fullPath.startsWith(`${orgId}/`)) {
+    // Seguridad: verificar que el path pertenece a la org (por UUID o slug)
+    const prefix = fullPath.split("/")[0]
+    if (prefix !== orgId && prefix !== slug) {
       return failure("No tienes permiso para eliminar este archivo")
     }
 
