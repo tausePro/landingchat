@@ -176,7 +176,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     }
 
     // Logic for Brand/Category Label
-    const brandOrCategory = product.brand || product.category || organization.name
+    const brandOrCategory = product.categories?.[0] || product.brand || organization.name
 
     // Logic for Free Shipping
     const freeShippingThreshold = organization.settings?.shipping?.free_shipping_threshold || 100000 // Default to 100k if not set
