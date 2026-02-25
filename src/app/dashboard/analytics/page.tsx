@@ -7,6 +7,9 @@ import { TrafficSources } from "./components/traffic-sources"
 import { ConversionFunnel } from "./components/conversion-funnel"
 import { SalesSources } from "./components/sales-sources"
 import { MetaAdsCard } from "./components/meta-ads-card"
+import { TopProductsCard } from "./components/top-products-card"
+import { RevenueByChannelCard } from "./components/revenue-by-channel-card"
+import { AiPerformanceCard } from "./components/ai-performance-card"
 
 export const dynamic = 'force-dynamic'
 
@@ -38,8 +41,9 @@ async function getAnalyticsData() {
     // Filtrar por status válidos (mismo criterio que dashboard-actions.ts)
     const validStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "completed"]
 
-    // Fetch org, orders, and chats in parallel (async-parallel optimization)
-    const [orgResult, ordersResult, chatsResult] = await Promise.all([
+    // Fetch org, orders, chats, and products in parallel
+    // Messages se fetchean después en batches (necesitan chatIds primero)
+    const [orgResult, ordersResult, chatsResult, productsResult] = await Promise.all([
         supabase
             .from("organizations")
             .select("id, name, slug, tracking_config")
@@ -47,7 +51,7 @@ async function getAnalyticsData() {
             .single(),
         supabase
             .from("orders")
-            .select("id, total, created_at, status, payment_status, source_channel, chat_id, utm_data")
+            .select("id, total, created_at, status, payment_status, source_channel, chat_id, utm_data, items")
             .eq("organization_id", orgId)
             .in("status", validStatuses)
             .gte("created_at", thirtyDaysAgo.toISOString())
@@ -56,12 +60,18 @@ async function getAnalyticsData() {
             .from("chats")
             .select("id, created_at, channel")
             .eq("organization_id", orgId)
-            .gte("created_at", thirtyDaysAgo.toISOString())
+            .gte("created_at", thirtyDaysAgo.toISOString()),
+        supabase
+            .from("products")
+            .select("id, name, stock, image_url, is_active")
+            .eq("organization_id", orgId)
+            .eq("is_active", true),
     ])
 
     const org = orgResult.data
     const orders = ordersResult.data
     const chats = chatsResult.data
+    const products = productsResult.data
 
     if (!org) {
         redirect("/onboarding")
@@ -124,6 +134,127 @@ async function getAnalyticsData() {
     // Conversión real del chat (solo órdenes que vinieron del chat / total chats)
     const chatConversionRate = totalChats > 0 ? ((ordersFromChat / totalChats) * 100).toFixed(1) : "0"
 
+    // ============================================================
+    // Top Products (de items JSONB en orders)
+    // ============================================================
+    const productStats: Record<string, { productName: string; totalRevenue: number; totalUnits: number }> = {}
+    orders?.forEach(order => {
+        const items = order.items as Array<{
+            product_id?: string
+            product_name?: string
+            name?: string
+            total_price?: number
+            price?: number
+            quantity?: number
+        }> | null
+        items?.forEach(item => {
+            const pid = item.product_id || 'unknown'
+            const name = item.product_name || item.name || 'Producto'
+            const revenue = item.total_price || (item.price || 0) * (item.quantity || 1)
+            if (!productStats[pid]) {
+                productStats[pid] = { productName: name, totalRevenue: 0, totalUnits: 0 }
+            }
+            productStats[pid].totalRevenue += revenue
+            productStats[pid].totalUnits += item.quantity || 1
+        })
+    })
+    const topProducts = Object.entries(productStats)
+        .map(([productId, stats]) => ({ productId, ...stats }))
+        .sort((a, b) => b.totalRevenue - a.totalRevenue)
+        .slice(0, 5)
+
+    // Productos con stock bajo (<=5 unidades)
+    const lowStockProducts = (products || [])
+        .filter(p => p.stock <= 5)
+        .sort((a, b) => a.stock - b.stock)
+        .map(p => ({ id: p.id, name: p.name, stock: p.stock, imageUrl: p.image_url }))
+
+    // ============================================================
+    // Revenue por canal (no solo conteo, sino $ por fuente)
+    // ============================================================
+    const revenueBySource: Record<string, { revenue: number; orders: number }> = {}
+    orders?.forEach(order => {
+        let source = 'direct'
+        if (order.source_channel === 'chat' || order.chat_id) {
+            source = 'chat'
+        } else if (order.utm_data && typeof order.utm_data === 'object') {
+            const utmData = order.utm_data as Record<string, unknown>
+            const utmSource = (utmData.utm_source as string)?.toLowerCase() || ''
+            if (utmSource.includes('facebook') || utmSource.includes('instagram') || utmSource.includes('meta') || utmSource.includes('fb') || utmSource.includes('ig')) {
+                source = 'meta_ads'
+            } else if (utmSource.includes('google')) {
+                source = 'google_ads'
+            } else if (utmSource) {
+                source = 'campaign'
+            }
+        } else if (order.source_channel === 'whatsapp') {
+            source = 'whatsapp'
+        }
+        if (!revenueBySource[source]) {
+            revenueBySource[source] = { revenue: 0, orders: 0 }
+        }
+        revenueBySource[source].revenue += order.total || 0
+        revenueBySource[source].orders += 1
+    })
+
+    // ============================================================
+    // AI Performance: mensajes por chat (query adicional)
+    // ============================================================
+    const chatIds = chats?.map(c => c.id) || []
+    let messagesData: Array<{ chat_id: string; sender_type: string; metadata: Record<string, unknown> | null }> = []
+    if (chatIds.length > 0) {
+        // Fetch messages en batches si hay muchos chats
+        const batchSize = 100
+        for (let i = 0; i < chatIds.length; i += batchSize) {
+            const batch = chatIds.slice(i, i + batchSize)
+            const { data } = await supabase
+                .from("messages")
+                .select("chat_id, sender_type, metadata")
+                .in("chat_id", batch)
+            if (data) messagesData = messagesData.concat(data)
+        }
+    }
+
+    const totalMessages = messagesData.length
+    // sender_type reales: "user" (cliente), "bot" (agente AI), "agent" (humano desde dashboard)
+    const messagesByType = {
+        user: messagesData.filter(m => m.sender_type === 'user' || m.sender_type === 'customer').length,
+        assistant: messagesData.filter(m => m.sender_type === 'bot' || m.sender_type === 'agent').length,
+        tool: 0, // Se calcula abajo desde metadata.tools_used
+    }
+    const avgMessagesPerChat = totalChats > 0 ? Math.round(totalMessages / totalChats) : 0
+
+    // Chats que generaron orden
+    const chatIdsWithOrder = new Set(orders?.filter(o => o.chat_id).map(o => o.chat_id) || [])
+    const chatsWithOrder = chatIdsWithOrder.size
+
+    // Top herramientas usadas (extraer de metadata.tools_used en mensajes del bot)
+    const toolCounts: Record<string, number> = {}
+    let totalToolCalls = 0
+    messagesData.forEach(m => {
+        if (m.sender_type === 'bot' && m.metadata) {
+            const toolsUsed = m.metadata.tools_used as string[] | undefined
+            if (toolsUsed && Array.isArray(toolsUsed)) {
+                toolsUsed.forEach(tool => {
+                    toolCounts[tool] = (toolCounts[tool] || 0) + 1
+                    totalToolCalls++
+                })
+            }
+        }
+    })
+    messagesByType.tool = totalToolCalls
+    const topTools = Object.entries(toolCounts)
+        .map(([tool, count]) => ({ tool, count }))
+        .sort((a, b) => b.count - a.count)
+
+    // Conversión por canal
+    const webChats = chats?.filter(c => !c.channel || c.channel === 'web') || []
+    const waChats = chats?.filter(c => c.channel === 'whatsapp') || []
+    const webChatIds = new Set(webChats.map(c => c.id))
+    const waChatIds = new Set(waChats.map(c => c.id))
+    const webOrders = orders?.filter(o => o.chat_id && webChatIds.has(o.chat_id)).length || 0
+    const waOrders = orders?.filter(o => o.chat_id && waChatIds.has(o.chat_id)).length || 0
+
     return {
         organization: org,
         metrics: {
@@ -145,7 +276,23 @@ async function getAnalyticsData() {
             posthog: Boolean(org.tracking_config?.posthog_enabled),
             metaPixel: Boolean(org.tracking_config?.meta_pixel_id),
             metaCapi: Boolean(org.tracking_config?.meta_access_token),
-        }
+        },
+        topProducts,
+        lowStockProducts,
+        revenueBySource,
+        aiPerformance: {
+            totalChats,
+            chatsWithOrder,
+            chatConversionRate,
+            totalMessages,
+            avgMessagesPerChat,
+            messagesByType,
+            topTools,
+            channelBreakdown: {
+                web: { chats: webChats.length, orders: webOrders },
+                whatsapp: { chats: waChats.length, orders: waOrders },
+            },
+        },
     }
 }
 
@@ -273,6 +420,21 @@ export default async function AnalyticsPage() {
                         totalOrders={data.metrics.totalOrders}
                     />
                 </div>
+
+                {/* Top Products + Revenue by Channel */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <TopProductsCard
+                        topProducts={data.topProducts}
+                        lowStockProducts={data.lowStockProducts}
+                    />
+                    <RevenueByChannelCard
+                        revenueBySource={data.revenueBySource}
+                        totalRevenue={data.metrics.totalRevenue}
+                    />
+                </div>
+
+                {/* AI Performance */}
+                <AiPerformanceCard {...data.aiPerformance} />
 
                 {/* Meta Ads */}
                 <MetaAdsCard />
