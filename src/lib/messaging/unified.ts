@@ -386,6 +386,25 @@ async function sendRichSocialAction(
             )
             break
         }
+
+        case "create_payment_link": {
+            const paymentUrl = data.paymentUrl
+            const order = data.order
+            if (!paymentUrl) return
+
+            const total = order?.total ? `$${Number(order.total).toLocaleString()}` : ""
+            await sendSocialQuickReplies(
+                organizationId,
+                platform,
+                recipientId,
+                `\u{1F6D2} Pedido listo ${total ? `por ${total}` : ""}\n\n\u{1F517} ${paymentUrl}`,
+                [
+                    { id: "payment_help", title: "Ayuda con el pago" },
+                    { id: "modify_order", title: "Modificar pedido" },
+                ]
+            )
+            break
+        }
     }
 }
 

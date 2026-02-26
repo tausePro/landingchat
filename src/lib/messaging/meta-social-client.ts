@@ -223,10 +223,16 @@ async function sendWithRetry(
 ): Promise<MetaSocialSendResponse> {
     let lastError: Error | null = null
 
+    // Para Instagram vía Facebook Login, el Send API usa el Facebook Page ID (Messenger Platform)
+    // Para Messenger, platform_page_id ya ES el Facebook Page ID
+    const endpointId = channel.platform === "instagram"
+        ? (channel.metadata?.facebook_page_id as string) || channel.platform_page_id
+        : channel.platform_page_id
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const response = await fetch(
-                `${META_GRAPH_API_BASE}/${channel.platform_page_id}/messages`,
+                `${META_GRAPH_API_BASE}/${endpointId}/messages`,
                 {
                     method: "POST",
                     headers: {
@@ -268,6 +274,26 @@ async function sendWithRetry(
     }
 
     throw lastError || new Error("Failed to send message after retries")
+}
+
+/**
+ * Obtiene el username y nombre de un usuario de Instagram vía Graph API.
+ * Útil para enriquecer el perfil del cliente en el CRM.
+ */
+export async function fetchInstagramUserProfile(
+    platformUserId: string,
+    pageAccessToken: string
+): Promise<{ name?: string; username?: string } | null> {
+    try {
+        const response = await fetch(
+            `${META_GRAPH_API_BASE}/${platformUserId}?fields=name,username&access_token=${pageAccessToken}`
+        )
+        if (!response.ok) return null
+        const data = await response.json()
+        return { name: data.name, username: data.username }
+    } catch {
+        return null
+    }
 }
 
 /**

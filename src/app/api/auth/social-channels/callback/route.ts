@@ -171,6 +171,10 @@ export async function POST(request: NextRequest) {
                 },
             })
 
+            // Suscribir la Facebook Page al webhook para recibir Instagram DMs
+            // Instagram Messaging usa el webhook de la Page vinculada (no del IG account)
+            await subscribePageWebhook(selectedPage.id, pageAccessToken)
+
             console.log(`[Social Channels Callback] Instagram connected for org ${orgId}: @${igAccount.username}`)
 
             return NextResponse.json({
