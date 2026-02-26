@@ -21,7 +21,7 @@ interface FBLoginResponse {
 
 const PLATFORM_CONFIG = {
     instagram: {
-        scope: "instagram_business_basic,instagram_business_manage_messages,pages_show_list,pages_messaging",
+        scope: "instagram_manage_messages,pages_show_list,pages_messaging",
         label: "Conectar Instagram",
         icon: Instagram,
         color: "bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 hover:from-purple-600 hover:via-pink-600 hover:to-orange-500",
