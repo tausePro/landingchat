@@ -48,3 +48,6 @@ next-env.d.ts
 
 # prototypes
 /prototypes/
+
+# private docs (not for GitHub)
+/docs-private/
