@@ -223,10 +223,16 @@ async function sendWithRetry(
 ): Promise<MetaSocialSendResponse> {
     let lastError: Error | null = null
 
+    // Para Instagram vía Facebook Login, el Send API usa el Facebook Page ID (Messenger Platform)
+    // Para Messenger, platform_page_id ya ES el Facebook Page ID
+    const endpointId = channel.platform === "instagram"
+        ? (channel.metadata?.facebook_page_id as string) || channel.platform_page_id
+        : channel.platform_page_id
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const response = await fetch(
-                `${META_GRAPH_API_BASE}/${channel.platform_page_id}/messages`,
+                `${META_GRAPH_API_BASE}/${endpointId}/messages`,
                 {
                     method: "POST",
                     headers: {
