@@ -93,9 +93,19 @@ export async function POST(request: NextRequest) {
         }
 
         // Verificar firma X-Hub-Signature-256
+        // Soporta múltiples app_secrets: WhatsApp y Instagram pueden tener apps separadas
         const signature = request.headers.get("x-hub-signature-256")
         if (signature) {
-            const isValid = verifyMetaSignature(bodyText, signature, config.app_secret)
+            let isValid = verifyMetaSignature(bodyText, signature, config.app_secret)
+
+            // Si falla con el secret de WhatsApp, intentar con el de Instagram
+            if (!isValid) {
+                const igSecret = await getInstagramAppSecret()
+                if (igSecret) {
+                    isValid = verifyMetaSignature(bodyText, signature, igSecret)
+                }
+            }
+
             if (!isValid) {
                 log.error("Invalid signature")
                 return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
@@ -510,5 +520,32 @@ async function handleStatusUpdates(
 
         // TODO: Actualizar estado del mensaje en la DB si lo necesitamos
         // (delivered, read, failed)
+    }
+}
+
+// ============================================
+// Instagram app secret
+// ============================================
+
+/**
+ * Obtiene el app_secret de la app de Instagram desde system_settings.
+ * Instagram puede tener un app_secret diferente al de WhatsApp.
+ */
+async function getInstagramAppSecret(): Promise<string | null> {
+    try {
+        const supabase = createServiceClient()
+
+        const { data: settings } = await supabase
+            .from("system_settings")
+            .select("value")
+            .eq("key", "meta_instagram_config")
+            .single()
+
+        if (!settings?.value) return null
+
+        const config = settings.value as Record<string, string>
+        return config.app_secret || null
+    } catch {
+        return null
     }
 }
