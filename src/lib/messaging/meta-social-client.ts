@@ -277,6 +277,26 @@ async function sendWithRetry(
 }
 
 /**
+ * Obtiene el username y nombre de un usuario de Instagram vía Graph API.
+ * Útil para enriquecer el perfil del cliente en el CRM.
+ */
+export async function fetchInstagramUserProfile(
+    platformUserId: string,
+    pageAccessToken: string
+): Promise<{ name?: string; username?: string } | null> {
+    try {
+        const response = await fetch(
+            `${META_GRAPH_API_BASE}/${platformUserId}?fields=name,username&access_token=${pageAccessToken}`
+        )
+        if (!response.ok) return null
+        const data = await response.json()
+        return { name: data.name, username: data.username }
+    } catch {
+        return null
+    }
+}
+
+/**
  * Busca el canal social por platform_page_id (usado por el webhook para identificar la org)
  */
 export async function findSocialChannelByPageId(

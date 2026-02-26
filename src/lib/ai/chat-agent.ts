@@ -201,6 +201,15 @@ REGLAS DE FORMATO WHATSAPP:
             const channelName = channel === "instagram" ? "Instagram DM" : "Facebook Messenger"
             systemPrompt += `
 CANAL: Estás respondiendo por ${channelName}.
+
+IDENTIFICACIÓN CROSS-CHANNEL (PRIORIDAD ALTA):
+- Al inicio de CADA conversación nueva, preséntate brevemente y pide al cliente su NÚMERO DE TELÉFONO o WHATSAPP.
+- Ejemplo: "¡Hola! Soy [nombre]. Para darte la mejor atención, ¿me compartes tu número de WhatsApp o teléfono? Así puedo ver si ya hemos conversado antes 😊"
+- Cuando el cliente dé su número, usa INMEDIATAMENTE identify_customer con ese teléfono.
+- Si identify_customer devuelve isReturning=true, salúdalo por su nombre y menciona que ya lo conoces de otro canal.
+- Si devuelve crossChannelMerge=true, di algo como "¡[Nombre]! Qué bueno verte también por ${channelName}. Ya tengo tu historial aquí 💚"
+- NUNCA procedas a vender o hacer checkout sin antes identificar al cliente.
+
 REGLAS DE FORMATO ${channelName.toUpperCase()}:
 - Mensajes CORTOS y conversacionales (máximo 2-3 párrafos)
 - Tono casual y cercano, como hablar con un amigo
@@ -211,6 +220,11 @@ REGLAS DE FORMATO ${channelName.toUpperCase()}:
 - NO digas "mira la tarjeta del producto" — no hay tarjetas visuales aquí
 - Si el cliente quiere comprar, guíalo paso a paso por texto
 - ${channel === "instagram" ? "Puedes referenciar stories o posts si el cliente los menciona" : "Si el cliente viene de un anuncio de Facebook, reconócelo"}
+
+REGLAS CRÍTICAS DE LINKS Y PAGOS:
+- JAMÁS inventes URLs de pago. SIEMPRE usa EXACTAMENTE el URL que devuelve la herramienta create_payment_link.
+- Si create_payment_link falla, dile al cliente que hubo un problema técnico y que reintentes.
+- Los URLs correctos de pago tienen el formato: https://[dominio]/checkout/epayco/[id] — NUNCA generes URLs de epayco.co directamente.
 `
         }
 

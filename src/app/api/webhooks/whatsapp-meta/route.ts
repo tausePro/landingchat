@@ -224,7 +224,7 @@ async function handleSocialWebhook(
 
         try {
             for (const messaging of entry.messaging || []) {
-                await handleSocialMessage(supabase, channel.organization_id, platform, messaging)
+                await handleSocialMessage(supabase, channel.organization_id, platform, messaging, channel.page_access_token)
             }
         } catch (processingError) {
             processingResult = "error"
@@ -243,7 +243,8 @@ async function handleSocialMessage(
     supabase: SupabaseClient,
     organizationId: string,
     platform: "instagram" | "messenger",
-    messaging: MetaSocialWebhookMessaging
+    messaging: MetaSocialWebhookMessaging,
+    pageAccessToken: string
 ) {
     // Ignorar ecos (mensajes que nosotros enviamos)
     if (messaging.message?.is_echo) return
@@ -302,8 +303,19 @@ async function handleSocialMessage(
 
     log.info(`${platform} message received`, { from: senderId, preview: messageText.substring(0, 50) })
 
+    // Obtener @username de Instagram vía Graph API (para enriquecer CRM)
+    let instagramUsername: string | undefined
+    if (platform === "instagram") {
+        const { fetchInstagramUserProfile } = await import("@/lib/messaging/meta-social-client")
+        const profile = await fetchInstagramUserProfile(senderId, pageAccessToken)
+        if (profile?.username) {
+            instagramUsername = profile.username
+            log.debug("Instagram username fetched", { username: instagramUsername })
+        }
+    }
+
     // Buscar o crear cliente por social ID
-    const customer = await findOrCreateCustomerBySocialId(supabase, organizationId, platform, senderId)
+    const customer = await findOrCreateCustomerBySocialId(supabase, organizationId, platform, senderId, instagramUsername)
 
     // Verificar límite de conversaciones
     const canContinue = await checkConversationLimit(supabase, organizationId)
@@ -312,8 +324,16 @@ async function handleSocialMessage(
         return
     }
 
-    // Buscar o crear chat
+    // Buscar o crear chat (con @username en metadata para uso del AI)
     const chat = await findOrCreateSocialChat(supabase, organizationId, customer.id, platform, senderId)
+
+    // Guardar @username en el metadata del chat para que identify_customer pueda usarlo
+    if (instagramUsername) {
+        await supabase
+            .from("chats")
+            .update({ metadata: { platform_user_id: senderId, instagram_username: instagramUsername } })
+            .eq("id", chat.id)
+    }
 
     // Guardar mensaje
     await supabase.from("messages").insert({
@@ -324,6 +344,7 @@ async function handleSocialMessage(
             social_message_id: messaging.message?.mid || messaging.postback?.mid,
             platform_user_id: senderId,
             platform,
+            instagram_username: instagramUsername,
             message_type: messaging.message ? "message" : messaging.postback ? "postback" : "other",
         },
     })
@@ -339,6 +360,7 @@ async function handleSocialMessage(
             social_message_id: messaging.message?.mid,
             platform_user_id: senderId,
             platform,
+            instagram_username: instagramUsername,
         },
     })
 

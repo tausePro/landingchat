@@ -27,6 +27,7 @@ interface ToolContext {
     chatId: string
     organizationId: string
     customerId?: string
+    channel?: string
 }
 
 interface ToolResult {
@@ -130,7 +131,18 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
         }
     }
 
-    // Buscar cliente existente
+    // Obtener info del chat actual (canal, social IDs, customer_id del shell)
+    const { data: currentChat } = await supabase
+        .from("chats")
+        .select("channel, customer_id, whatsapp_chat_id, metadata")
+        .eq("id", context.chatId)
+        .single()
+
+    const isSocialChannel = currentChat?.channel === "instagram" || currentChat?.channel === "messenger"
+    const socialPlatformUserId = currentChat?.whatsapp_chat_id || (currentChat?.metadata as any)?.platform_user_id
+    const shellCustomerId = currentChat?.customer_id
+
+    // Buscar cliente existente por email o teléfono
     let query = supabase
         .from("customers")
         .select("*, orders(id, total, status, created_at)")
@@ -145,17 +157,67 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
     const { data: existingCustomer } = await query.single()
 
     if (existingCustomer) {
-        // Actualizar chat con customer_id
+        // CROSS-CHANNEL MERGE: si estamos en IG/Messenger, vincular el social ID al customer existente
+        const updateFields: Record<string, unknown> = {
+            last_interaction_at: new Date().toISOString(),
+        }
+
+        if (isSocialChannel && socialPlatformUserId) {
+            const idColumn = currentChat.channel === "instagram" ? "instagram_id" : "messenger_id"
+
+            // Solo actualizar si el customer no tiene ya este social ID
+            if (!existingCustomer[idColumn]) {
+                updateFields[idColumn] = socialPlatformUserId
+                console.log(`[identifyCustomer] Cross-channel merge: linking ${idColumn}=${socialPlatformUserId} to customer ${existingCustomer.id}`)
+            }
+
+            // Guardar @username de Instagram si está disponible
+            if (currentChat.channel === "instagram" && (currentChat.metadata as any)?.instagram_username) {
+                const meta = existingCustomer.metadata || {}
+                updateFields.metadata = { ...meta, instagram_username: (currentChat.metadata as any).instagram_username }
+            }
+        }
+
+        // Actualizar nombre si no tenía uno real
+        if (name && (!existingCustomer.full_name || existingCustomer.full_name.startsWith("IG User") || existingCustomer.full_name.startsWith("FB User"))) {
+            updateFields.full_name = name
+        }
+
+        await supabase
+            .from("customers")
+            .update(updateFields)
+            .eq("id", existingCustomer.id)
+
+        // Vincular este chat al customer real (no al shell)
         await supabase
             .from("chats")
             .update({ customer_id: existingCustomer.id })
             .eq("id", context.chatId)
 
-        // Actualizar última interacción
-        await supabase
-            .from("customers")
-            .update({ last_interaction_at: new Date().toISOString() })
-            .eq("id", existingCustomer.id)
+        // Si había un shell customer diferente, eliminar el shell para no tener duplicados
+        if (shellCustomerId && shellCustomerId !== existingCustomer.id) {
+            // Reasignar chats del shell al customer real
+            await supabase
+                .from("chats")
+                .update({ customer_id: existingCustomer.id })
+                .eq("customer_id", shellCustomerId)
+                .eq("organization_id", context.organizationId)
+
+            // Eliminar el shell customer (solo si no tiene órdenes propias)
+            const { data: shellOrders } = await supabase
+                .from("orders")
+                .select("id")
+                .eq("customer_id", shellCustomerId)
+                .limit(1)
+
+            if (!shellOrders || shellOrders.length === 0) {
+                await supabase
+                    .from("customers")
+                    .delete()
+                    .eq("id", shellCustomerId)
+                console.log(`[identifyCustomer] Deleted shell customer ${shellCustomerId}, merged into ${existingCustomer.id}`)
+            }
+        }
 
         const lastOrder = existingCustomer.orders?.[0]
 
@@ -163,9 +225,10 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
             success: true,
             data: {
                 isReturning: true,
+                crossChannelMerge: isSocialChannel && socialPlatformUserId ? true : false,
                 customer: {
                     id: existingCustomer.id,
-                    name: existingCustomer.full_name,
+                    name: existingCustomer.full_name || name,
                     email: existingCustomer.email,
                     phone: existingCustomer.phone
                 },
@@ -183,7 +246,52 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
         }
     }
 
-    // Crear nuevo cliente
+    // No existe por email/teléfono — actualizar el shell customer si existe (en vez de crear duplicado)
+    if (shellCustomerId) {
+        const updateFields: Record<string, unknown> = {
+            full_name: name,
+            email: email || null,
+            phone: phone || null,
+            last_interaction_at: new Date().toISOString(),
+        }
+
+        // Guardar @username si está disponible
+        if (isSocialChannel && (currentChat.metadata as any)?.instagram_username) {
+            const { data: shellCustomer } = await supabase
+                .from("customers")
+                .select("metadata")
+                .eq("id", shellCustomerId)
+                .single()
+            const meta = shellCustomer?.metadata || {}
+            updateFields.metadata = { ...meta, instagram_username: (currentChat.metadata as any).instagram_username }
+        }
+
+        const { data: updatedCustomer, error } = await supabase
+            .from("customers")
+            .update(updateFields)
+            .eq("id", shellCustomerId)
+            .select()
+            .single()
+
+        if (error) {
+            return { success: false, error: `Error actualizando cliente: ${error.message}` }
+        }
+
+        return {
+            success: true,
+            data: {
+                isReturning: false,
+                customer: {
+                    id: updatedCustomer.id,
+                    name: updatedCustomer.full_name,
+                    email: updatedCustomer.email,
+                    phone: updatedCustomer.phone
+                }
+            }
+        }
+    }
+
+    // Crear nuevo cliente (fallback si no hay shell)
     const { data: newCustomer, error } = await supabase
         .from("customers")
         .insert({
