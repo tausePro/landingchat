@@ -175,6 +175,15 @@ export function IntegrationsList({ integrations }: IntegrationsListProps) {
                   <Badge variant="default">Conectado</Badge>
                 </div>
 
+                {gcalIntegration.config?.connected_email && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Cuenta</span>
+                    <span className="text-sm font-medium truncate max-w-[180px]">
+                      {gcalIntegration.config.connected_email}
+                    </span>
+                  </div>
+                )}
+
                 {gcalIntegration.config?.connected_at && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Conectado desde</span>

@@ -24,6 +24,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_CALENDAR_REDIRECT_URI || ""
 const SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/calendar.readonly",
+    "https://www.googleapis.com/auth/userinfo.email",
 ]
 
 // ─── OAuth2 Client ───────────────────────────────────────────────
@@ -72,6 +73,17 @@ export async function exchangeCodeForTokens(
         throw new Error("No se recibió refresh_token. Revoca el acceso en tu cuenta de Google e intenta de nuevo.")
     }
 
+    // Obtener email de la cuenta de Google conectada
+    let connectedEmail = ""
+    try {
+        oauth2Client.setCredentials(tokens)
+        const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client })
+        const userInfo = await oauth2.userinfo.get()
+        connectedEmail = userInfo.data.email || ""
+    } catch (emailError) {
+        console.warn("[google-calendar] Could not fetch user email:", emailError)
+    }
+
     const encryptedTokens: StoredTokens = {
         access_token: encrypt(tokens.access_token || ""),
         refresh_token: encrypt(tokens.refresh_token),
@@ -96,6 +108,7 @@ export async function exchangeCodeForTokens(
         config: {
             calendar_id: "primary",
             connected_at: new Date().toISOString(),
+            connected_email: connectedEmail,
         },
         sync_enabled: true,
     }
@@ -188,7 +201,8 @@ export interface CalendarEventInput {
  */
 export async function createCalendarEvent(
     organizationId: string,
-    event: CalendarEventInput
+    event: CalendarEventInput,
+    advisorCalendarId?: string
 ): Promise<string | null> {
     const auth = await getAuthenticatedClient(organizationId)
     if (!auth) {
@@ -197,7 +211,7 @@ export async function createCalendarEvent(
     }
 
     const calendar = google.calendar({ version: "v3", auth })
-    const calendarId = await getCalendarId(organizationId)
+    const calendarId = advisorCalendarId || await getCalendarId(organizationId)
 
     const eventBody: calendar_v3.Schema$Event = {
         summary: event.title,
@@ -322,6 +336,108 @@ export async function isCalendarConnected(organizationId: string): Promise<boole
         .single()
 
     return !!data
+}
+
+/**
+ * Consulta los slots ocupados en Google Calendar (FreeBusy API).
+ * Retorna los rangos de tiempo donde hay eventos.
+ */
+export async function getFreeBusySlots(
+    organizationId: string,
+    timeMin: Date,
+    timeMax: Date
+): Promise<Array<{ start: string; end: string }> | null> {
+    const auth = await getAuthenticatedClient(organizationId)
+    if (!auth) return null
+
+    const calendar = google.calendar({ version: "v3", auth })
+    const calendarId = await getCalendarId(organizationId)
+
+    try {
+        const response = await calendar.freebusy.query({
+            requestBody: {
+                timeMin: timeMin.toISOString(),
+                timeMax: timeMax.toISOString(),
+                timeZone: "America/Bogota",
+                items: [{ id: calendarId }],
+            },
+        })
+
+        const busy = response.data.calendars?.[calendarId]?.busy || []
+        return busy.map((slot) => ({
+            start: slot.start || "",
+            end: slot.end || "",
+        }))
+    } catch (error) {
+        console.error("[google-calendar] Error querying free/busy:", error)
+        return null
+    }
+}
+
+/**
+ * Lista eventos próximos del calendario para un rango de fechas.
+ */
+export async function listUpcomingEvents(
+    organizationId: string,
+    timeMin: Date,
+    timeMax: Date,
+    maxResults: number = 20
+): Promise<Array<{ id: string; summary: string; start: string; end: string }> | null> {
+    const auth = await getAuthenticatedClient(organizationId)
+    if (!auth) return null
+
+    const calendar = google.calendar({ version: "v3", auth })
+    const calendarId = await getCalendarId(organizationId)
+
+    try {
+        const response = await calendar.events.list({
+            calendarId,
+            timeMin: timeMin.toISOString(),
+            timeMax: timeMax.toISOString(),
+            singleEvents: true,
+            orderBy: "startTime",
+            maxResults,
+        })
+
+        return (response.data.items || []).map((event) => ({
+            id: event.id || "",
+            summary: event.summary || "Sin título",
+            start: event.start?.dateTime || event.start?.date || "",
+            end: event.end?.dateTime || event.end?.date || "",
+        }))
+    } catch (error) {
+        console.error("[google-calendar] Error listing events:", error)
+        return null
+    }
+}
+
+/**
+ * Lista todos los sub-calendarios de la cuenta de Google conectada.
+ * Retorna los calendarios que el usuario posee o puede editar.
+ */
+export async function listSubCalendars(
+    organizationId: string
+): Promise<Array<{ id: string; name: string; color: string; isPrimary: boolean }> | null> {
+    const auth = await getAuthenticatedClient(organizationId)
+    if (!auth) return null
+
+    const calendar = google.calendar({ version: "v3", auth })
+
+    try {
+        const response = await calendar.calendarList.list({
+            minAccessRole: "writer",
+        })
+
+        return (response.data.items || []).map((cal) => ({
+            id: cal.id || "",
+            name: cal.summary || "Sin nombre",
+            color: cal.backgroundColor || "#4285f4",
+            isPrimary: cal.primary === true,
+        }))
+    } catch (error) {
+        console.error("[google-calendar] Error listing sub-calendars:", error)
+        return null
+    }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────

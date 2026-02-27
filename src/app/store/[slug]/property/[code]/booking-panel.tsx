@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 
 interface BookingPanelProps {
@@ -9,38 +9,137 @@ interface BookingPanelProps {
   propertyTitle: string
   primaryColor: string
   orgName: string
+  organizationId: string
 }
 
-const TIME_SLOTS = ["09:00 AM", "10:30 AM", "02:00 PM", "04:30 PM"]
+interface AvailableDay {
+  date: string
+  dayName: string
+  slots: Array<{ time: string; isoDate: string }>
+}
 
-export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, orgName }: BookingPanelProps) {
-  const [selectedTime, setSelectedTime] = useState("")
+export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, orgName, organizationId }: BookingPanelProps) {
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
-
-  // Generar próximos 7 días
-  const today = new Date()
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(d.getDate() + i + 1)
-    return d
-  })
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [availability, setAvailability] = useState<AvailableDay[]>([])
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedSlot, setSelectedSlot] = useState<{ time: string; isoDate: string } | null>(null)
+  const [loadingSlots, setLoadingSlots] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [success, setSuccess] = useState<{ date: string; time: string } | null>(null)
+  const [error, setError] = useState("")
 
   const dayLabels = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"]
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const fetchAvailability = useCallback(async () => {
+    setLoadingSlots(true)
+    try {
+      const today = new Date()
+      const res = await fetch("/api/bookings/availability", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          date: today.toISOString(),
+          daysAhead: 8,
+        }),
+      })
+      const data = await res.json()
+      if (data.availability) {
+        setAvailability(data.availability)
+        if (data.availability.length > 0) {
+          setSelectedDate(data.availability[0].date)
+        }
+      }
+    } catch {
+      console.error("Error fetching availability")
+    } finally {
+      setLoadingSlots(false)
+    }
+  }, [organizationId])
+
+  useEffect(() => {
+    fetchAvailability()
+  }, [fetchAvailability])
+
+  const selectedDaySlots = availability.find(d => d.date === selectedDate)?.slots || []
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
 
-    // Construir mensaje de WhatsApp o redirigir al chat
-    const dateStr = selectedDate ? selectedDate.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" }) : ""
-    const context = `Quiero agendar una cita para ver la propiedad ${propertyTitle} (${propertyCode})${dateStr ? ` el ${dateStr}` : ""}${selectedTime ? ` a las ${selectedTime}` : ""}. Mi nombre es ${name || "no especificado"}.`
+    if (!selectedSlot) {
+      setError("Selecciona un horario")
+      return
+    }
+    if (!name.trim()) {
+      setError("Ingresa tu nombre")
+      return
+    }
+    if (!phone.trim() || phone.length < 7) {
+      setError("Ingresa un número de WhatsApp válido")
+      return
+    }
 
-    const params = new URLSearchParams()
-    params.set("property", propertyCode)
-    params.set("context", context)
+    setSubmitting(true)
+    try {
+      const res = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          propertyCode,
+          proposedDate: selectedSlot.isoDate,
+          customerName: name.trim(),
+          customerPhone: `+57${phone.replace(/\s/g, "")}`,
+        }),
+      })
 
-    window.location.href = `/chat/${slug}/asesor?${params.toString()}`
+      const data = await res.json()
+
+      if (data.success) {
+        setSuccess({ date: data.appointment.date, time: data.appointment.time })
+      } else {
+        setError(data.error || "Error al agendar. Intenta de nuevo.")
+        if (res.status === 409) {
+          fetchAvailability()
+        }
+      }
+    } catch {
+      setError("Error de conexión. Intenta de nuevo.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Vista de éxito
+  if (success) {
+    return (
+      <div className="sticky top-24 bg-white border border-slate-200 rounded-2xl shadow-xl p-6 lg:p-8 text-center">
+        <div className="size-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${primaryColor}15` }}>
+          <span className="material-symbols-outlined text-3xl" style={{ color: primaryColor }}>check_circle</span>
+        </div>
+        <h3 className="text-xl font-extrabold text-slate-900 mb-2">¡Visita Agendada!</h3>
+        <p className="text-sm text-slate-600 mb-4">
+          Tu visita a <strong>{propertyTitle}</strong> ha sido agendada para:
+        </p>
+        <div className="bg-slate-50 rounded-xl p-4 mb-4 border border-slate-100">
+          <p className="text-lg font-bold text-slate-900 capitalize">{success.date}</p>
+          <p className="text-sm text-slate-600">{success.time}</p>
+        </div>
+        <p className="text-xs text-slate-500 mb-6">
+          Un asesor de {orgName} confirmará tu cita en breve por WhatsApp.
+        </p>
+        <Link
+          href={`/chat/${slug}/asesor?property=${propertyCode}`}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
+          style={{ color: primaryColor }}
+        >
+          <span className="material-symbols-outlined text-base">chat</span>
+          ¿Tienes preguntas? Chatea con un asesor
+        </Link>
+      </div>
+    )
   }
 
   return (
@@ -54,55 +153,73 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
             1. Selecciona la fecha
           </label>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs border border-slate-100 p-2 rounded-lg bg-slate-50">
-            {days.map((d, i) => {
-              const isSelected = selectedDate?.toDateString() === d.toDateString()
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setSelectedDate(d)}
-                  className={`py-2 rounded text-xs font-medium transition-all ${
-                    isSelected
-                      ? "text-white font-bold shadow-md"
-                      : "hover:bg-slate-200"
-                  }`}
-                  style={isSelected ? { backgroundColor: primaryColor } : {}}
-                >
-                  <div className="text-[10px] text-slate-400 mb-0.5">{dayLabels[d.getDay()]}</div>
-                  {d.getDate()}
-                </button>
-              )
-            })}
-          </div>
+          {loadingSlots ? (
+            <div className="flex items-center justify-center py-4 text-sm text-slate-400">
+              <span className="material-symbols-outlined text-base animate-spin mr-2">progress_activity</span>
+              Consultando disponibilidad...
+            </div>
+          ) : availability.length === 0 ? (
+            <p className="text-sm text-slate-500 py-2">No hay horarios disponibles esta semana.</p>
+          ) : (
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {availability.map((day) => {
+                const d = new Date(day.date + "T12:00:00")
+                const isSelected = selectedDate === day.date
+                return (
+                  <button
+                    key={day.date}
+                    type="button"
+                    onClick={() => { setSelectedDate(day.date); setSelectedSlot(null) }}
+                    className={`flex-shrink-0 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                      isSelected
+                        ? "text-white font-bold shadow-md"
+                        : "border border-slate-200 hover:border-slate-400"
+                    }`}
+                    style={isSelected ? { backgroundColor: primaryColor } : {}}
+                  >
+                    <div className={`text-[10px] mb-0.5 ${isSelected ? "text-white/70" : "text-slate-400"}`}>
+                      {dayLabels[d.getDay()]}
+                    </div>
+                    {d.getDate()}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Time Slots */}
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-            2. Horario disponible
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            {TIME_SLOTS.map((time) => {
-              const isSelected = selectedTime === time
-              return (
-                <button
-                  key={time}
-                  type="button"
-                  onClick={() => setSelectedTime(isSelected ? "" : time)}
-                  className={`py-2 text-sm font-semibold rounded-lg transition-all ${
-                    isSelected
-                      ? "border-2 font-bold"
-                      : "border border-slate-200 hover:border-slate-400"
-                  }`}
-                  style={isSelected ? { borderColor: primaryColor, color: primaryColor, backgroundColor: `${primaryColor}08` } : {}}
-                >
-                  {time}
-                </button>
-              )
-            })}
+        {selectedDate && (
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
+              2. Horario disponible
+            </label>
+            {selectedDaySlots.length === 0 ? (
+              <p className="text-sm text-slate-500">No hay horarios disponibles este día.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {selectedDaySlots.map((slot) => {
+                  const isSelected = selectedSlot?.isoDate === slot.isoDate
+                  return (
+                    <button
+                      key={slot.isoDate}
+                      type="button"
+                      onClick={() => setSelectedSlot(isSelected ? null : slot)}
+                      className={`py-2 text-sm font-semibold rounded-lg transition-all ${
+                        isSelected
+                          ? "border-2 font-bold"
+                          : "border border-slate-200 hover:border-slate-400"
+                      }`}
+                      style={isSelected ? { borderColor: primaryColor, color: primaryColor, backgroundColor: `${primaryColor}08` } : {}}
+                    >
+                      {slot.time}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Contact Fields */}
         <div className="space-y-4">
@@ -116,6 +233,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              required
             />
           </div>
           <div>
@@ -132,17 +250,37 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                required
               />
             </div>
           </div>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full bg-[#10b981] text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          disabled={submitting || !selectedSlot}
+          className="w-full text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:brightness-110 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ backgroundColor: selectedSlot ? "#10b981" : "#94a3b8" }}
         >
-          <span className="material-symbols-outlined">event_available</span> Confirmar Cita
+          {submitting ? (
+            <>
+              <span className="material-symbols-outlined animate-spin">progress_activity</span>
+              Agendando...
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined">event_available</span>
+              Confirmar Cita
+            </>
+          )}
         </button>
         <p className="text-center text-[10px] text-slate-400 italic">
           Al confirmar, un asesor validará la disponibilidad en menos de 15 minutos.

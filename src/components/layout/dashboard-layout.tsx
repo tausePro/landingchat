@@ -30,6 +30,7 @@ import {
     Truck,
     Tag,
     ImageIcon,
+    UserCog,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -57,6 +58,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
     properties: Building2,
     leads: UserPlus,
     appointments: Calendar,
+    advisors: UserCog,
     documents: FileText,
     // Ecommerce extras
     coupons: Ticket,
@@ -91,6 +93,7 @@ const MODULE_TO_NAV: Record<string, NavItem> = {
     properties: { slug: "properties", label: "Propiedades", href: "/dashboard/properties", icon: Building2 },
     leads: { slug: "leads", label: "Leads", href: "/dashboard/leads", icon: UserPlus },
     appointments: { slug: "appointments", label: "Citas", href: "/dashboard/appointments", icon: Calendar },
+    advisors: { slug: "advisors", label: "Asesores", href: "/dashboard/settings/advisors", icon: UserCog },
     documents: { slug: "documents", label: "Documentos", href: "/dashboard/documents", icon: FileText },
     // Media
     media: { slug: "media", label: "Media", href: "/dashboard/media", icon: ImageIcon },
@@ -168,8 +171,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             ? enabledModules
             : ["conversations", "products", "orders", "customers", "agent"]
 
+        // Detectar si es vertical inmobiliaria
+        const isRealEstate = modules.includes("properties") || modules.includes("appointments") || modules.includes("leads")
+
         // Agregar items según módulos habilitados
         for (const mod of modules) {
+            // Ocultar "Clientes" en real estate (Leads lo reemplaza)
+            if (mod === "customers" && isRealEstate) continue
+
             if (MODULE_TO_NAV[mod]) {
                 items.push(MODULE_TO_NAV[mod])
                 // Categorías y Media aparecen automáticamente con productos
@@ -178,6 +187,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     if (MODULE_TO_NAV["media"]) items.push(MODULE_TO_NAV["media"])
                 }
             }
+        }
+
+        // Asesores aparece automáticamente con la vertical inmobiliaria
+        if (isRealEstate && !modules.includes("advisors")) {
+            items.push(MODULE_TO_NAV["advisors"])
         }
 
         // Marketing solo si hay módulos de marketing habilitados

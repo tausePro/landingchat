@@ -166,6 +166,74 @@ Un nuevo cliente está chateando con tu agente IA.`
 }
 
 /**
+ * Envía notificación de nueva cita agendada
+ */
+export async function sendAppointmentNotification(
+    context: NotificationContext,
+    appointment: {
+        title: string
+        customerName: string
+        customerPhone?: string | null
+        proposedDate: Date
+        appointmentType: string
+        location?: string | null
+    }
+): Promise<boolean> {
+    try {
+        const supabase = await createServiceClient()
+
+        const { data: instance } = await supabase
+            .from("whatsapp_instances")
+            .select("phone_number, notifications_enabled")
+            .eq("organization_id", context.organizationId)
+            .eq("instance_type", "personal")
+            .eq("status", "connected")
+            .single()
+
+        if (!instance || !instance.notifications_enabled) {
+            return false
+        }
+
+        if (!instance.phone_number) {
+            return false
+        }
+
+        const typeLabels: Record<string, string> = {
+            visit: "Visita presencial",
+            consultation: "Consulta",
+            call: "Llamada",
+            meeting: "Reunión",
+        }
+
+        const dateFormatted = appointment.proposedDate.toLocaleDateString("es-CO", {
+            weekday: "long",
+            day: "numeric",
+            month: "long",
+        })
+        const timeFormatted = appointment.proposedDate.toLocaleTimeString("es-CO", {
+            hour: "2-digit",
+            minute: "2-digit",
+        })
+
+        const message = `📅 *Nueva Cita Agendada*
+
+*${appointment.title}*
+*Tipo:* ${typeLabels[appointment.appointmentType] || appointment.appointmentType}
+*Cliente:* ${appointment.customerName}${appointment.customerPhone ? `\n*Teléfono:* ${appointment.customerPhone}` : ""}
+*Fecha:* ${dateFormatted}
+*Hora:* ${timeFormatted}${appointment.location ? `\n*Ubicación:* ${appointment.location}` : ""}
+
+La cita queda pendiente de confirmación.`
+
+        await sendNotification(context.organizationId, instance.phone_number, message)
+        return true
+    } catch (error) {
+        console.error("[WhatsApp Notifications] Error sending appointment notification:", error)
+        return false
+    }
+}
+
+/**
  * Función auxiliar para enviar notificación por WhatsApp
  * Usa el provider agnóstico (Meta Cloud API o Evolution API)
  */

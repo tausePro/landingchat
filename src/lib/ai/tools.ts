@@ -562,7 +562,8 @@ export const ScheduleAppointmentSchema = z.object({
     customer_name: z.string(),
     customer_phone: z.string().optional(),
     customer_email: z.string().optional(),
-    notes: z.string().optional()
+    notes: z.string().optional(),
+    property_code: z.string().optional()
 })
 
 export const SearchPropertiesSchema = z.object({
