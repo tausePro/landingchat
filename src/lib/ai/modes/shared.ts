@@ -71,6 +71,24 @@ export const sharedTools: Anthropic.Tool[] = [
 
     // ==================== CITAS (compartida — aplica a ambos modos) ====================
     {
+        name: "check_availability",
+        description: "Consulta la disponibilidad de horarios para agendar citas. Revisa Google Calendar (si está conectado) y las citas existentes en la plataforma. USAR ANTES de schedule_appointment para ofrecer horarios reales al cliente.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                date: {
+                    type: "string",
+                    description: "Fecha para consultar disponibilidad en formato ISO 8601 (ej: '2026-02-27'). Si el cliente dice 'mañana', calcula la fecha correcta."
+                },
+                days_ahead: {
+                    type: "number",
+                    description: "Número de días a consultar desde la fecha indicada (default 1, máximo 7)"
+                }
+            },
+            required: ["date"]
+        }
+    },
+    {
         name: "schedule_appointment",
         description: "Agenda una cita o visita con el cliente. Usar cuando el cliente quiere agendar una visita a una propiedad, una consulta, una llamada o una reunión. Recolecta fecha, hora y tipo de cita.",
         input_schema: {
@@ -115,6 +133,10 @@ export const sharedTools: Anthropic.Tool[] = [
                 notes: {
                     type: "string",
                     description: "Notas adicionales sobre la cita"
+                },
+                property_code: {
+                    type: "string",
+                    description: "Código de la propiedad (ej: 'ARR-137', '1436'). Si la cita es para visitar una propiedad específica, incluye su código. La ubicación se auto-completa con la dirección de la propiedad."
                 }
             },
             required: ["title", "proposed_date", "customer_name"]

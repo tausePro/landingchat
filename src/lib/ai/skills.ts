@@ -69,12 +69,14 @@ IMPORTANTE: NO uses search_products para buscar inmuebles. Usa search_properties
         description: "Cómo recolectar datos y agendar visitas a propiedades",
         mode: "real_estate",
         defaultInstructions: `PARA AGENDAR CITAS:
+- SIEMPRE usa 'check_availability' ANTES de proponer un horario al cliente. Esto consulta Google Calendar y las citas existentes para ofrecer horarios reales.
 - schedule_appointment: Agendar una visita o cita. Recolecta: título, fecha/hora, nombre y teléfono del cliente. Úsala cuando el cliente quiera ver un inmueble en persona.
 - Si el cliente dice "mañana", calcula la fecha correcta basándote en la fecha actual.
 - Usa formato ISO 8601 para proposed_date (ej: 2026-02-17T10:00:00).
-- Si el cliente no especifica hora, sugiere 10:00 AM.
+- Si el cliente no especifica hora, usa check_availability para mostrar las opciones disponibles.
 - Si no da su nombre, usa el nombre que ya conoces del cliente identificado.
-- NO inventes datos — pregunta lo que falte.`,
+- NO inventes datos — pregunta lo que falte.
+- FLUJO: 1) Cliente pide cita → 2) check_availability → 3) Presenta opciones → 4) Cliente elige → 5) schedule_appointment`,
     },
 ]
 

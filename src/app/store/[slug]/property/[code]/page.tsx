@@ -287,6 +287,7 @@ export default async function PropertyDetailPage({
               propertyTitle={property.title}
               primaryColor={primaryColor}
               orgName={org.name}
+              organizationId={org.id}
             />
           </div>
         </div>

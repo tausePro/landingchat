@@ -101,6 +101,9 @@ export async function executeTool(
             case "escalate_to_human":
                 return await escalateToHuman(supabase, input, context)
 
+            case "check_availability":
+                return await checkAvailability(supabase, input, context)
+
             case "schedule_appointment":
                 return await scheduleAppointment(supabase, input, context)
 
@@ -1394,6 +1397,170 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
     }
 }
 
+// ==================== DISPONIBILIDAD ====================
+
+async function checkAvailability(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { date, days_ahead = 1 } = input
+    const daysToCheck = Math.min(Math.max(days_ahead, 1), 7)
+
+    const startDate = new Date(date)
+    if (isNaN(startDate.getTime())) {
+        return { success: false, error: "Fecha inválida. Usa formato ISO 8601 (ej: 2026-02-27)" }
+    }
+
+    startDate.setHours(0, 0, 0, 0)
+    const endDate = new Date(startDate.getTime() + daysToCheck * 24 * 60 * 60 * 1000)
+
+    const DEFAULT_START = 9
+    const DEFAULT_END = 18
+    const SLOT_DURATION = 60 // minutos
+
+    const DAY_KEYS: Record<number, string> = {
+        0: "sunday", 1: "monday", 2: "tuesday", 3: "wednesday",
+        4: "thursday", 5: "friday", 6: "saturday",
+    }
+
+    // Cargar asesores (si existen)
+    let advisorNames: string[] = []
+    let advisorWorkingHours: Record<string, Array<{ start: string; end: string }>> = {}
+    let useAdvisors = false
+    try {
+        const { getAdvisors } = await import("@/lib/advisors/assignment")
+        const advisors = await getAdvisors(context.organizationId)
+        if (advisors.length > 0) {
+            useAdvisors = true
+            advisorNames = advisors.map(a => `${a.name} (${a.specialty === "sales" ? "ventas" : a.specialty === "rentals" ? "arriendos" : "ambos"})`)
+            // Merge working hours de todos los asesores
+            for (const advisor of advisors) {
+                if (!advisor.working_hours) continue
+                for (const [day, blocks] of Object.entries(advisor.working_hours)) {
+                    if (!blocks || (blocks as any[]).length === 0) continue
+                    if (!advisorWorkingHours[day]) advisorWorkingHours[day] = []
+                    for (const block of (blocks as any[])) {
+                        advisorWorkingHours[day].push(block)
+                    }
+                }
+            }
+        }
+    } catch {
+        // tabla advisors puede no existir aún
+    }
+
+    // 1. Obtener citas locales en el rango
+    const { data: localAppointments } = await supabase
+        .from("appointments")
+        .select("id, title, proposed_date, proposed_end_date, status")
+        .eq("organization_id", context.organizationId)
+        .in("status", ["pending", "confirmed"])
+        .gte("proposed_date", startDate.toISOString())
+        .lte("proposed_date", endDate.toISOString())
+        .order("proposed_date", { ascending: true })
+
+    // 2. Obtener slots ocupados de Google Calendar (si conectado)
+    let gcalBusy: Array<{ start: string; end: string }> = []
+    let gcalConnected = false
+    try {
+        const { getFreeBusySlots, isCalendarConnected } = await import("@/lib/calendar/google-calendar")
+        gcalConnected = await isCalendarConnected(context.organizationId)
+        if (gcalConnected) {
+            const busy = await getFreeBusySlots(context.organizationId, startDate, endDate)
+            if (busy) gcalBusy = busy
+        }
+    } catch (gcalError) {
+        console.warn("[checkAvailability] GCal query failed:", gcalError)
+    }
+
+    // 3. Combinar todos los slots ocupados
+    const busySlots: Array<{ start: Date; end: Date }> = []
+
+    for (const apt of (localAppointments || [])) {
+        busySlots.push({
+            start: new Date(apt.proposed_date),
+            end: new Date(apt.proposed_end_date || new Date(new Date(apt.proposed_date).getTime() + 60 * 60 * 1000)),
+        })
+    }
+
+    for (const slot of gcalBusy) {
+        busySlots.push({ start: new Date(slot.start), end: new Date(slot.end) })
+    }
+
+    // 4. Calcular slots disponibles por día
+    const availabilityByDay: Array<{
+        date: string
+        dayName: string
+        availableSlots: Array<{ start: string; end: string }>
+        busyCount: number
+    }> = []
+
+    for (let d = 0; d < daysToCheck; d++) {
+        const dayDate = new Date(startDate.getTime() + d * 24 * 60 * 60 * 1000)
+        const dayStr = dayDate.toISOString().split("T")[0]
+        const dayName = dayDate.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })
+
+        if (dayDate.getDay() === 0) {
+            availabilityByDay.push({ date: dayStr, dayName, availableSlots: [], busyCount: 0 })
+            continue
+        }
+
+        const dayKey = DAY_KEYS[dayDate.getDay()]
+        const dayBusy = busySlots.filter(b => b.start.toISOString().split("T")[0] === dayStr)
+
+        // Determinar bloques de trabajo para este día
+        let workMinutes = new Set<number>()
+
+        if (useAdvisors && advisorWorkingHours[dayKey]) {
+            for (const block of advisorWorkingHours[dayKey]) {
+                const [sh, sm] = block.start.split(":").map(Number)
+                const [eh, em] = block.end.split(":").map(Number)
+                for (let m = sh * 60 + (sm || 0); m < eh * 60 + (em || 0); m += 60) {
+                    workMinutes.add(m)
+                }
+            }
+        } else {
+            for (let h = DEFAULT_START; h < DEFAULT_END; h++) {
+                workMinutes.add(h * 60)
+            }
+        }
+
+        const sortedMinutes = Array.from(workMinutes).sort((a, b) => a - b)
+        const available: Array<{ start: string; end: string }> = []
+
+        for (const mins of sortedMinutes) {
+            const slotStart = new Date(dayDate)
+            slotStart.setHours(Math.floor(mins / 60), mins % 60, 0, 0)
+            const slotEnd = new Date(slotStart.getTime() + SLOT_DURATION * 60 * 1000)
+
+            const isOccupied = dayBusy.some(b => slotStart < b.end && slotEnd > b.start)
+
+            if (!isOccupied) {
+                available.push({
+                    start: slotStart.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+                    end: slotEnd.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+                })
+            }
+        }
+
+        availabilityByDay.push({
+            date: dayStr,
+            dayName,
+            availableSlots: available,
+            busyCount: dayBusy.length,
+        })
+    }
+
+    return {
+        success: true,
+        data: {
+            googleCalendarConnected: gcalConnected,
+            hasAdvisors: useAdvisors,
+            advisors: advisorNames.length > 0 ? advisorNames : undefined,
+            availability: availabilityByDay,
+            totalAvailableSlots: availabilityByDay.reduce((sum, d) => sum + d.availableSlots.length, 0),
+            tip: "Sugiere al cliente los horarios disponibles. Usa schedule_appointment con la fecha/hora que elija."
+        }
+    }
+}
+
 // ==================== CITAS ====================
 
 async function scheduleAppointment(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
@@ -1447,27 +1614,73 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
         }
     }
 
+    // Buscar propiedad vinculada si se proporcionó property_code
+    let propertyId: string | null = null
+    let propertyAddress = validated.location || null
+    let propertyType: string | undefined
+
+    if (validated.property_code) {
+        const { data: property } = await supabase
+            .from("properties")
+            .select("id, title, address, neighborhood, city, property_type")
+            .eq("organization_id", context.organizationId)
+            .eq("external_code", validated.property_code)
+            .single()
+
+        if (property) {
+            propertyId = property.id
+            propertyType = property.property_type
+            if (!propertyAddress) {
+                propertyAddress = [property.address, property.neighborhood, property.city].filter(Boolean).join(", ")
+            }
+            console.log("[scheduleAppointment] Linked to property:", property.id, property.title)
+        }
+    }
+
+    // Asignar asesor automáticamente (si hay asesores configurados)
+    let assignedAdvisor: { id: string; name: string; google_calendar_id: string | null } | null = null
+    try {
+        const { assignAdvisor } = await import("@/lib/advisors/assignment")
+        const advisor = await assignAdvisor(context.organizationId, proposedDate, propertyType)
+        if (advisor) {
+            assignedAdvisor = { id: advisor.id, name: advisor.name, google_calendar_id: advisor.google_calendar_id }
+            console.log("[scheduleAppointment] Assigned to advisor:", advisor.name)
+        }
+    } catch {
+        // tabla advisors puede no existir aún
+    }
+
     // Crear la cita
+    const insertData: Record<string, unknown> = {
+        organization_id: context.organizationId,
+        customer_id: context.customerId || null,
+        chat_id: context.chatId,
+        property_id: propertyId,
+        title: validated.title,
+        appointment_type: validated.appointment_type,
+        status: "pending",
+        proposed_date: proposedDate.toISOString(),
+        proposed_end_date: endDate.toISOString(),
+        duration_minutes: validated.duration_minutes,
+        customer_name: validated.customer_name,
+        customer_phone: validated.customer_phone || null,
+        customer_email: validated.customer_email || null,
+        location: propertyAddress,
+        location_type: validated.location_type,
+        notes: validated.notes || null,
+        metadata: {
+            ...(validated.property_code ? { property_code: validated.property_code } : {}),
+            ...(assignedAdvisor ? { advisor_name: assignedAdvisor.name } : {}),
+        }
+    }
+
+    if (assignedAdvisor) {
+        insertData.assigned_to = assignedAdvisor.id
+    }
+
     const { data: appointment, error } = await supabase
         .from("appointments")
-        .insert({
-            organization_id: context.organizationId,
-            customer_id: context.customerId || null,
-            chat_id: context.chatId,
-            title: validated.title,
-            appointment_type: validated.appointment_type,
-            status: "pending",
-            proposed_date: proposedDate.toISOString(),
-            proposed_end_date: endDate.toISOString(),
-            duration_minutes: validated.duration_minutes,
-            customer_name: validated.customer_name,
-            customer_phone: validated.customer_phone || null,
-            customer_email: validated.customer_email || null,
-            location: validated.location || null,
-            location_type: validated.location_type,
-            notes: validated.notes || null,
-            metadata: {}
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -1477,27 +1690,47 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
     }
 
     // Sync con Google Calendar (si está conectado, non-blocking)
+    // Ruta al sub-calendario del asesor si tiene uno vinculado
     try {
         const { createCalendarEvent } = await import("@/lib/calendar/google-calendar")
+        const advisorCalId = assignedAdvisor?.google_calendar_id || undefined
         const googleEventId = await createCalendarEvent(context.organizationId, {
-            title: validated.title,
-            description: `Cita con ${validated.customer_name}${validated.notes ? ` — ${validated.notes}` : ""}`,
+            title: assignedAdvisor ? `${validated.title} — ${assignedAdvisor.name}` : validated.title,
+            description: `Cita con ${validated.customer_name}${validated.property_code ? ` — Propiedad: ${validated.property_code}` : ""}${assignedAdvisor ? `\nAsesor: ${assignedAdvisor.name}` : ""}${validated.notes ? `\n${validated.notes}` : ""}`,
             startDate: proposedDate,
             endDate: endDate,
-            location: validated.location,
+            location: propertyAddress || undefined,
             attendeeEmail: validated.customer_email,
-        })
+        }, advisorCalId)
 
         if (googleEventId) {
             await supabase
                 .from("appointments")
                 .update({ google_event_id: googleEventId })
                 .eq("id", appointment.id)
-            console.log("[scheduleAppointment] Google Calendar event created:", googleEventId)
+            console.log("[scheduleAppointment] Google Calendar event created:", googleEventId, advisorCalId ? `in ${assignedAdvisor?.name}'s calendar` : "in primary")
         }
     } catch (gcalError) {
         // No bloquear la cita si GCal falla
         console.warn("[scheduleAppointment] Google Calendar sync failed (non-blocking):", gcalError)
+    }
+
+    // Notificación WhatsApp al admin (non-blocking)
+    try {
+        const { sendAppointmentNotification } = await import("@/lib/notifications/whatsapp")
+        await sendAppointmentNotification(
+            { organizationId: context.organizationId },
+            {
+                title: validated.title,
+                customerName: validated.customer_name,
+                customerPhone: validated.customer_phone,
+                proposedDate: proposedDate,
+                appointmentType: validated.appointment_type,
+                location: validated.location,
+            }
+        )
+    } catch (notifError) {
+        console.warn("[scheduleAppointment] WhatsApp notification failed (non-blocking):", notifError)
     }
 
     // Formatear la respuesta
@@ -1530,13 +1763,16 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
                 date: dateFormatted,
                 time: timeFormatted,
                 duration: `${validated.duration_minutes} minutos`,
-                location: validated.location || "Por confirmar",
+                location: propertyAddress || validated.location || "Por confirmar",
                 locationType: validated.location_type,
                 customerName: validated.customer_name,
+                advisor: assignedAdvisor?.name || null,
                 status: "pending"
             },
-            message: `Cita agendada: "${validated.title}" para el ${dateFormatted} a las ${timeFormatted}.`,
-            nextStep: "La cita queda pendiente de confirmación. El equipo se comunicará para confirmar."
+            message: `Cita agendada: "${validated.title}" para el ${dateFormatted} a las ${timeFormatted}.${assignedAdvisor ? ` Tu asesor será ${assignedAdvisor.name}.` : ""}`,
+            nextStep: assignedAdvisor
+                ? `${assignedAdvisor.name} te atenderá. La cita queda pendiente de confirmación.`
+                : "La cita queda pendiente de confirmación. El equipo se comunicará para confirmar."
         }
     }
 }
