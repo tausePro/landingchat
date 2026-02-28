@@ -340,7 +340,7 @@ export async function isCalendarConnected(organizationId: string): Promise<boole
 
 /**
  * Consulta los slots ocupados en Google Calendar (FreeBusy API).
- * Retorna los rangos de tiempo donde hay eventos.
+ * Consulta TODOS los sub-calendarios de la cuenta, no solo primary.
  */
 export async function getFreeBusySlots(
     organizationId: string,
@@ -351,7 +351,7 @@ export async function getFreeBusySlots(
     if (!auth) return null
 
     const calendar = google.calendar({ version: "v3", auth })
-    const calendarId = await getCalendarId(organizationId)
+    const calendarIds = await getAllCalendarIds(organizationId, auth)
 
     try {
         const response = await calendar.freebusy.query({
@@ -359,15 +359,19 @@ export async function getFreeBusySlots(
                 timeMin: timeMin.toISOString(),
                 timeMax: timeMax.toISOString(),
                 timeZone: "America/Bogota",
-                items: [{ id: calendarId }],
+                items: calendarIds.map(id => ({ id })),
             },
         })
 
-        const busy = response.data.calendars?.[calendarId]?.busy || []
-        return busy.map((slot) => ({
-            start: slot.start || "",
-            end: slot.end || "",
-        }))
+        const allBusy: Array<{ start: string; end: string }> = []
+        const calendars = response.data.calendars || {}
+        for (const calId of Object.keys(calendars)) {
+            const busy = calendars[calId]?.busy || []
+            for (const slot of busy) {
+                allBusy.push({ start: slot.start || "", end: slot.end || "" })
+            }
+        }
+        return allBusy
     } catch (error) {
         console.error("[google-calendar] Error querying free/busy:", error)
         return null
@@ -375,36 +379,50 @@ export async function getFreeBusySlots(
 }
 
 /**
- * Lista eventos próximos del calendario para un rango de fechas.
+ * Lista eventos próximos de TODOS los sub-calendarios para un rango de fechas.
  */
 export async function listUpcomingEvents(
     organizationId: string,
     timeMin: Date,
     timeMax: Date,
-    maxResults: number = 20
+    maxResults: number = 50
 ): Promise<Array<{ id: string; summary: string; start: string; end: string }> | null> {
     const auth = await getAuthenticatedClient(organizationId)
     if (!auth) return null
 
     const calendar = google.calendar({ version: "v3", auth })
-    const calendarId = await getCalendarId(organizationId)
+    const calendarIds = await getAllCalendarIds(organizationId, auth)
 
     try {
-        const response = await calendar.events.list({
-            calendarId,
-            timeMin: timeMin.toISOString(),
-            timeMax: timeMax.toISOString(),
-            singleEvents: true,
-            orderBy: "startTime",
-            maxResults,
-        })
+        const allEvents: Array<{ id: string; summary: string; start: string; end: string }> = []
 
-        return (response.data.items || []).map((event) => ({
-            id: event.id || "",
-            summary: event.summary || "Sin título",
-            start: event.start?.dateTime || event.start?.date || "",
-            end: event.end?.dateTime || event.end?.date || "",
-        }))
+        for (const calId of calendarIds) {
+            try {
+                const response = await calendar.events.list({
+                    calendarId: calId,
+                    timeMin: timeMin.toISOString(),
+                    timeMax: timeMax.toISOString(),
+                    singleEvents: true,
+                    orderBy: "startTime",
+                    maxResults: Math.ceil(maxResults / calendarIds.length) + 10,
+                })
+
+                for (const event of (response.data.items || [])) {
+                    allEvents.push({
+                        id: `${calId}:${event.id || ""}`,
+                        summary: event.summary || "Sin título",
+                        start: event.start?.dateTime || event.start?.date || "",
+                        end: event.end?.dateTime || event.end?.date || "",
+                    })
+                }
+            } catch (calError) {
+                console.warn(`[google-calendar] Error listing events for ${calId}:`, calError)
+            }
+        }
+
+        // Ordenar por fecha de inicio y limitar
+        allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+        return allEvents.slice(0, maxResults)
     } catch (error) {
         console.error("[google-calendar] Error listing events:", error)
         return null
@@ -441,6 +459,24 @@ export async function listSubCalendars(
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
+
+/**
+ * Obtiene todos los IDs de sub-calendarios de la cuenta.
+ * Incluye primary y todos los que el usuario puede escribir.
+ */
+async function getAllCalendarIds(
+    organizationId: string,
+    auth: InstanceType<typeof google.auth.OAuth2>
+): Promise<string[]> {
+    try {
+        const cal = google.calendar({ version: "v3", auth })
+        const response = await cal.calendarList.list({ minAccessRole: "writer" })
+        const ids = (response.data.items || []).map(c => c.id).filter(Boolean) as string[]
+        return ids.length > 0 ? ids : ["primary"]
+    } catch {
+        return ["primary"]
+    }
+}
 
 async function getCalendarId(organizationId: string): Promise<string> {
     const supabase = createServiceClient()
