@@ -395,6 +395,7 @@ export async function listUpcomingEvents(
 
     try {
         const allEvents: Array<{ id: string; summary: string; start: string; end: string }> = []
+        console.log(`[google-calendar] listUpcomingEvents: querying ${calendarIds.length} calendars from ${timeMin.toISOString()} to ${timeMax.toISOString()}`)
 
         for (const calId of calendarIds) {
             try {
@@ -406,6 +407,7 @@ export async function listUpcomingEvents(
                     orderBy: "startTime",
                     maxResults: Math.ceil(maxResults / calendarIds.length) + 10,
                 })
+                console.log(`[google-calendar] Calendar ${calId}: ${response.data.items?.length || 0} events`)
 
                 for (const event of (response.data.items || [])) {
                     allEvents.push({
@@ -462,7 +464,7 @@ export async function listSubCalendars(
 
 /**
  * Obtiene todos los IDs de sub-calendarios de la cuenta.
- * Incluye primary y todos los que el usuario puede escribir.
+ * Incluye primary y todos los calendarios accesibles.
  */
 async function getAllCalendarIds(
     organizationId: string,
@@ -470,10 +472,13 @@ async function getAllCalendarIds(
 ): Promise<string[]> {
     try {
         const cal = google.calendar({ version: "v3", auth })
-        const response = await cal.calendarList.list({ minAccessRole: "writer" })
-        const ids = (response.data.items || []).map(c => c.id).filter(Boolean) as string[]
+        const response = await cal.calendarList.list()
+        const items = response.data.items || []
+        const ids = items.map(c => c.id).filter(Boolean) as string[]
+        console.log(`[google-calendar] getAllCalendarIds: found ${ids.length} calendars for org ${organizationId}`)
         return ids.length > 0 ? ids : ["primary"]
-    } catch {
+    } catch (error) {
+        console.error("[google-calendar] getAllCalendarIds failed, falling back to primary:", error)
         return ["primary"]
     }
 }

@@ -83,8 +83,12 @@ export async function getCalendarEvents(weekStart: string): Promise<{
     let gcalConnected = false
     try {
         gcalConnected = await isCalendarConnected(profile.organization_id)
+        console.log(`[getCalendarEvents] GCal connected: ${gcalConnected} for org ${profile.organization_id}`)
+
         if (gcalConnected) {
             const gcalEvents = await listUpcomingEvents(profile.organization_id, startDate, endDate, 50)
+            console.log(`[getCalendarEvents] GCal events fetched: ${gcalEvents?.length || 0}`)
+
             const localGoogleIds = new Set(
                 (appointments || []).filter((a: any) => a.google_event_id).map((a: any) => a.google_event_id)
             )
@@ -100,9 +104,10 @@ export async function getCalendarEvents(weekStart: string): Promise<{
                     })
                 }
             }
+            console.log(`[getCalendarEvents] Total events after merge: ${events.length}`)
         }
     } catch (error) {
-        console.warn("[getCalendarEvents] GCal fetch failed:", error)
+        console.error("[getCalendarEvents] GCal fetch failed:", error)
     }
 
     return { events, gcalConnected }
