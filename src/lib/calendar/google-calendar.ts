@@ -134,12 +134,13 @@ async function getAuthenticatedClient(
 ): Promise<InstanceType<typeof google.auth.OAuth2> | null> {
     const supabase = createServiceClient()
 
+    // Buscar integración conectada O en error (para poder recuperarse con refresh)
     const { data: integration } = await supabase
         .from("integrations")
-        .select("id, credentials")
+        .select("id, credentials, status")
         .eq("organization_id", organizationId)
         .eq("provider", "google_calendar")
-        .eq("status", "connected")
+        .in("status", ["connected", "error"])
         .single()
 
     if (!integration?.credentials) return null
@@ -154,12 +155,15 @@ async function getAuthenticatedClient(
             expiry_date: creds.expiry_date,
         })
 
-        // Si el token expiró, renovarlo
+        // Si el token expiró o la integración está en error, renovar
         const now = Date.now()
-        if (creds.expiry_date && creds.expiry_date < now) {
+        const needsRefresh = (creds.expiry_date && creds.expiry_date < now) || integration.status === "error"
+
+        if (needsRefresh) {
+            console.log("[google-calendar] Refreshing token for org:", organizationId)
             const { credentials: newTokens } = await oauth2Client.refreshAccessToken()
             
-            // Actualizar tokens en BD
+            // Actualizar tokens en BD y restaurar status a connected
             const updatedCreds: StoredTokens = {
                 access_token: encrypt(newTokens.access_token || ""),
                 refresh_token: creds.refresh_token, // Mantener el refresh_token encriptado original
@@ -168,18 +172,22 @@ async function getAuthenticatedClient(
 
             await supabase
                 .from("integrations")
-                .update({ credentials: updatedCreds })
+                .update({ credentials: updatedCreds, status: "connected", error_message: null })
                 .eq("id", integration.id)
+
+            console.log("[google-calendar] Token refreshed successfully, status restored to connected")
         }
 
         return oauth2Client
     } catch (error) {
         console.error("[google-calendar] Error authenticating:", error)
-        // Marcar como desconectado si los tokens son inválidos
-        await supabase
-            .from("integrations")
-            .update({ status: "error", error_message: "Token inválido. Reconecta Google Calendar." })
-            .eq("id", integration.id)
+        // Solo marcar como error si ya estaba connected (no re-marcar si ya está en error)
+        if (integration.status === "connected") {
+            await supabase
+                .from("integrations")
+                .update({ status: "error", error_message: "Token expirado. Intentando reconectar automáticamente." })
+                .eq("id", integration.id)
+        }
         return null
     }
 }
@@ -332,7 +340,7 @@ export async function isCalendarConnected(organizationId: string): Promise<boole
         .select("id")
         .eq("organization_id", organizationId)
         .eq("provider", "google_calendar")
-        .eq("status", "connected")
+        .in("status", ["connected", "error"])
         .single()
 
     return !!data
