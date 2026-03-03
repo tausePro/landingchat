@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface CampaignInsight {
@@ -39,6 +40,7 @@ const datePresetLabels: Record<Exclude<DatePreset, "custom">, string> = {
 }
 
 export function MetaAdsCard() {
+    const router = useRouter()
     const [data, setData] = useState<MetaAdsData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -346,7 +348,8 @@ export function MetaAdsCard() {
                                 .map((campaign) => (
                                     <div
                                         key={campaign.campaign_id}
-                                        className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50"
+                                        onClick={() => router.push(`/dashboard/analytics/campaign/${campaign.campaign_id}`)}
+                                        className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                     >
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium truncate">{campaign.campaign_name}</p>
@@ -358,7 +361,7 @@ export function MetaAdsCard() {
                                             </div>
                                         </div>
                                         {/* Spend bar relative to total */}
-                                        <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                        <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                             <div
                                                 className="h-full bg-blue-500 rounded-full"
                                                 style={{
@@ -366,6 +369,7 @@ export function MetaAdsCard() {
                                                 }}
                                             />
                                         </div>
+                                        <span className="material-symbols-outlined text-base text-muted-foreground">chevron_right</span>
                                     </div>
                                 ))}
                         </div>
