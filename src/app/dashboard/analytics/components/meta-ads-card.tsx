@@ -180,16 +180,68 @@ export function MetaAdsCard() {
         return (
             <Card className="relative overflow-hidden">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-blue-500">campaign</span>
-                        Meta Ads
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-blue-500">campaign</span>
+                            Meta Ads
+                        </CardTitle>
+                        <div className="flex items-center gap-1 flex-wrap">
+                            {(Object.keys(datePresetLabels) as Exclude<DatePreset, "custom">[]).map((preset) => (
+                                <button
+                                    key={preset}
+                                    onClick={() => handlePreset(preset)}
+                                    className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                        datePreset === preset && !showCustom
+                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium"
+                                            : "text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800"
+                                    }`}
+                                >
+                                    {datePresetLabels[preset]}
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => setShowCustom(!showCustom)}
+                                className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+                                    showCustom || datePreset === "custom"
+                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-medium"
+                                        : "text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800"
+                                }`}
+                            >
+                                <span className="material-symbols-outlined text-sm align-middle">date_range</span>
+                            </button>
+                        </div>
+                    </div>
                     <CardDescription>Sin campañas activas en este período</CardDescription>
+                    {showCustom && (
+                        <div className="flex items-center gap-2 mt-2">
+                            <input
+                                type="date"
+                                value={customStart}
+                                onChange={(e) => setCustomStart(e.target.value)}
+                                className="px-2 py-1 text-xs border rounded-md bg-background"
+                            />
+                            <span className="text-xs text-muted-foreground">a</span>
+                            <input
+                                type="date"
+                                value={customEnd}
+                                onChange={(e) => setCustomEnd(e.target.value)}
+                                className="px-2 py-1 text-xs border rounded-md bg-background"
+                            />
+                            <button
+                                onClick={handleCustomApply}
+                                disabled={!customStart || !customEnd}
+                                className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Aplicar
+                            </button>
+                        </div>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <div className="text-center py-8 text-muted-foreground">
                         <span className="material-symbols-outlined text-4xl mb-2 block">info</span>
                         <p className="text-sm">No se encontraron campañas con datos en el período: {dateLabel}.</p>
+                        <p className="text-xs mt-1">Prueba seleccionando otro rango de fechas.</p>
                     </div>
                 </CardContent>
             </Card>
