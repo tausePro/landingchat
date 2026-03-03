@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import ReactMarkdown from "react-markdown"
 import {
     LineChart,
     Line,
@@ -132,6 +133,80 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
     const [customEnd, setCustomEnd] = useState("")
     const [showCustom, setShowCustom] = useState(false)
     const [activeMetric, setActiveMetric] = useState<"spend" | "impressions" | "clicks">("spend")
+    const [aiAnalysis, setAiAnalysis] = useState<string>("")
+    const [aiGeneratedAt, setAiGeneratedAt] = useState<string | null>(null)
+    const [aiLoading, setAiLoading] = useState(false)
+    const [aiError, setAiError] = useState<string | null>(null)
+    const [aiDone, setAiDone] = useState(false)
+
+    const analyzeWithAI = useCallback(async () => {
+        if (!data) return
+        setAiLoading(true)
+        setAiError(null)
+        setAiAnalysis("")
+        setAiDone(false)
+
+        const dateRange =
+            datePreset === "custom" && customStart && customEnd
+                ? `${customStart} al ${customEnd}`
+                : `Últimos ${datePreset.replace("last_", "").replace("d", " días").replace("_month", " mes")}`
+
+        const conversions = data.summary?.actions
+            ?.filter((a) => ["purchase", "complete_registration", "lead"].includes(a.action_type))
+            .reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0
+
+        try {
+            const res = await fetch(`/api/analytics/meta-ads/campaign/${campaignId}/ai-analysis?date_preset=${datePreset}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    campaign: data.campaign,
+                    summary: { ...data.summary, cpm: data.summary?.cpm || 0, conversions },
+                    adSets: data.adSets,
+                    ads: data.ads,
+                    dateRange,
+                }),
+            })
+
+            if (!res.ok || !res.body) {
+                setAiError("No se pudo generar el análisis")
+                return
+            }
+
+            const reader = res.body.getReader()
+            const decoder = new TextDecoder()
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                setAiAnalysis((prev) => prev + decoder.decode(value, { stream: true }))
+            }
+            setAiDone(true)
+            setAiGeneratedAt(new Date().toISOString())
+        } catch {
+            setAiError("Error de conexión al analizar")
+        } finally {
+            setAiLoading(false)
+        }
+    }, [data, campaignId, datePreset, customStart, customEnd])
+
+    // Cargar análisis guardado cuando los datos de la campaña estén listos
+    const loadSavedAnalysis = useCallback(async () => {
+        try {
+            const res = await fetch(
+                `/api/analytics/meta-ads/campaign/${campaignId}/ai-analysis?date_preset=${datePreset}`
+            )
+            const json = await res.json() as { analysis: string | null; generated_at?: string }
+            if (json.analysis) {
+                setAiAnalysis(json.analysis)
+                setAiGeneratedAt(json.generated_at || null)
+                setAiDone(true)
+            } else {
+                setAiAnalysis("")
+                setAiGeneratedAt(null)
+                setAiDone(false)
+            }
+        } catch { /* ignorar */ }
+    }, [campaignId, datePreset])
 
     const fetchData = useCallback(async () => {
         setLoading(true)
@@ -158,6 +233,10 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
     useEffect(() => {
         fetchData()
     }, [fetchData])
+
+    useEffect(() => {
+        loadSavedAnalysis()
+    }, [loadSavedAnalysis])
 
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(amount)
@@ -261,7 +340,25 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                     )}
                 </div>
 
-                {/* Date selector */}
+                {/* Acciones: Analizar con IA + Date selector */}
+                <div className="flex flex-col items-end gap-2">
+                    <button
+                        onClick={analyzeWithAI}
+                        disabled={aiLoading || !data}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                    >
+                        {aiLoading ? (
+                            <>
+                                <span className="inline-block w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                Analizando...
+                            </>
+                        ) : (
+                            <>
+                                <span className="material-symbols-outlined text-base">auto_awesome</span>
+                                Analizar con IA
+                            </>
+                        )}
+                    </button>
                 <div className="flex items-center gap-1 flex-wrap justify-end">
                     {(Object.keys(datePresetLabels) as Exclude<DatePreset, "custom">[]).map((preset) => (
                         <button
@@ -303,6 +400,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                         </div>
                     )}
                 </div>
+                </div>
             </div>
 
             {/* KPI Grid */}
@@ -319,6 +417,52 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                     </Card>
                 ))}
             </div>
+
+            {/* Análisis IA */}
+            {(aiAnalysis || aiLoading || aiError) && (
+                <Card className="border-purple-200 dark:border-purple-800/50 bg-gradient-to-br from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between w-full">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <span className="material-symbols-outlined text-lg text-purple-500">auto_awesome</span>
+                                Análisis IA
+                                {aiLoading && (
+                                    <span className="inline-block w-3 h-3 border-2 border-purple-400/40 border-t-purple-500 rounded-full animate-spin ml-1" />
+                                )}
+                            </CardTitle>
+                            <div className="flex items-center gap-3">
+                                {aiGeneratedAt && !aiLoading && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Generado {new Date(aiGeneratedAt).toLocaleDateString("es-CO", { day: "numeric", month: "short" })} · {new Date(aiGeneratedAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                )}
+                                {aiDone && !aiLoading && (
+                                    <button
+                                        onClick={analyzeWithAI}
+                                        className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">refresh</span>
+                                        Actualizar
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {aiError ? (
+                            <p className="text-sm text-red-500">{aiError}</p>
+                        ) : (
+                            <div className="prose prose-sm dark:prose-invert max-w-none
+                                prose-headings:text-foreground prose-headings:font-semibold prose-headings:text-sm prose-headings:mt-4 prose-headings:mb-2
+                                prose-p:text-muted-foreground prose-p:text-sm prose-p:leading-relaxed
+                                prose-ul:text-muted-foreground prose-ul:text-sm prose-li:my-0.5
+                                prose-strong:text-foreground">
+                                <ReactMarkdown>{aiAnalysis || "Generando análisis..."}</ReactMarkdown>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Trend Chart */}
             <Card>
