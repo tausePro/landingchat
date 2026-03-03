@@ -54,6 +54,7 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
     const router = useRouter()
     const searchParams = useSearchParams()
     const contextParam = searchParams.get("context")
+    const propertyCodeParam = searchParams.get("product")
     const contextSentRef = useRef(false)
 
     const [customerId, setCustomerId] = useState<string | null>(null)
@@ -102,10 +103,15 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                 if (data.agent) setAgent(data.agent)
                 await initializeChat(storedCustomerId, storedChatId)
 
-                // Si viene contexto del BookingPanel en el URL, marcarlo como pendiente
-                if (contextParam && !contextSentRef.current) {
-                    contextSentRef.current = true
-                    setPendingContext(contextParam)
+                // Si viene contexto del BookingPanel o código de propiedad en el URL
+                if (!contextSentRef.current) {
+                    if (propertyCodeParam) {
+                        contextSentRef.current = true
+                        setPendingContext(`Hola, me interesa la propiedad con código ${propertyCodeParam}. Muéstrame los detalles.`)
+                    } else if (contextParam) {
+                        contextSentRef.current = true
+                        setPendingContext(contextParam)
+                    }
                 }
             } else {
                 setError("No se pudo cargar la información.")

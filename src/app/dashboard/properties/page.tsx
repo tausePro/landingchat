@@ -16,18 +16,32 @@ export default async function PropertiesPage() {
     .eq('id', user.id)
     .single()
 
+  const orgId = profile?.organization_id
+
   const { data: properties } = await supabase
     .from('properties')
     .select('*')
-    .eq('organization_id', profile?.organization_id)
+    .eq('organization_id', orgId)
+    .eq('status', 'active')
     .order('created_at', { ascending: false })
+
+  const { data: nubyIntegration } = await supabase
+    .from('integrations')
+    .select('id, last_sync_at')
+    .eq('organization_id', orgId)
+    .eq('provider', 'nuby')
+    .in('status', ['connected', 'error'])
+    .single()
 
   return (
     <DashboardLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Propiedades Sincronizadas ({properties?.length || 0})</h1>
-        
-        <PropertiesGrid properties={properties || []} />
+        <PropertiesGrid
+          properties={properties || []}
+          organizationId={orgId || ''}
+          hasNuby={!!nubyIntegration}
+          lastSyncAt={nubyIntegration?.last_sync_at || null}
+        />
 
         {(!properties || properties.length === 0) && (
           <div className="text-center py-12 text-gray-500">

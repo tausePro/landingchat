@@ -120,11 +120,48 @@ export async function syncNubyProperties(
       throw new Error(`Error al conectar con Nuby: ${fetchError.message}`)
     }
 
-    // 6. Procesar propiedades en chunks pequeños para no saturar la BD
+    // 5.1 Filtrar: solo propiedades para arriendo o venta
+    const ALLOWED_TYPES = ['arriendo', 'venta', 'arriendo y venta']
+    const filteredProperties = nubyProperties.filter((p: any) => {
+      const tipo = (p.tipo_servicio || '').toLowerCase().trim()
+      return ALLOWED_TYPES.some(t => tipo.includes(t))
+    })
+    console.log(`Propiedades filtradas (solo arriendo/venta): ${filteredProperties.length} de ${nubyProperties.length}`)
+
+    // 5.2 Separar: arrendadas/vendidas (estado 0 o 3) → eliminar de LandingChat
+    const toDelete = filteredProperties.filter((p: any) => {
+      const estado = String(p.estado ?? '').trim()
+      return estado === '0' || estado === '3' // 0=Arrendada, 3=Vendida
+    })
+    const toSync = filteredProperties.filter((p: any) => {
+      const estado = String(p.estado ?? '').trim()
+      return estado !== '0' && estado !== '3'
+    })
+    console.log(`Para sincronizar: ${toSync.length} | Para eliminar (arrendadas/vendidas): ${toDelete.length}`)
+
+    // 5.3 Eliminar propiedades arrendadas/vendidas de la BD
+    if (toDelete.length > 0) {
+      const codesToDelete = toDelete.map((p: any) => p.codigo)
+      const { data: deleted, error: deleteError } = await supabase
+        .from('properties')
+        .delete()
+        .eq('organization_id', organizationId)
+        .in('external_id', codesToDelete)
+        .select('id')
+
+      if (deleteError) {
+        console.error('Error eliminando propiedades arrendadas/vendidas:', deleteError.message)
+        result.errors.push(`Error eliminando arrendadas/vendidas: ${deleteError.message}`)
+      } else {
+        console.log(`Eliminadas ${deleted?.length || 0} propiedades arrendadas/vendidas`)
+      }
+    }
+
+    // 6. Procesar propiedades activas en chunks pequeños
     const CHUNK_SIZE = 50
     const CHUNK_DELAY_MS = 500
 
-    const mappedProperties = nubyProperties.map((nubyProperty: any) =>
+    const mappedProperties = toSync.map((nubyProperty: any) =>
       mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
     )
 
@@ -160,23 +197,21 @@ export async function syncNubyProperties(
       }
     }
 
-    // 7. Soft-delete: marcar como inactive las propiedades que ya no vienen de la API
-    // Solo en sync full para evitar falsos positivos en incremental
+    // 7. Eliminar propiedades que ya no existen en Nuby (solo en sync full)
     if (syncType === 'full' && mappedProperties.length > 0) {
       const syncedExternalIds = mappedProperties.map((p: any) => p.external_id)
-      const { data: deactivated, error: deactivateError } = await supabase
+      const { data: removed, error: removeError } = await supabase
         .from('properties')
-        .update({ status: 'inactive', status_detail: 'No encontrada en última sincronización' })
+        .delete()
         .eq('organization_id', organizationId)
-        .eq('status', 'active')
         .not('external_id', 'in', `(${syncedExternalIds.join(',')})`)
         .select('id')
 
-      if (deactivateError) {
-        console.error('Soft-delete error:', deactivateError.message)
-        result.errors.push(`Soft-delete error: ${deactivateError.message}`)
-      } else if (deactivated && deactivated.length > 0) {
-        console.log(`Soft-delete: ${deactivated.length} propiedades marcadas como inactive`)
+      if (removeError) {
+        console.error('Cleanup error:', removeError.message)
+        result.errors.push(`Cleanup error: ${removeError.message}`)
+      } else if (removed && removed.length > 0) {
+        console.log(`Cleanup: ${removed.length} propiedades eliminadas (ya no existen en Nuby)`)
       }
     }
 
