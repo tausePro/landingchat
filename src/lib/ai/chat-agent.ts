@@ -170,6 +170,34 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             currentProduct || undefined
         )
 
+        // 7.5. Inyectar documentos de conocimiento del agente (si existen)
+        try {
+            const { data: agentDocs } = await supabase
+                .from("agent_documents")
+                .select("name, extracted_text")
+                .eq("agent_id", agent.id)
+                .eq("status", "ready")
+                .not("extracted_text", "is", null)
+                .order("created_at", { ascending: true })
+
+            if (agentDocs && agentDocs.length > 0) {
+                const docsText = agentDocs.map(doc =>
+                    `--- DOCUMENTO: ${doc.name} ---\n${doc.extracted_text}`
+                ).join("\n\n")
+
+                systemPrompt += `\n\nDOCUMENTOS DE REFERENCIA DEL NEGOCIO:
+Tienes acceso a ${agentDocs.length} documento(s) con información del negocio. Usa esta información para responder preguntas del cliente sobre políticas, garantías, procedimientos, etc.
+
+${docsText}
+
+IMPORTANTE: Si la respuesta está en estos documentos, cita la información. Si no está, di que no tienes esa información específica.`
+
+                console.log(`[processMessage] Injected ${agentDocs.length} knowledge docs (${docsText.length} chars)`)
+            }
+        } catch (docsError) {
+            console.warn("[processMessage] Error loading agent documents:", docsError)
+        }
+
         // Determinar modo de la org via factory (prioridad: features → industry → conteo)
         const orgMode = getOrgMode({
             industry: organization?.industry,

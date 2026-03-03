@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -91,6 +91,9 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
 
     // Knowledge form state
     const [productKnowledge, setProductKnowledge] = useState(agent.configuration?.knowledge?.product_knowledge !== false)
+    const [documents, setDocuments] = useState<Array<{ id: string; name: string; status: string; file_size: number; created_at: string; error_message?: string }>>([])
+    const [uploading, setUploading] = useState(false)
+    const [docsLoading, setDocsLoading] = useState(true)
 
     // Skills form state
     const activeMode = getActiveMode(orgContext) as OrgMode
@@ -107,6 +110,73 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         return initial
     })
     const [editingSkill, setEditingSkill] = useState<string | null>(null)
+
+    const fileInputRef = useRef<HTMLInputElement>(null)
+
+    // Cargar documentos existentes
+    const loadDocuments = useCallback(async () => {
+        setDocsLoading(true)
+        try {
+            const { createClient } = await import("@/lib/supabase/client")
+            const supabase = createClient()
+            const { data } = await supabase
+                .from("agent_documents")
+                .select("id, name, status, file_size, created_at, error_message")
+                .eq("agent_id", agent.id)
+                .order("created_at", { ascending: false })
+            setDocuments(data || [])
+        } catch (err) {
+            console.error("Error loading documents:", err)
+        } finally {
+            setDocsLoading(false)
+        }
+    }, [agent.id])
+
+    useEffect(() => {
+        if (isMounted) loadDocuments()
+    }, [isMounted, loadDocuments])
+
+    const handleUploadDocument = async (file: File) => {
+        setUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append("agentId", agent.id)
+            formData.append("file", file)
+
+            const res = await fetch("/api/agents/documents", {
+                method: "POST",
+                body: formData,
+            })
+            const data = await res.json()
+
+            if (data.success) {
+                await loadDocuments()
+            } else {
+                alert(data.error || "Error al subir documento")
+            }
+        } catch {
+            alert("Error de conexión al subir documento")
+        } finally {
+            setUploading(false)
+            if (fileInputRef.current) fileInputRef.current.value = ""
+        }
+    }
+
+    const handleDeleteDocument = async (docId: string, docName: string) => {
+        if (!confirm(`¿Eliminar "${docName}"? El agente ya no tendrá acceso a este documento.`)) return
+
+        try {
+            const res = await fetch(`/api/agents/documents?id=${docId}`, { method: "DELETE" })
+            const data = await res.json()
+            if (data.success) {
+                setDocuments(prev => prev.filter(d => d.id !== docId))
+            } else {
+                alert(data.error || "Error al eliminar")
+            }
+        } catch {
+            alert("Error de conexión")
+        }
+    }
 
     if (!isMounted) {
         return null
@@ -542,17 +612,88 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
 
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <Label>Documentos Adicionales</Label>
-                                        <Button variant="outline" size="sm">
-                                            <span className="material-symbols-outlined mr-2 text-sm">upload_file</span>
-                                            Subir PDF
-                                        </Button>
+                                        <div>
+                                            <Label>Documentos de Conocimiento</Label>
+                                            <p className="text-xs text-muted-foreground mt-0.5">PDF, Excel, TXT, MD o CSV — El agente usará el contenido para responder</p>
+                                        </div>
+                                        <div>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept=".pdf,.txt,.md,.xlsx,.xls,.csv"
+                                                className="hidden"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0]
+                                                    if (file) handleUploadDocument(file)
+                                                }}
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => fileInputRef.current?.click()}
+                                                disabled={uploading}
+                                            >
+                                                <span className="material-symbols-outlined mr-2 text-sm">
+                                                    {uploading ? "sync" : "upload_file"}
+                                                </span>
+                                                {uploading ? "Subiendo..." : "Subir documento"}
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="p-8 border-2 border-dashed border-border-light dark:border-border-dark rounded-xl flex flex-col items-center justify-center text-center text-muted-foreground bg-slate-50 dark:bg-slate-900/20">
-                                        <span className="material-symbols-outlined text-4xl mb-2 opacity-50">description</span>
-                                        <p className="font-medium">No hay documentos subidos</p>
-                                        <p className="text-xs">Sube manuales, políticas de garantía o guías de talla</p>
-                                    </div>
+
+                                    {docsLoading ? (
+                                        <div className="p-6 text-center text-muted-foreground text-sm">
+                                            Cargando documentos...
+                                        </div>
+                                    ) : documents.length === 0 ? (
+                                        <div
+                                            className="p-8 border-2 border-dashed border-border-light dark:border-border-dark rounded-xl flex flex-col items-center justify-center text-center text-muted-foreground bg-slate-50 dark:bg-slate-900/20 cursor-pointer hover:border-primary/50 transition-colors"
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            <span className="material-symbols-outlined text-4xl mb-2 opacity-50">description</span>
+                                            <p className="font-medium">No hay documentos subidos</p>
+                                            <p className="text-xs">Sube manuales, políticas, guías de talla o cualquier documento que el agente deba conocer</p>
+                                            <p className="text-xs text-primary mt-2 font-medium">Haz clic para subir</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {documents.map((doc) => (
+                                                <div
+                                                    key={doc.id}
+                                                    className="flex items-center justify-between p-3 border rounded-lg bg-card-light dark:bg-card-dark"
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className={`p-1.5 rounded-lg ${
+                                                            doc.status === "ready"
+                                                                ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                                                                : doc.status === "error"
+                                                                ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                                                : "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
+                                                        }`}>
+                                                            <span className="material-symbols-outlined text-base">
+                                                                {doc.status === "ready" ? "check_circle" : doc.status === "error" ? "error" : "hourglass_top"}
+                                                            </span>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-medium truncate">{doc.name}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {(doc.file_size / 1024).toFixed(0)} KB
+                                                                {doc.status === "ready" && " · Listo"}
+                                                                {doc.status === "processing" && " · Procesando..."}
+                                                                {doc.status === "error" && ` · Error: ${doc.error_message || "No se pudo procesar"}`}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleDeleteDocument(doc.id, doc.name)}
+                                                        className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-500 transition-colors flex-shrink-0"
+                                                    >
+                                                        <span className="material-symbols-outlined text-base">delete</span>
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end pt-4">
