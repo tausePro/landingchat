@@ -109,7 +109,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
         addItem({
             id: crossSellProduct.id,
             name: crossSellProduct.name,
-            price: crossSellProduct.price,
+            price: crossSellProduct.sale_price || crossSellProduct.price,
             image_url: crossSellProduct.image_url
         })
     }

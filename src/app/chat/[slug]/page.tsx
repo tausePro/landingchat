@@ -21,6 +21,7 @@ interface Product {
     id: string
     name: string
     price: number
+    sale_price?: number | null
     image_url: string
     description: string
     stock: number
@@ -713,7 +714,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                             onClick={() => addItem({
                                                                 id: product.id,
                                                                 name: product.name,
-                                                                price: product.price,
+                                                                price: product.sale_price || product.price,
                                                                 image_url: product.image_url
                                                             })}
                                                             disabled={product.stock <= 0}
