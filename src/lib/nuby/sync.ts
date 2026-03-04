@@ -120,48 +120,20 @@ export async function syncNubyProperties(
       throw new Error(`Error al conectar con Nuby: ${fetchError.message}`)
     }
 
-    // 5.1 Filtrar: solo propiedades para arriendo o venta
-    const ALLOWED_TYPES = ['arriendo', 'venta', 'arriendo y venta']
-    const filteredProperties = nubyProperties.filter((p: any) => {
-      const tipo = (p.tipo_servicio || '').toLowerCase().trim()
-      return ALLOWED_TYPES.some(t => tipo.includes(t))
+    // 6. Filtrar: solo activas + arriendo/venta
+    // La API de Nuby ignora los filtros por query param, hay que filtrar post-descarga
+    const validTypes = ['arriendo', 'venta', 'venta y arriendo']
+    const filtered = nubyProperties.filter((p: any) => {
+      const isActive = String(p.estado ?? '').trim() === '1'
+      const isValidType = validTypes.includes((p.tipo_servicio || '').toLowerCase())
+      return isActive && isValidType
     })
-    console.log(`Propiedades filtradas (solo arriendo/venta): ${filteredProperties.length} de ${nubyProperties.length}`)
+    console.log(`Propiedades activas arriendo/venta: ${filtered.length} de ${nubyProperties.length}`)
 
-    // 5.2 Separar: arrendadas/vendidas (estado 0 o 3) → eliminar de LandingChat
-    const toDelete = filteredProperties.filter((p: any) => {
-      const estado = String(p.estado ?? '').trim()
-      return estado === '0' || estado === '3' // 0=Arrendada, 3=Vendida
-    })
-    const toSync = filteredProperties.filter((p: any) => {
-      const estado = String(p.estado ?? '').trim()
-      return estado !== '0' && estado !== '3'
-    })
-    console.log(`Para sincronizar: ${toSync.length} | Para eliminar (arrendadas/vendidas): ${toDelete.length}`)
-
-    // 5.3 Eliminar propiedades arrendadas/vendidas de la BD
-    if (toDelete.length > 0) {
-      const codesToDelete = toDelete.map((p: any) => p.codigo)
-      const { data: deleted, error: deleteError } = await supabase
-        .from('properties')
-        .delete()
-        .eq('organization_id', organizationId)
-        .in('external_id', codesToDelete)
-        .select('id')
-
-      if (deleteError) {
-        console.error('Error eliminando propiedades arrendadas/vendidas:', deleteError.message)
-        result.errors.push(`Error eliminando arrendadas/vendidas: ${deleteError.message}`)
-      } else {
-        console.log(`Eliminadas ${deleted?.length || 0} propiedades arrendadas/vendidas`)
-      }
-    }
-
-    // 6. Procesar propiedades activas en chunks pequeños
     const CHUNK_SIZE = 50
     const CHUNK_DELAY_MS = 500
 
-    const mappedProperties = toSync.map((nubyProperty: any) =>
+    const mappedProperties = filtered.map((nubyProperty: any) =>
       mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
     )
 
