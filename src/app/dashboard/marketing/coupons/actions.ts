@@ -182,6 +182,30 @@ export async function deleteCoupon(id: string) {
     return { success: true }
 }
 
+export async function getProducts(): Promise<Array<{ id: string; name: string; categories?: string[] }>> {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error("Unauthorized")
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.organization_id) throw new Error("No organization found")
+
+    const { data } = await supabase
+        .from("products")
+        .select("id, name, categories")
+        .eq("organization_id", profile.organization_id)
+        .eq("is_active", true)
+        .order("name")
+
+    return (data || []).map(p => ({ id: p.id, name: p.name, categories: p.categories || [] }))
+}
+
 export async function toggleCouponStatus(id: string, isActive: boolean) {
     const supabase = await createClient()
 

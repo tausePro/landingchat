@@ -374,7 +374,9 @@ export async function validateCoupon(slug: string, code: string, subtotal: numbe
                 discountAmount,
                 maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
                 freeShipping: false,
-                description: coupon.description || `Descuento de $${discountAmount.toLocaleString()}`
+                description: coupon.description || `Descuento de $${discountAmount.toLocaleString()}`,
+                appliesTo: coupon.applies_to || 'all',
+                targetIds: coupon.target_ids || null
             }
         }
     } catch (error) {

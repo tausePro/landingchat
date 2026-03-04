@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createCoupon, updateCoupon, getCouponById, CreateCouponData } from "../actions"
+import { createCoupon, updateCoupon, getCouponById, CreateCouponData, getProducts } from "../actions"
 
 interface CouponFormProps {
     couponId?: string
@@ -26,6 +26,19 @@ export default function CouponForm({ couponId }: CouponFormProps) {
     const [validFrom, setValidFrom] = useState(new Date().toISOString().split('T')[0])
     const [validUntil, setValidUntil] = useState("")
     const [isActive, setIsActive] = useState(true)
+    const [appliesTo, setAppliesTo] = useState<'all' | 'products' | 'categories'>('all')
+    const [targetIds, setTargetIds] = useState<string[]>([])
+    const [products, setProducts] = useState<Array<{ id: string; name: string; categories?: string[] }>>([])
+    const [availableCategories, setAvailableCategories] = useState<string[]>([])
+
+    useEffect(() => {
+        getProducts().then(data => {
+            setProducts(data)
+            const cats = new Set<string>()
+            data.forEach((p: any) => p.categories?.forEach((c: string) => cats.add(c)))
+            setAvailableCategories(Array.from(cats).sort())
+        }).catch(() => {})
+    }, [])
 
     useEffect(() => {
         if (couponId) {
@@ -48,6 +61,8 @@ export default function CouponForm({ couponId }: CouponFormProps) {
                 setValidFrom(coupon.valid_from.split('T')[0])
                 setValidUntil(coupon.valid_until ? coupon.valid_until.split('T')[0] : "")
                 setIsActive(coupon.is_active)
+                setAppliesTo(coupon.applies_to || 'all')
+                setTargetIds(coupon.target_ids || [])
             }
         } catch (error) {
             console.error("Error loading coupon:", error)
@@ -75,7 +90,9 @@ export default function CouponForm({ couponId }: CouponFormProps) {
                 max_uses_per_customer: parseInt(maxUsesPerCustomer) || 1,
                 valid_from: validFrom,
                 valid_until: validUntil || undefined,
-                is_active: isActive
+                is_active: isActive,
+                applies_to: appliesTo,
+                target_ids: appliesTo !== 'all' ? targetIds : undefined
             }
 
             if (isEditing) {
@@ -232,6 +249,82 @@ export default function CouponForm({ couponId }: CouponFormProps) {
                                 <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
                                     Opcional. Límite máximo del descuento
                                 </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Aplica A */}
+                <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary mb-6">
+                        Aplica A
+                    </h2>
+
+                    <div className="space-y-4">
+                        <div className="flex gap-3">
+                            {(['all', 'products', 'categories'] as const).map((opt) => (
+                                <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => { setAppliesTo(opt); setTargetIds([]) }}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${appliesTo === opt ? 'bg-primary text-white' : 'bg-background-light dark:bg-background-dark text-text-light-secondary dark:text-text-dark-secondary border border-border-light dark:border-border-dark hover:border-primary'}`}
+                                >
+                                    {{ all: 'Toda la tienda', products: 'Productos específicos', categories: 'Categorías' }[opt]}
+                                </button>
+                            ))}
+                        </div>
+
+                        {appliesTo === 'products' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                    Selecciona productos ({targetIds.length} seleccionados)
+                                </label>
+                                <div className="max-h-48 overflow-y-auto rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark p-2 space-y-1">
+                                    {products.map((p) => (
+                                        <label key={p.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-card-light dark:hover:bg-card-dark cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={targetIds.includes(p.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setTargetIds([...targetIds, p.id])
+                                                    else setTargetIds(targetIds.filter(id => id !== p.id))
+                                                }}
+                                                className="rounded text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-text-light-primary dark:text-text-dark-primary">{p.name}</span>
+                                        </label>
+                                    ))}
+                                    {products.length === 0 && (
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary p-2">Cargando productos...</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {appliesTo === 'categories' && (
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                    Selecciona categorías ({targetIds.length} seleccionadas)
+                                </label>
+                                <div className="max-h-48 overflow-y-auto rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark p-2 space-y-1">
+                                    {availableCategories.map((cat) => (
+                                        <label key={cat} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-card-light dark:hover:bg-card-dark cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={targetIds.includes(cat)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) setTargetIds([...targetIds, cat])
+                                                    else setTargetIds(targetIds.filter(id => id !== cat))
+                                                }}
+                                                className="rounded text-primary focus:ring-primary"
+                                            />
+                                            <span className="text-sm text-text-light-primary dark:text-text-dark-primary">{cat}</span>
+                                        </label>
+                                    ))}
+                                    {availableCategories.length === 0 && (
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary p-2">No hay categorías configuradas</p>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
