@@ -61,7 +61,7 @@ export const useCartStore = create<CartState>()(
                     set({
                         items: items.map((item) =>
                             item.id === product.id
-                                ? { ...item, quantity: item.quantity + quantity }
+                                ? { ...item, quantity: item.quantity + quantity, price: product.price }
                                 : item
                         ),
                         isOpen: true, // Open cart when adding item

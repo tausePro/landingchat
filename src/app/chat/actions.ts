@@ -572,7 +572,7 @@ export async function createOrder(params: CreateOrderParams) {
             const paymentResult = await paymentService.initiatePayment({
                 orderId: order.id,
                 organizationId: org.id,
-                amount: Math.round(params.total * 100), // Convert to cents
+                amount: Math.round(finalTotal * 100), // Use backend-calculated total for consistency
                 currency: 'COP',
                 customerEmail: params.customerInfo.email,
                 customerName: params.customerInfo.name,
