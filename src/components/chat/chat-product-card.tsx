@@ -8,6 +8,7 @@ interface Product {
     id: string
     name: string
     price: number
+    sale_price?: number | null
     image_url: string
     description: string
     stock: number
@@ -36,7 +37,7 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
         addItem({
             id: product.id,
             name: product.name,
-            price: product.price,
+            price: product.sale_price || product.price,
             image_url: product.image_url
         })
 

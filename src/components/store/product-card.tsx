@@ -79,15 +79,16 @@ export function ProductCard({
 
         // Simulate small delay for better UX feel
         setTimeout(() => {
+            const effectivePrice = product.sale_price || product.price
             addItem({
                 id: product.id,
                 name: product.name,
-                price: product.price,
+                price: effectivePrice,
                 image_url: product.image_url
             })
 
             // Track AddToCart event
-            trackAddToCart(product.id, product.name, product.price, "COP")
+            trackAddToCart(product.id, product.name, effectivePrice, "COP")
 
             setIsAdding(false)
             setJustAdded(true)
