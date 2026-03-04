@@ -170,8 +170,8 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const localFee = (paymentMethod === 'contraentrega' && manualPaymentInfo?.cod_additional_cost) ? manualPaymentInfo.cod_additional_cost : 0
     const displayFee = orderSummary?.paymentMethodFee ?? localFee
 
-    // Coupon discount - reactivo basado en subtotal actual
-    const couponDiscount = calculateCouponDiscount(appliedCoupon, subtotal)
+    // Coupon discount - reactivo, aplica solo a items que correspondan
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, subtotal, items)
     const couponFreeShipping = appliedCoupon?.freeShipping || false
 
     // Final total for display and submission

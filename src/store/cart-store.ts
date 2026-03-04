@@ -20,6 +20,8 @@ export interface AppliedCoupon {
     maxDiscountAmount?: number | null
     freeShipping: boolean
     description: string
+    appliesTo?: 'all' | 'products' | 'categories'
+    targetIds?: string[] | null
 }
 
 interface CartState {
