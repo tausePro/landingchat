@@ -174,20 +174,34 @@ export class NubyClient {
     let page = 1
     const limit = 50
     const maxPages = 20 // Hasta 1000 propiedades
+    let consecutiveErrors = 0
 
     while (true) {
-      const properties = await this.listProperties({ page, limit })
-      
-      if (properties.length === 0) break
-      
-      allProperties.push(...properties)
-      
-      if (properties.length < limit) break // Última página
+      try {
+        const properties = await this.listProperties({ page, limit })
+        
+        if (properties.length === 0) break
+        
+        allProperties.push(...properties)
+        consecutiveErrors = 0 // Reset en éxito
+        
+        if (properties.length < limit) break // Última página
+      } catch (error: any) {
+        consecutiveErrors++
+        console.warn(`Nuby: Error en página ${page}, continuando (${consecutiveErrors}/3):`, error.message?.substring(0, 100))
+        
+        // Si fallan 3 páginas seguidas, parar
+        if (consecutiveErrors >= 3) {
+          console.error(`Nuby: 3 errores consecutivos, deteniendo en página ${page}`)
+          break
+        }
+      }
       
       page++
       if (page > maxPages) break
     }
 
+    console.log(`Nuby: sincronización completada con ${allProperties.length} propiedades (${page} páginas procesadas)`)
     return allProperties
   }
 
