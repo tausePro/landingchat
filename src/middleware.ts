@@ -347,6 +347,15 @@ export async function middleware(request: NextRequest) {
         return NextResponse.rewrite(url)
     }
 
+    // Asesor inmobiliario: tienda.landingchat.co/asesor → /chat/tienda/asesor
+    if (pathname === '/asesor' || pathname === '/asesor/') {
+        const url = new URL(`/chat/${slug}/asesor`, request.url)
+        request.nextUrl.searchParams.forEach((value, key) => {
+            if (key !== 'store') url.searchParams.set(key, value)
+        })
+        return NextResponse.rewrite(url)
+    }
+
     // Productos por ID corto: tienda.landingchat.co/p/123 → /store/tienda/p/123
     if (pathname.startsWith('/p/')) {
         const url = new URL(`/store/${slug}${pathname}`, request.url)

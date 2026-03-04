@@ -32,12 +32,14 @@ export function getProductUrl(productSlug: string, isSubdomain: boolean, storeSl
 
 /**
  * Genera URL del chat
+ * Para orgs inmobiliarias, redirige a /asesor (chat especializado sin carrito)
  */
-export function getChatUrl(isSubdomain: boolean, storeSlug: string): string {
+export function getChatUrl(isSubdomain: boolean, storeSlug: string, isRealEstate: boolean = false): string {
+    const chatPath = isRealEstate ? '/chat/asesor' : '/chat'
     if (isSubdomain) {
-        return '/chat'
+        return isRealEstate ? '/asesor' : '/chat'
     }
-    return `/chat/${storeSlug}`
+    return `/chat/${storeSlug}${isRealEstate ? '/asesor' : ''}`
 }
 
 /**

@@ -1914,14 +1914,29 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
 async function showProperty(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { property_id } = ShowPropertySchema.parse(input)
 
-    const { data: property, error } = await supabase
+    // Intentar buscar por UUID primero, luego por external_code/external_id
+    let property = null
+    const { data: byId } = await supabase
         .from("properties")
         .select("*")
         .eq("id", property_id)
         .eq("organization_id", context.organizationId)
         .single()
 
-    if (error || !property) {
+    if (byId) {
+        property = byId
+    } else {
+        const { data: byCode } = await supabase
+            .from("properties")
+            .select("*")
+            .eq("organization_id", context.organizationId)
+            .or(`external_code.eq.${property_id},external_id.eq.${property_id}`)
+            .limit(1)
+            .single()
+        property = byCode
+    }
+
+    if (!property) {
         return { success: false, error: "Propiedad no encontrada" }
     }
 

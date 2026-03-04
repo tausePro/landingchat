@@ -120,11 +120,20 @@ export async function syncNubyProperties(
       throw new Error(`Error al conectar con Nuby: ${fetchError.message}`)
     }
 
-    // 6. Procesar propiedades en chunks pequeños para no saturar la BD
+    // 6. Filtrar: solo activas + arriendo/venta
+    // La API de Nuby ignora los filtros por query param, hay que filtrar post-descarga
+    const validTypes = ['arriendo', 'venta', 'venta y arriendo']
+    const filtered = nubyProperties.filter((p: any) => {
+      const isActive = String(p.estado ?? '').trim() === '1'
+      const isValidType = validTypes.includes((p.tipo_servicio || '').toLowerCase())
+      return isActive && isValidType
+    })
+    console.log(`Propiedades activas arriendo/venta: ${filtered.length} de ${nubyProperties.length}`)
+
     const CHUNK_SIZE = 50
     const CHUNK_DELAY_MS = 500
 
-    const mappedProperties = nubyProperties.map((nubyProperty: any) =>
+    const mappedProperties = filtered.map((nubyProperty: any) =>
       mapNubyPropertyToLocal(nubyProperty, organizationId, baseUrl)
     )
 
@@ -160,23 +169,21 @@ export async function syncNubyProperties(
       }
     }
 
-    // 7. Soft-delete: marcar como inactive las propiedades que ya no vienen de la API
-    // Solo en sync full para evitar falsos positivos en incremental
+    // 7. Eliminar propiedades que ya no existen en Nuby (solo en sync full)
     if (syncType === 'full' && mappedProperties.length > 0) {
       const syncedExternalIds = mappedProperties.map((p: any) => p.external_id)
-      const { data: deactivated, error: deactivateError } = await supabase
+      const { data: removed, error: removeError } = await supabase
         .from('properties')
-        .update({ status: 'inactive', status_detail: 'No encontrada en última sincronización' })
+        .delete()
         .eq('organization_id', organizationId)
-        .eq('status', 'active')
         .not('external_id', 'in', `(${syncedExternalIds.join(',')})`)
         .select('id')
 
-      if (deactivateError) {
-        console.error('Soft-delete error:', deactivateError.message)
-        result.errors.push(`Soft-delete error: ${deactivateError.message}`)
-      } else if (deactivated && deactivated.length > 0) {
-        console.log(`Soft-delete: ${deactivated.length} propiedades marcadas como inactive`)
+      if (removeError) {
+        console.error('Cleanup error:', removeError.message)
+        result.errors.push(`Cleanup error: ${removeError.message}`)
+      } else if (removed && removed.length > 0) {
+        console.log(`Cleanup: ${removed.length} propiedades eliminadas (ya no existen en Nuby)`)
       }
     }
 

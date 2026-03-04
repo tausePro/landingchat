@@ -1,7 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { syncNubyProperties } from "@/lib/nuby/sync"
 
 interface Property {
   id: string
@@ -19,6 +21,9 @@ interface Property {
 
 interface PropertiesGridProps {
   properties: Property[]
+  organizationId: string
+  hasNuby: boolean
+  lastSyncAt: string | null
 }
 
 const isValidImageUrl = (url?: string | null) =>
@@ -31,18 +36,74 @@ const formatPrice = (price: number) =>
     minimumFractionDigits: 0
   }).format(price)
 
-export function PropertiesGrid({ properties }: PropertiesGridProps) {
+export function PropertiesGrid({ properties, organizationId, hasNuby, lastSyncAt }: PropertiesGridProps) {
   const [isMounted, setIsMounted] = useState(false)
+  const [isPending, startTransition] = useTransition()
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  const handleSync = () => {
+    setSyncMessage(null)
+    startTransition(async () => {
+      try {
+        const result = await syncNubyProperties(organizationId, 'full')
+        if (result.success) {
+          setSyncMessage(`Sincronización exitosa: ${result.itemsUpdated} propiedades actualizadas`)
+        } else {
+          setSyncMessage(`Error: ${result.errors[0] || 'Error desconocido'}`)
+        }
+        router.refresh()
+      } catch (err: any) {
+        setSyncMessage(`Error: ${err.message}`)
+      }
+    })
+  }
 
   if (!isMounted) {
     return null
   }
 
   return (
+    <>
+    {/* Header */}
+    <div className="flex items-center justify-between mb-6">
+      <div>
+        <h1 className="text-2xl font-bold">Propiedades ({properties.length})</h1>
+        {lastSyncAt && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Última sincronización: {new Date(lastSyncAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+      </div>
+      {hasNuby && (
+        <button
+          onClick={handleSync}
+          disabled={isPending}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isPending ? (
+            <>
+              <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              Sincronizando...
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-base">sync</span>
+              Actualizar desde Nuby
+            </>
+          )}
+        </button>
+      )}
+    </div>
+    {syncMessage && (
+      <div className={`mb-4 p-3 rounded-lg text-sm ${syncMessage.startsWith('Error') ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400' : 'bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400'}`}>
+        {syncMessage}
+      </div>
+    )}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {properties.map((property) => {
         const mainImage = property.images?.[0]?.url || null
@@ -88,5 +149,6 @@ export function PropertiesGrid({ properties }: PropertiesGridProps) {
         )
       })}
     </div>
+    </>
   )
 }

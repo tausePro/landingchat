@@ -130,7 +130,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
 
             if (customerId) {
                 // Ya identificado, ir directamente al chat
-                let chatUrl = getChatUrl(isSubdomain, organization.slug)
+                let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
                 const params = new URLSearchParams()
                 if (productId) params.set('product', productId)
                 if (context) params.set('context', context)
@@ -154,7 +154,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
             // Ya identificado, ir al chat
             // Se mantiene el chatId anterior para continuar la conversación
 
-            let chatUrl = getChatUrl(isSubdomain, organization.slug)
+            let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
             const params = new URLSearchParams()
             if (productId) params.set('product', productId)
             if (query) params.set('context', query)
@@ -191,7 +191,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
         setShowGateModal(false)
 
         // Construir URL del chat con producto y contexto si existen
-        let chatUrl = getChatUrl(isSubdomain, organization.slug)
+        let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
         const params = new URLSearchParams()
         if (pendingProductId) params.set('product', pendingProductId)
         if (pendingContext) params.set('context', pendingContext)

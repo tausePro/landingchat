@@ -31,7 +31,7 @@ export function mapNubyPropertyToLocal(
     external_code: nubyProperty.codigo,
     external_url: `https://${nubyProperty.codigo}.arrendasoft.co`,
     
-    title: nubyProperty.titulo,
+    title: nubyProperty.titulo || `${nubyProperty.clase_inmueble || 'Propiedad'} ${nubyProperty.codigo}`,
     description: nubyProperty.observaciones || '',
     property_type: nubyProperty.tipo_servicio_id,
     property_class: nubyProperty.clase_inmueble,
@@ -67,12 +67,20 @@ export function mapNubyPropertyToLocal(
     })),
     
     images: nubyProperty.imagenes.map(img => {
-      const rawUrl = img.imagen || ''
-      let normalizedUrl = rawUrl
+      // Preferir campo 'img' (path relativo) porque 'imagen' viene malformada de Nuby
+      // (ej: https://x.arrendasoft.coimg/... sin el /)
+      const relativePath = (img as any).img || ''
+      let normalizedUrl = ''
 
-      if (rawUrl && !rawUrl.startsWith('http')) {
-        normalizedUrl = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
-        normalizedUrl = `${baseUrl}${normalizedUrl}`
+      if (relativePath) {
+        normalizedUrl = `${baseUrl}/${relativePath.replace(/^\//, '')}`
+      } else {
+        const rawUrl = img.imagen || ''
+        if (rawUrl && rawUrl.includes('.arrendasoft.co') && !rawUrl.includes('.co/')) {
+          normalizedUrl = rawUrl.replace('.arrendasoft.co', '.arrendasoft.co/')
+        } else {
+          normalizedUrl = rawUrl
+        }
       }
 
       return {
