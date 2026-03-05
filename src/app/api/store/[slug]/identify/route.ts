@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { normalizePhone, getPhoneVariants } from "@/lib/utils/phone"
+import { storeApiRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 
 const identifySchema = z.object({
     name: z.string().min(1, "El nombre es requerido").max(100, "Nombre muy largo"),
@@ -13,6 +14,18 @@ export async function POST(
     { params }: { params: Promise<{ slug: string }> }
 ) {
     const { slug } = await params
+
+    // Rate limiting: 30 req/min por IP
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = await storeApiRateLimit.limit(clientId)
+    const headers = getRateLimitHeaders(rateLimitResult)
+
+    if (!rateLimitResult.success) {
+        return NextResponse.json(
+            { error: "Demasiadas solicitudes. Intenta de nuevo en un momento." },
+            { status: 429, headers }
+        )
+    }
 
     try {
         const body = await request.json()

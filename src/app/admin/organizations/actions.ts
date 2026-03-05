@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export interface OrganizationData {
@@ -17,7 +17,7 @@ export interface OrganizationData {
 }
 
 export async function getOrganizations(page = 1, limit = 10, search = "") {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Calculate offset
     const from = (page - 1) * limit
@@ -59,7 +59,7 @@ export async function getOrganizations(page = 1, limit = 10, search = "") {
 }
 
 export async function updateOrganizationStatus(id: string, status: 'active' | 'suspended' | 'archived') {
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     const { error } = await supabase
         .from("organizations")
@@ -73,4 +73,82 @@ export async function updateOrganizationStatus(id: string, status: 'active' | 's
 
     revalidatePath("/admin/organizations")
     return { success: true }
+}
+
+export async function deleteOrganization(id: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = createServiceClient()
+
+    try {
+        // 1. Verificar que la org existe y obtener info
+        const { data: org, error: orgError } = await supabase
+            .from("organizations")
+            .select("id, name, slug")
+            .eq("id", id)
+            .single()
+
+        if (orgError || !org) {
+            return { success: false, error: "Organización no encontrada" }
+        }
+
+        // 2. Eliminar datos relacionados en orden (respetando FK)
+        // Obtener IDs de chats para eliminar mensajes
+        const { data: chatRows } = await supabase
+            .from("chats")
+            .select("id")
+            .eq("organization_id", id)
+
+        const chatIds = chatRows?.map((c: { id: string }) => c.id) || []
+
+        // Mensajes de chats
+        if (chatIds.length > 0) {
+            await supabase.from("messages").delete().in("chat_id", chatIds)
+        }
+
+        // Chats
+        await supabase.from("chats").delete().eq("organization_id", id)
+
+        // Productos (imágenes, variantes, etc. se eliminan por CASCADE en FK)
+        await supabase.from("products").delete().eq("organization_id", id)
+
+        // Agentes
+        await supabase.from("agents").delete().eq("organization_id", id)
+
+        // Categorías
+        await supabase.from("categories").delete().eq("organization_id", id)
+
+        // Customers
+        await supabase.from("customers").delete().eq("organization_id", id)
+
+        // Orders
+        await supabase.from("orders").delete().eq("organization_id", id)
+
+        // Suscripciones
+        await supabase.from("subscriptions").delete().eq("organization_id", id)
+
+        // Founding slots
+        await supabase.from("founding_slots").delete().eq("organization_id", id)
+
+        // 3. Desvincular perfiles (no eliminar usuarios, solo quitar org)
+        await supabase
+            .from("profiles")
+            .update({ organization_id: null })
+            .eq("organization_id", id)
+
+        // 4. Eliminar la organización
+        const { error: deleteError } = await supabase
+            .from("organizations")
+            .delete()
+            .eq("id", id)
+
+        if (deleteError) {
+            console.error("Error deleting organization:", deleteError)
+            return { success: false, error: `Error al eliminar: ${deleteError.message}` }
+        }
+
+        revalidatePath("/admin/organizations")
+        return { success: true }
+    } catch (error) {
+        console.error("Error in deleteOrganization:", error)
+        return { success: false, error: "Error inesperado al eliminar la organización" }
+    }
 }

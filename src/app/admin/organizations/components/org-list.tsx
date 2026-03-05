@@ -17,10 +17,12 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { OrganizationData, updateOrganizationStatus } from "../actions"
+import { OrganizationData, updateOrganizationStatus, deleteOrganization } from "../actions"
+import { toast } from "sonner"
 // import { useDebounce } from "@/hooks/use-debounce" // We might need to create this hook or implement debounce manually
 
 // Simple debounce implementation inside component if hook doesn't exist
@@ -75,6 +77,28 @@ export function OrgList({ initialData }: OrgListProps) {
         }
     }
 
+    const handleDelete = async (id: string, name: string) => {
+        const confirmation = prompt(`Escribe "${name}" para confirmar la eliminación:`)
+        if (confirmation !== name) {
+            if (confirmation !== null) toast.error("El nombre no coincide. Operación cancelada.")
+            return
+        }
+        setLoading(true)
+        try {
+            const result = await deleteOrganization(id)
+            if (result.success) {
+                toast.success(`Organización "${name}" eliminada`)
+                router.refresh()
+            } else {
+                toast.error(result.error || "Error al eliminar")
+            }
+        } catch {
+            toast.error("Error inesperado al eliminar")
+        } finally {
+            setLoading(false)
+        }
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -120,7 +144,7 @@ export function OrgList({ initialData }: OrgListProps) {
                                 </TableCell>
                                 <TableCell>{org.users_count}</TableCell>
                                 <TableCell>{org.chats_count}</TableCell>
-                                <TableCell>{new Date(org.created_at).toLocaleDateString()}</TableCell>
+                                <TableCell>{new Date(org.created_at).toLocaleDateString("es-CO")}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -139,6 +163,14 @@ export function OrgList({ initialData }: OrgListProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleStatusChange(org.id, 'suspended')} className="text-red-600">
                                                 Suspender
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                onClick={() => handleDelete(org.id, org.name)}
+                                                className="text-red-600 font-semibold"
+                                                disabled={loading}
+                                            >
+                                                Eliminar Organización
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>

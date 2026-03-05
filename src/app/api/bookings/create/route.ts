@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { createCalendarEvent } from "@/lib/calendar/google-calendar"
 import { assignAdvisor } from "@/lib/advisors/assignment"
+import { bookingsRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 
 /**
  * POST /api/bookings/create
@@ -9,6 +10,18 @@ import { assignAdvisor } from "@/lib/advisors/assignment"
  * Body: { organizationId, propertyCode, proposedDate, customerName, customerPhone, customerEmail? }
  */
 export async function POST(request: NextRequest) {
+    // Rate limiting: 3 citas por minuto por IP
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = await bookingsRateLimit.limit(clientId)
+    const headers = getRateLimitHeaders(rateLimitResult)
+
+    if (!rateLimitResult.success) {
+        return NextResponse.json(
+            { error: "Demasiadas solicitudes. Intenta de nuevo en un momento." },
+            { status: 429, headers }
+        )
+    }
+
     try {
         const body = await request.json()
         const { organizationId, propertyCode, proposedDate, customerName, customerPhone, customerEmail } = body

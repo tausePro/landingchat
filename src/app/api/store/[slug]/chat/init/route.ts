@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
+import { chatInitRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 
 const chatInitSchema = z.object({
     customerId: z.string().uuid("Customer ID inválido")
@@ -11,6 +12,18 @@ export async function POST(
     { params }: { params: Promise<{ slug: string }> }
 ) {
     const { slug } = await params
+
+    // Rate limiting: 5 sesiones por minuto por IP
+    const clientId = getClientIdentifier(request)
+    const rateLimitResult = await chatInitRateLimit.limit(clientId)
+    const headers = getRateLimitHeaders(rateLimitResult)
+
+    if (!rateLimitResult.success) {
+        return NextResponse.json(
+            { error: "Demasiadas solicitudes. Intenta de nuevo en un momento." },
+            { status: 429, headers }
+        )
+    }
 
     try {
         const body = await request.json()
