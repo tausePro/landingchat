@@ -33,7 +33,8 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
     const currentTotal = total()
 
     // Descuento reactivo: recalcular cada vez que cambia el carrito
-    const couponDiscount = calculateCouponDiscount(appliedCoupon, currentTotal)
+    // Pasar items para que cupones targeted solo apliquen a productos/categorías correspondientes
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, currentTotal, items)
     const couponFreeShipping = appliedCoupon?.freeShipping || false
 
     // Calcular impuestos cuando cambian los items
