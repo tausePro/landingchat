@@ -84,8 +84,6 @@ export function buildSystemPromptOptimized(
     const customInstructions = agent.configuration?.personality?.instructions
     const hasCustomPrompt = customInstructions && customInstructions.trim().length > 50
 
-    console.log("[buildSystemPrompt] Custom instructions found:", hasCustomPrompt, customInstructions?.substring(0, 80) + "...")
-
     let prompt = ""
 
     if (hasCustomPrompt) {
