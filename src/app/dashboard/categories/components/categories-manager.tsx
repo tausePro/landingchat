@@ -221,8 +221,8 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
                     </div>
                 ) : (
                     <div className="divide-y">
-                        {filtered.map((cat) => (
-                            <div key={cat.id}>
+                        {filtered.map((cat, idx) => (
+                            <div key={cat.id ?? idx}>
                                 {/* Fila principal */}
                                 <div className="flex items-center px-6 py-4 hover:bg-muted/50 transition-colors">
                                     <button onClick={() => handleExpand(cat.id)} className="mr-3 text-muted-foreground hover:text-foreground">

@@ -345,7 +345,29 @@ async function processOrderUpdate(
                 city?: string
             } | null
 
-            // 1. Enviar notificación de venta por WhatsApp
+            // 1. Decrementar stock de cada producto comprado
+            if (orderItems?.length) {
+                for (const item of orderItems) {
+                    if (item.product_id) {
+                        const { data: product } = await supabase
+                            .from("products")
+                            .select("stock")
+                            .eq("id", item.product_id)
+                            .single()
+
+                        if (product) {
+                            const newStock = Math.max(0, product.stock - item.quantity)
+                            await supabase
+                                .from("products")
+                                .update({ stock: newStock, updated_at: new Date().toISOString() })
+                                .eq("id", item.product_id)
+                            log.info("Stock decremented", { productId: item.product_id, oldStock: product.stock, newStock, quantity: item.quantity })
+                        }
+                    }
+                }
+            }
+
+            // 2. Enviar notificación de venta por WhatsApp
             try {
                 const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
 

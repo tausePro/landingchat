@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server"
+import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import {
     IdentifyCustomerSchema,
     SearchProductsSchema,
@@ -331,23 +332,33 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
     }
 }
 
+function removeAccents(str: string): string {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+}
+
 async function searchProducts(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
-    const { query, category, max_price, limit = 5 } = input
+    const { query, category, max_price, limit = 15 } = input
 
     let dbQuery = supabase
         .from("products")
-        .select("id, name, description, price, image_url, images, stock, categories, variants")
+        .select("id, name, description, price, sale_price, image_url, images, stock, categories, variants")
         .eq("organization_id", context.organizationId)
         .eq("is_active", true)
-        .gt("stock", 0)
+        .order("stock", { ascending: false })
 
     if (max_price) {
         dbQuery = dbQuery.lte("price", max_price)
     }
 
-    // Búsqueda por texto en nombre y descripción
+    // Búsqueda por palabras individuales (sin acentos) para mejor cobertura
     if (query) {
-        dbQuery = dbQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+        const words = removeAccents(query)
+            .split(/\s+/)
+            .filter(w => w.length >= 2)
+
+        for (const word of words) {
+            dbQuery = dbQuery.or(`name.ilike.%${word}%,description.ilike.%${word}%`)
+        }
     }
 
     if (category) {
@@ -367,9 +378,12 @@ async function searchProducts(supabase: any, input: any, context: ToolContext): 
                 id: p.id,
                 name: p.name,
                 description: p.description,
-                price: p.price,
+                price: p.sale_price || p.price,
+                originalPrice: p.sale_price ? p.price : undefined,
+                onSale: !!p.sale_price,
                 image_url: p.image_url || p.images?.[0],
                 stock: p.stock,
+                available: p.stock > 0,
                 hasVariants: p.variants?.length > 0
             })),
             totalFound: products.length
@@ -398,10 +412,13 @@ async function showProduct(supabase: any, input: any, context: ToolContext): Pro
                 id: product.id,
                 name: product.name,
                 description: product.description,
-                price: product.price,
+                price: product.sale_price || product.price,
+                originalPrice: product.sale_price ? product.price : undefined,
+                onSale: !!product.sale_price,
                 image_url: product.image_url,
                 images: product.images || [],
                 stock: product.stock,
+                available: product.stock > 0,
                 sku: product.sku,
                 categories: product.categories || [],
                 variants: product.variants || []
@@ -460,7 +477,7 @@ async function addToCart(supabase: any, input: any, context: ToolContext): Promi
     // Obtener producto (incluir variants para validar stock por variante)
     const { data: product, error: productError } = await supabase
         .from("products")
-        .select("id, name, price, image_url, stock, variants")
+        .select("id, name, price, sale_price, image_url, stock, variants")
         .eq("id", product_id)
         .eq("organization_id", context.organizationId)
         .single()
@@ -535,7 +552,8 @@ async function addToCart(supabase: any, input: any, context: ToolContext): Promi
         items.push({
             product_id: product.id,
             name: product.name,
-            price: product.price,
+            price: product.sale_price || product.price,
+            original_price: product.sale_price ? product.price : undefined,
             image_url: product.image_url,
             quantity: quantity,
             variant: variant || null
@@ -562,7 +580,8 @@ async function addToCart(supabase: any, input: any, context: ToolContext): Promi
             added: {
                 name: product.name,
                 quantity: quantity,
-                price: product.price
+                price: product.sale_price || product.price,
+                onSale: !!product.sale_price
             },
             cart: {
                 itemCount: items.length,
@@ -826,7 +845,11 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
         .eq("status", "active")
         .single()
 
-    const subtotal = cart?.items?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
+    if (!cart?.items?.length) {
+        return { success: false, error: "El carrito está vacío. Agrega productos antes de aplicar un cupón." }
+    }
+
+    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
 
     // Verificar compra mínima
     if (coupon.min_purchase_amount && subtotal < Number(coupon.min_purchase_amount)) {
@@ -836,16 +859,43 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
         }
     }
 
-    let discountAmount = 0
-    if (coupon.type === "percentage") {
-        discountAmount = subtotal * (Number(coupon.value) / 100)
-        // Aplicar tope máximo de descuento si existe
-        if (coupon.max_discount_amount && discountAmount > Number(coupon.max_discount_amount)) {
-            discountAmount = Number(coupon.max_discount_amount)
+    // Preparar items para cálculo de cupón dirigido
+    let cartItems: CartItemForCoupon[] = cart.items.map((item: any) => ({
+        id: item.product_id,
+        price: item.price,
+        quantity: item.quantity,
+        categories: [] as string[]
+    }))
+
+    // Si el cupón aplica a categorías, necesitamos las categorías de cada producto
+    if (coupon.applies_to === 'categories' && coupon.target_ids?.length) {
+        const productIds = cartItems.map((i: CartItemForCoupon) => i.id)
+        const { data: products } = await supabase
+            .from("products")
+            .select("id, categories")
+            .in("id", productIds)
+
+        if (products) {
+            const catMap = new Map<string, string[]>(products.map((p: any) => [p.id, p.categories || []]))
+            cartItems = cartItems.map((item: CartItemForCoupon) => ({
+                ...item,
+                categories: catMap.get(item.id) || []
+            }))
         }
-    } else if (coupon.type === "fixed") {
-        discountAmount = Math.min(Number(coupon.value), subtotal)
-    } else if (coupon.type === "free_shipping") {
+    }
+
+    // Construir metadata del cupón para cálculo centralizado
+    const couponMeta: CouponMetadata = {
+        code: coupon.code,
+        type: coupon.type,
+        value: Number(coupon.value),
+        maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
+        freeShipping: coupon.type === 'free_shipping',
+        appliesTo: coupon.applies_to || 'all',
+        targetIds: coupon.target_ids || null
+    }
+
+    if (coupon.type === "free_shipping") {
         return {
             success: true,
             data: {
@@ -861,7 +911,15 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
         }
     }
 
-    discountAmount = Math.round(discountAmount)
+    // Calcular descuento usando lógica centralizada (respeta applies_to/target_ids)
+    const discountAmount = calculateCouponDiscount(couponMeta, subtotal, cartItems)
+
+    if (discountAmount === 0 && coupon.applies_to !== 'all') {
+        return {
+            success: false,
+            error: `Este cupón aplica solo a ${coupon.applies_to === 'products' ? 'productos' : 'categorías'} específicos que no están en tu carrito.`
+        }
+    }
 
     return {
         success: true,
@@ -872,6 +930,7 @@ async function applyDiscount(supabase: any, input: any, context: ToolContext): P
             discountAmount,
             maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
             freeShipping: false,
+            appliesTo: coupon.applies_to || 'all',
             message: `¡Cupón ${coupon.code} aplicado! Descuento de $${discountAmount.toLocaleString()}`,
             newTotal: subtotal - discountAmount
         }
