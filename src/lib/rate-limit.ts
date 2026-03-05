@@ -6,17 +6,18 @@
 import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
 
-// Check if Redis is properly configured
-const isRedisConfigured = process.env.UPSTASH_REDIS_REST_URL && 
-                         process.env.UPSTASH_REDIS_REST_TOKEN &&
-                         process.env.UPSTASH_REDIS_REST_URL.startsWith('https')
+// Resolve Redis URL/Token: Vercel integration uses KV_REST_API_*, Upstash SDK uses UPSTASH_REDIS_REST_*
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN
+
+const isRedisConfigured = redisUrl && redisToken && redisUrl.startsWith('https')
 
 // Initialize Redis client only if properly configured
 let redis: Redis | null = null
 if (isRedisConfigured) {
   redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL!,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    url: redisUrl!,
+    token: redisToken!,
   })
 }
 
@@ -37,6 +38,30 @@ export const aiChatRateLimit = redis ? new Ratelimit({
   limiter: Ratelimit.slidingWindow(10, "1 m"),
   analytics: true,
   prefix: "ratelimit:ai-chat",
+}) : mockRateLimit
+
+// Store public endpoints: 30 requests per minute per IP
+export const storeApiRateLimit = redis ? new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(30, "1 m"),
+  analytics: true,
+  prefix: "ratelimit:store-api",
+}) : mockRateLimit
+
+// Chat init: 5 per minute per IP (crear sesiones)
+export const chatInitRateLimit = redis ? new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(5, "1 m"),
+  analytics: true,
+  prefix: "ratelimit:chat-init",
+}) : mockRateLimit
+
+// Bookings: 3 per minute per IP
+export const bookingsRateLimit = redis ? new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(3, "1 m"),
+  analytics: true,
+  prefix: "ratelimit:bookings",
 }) : mockRateLimit
 
 // Generic rate limiter factory

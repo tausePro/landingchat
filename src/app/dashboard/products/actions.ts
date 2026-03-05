@@ -11,6 +11,7 @@ import {
   type ProductData,
 } from "@/types/product"
 import { type ActionResult, success, failure } from "@/types/common"
+import { canCreateResource } from "@/lib/utils/subscription"
 
 // Re-export types for backward compatibility
 export type {
@@ -123,7 +124,13 @@ export async function createProduct(
       return failure("No organization found")
     }
 
-    // 4. Generate slug
+    // 4. Verificar límite de productos del plan
+    const resourceCheck = await canCreateResource(profile.organization_id, "product")
+    if (!resourceCheck.allowed) {
+      return failure(resourceCheck.message || "Has alcanzado el límite de productos de tu plan.")
+    }
+
+    // 5. Generate slug
     const baseSlug = generateSlug(parsed.data.name)
     const { data: existingSlugs } = await supabase
       .from("products")

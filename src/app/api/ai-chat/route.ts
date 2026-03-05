@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { canCreateResource } from "@/lib/utils/subscription"
 import { z } from "zod"
 
 const cartItemSchema = z.object({
@@ -92,6 +93,15 @@ export async function POST(request: NextRequest) {
                 return NextResponse.json(
                     { error: "No active agent found for this organization" },
                     { status: 404, headers }
+                )
+            }
+
+            // Verificar límite de conversaciones mensuales del plan
+            const resourceCheck = await canCreateResource(organization.id, "conversation", supabase)
+            if (!resourceCheck.allowed) {
+                return NextResponse.json(
+                    { error: resourceCheck.message || "Esta tienda ha alcanzado el límite de conversaciones de su plan." },
+                    { status: 429, headers }
                 )
             }
 

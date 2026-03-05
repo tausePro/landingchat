@@ -71,8 +71,8 @@ export function shouldShowUsageAlert(usage: number, limit: number): boolean {
  * @param orgId - ID de la organización
  * @returns Datos de uso actual
  */
-export async function getOrganizationUsage(orgId: string): Promise<UsageData> {
-    const supabase = await createClient()
+export async function getOrganizationUsage(orgId: string, externalClient?: any): Promise<UsageData> {
+    const supabase = externalClient || await createClient()
 
     // Contar productos
     const { count: productsCount } = await supabase
@@ -109,10 +109,10 @@ export async function getOrganizationUsage(orgId: string): Promise<UsageData> {
  * @param orgId - ID de la organización
  * @returns Límites del plan o defaults si no tiene suscripción
  */
-export async function getOrganizationLimits(orgId: string): Promise<PlanLimits> {
-    const supabase = await createClient()
+export async function getOrganizationLimits(orgId: string, externalClient?: any): Promise<PlanLimits> {
+    const supabase = externalClient || await createClient()
 
-    // Buscar suscripción activa
+    // Buscar suscripción activa, en trial o con gracia (past_due)
     const { data: subscription } = await supabase
         .from("subscriptions")
         .select(`
@@ -122,7 +122,7 @@ export async function getOrganizationLimits(orgId: string): Promise<PlanLimits> 
             plan:plans(max_products, max_agents, max_monthly_conversations)
         `)
         .eq("organization_id", orgId)
-        .eq("status", "active")
+        .in("status", ["active", "trialing", "past_due"])
         .single()
 
     if (subscription) {
@@ -149,10 +149,10 @@ export async function getOrganizationLimits(orgId: string): Promise<PlanLimits> 
  * @param orgId - ID de la organización
  * @returns Datos completos de uso
  */
-export async function getOrganizationUsageWithLimits(orgId: string): Promise<UsageWithLimits> {
+export async function getOrganizationUsageWithLimits(orgId: string, externalClient?: any): Promise<UsageWithLimits> {
     const [usage, limits] = await Promise.all([
-        getOrganizationUsage(orgId),
-        getOrganizationLimits(orgId),
+        getOrganizationUsage(orgId, externalClient),
+        getOrganizationLimits(orgId, externalClient),
     ])
 
     const percentages = {
@@ -190,9 +190,10 @@ export async function getOrganizationUsageWithLimits(orgId: string): Promise<Usa
  */
 export async function canCreateResource(
     orgId: string,
-    resourceType: "product" | "agent" | "conversation"
+    resourceType: "product" | "agent" | "conversation",
+    externalClient?: any
 ): Promise<{ allowed: boolean; message?: string }> {
-    const usageData = await getOrganizationUsageWithLimits(orgId)
+    const usageData = await getOrganizationUsageWithLimits(orgId, externalClient)
 
     const resourceMap = {
         product: {

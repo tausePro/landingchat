@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { canCreateResource } from "@/lib/utils/subscription"
 
 export interface AgentData {
     id: string
@@ -113,6 +114,12 @@ export async function createAgentFromTemplate(templateId: string, name: string) 
         .single()
 
     if (!profile?.organization_id) throw new Error("No organization found")
+
+    // Verificar límite de agentes del plan
+    const resourceCheck = await canCreateResource(profile.organization_id, "agent")
+    if (!resourceCheck.allowed) {
+        throw new Error(resourceCheck.message || "Has alcanzado el límite de agentes de tu plan.")
+    }
 
     // Get template details
     const { data: templateItem, error: templateError } = await supabase
