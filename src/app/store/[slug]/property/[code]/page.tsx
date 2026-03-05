@@ -1,9 +1,13 @@
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
+import { headers } from "next/headers"
 import { BookingPanel } from "./booking-panel"
 import { PhotoGallery } from "./photo-gallery"
+import { StoreLayoutClient } from "../../store-layout-client"
+import { getStoreData } from "../../actions"
+import { isSubdomain, getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
@@ -20,22 +24,23 @@ export default async function PropertyDetailPage({
   params: Promise<{ slug: string; code: string }>
 }) {
   const { slug, code } = await params
-  const supabase = await createClient()
 
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("id, name, slug, logo_url, settings, primary_color")
-    .eq("slug", slug)
-    .single()
+  const headersList = await headers()
+  const host = headersList.get("host") || ""
+  const initialIsSubdomain = isSubdomain(host)
 
-  if (!org) return notFound()
+  // Obtener datos completos de la org (mismo patrón que el home)
+  const storeData = await getStoreData(slug)
+  if (!storeData) return notFound()
 
-  // Usar service client para acceso público (subdominios)
+  const { organization, products, pages, properties: allProperties, badges } = storeData
+
+  // Obtener la propiedad específica
   const serviceClient = createServiceClient()
   const { data: property } = await serviceClient
     .from("properties")
     .select("*")
-    .eq("organization_id", org.id)
+    .eq("organization_id", organization.id)
     .eq("external_code", code)
     .eq("status", "active")
     .single()
@@ -47,39 +52,29 @@ export default async function PropertyDetailPage({
   const priceLabel = isRent ? "Arriendo" : "Venta"
   const images = (property.images || []).sort((a: any, b: any) => a.position - b.position)
   const features = property.features || []
-  const primaryColor = org.settings?.branding?.primaryColor || "#1a3a3a"
+  const primaryColor = organization.settings?.branding?.primaryColor || "#1a3a3a"
+
+  // URLs subdomain-aware
+  const homeUrl = getStoreLink("/", initialIsSubdomain, slug)
+  const chatUrl = getChatUrl(initialIsSubdomain, slug, true) + `?property=${code}`
 
   return (
-    <div className="bg-[#f8fafc] text-slate-900" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* ═══════════════════ HEADER ═══════════════════ */}
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <Link href={`/store/${slug}`} className="flex items-center gap-3">
-              {org.logo_url && (
-                <Image src={org.logo_url} alt={org.name} width={40} height={40} className="rounded" />
-              )}
-              <span className="text-xl font-bold tracking-tight text-slate-900">{org.name}</span>
-            </Link>
-            <nav className="hidden md:flex gap-8 items-center">
-              <Link href={`/store/${slug}`} className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">Propiedades</Link>
-              <Link
-                href={`/chat/${slug}/asesor?property=${code}`}
-                className="text-white px-6 py-2.5 rounded-lg font-bold text-sm shadow-sm hover:brightness-90 transition-all"
-                style={{ backgroundColor: primaryColor }}
-              >
-                Consultar Inmueble
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <StoreLayoutClient
+      slug={slug}
+      organization={organization}
+      products={products}
+      pages={pages}
+      properties={allProperties}
+      badges={badges}
+      hideHeaderOnMobile={false}
+      initialIsSubdomain={initialIsSubdomain}
+    >
+      <div className="bg-[#f8fafc]" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* ═══════════════════ BREADCRUMBS ═══════════════════ */}
         <nav aria-label="Breadcrumb" className="flex text-sm text-slate-500 mb-6">
           <ol className="flex items-center space-x-2">
-            <li><Link href={`/store/${slug}`} className="hover:text-slate-900">Inicio</Link></li>
+            <li><Link href={homeUrl} className="hover:text-slate-900">Inicio</Link></li>
             <li className="flex items-center space-x-2">
               <span className="material-symbols-outlined text-sm">chevron_right</span>
               <span className="capitalize">{priceLabel}</span>
@@ -286,8 +281,8 @@ export default async function PropertyDetailPage({
               propertyCode={code}
               propertyTitle={property.title}
               primaryColor={primaryColor}
-              orgName={org.name}
-              organizationId={org.id}
+              orgName={organization.name}
+              organizationId={organization.id}
             />
           </div>
         </div>
@@ -297,17 +292,18 @@ export default async function PropertyDetailPage({
       <footer className="bg-white border-t border-slate-200 mt-20 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 mb-6">
-            {org.logo_url && (
-              <Image src={org.logo_url} alt={org.name} width={32} height={32} className="rounded" />
+            {organization.logo_url && (
+              <Image src={organization.logo_url} alt={organization.name} width={32} height={32} className="rounded" />
             )}
-            <span className="text-lg font-bold tracking-tight text-slate-900">{org.name}</span>
+            <span className="text-lg font-bold tracking-tight text-slate-900">{organization.name}</span>
           </div>
           <div className="pt-8 border-t border-slate-100 text-center text-xs text-slate-400">
-            &copy; {new Date().getFullYear()} {org.name}. Todos los derechos reservados.
+            &copy; {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.
           </div>
         </div>
       </footer>
     </div>
+    </StoreLayoutClient>
   )
 }
 
