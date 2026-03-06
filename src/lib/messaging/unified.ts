@@ -7,7 +7,7 @@
 
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
-import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
+import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppMedia, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
 import { sendSocialMessage, sendSocialImage, sendSocialQuickReplies } from "@/lib/messaging/meta-social-client"
 
 export type MessageChannel = "web" | "whatsapp" | "instagram" | "messenger"
@@ -250,6 +250,26 @@ async function sendRichWhatsAppAction(
             )
             break
         }
+
+        case "send_media": {
+            const media = data.media
+            if (!media?.file_url) return
+
+            const fileType = media.file_type as string || ""
+            const fileName = media.file_name as string || media.name as string || "archivo"
+            const mediaName = media.name as string || fileName
+
+            if (fileType.startsWith("image/")) {
+                await sendWhatsAppImage(organizationId, phoneNumber, media.file_url, `📎 ${mediaName}`)
+            } else if (fileType.startsWith("audio/")) {
+                await sendWhatsAppMedia(organizationId, phoneNumber, media.file_url, "audio")
+            } else if (fileType.startsWith("video/")) {
+                await sendWhatsAppMedia(organizationId, phoneNumber, media.file_url, "video", `📎 ${mediaName}`)
+            } else {
+                await sendWhatsAppMedia(organizationId, phoneNumber, media.file_url, "document", `📎 ${mediaName}`, fileName)
+            }
+            break
+        }
     }
 }
 
@@ -403,6 +423,21 @@ async function sendRichSocialAction(
                     { id: "modify_order", title: "Modificar pedido" },
                 ]
             )
+            break
+        }
+
+        case "send_media": {
+            const media = data.media
+            if (!media?.file_url) return
+
+            const fileType = media.file_type as string || ""
+            const mediaName = media.name as string || "Archivo"
+
+            if (fileType.startsWith("image/")) {
+                await sendSocialImage(organizationId, platform, recipientId, media.file_url, `\u{1F4CE} ${mediaName}`)
+            } else {
+                await sendSocialMessage(organizationId, platform, recipientId, `\u{1F4CE} ${mediaName}\n${media.file_url}`)
+            }
             break
         }
     }

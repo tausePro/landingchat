@@ -9,6 +9,7 @@
 export {
   sendWhatsAppMessage,
   sendWhatsAppImage,
+  sendWhatsAppMedia,
   sendWhatsAppButtons,
   sendWhatsAppList,
   getMetaWhatsAppConfig,

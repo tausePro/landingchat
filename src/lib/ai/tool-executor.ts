@@ -21,7 +21,8 @@ import {
     EscalateToHumanSchema,
     ScheduleAppointmentSchema,
     SearchPropertiesSchema,
-    ShowPropertySchema
+    ShowPropertySchema,
+    SendMediaSchema
 } from "./tools"
 
 interface ToolContext {
@@ -113,6 +114,9 @@ export async function executeTool(
 
             case "show_property":
                 return await showProperty(supabase, input, context)
+
+            case "send_media":
+                return await sendMedia(supabase, input, context)
 
             default:
                 return { success: false, error: `Unknown tool: ${toolName}` }
@@ -2042,6 +2046,62 @@ async function showProperty(supabase: any, input: any, context: ToolContext): Pr
                 is_featured: property.is_featured,
                 external_code: property.external_code
             }
+        }
+    }
+}
+
+// ==================== MEDIA / ARCHIVOS ====================
+
+async function sendMedia(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
+    const { media_id, context_message } = SendMediaSchema.parse(input)
+
+    const { data: media, error } = await supabase
+        .from("organization_media")
+        .select("id, name, description, file_url, file_type, file_name, media_category")
+        .eq("id", media_id)
+        .eq("organization_id", context.organizationId)
+        .eq("is_active", true)
+        .single()
+
+    if (error || !media) {
+        console.error("[sendMedia] Media not found:", media_id, error)
+        return { success: false, error: "Archivo no encontrado o no disponible." }
+    }
+
+    // Incrementar contador de uso (non-blocking)
+    supabase
+        .from("organization_media")
+        .update({ usage_count: media.usage_count + 1 || 1 })
+        .eq("id", media_id)
+        .then(() => console.log("[sendMedia] Usage count updated"))
+        .catch((e: any) => console.warn("[sendMedia] Failed to update usage count:", e))
+
+    console.log("[sendMedia] Sending media:", media.name, media.file_type, media.file_url)
+
+    // Determinar tipo de UI component según categoría
+    const categoryMap: Record<string, string> = {
+        document: "document_attachment",
+        audio: "audio_attachment",
+        image: "image_attachment",
+        video: "video_attachment",
+        catalog: "document_attachment"
+    }
+
+    return {
+        success: true,
+        data: {
+            ui_component: categoryMap[media.media_category] || "document_attachment",
+            media: {
+                id: media.id,
+                name: media.name,
+                description: media.description,
+                file_url: media.file_url,
+                file_type: media.file_type,
+                file_name: media.file_name,
+                category: media.media_category
+            },
+            context_message: context_message || `Aquí tienes: ${media.name}`,
+            message: `Archivo enviado: ${media.name}`
         }
     }
 }

@@ -143,6 +143,26 @@ export const sharedTools: Anthropic.Tool[] = [
         }
     },
 
+    // ==================== MEDIA / ARCHIVOS ====================
+    {
+        name: "send_media",
+        description: "Envía un archivo multimedia (PDF, catálogo, audio, imagen) al cliente. Usa esta herramienta cuando necesites compartir documentos, catálogos de productos, hojas de requisitos, audios informativos u otros archivos que la organización haya configurado. Consulta la lista de ARCHIVOS DISPONIBLES en el contexto del sistema para saber qué archivos puedes enviar.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                media_id: {
+                    type: "string",
+                    description: "ID del archivo multimedia a enviar. Debe ser uno de los IDs listados en ARCHIVOS DISPONIBLES."
+                },
+                context_message: {
+                    type: "string",
+                    description: "Mensaje breve que acompaña al archivo (ej: 'Aquí tienes los requisitos de arriendo')"
+                }
+            },
+            required: ["media_id"]
+        }
+    },
+
     // ==================== ESCALAMIENTO ====================
     {
         name: "escalate_to_human",

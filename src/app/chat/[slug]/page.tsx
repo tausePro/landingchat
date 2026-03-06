@@ -16,6 +16,7 @@ import { CartDrawer } from "../components/cart-drawer"
 import { CheckoutModal } from "../components/checkout-modal"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import Image from 'next/image'
 
 interface Product {
     id: string
@@ -28,12 +29,22 @@ interface Product {
     categories?: string[]
 }
 
+interface MediaAttachment {
+    id: string
+    name: string
+    file_url: string
+    file_type: string
+    file_name: string
+    category: string
+}
+
 interface Message {
     id: string
     role: 'user' | 'assistant'
     content: string
     product?: Product
     products?: Product[] // Multiple products for carousel
+    mediaAttachments?: MediaAttachment[]
     timestamp: Date
 }
 
@@ -369,6 +380,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             // Process actions from AI
             let collectedProducts: Product[] = []
             let hasProductAction = false
+            let collectedMedia: MediaAttachment[] = []
 
             if (data.actions && data.actions.length > 0) {
                 for (const action of data.actions) {
@@ -384,6 +396,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             price: addedProduct.price,
                             image_url: products.find(p => p.name === addedProduct.name)?.image_url
                         }, addedProduct.quantity || 1)
+                    } else if (action.type === 'send_media' && action.data?.media) {
+                        collectedMedia.push(action.data.media as MediaAttachment)
                     }
                 }
             }
@@ -396,6 +410,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     content: data.message,
                     products: collectedProducts.length > 1 ? collectedProducts : undefined,
                     product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
+                    mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
                     timestamp: new Date()
                 }
                 setMessages(prev => [...prev, productMsg])
@@ -407,6 +422,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     id: (Date.now() + 1).toString(),
                     role: 'assistant',
                     content: data.message,
+                    mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
                     timestamp: new Date()
                 }
                 setMessages(prev => [...prev, aiMsg])
@@ -695,6 +711,63 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                 formatPrice={formatPrice}
                                                 primaryColor={primaryColor}
                                             />
+                                        )}
+
+                                        {/* Archivos adjuntos del agente */}
+                                        {msg.mediaAttachments && msg.mediaAttachments.length > 0 && (
+                                            <div className="flex flex-col gap-2 w-full max-w-sm">
+                                                {msg.mediaAttachments.map((media) => {
+                                                    const isAudio = media.category === 'audio' || media.file_type.startsWith('audio/')
+                                                    const isImage = media.category === 'image' || media.file_type.startsWith('image/')
+                                                    const isPdf = media.file_type === 'application/pdf'
+                                                    const isVideo = media.category === 'video' || media.file_type.startsWith('video/')
+
+                                                    return (
+                                                        <div key={media.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                                                            {isImage && (
+                                                                <a href={media.file_url} target="_blank" rel="noopener noreferrer">
+                                                                    <div className="aspect-video bg-gray-100 relative">
+                                                                        <Image src={media.file_url} alt={media.name} fill className="object-contain" unoptimized />
+                                                                    </div>
+                                                                </a>
+                                                            )}
+                                                            {isAudio && (
+                                                                <div className="p-3">
+                                                                    <audio controls className="w-full" preload="metadata">
+                                                                        <source src={media.file_url} type={media.file_type} />
+                                                                    </audio>
+                                                                </div>
+                                                            )}
+                                                            {isVideo && (
+                                                                <video controls className="w-full aspect-video" preload="metadata">
+                                                                    <source src={media.file_url} type={media.file_type} />
+                                                                </video>
+                                                            )}
+                                                            <a
+                                                                href={media.file_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors"
+                                                            >
+                                                                <div className="size-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                                                                    style={{ backgroundColor: `${primaryColor}20` }}>
+                                                                    <span className="material-symbols-outlined text-lg" style={{ color: primaryColor }}>
+                                                                        {isPdf ? 'picture_as_pdf' : isAudio ? 'audio_file' : isImage ? 'image' : isVideo ? 'video_file' : 'attach_file'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{media.name}</p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {isPdf ? 'Documento PDF' : isAudio ? 'Audio' : isImage ? 'Imagen' : isVideo ? 'Video' : 'Archivo'}
+                                                                        {' · Toca para abrir'}
+                                                                    </p>
+                                                                </div>
+                                                                <span className="material-symbols-outlined text-gray-400 text-lg">open_in_new</span>
+                                                            </a>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
                                         )}
 
                                         {/* Carousel for multiple products */}
