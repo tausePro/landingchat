@@ -184,3 +184,35 @@ export async function updateAgentKnowledge(id: string, knowledge: {
     revalidatePath(`/dashboard/agents/${id}/config`)
     return { success: true }
 }
+
+export async function updateAgentSchedule(id: string, schedule: {
+    enabled: boolean
+    timezone: string
+    channels: Record<string, Record<string, { from: string; to: string } | null>>
+}) {
+    const supabase = await createClient()
+
+    const { data: agent } = await supabase
+        .from("agents")
+        .select("configuration")
+        .eq("id", id)
+        .single()
+
+    const updatedConfig = {
+        ...(agent?.configuration || {}),
+        schedule
+    }
+
+    const { error } = await supabase
+        .from("agents")
+        .update({ configuration: updatedConfig })
+        .eq("id", id)
+
+    if (error) {
+        console.error("Error updating schedule:", error)
+        throw new Error("Failed to update schedule")
+    }
+
+    revalidatePath(`/dashboard/agents/${id}/config`)
+    return { success: true }
+}

@@ -65,6 +65,7 @@ export interface ChatDetailData {
     customer_id: string | null
     status: string
     channel: string | null
+    ai_enabled: boolean
     created_at: string
     updated_at: string | null
     customer: {
@@ -117,6 +118,7 @@ export async function getChatDetail(chatId: string): Promise<ActionResult<ChatDe
                 customer_id,
                 status,
                 channel,
+                ai_enabled,
                 created_at,
                 updated_at,
                 messages(id, content, sender_type, created_at),
@@ -192,6 +194,7 @@ export async function getChatDetail(chatId: string): Promise<ActionResult<ChatDe
                 customer_id: chat.customer_id,
                 status: chat.status,
                 channel: chat.channel || 'web',
+                ai_enabled: chat.ai_enabled ?? true,
                 created_at: chat.created_at,
                 updated_at: chat.updated_at,
                 customer: customerData,
@@ -615,6 +618,43 @@ export async function updateChatStatus(
         return {
             success: false,
             error: err instanceof Error ? err.message : "Unknown error updating chat status"
+        }
+    }
+}
+
+/**
+ * Activa o desactiva la IA en una conversación específica.
+ * Cuando ai_enabled=false, el agente IA no responderá automáticamente.
+ */
+export async function toggleAiEnabled(
+    chatId: string,
+    aiEnabled: boolean
+): Promise<ActionResult<{ ai_enabled: boolean }>> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+            return { success: false, error: "Unauthorized" }
+        }
+
+        const { error } = await supabase
+            .from("chats")
+            .update({
+                ai_enabled: aiEnabled,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", chatId)
+
+        if (error) {
+            return { success: false, error: `Failed to toggle AI: ${error.message}` }
+        }
+
+        return { success: true, data: { ai_enabled: aiEnabled } }
+    } catch (err) {
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : "Unknown error toggling AI"
         }
     }
 }
