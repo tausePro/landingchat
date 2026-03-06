@@ -1885,7 +1885,7 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
     const buildQuery = (applyTextFilter: boolean) => {
         let q = supabase
             .from("properties")
-            .select("id, title, property_type, property_class, city, neighborhood, address, bedrooms, bathrooms, area_m2, price_sale, price_rent, price_admin, images, stratum, status")
+            .select("id, title, property_type, property_class, city, neighborhood, address, bedrooms, bathrooms, area_m2, price_sale, price_rent, price_admin, images, stratum, status, external_code")
             .eq("organization_id", context.organizationId)
             .eq("status", "active")
 
@@ -1949,12 +1949,26 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
 
     const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
 
+    // Obtener slug de la organización para construir URLs
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("slug, custom_domain")
+        .eq("id", context.organizationId)
+        .single()
+
+    const buildPropertyUrl = (id: string) => org?.custom_domain
+        ? `https://${org.custom_domain}/p/${id}`
+        : org?.slug
+            ? `https://${org.slug}.landingchat.co/p/${id}`
+            : null
+
     return {
         success: true,
         data: {
             properties: (properties || []).map((p: any) => ({
                 id: p.id,
                 title: p.title,
+                external_code: p.external_code || null,
                 type: p.property_type,
                 class: p.property_class,
                 location: `${p.neighborhood || ''}, ${p.city || ''}`.replace(/^, |, $/g, ''),
@@ -1966,10 +1980,11 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
                 priceRent: p.price_rent ? formatPrice(p.price_rent) : null,
                 priceSale: p.price_sale ? formatPrice(p.price_sale) : null,
                 priceAdmin: p.price_admin ? formatPrice(p.price_admin) : null,
-                image_url: p.images?.[0]?.url || null
+                image_url: p.images?.[0]?.url || null,
+                url: buildPropertyUrl(p.id)
             })),
             totalFound: properties?.length || 0,
-            tip: "Usa show_property con el ID para mostrar la ficha completa al cliente."
+            tip: "Usa show_property con el ID para mostrar la ficha completa al cliente. Comparte la URL de la propiedad para que el cliente pueda verla."
         }
     }
 }
@@ -1977,18 +1992,23 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
 async function showProperty(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { property_id } = ShowPropertySchema.parse(input)
 
-    // Intentar buscar por UUID primero, luego por external_code/external_id
+    // Intentar buscar por UUID primero, luego por external_code/external_id, luego por título
     let property = null
-    const { data: byId } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("id", property_id)
-        .eq("organization_id", context.organizationId)
-        .single()
 
-    if (byId) {
-        property = byId
-    } else {
+    // 1. Buscar por UUID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(property_id)
+    if (isUUID) {
+        const { data: byId } = await supabase
+            .from("properties")
+            .select("*")
+            .eq("id", property_id)
+            .eq("organization_id", context.organizationId)
+            .single()
+        if (byId) property = byId
+    }
+
+    // 2. Buscar por external_code o external_id
+    if (!property) {
         const { data: byCode } = await supabase
             .from("properties")
             .select("*")
@@ -1996,12 +2016,37 @@ async function showProperty(supabase: any, input: any, context: ToolContext): Pr
             .or(`external_code.eq.${property_id},external_id.eq.${property_id}`)
             .limit(1)
             .single()
-        property = byCode
+        if (byCode) property = byCode
+    }
+
+    // 3. Fallback: buscar por título (el AI a veces pasa el nombre en vez del ID)
+    if (!property) {
+        const { data: byTitle } = await supabase
+            .from("properties")
+            .select("*")
+            .eq("organization_id", context.organizationId)
+            .ilike("title", `%${property_id}%`)
+            .eq("status", "active")
+            .limit(1)
+            .single()
+        if (byTitle) property = byTitle
     }
 
     if (!property) {
-        return { success: false, error: "Propiedad no encontrada" }
+        return { success: false, error: `Propiedad "${property_id}" no encontrada. Usa el ID exacto de los resultados de búsqueda.` }
     }
+
+    // Obtener slug de la organización para construir URL
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("slug, custom_domain")
+        .eq("id", context.organizationId)
+        .single()
+    const propertyUrl = org?.custom_domain
+        ? `https://${org.custom_domain}/p/${property.id}`
+        : org?.slug
+            ? `https://${org.slug}.landingchat.co/p/${property.id}`
+            : null
 
     const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
 
@@ -2044,7 +2089,8 @@ async function showProperty(supabase: any, input: any, context: ToolContext): Pr
                 images: (property.images || []).slice(0, 10).map((img: any) => img.url),
                 features: features.slice(0, 15),
                 is_featured: property.is_featured,
-                external_code: property.external_code
+                external_code: property.external_code,
+                url: propertyUrl
             }
         }
     }

@@ -49,7 +49,7 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
     ])
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const hostname = request.headers.get('host') || ''
     const pathname = request.nextUrl.pathname
 
