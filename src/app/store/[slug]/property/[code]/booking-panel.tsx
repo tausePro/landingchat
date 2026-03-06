@@ -10,6 +10,7 @@ interface BookingPanelProps {
   primaryColor: string
   orgName: string
   organizationId: string
+  chatUrl?: string
 }
 
 interface AvailableDay {
@@ -18,7 +19,8 @@ interface AvailableDay {
   slots: Array<{ time: string; isoDate: string }>
 }
 
-export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, orgName, organizationId }: BookingPanelProps) {
+export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, orgName, organizationId, chatUrl }: BookingPanelProps) {
+  const fallbackChatUrl = chatUrl || `/chat/${slug}/asesor?property=${propertyCode}`
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [availability, setAvailability] = useState<AvailableDay[]>([])
@@ -131,7 +133,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
           Un asesor de {orgName} confirmará tu cita en breve por WhatsApp.
         </p>
         <Link
-          href={`/chat/${slug}/asesor?property=${propertyCode}`}
+          href={fallbackChatUrl}
           className="inline-flex items-center gap-1.5 text-sm font-semibold hover:underline"
           style={{ color: primaryColor }}
         >
@@ -290,7 +292,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
       {/* Alternative: Chat link */}
       <div className="mt-6 pt-6 border-t border-slate-100 text-center">
         <Link
-          href={`/chat/${slug}/asesor?property=${propertyCode}`}
+          href={fallbackChatUrl}
           className="text-sm font-semibold hover:underline"
           style={{ color: primaryColor }}
         >

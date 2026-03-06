@@ -68,6 +68,7 @@ export default async function PropertyDetailPage({
       badges={badges}
       hideHeaderOnMobile={false}
       initialIsSubdomain={initialIsSubdomain}
+      defaultChatProductId={code}
     >
       <div className="bg-[#f8fafc]" style={{ fontFamily: "'Inter', sans-serif" }}>
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -283,6 +284,7 @@ export default async function PropertyDetailPage({
               primaryColor={primaryColor}
               orgName={organization.name}
               organizationId={organization.id}
+              chatUrl={chatUrl}
             />
           </div>
         </div>
