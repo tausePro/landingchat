@@ -35,9 +35,10 @@ interface StoreLayoutClientProps {
     hideNavigation?: boolean
     hideHeaderOnMobile?: boolean
     initialIsSubdomain?: boolean
+    defaultChatProductId?: string
 }
 
-export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientIsSubdomain = useIsSubdomain()
@@ -149,6 +150,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const handleStartChat = (productId?: string, query?: string) => {
         // Verificar si ya está identificado (con validación de UUID)
         const customerId = getStoredUUID(`customer_${organization.slug}`)
+        const effectiveProductId = productId || defaultChatProductId
 
         if (customerId) {
             // Ya identificado, ir al chat
@@ -156,14 +158,14 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
 
             let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
             const params = new URLSearchParams()
-            if (productId) params.set('product', productId)
+            if (effectiveProductId) params.set('product', effectiveProductId)
             if (query) params.set('context', query)
             if (params.toString()) chatUrl += `?${params.toString()}`
 
             router.push(chatUrl)
         } else {
             // Guardar producto y contexto pendientes si existen
-            if (productId) setPendingProductId(productId)
+            if (effectiveProductId) setPendingProductId(effectiveProductId)
             if (query) setPendingContext(query)
             // Mostrar modal de identificación
             setShowGateModal(true)
