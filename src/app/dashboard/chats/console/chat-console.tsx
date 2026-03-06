@@ -7,6 +7,7 @@ import {
     getChatDetail,
     sendAgentMessage,
     updateChatStatus,
+    toggleAiEnabled,
 } from "../actions"
 import type { ConsoleChatsResult, ConsoleChatItem, ChatDetailData } from "../actions"
 import { SidebarFolders } from "./components/sidebar-folders"
@@ -116,6 +117,16 @@ export function ChatConsole({ initialData }: ChatConsoleProps) {
         return result
     }, [selectedChatId, refreshChats])
 
+    // Toggle IA en conversación
+    const handleToggleAi = useCallback(async (aiEnabled: boolean) => {
+        if (!selectedChatId) return
+
+        const result = await toggleAiEnabled(selectedChatId, aiEnabled)
+        if (result.success) {
+            setChatDetail(prev => prev ? { ...prev, ai_enabled: aiEnabled } : null)
+        }
+    }, [selectedChatId])
+
     return (
         <div className="flex h-screen w-full bg-background-light dark:bg-background-dark overflow-hidden">
             {/* Panel 1: Sidebar Carpetas */}
@@ -166,6 +177,7 @@ export function ChatConsole({ initialData }: ChatConsoleProps) {
                     loading={loadingDetail}
                     onSendMessage={handleSendMessage}
                     onStatusChange={handleStatusChange}
+                    onToggleAi={handleToggleAi}
                 />
             </div>
 

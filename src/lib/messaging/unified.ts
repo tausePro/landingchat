@@ -37,7 +37,7 @@ export async function processIncomingMessage(
         // Obtener información del chat
         const { data: chat, error: chatError } = await supabase
             .from("chats")
-            .select("organization_id, customer_id, agent_id")
+            .select("organization_id, customer_id, agent_id, ai_enabled")
             .eq("id", message.chatId)
             .single()
 
@@ -45,6 +45,15 @@ export async function processIncomingMessage(
             return {
                 success: false,
                 error: "Chat no encontrado",
+            }
+        }
+
+        // Check 1: IA desactivada manualmente en esta conversación
+        if (chat.ai_enabled === false) {
+            console.log("[Unified Messaging] AI disabled for chat:", message.chatId)
+            return {
+                success: true,
+                response: undefined,
             }
         }
 
@@ -80,6 +89,31 @@ export async function processIncomingMessage(
             return {
                 success: false,
                 error: "No hay agente disponible",
+            }
+        }
+
+        // Check 2: Horarios del agente por canal
+        if (message.channel !== "web") {
+            const { data: agent } = await supabase
+                .from("agents")
+                .select("configuration")
+                .eq("id", agentId)
+                .single()
+
+            if (agent?.configuration?.schedule?.enabled) {
+                const schedule = agent.configuration.schedule
+                const channelSchedule = schedule.channels?.[message.channel]
+
+                if (channelSchedule) {
+                    const isOutsideHours = isOutsideSchedule(channelSchedule, schedule.timezone || "America/Bogota")
+                    if (isOutsideHours) {
+                        console.log("[Unified Messaging] AI paused by schedule for channel:", message.channel)
+                        return {
+                            success: true,
+                            response: undefined,
+                        }
+                    }
+                }
             }
         }
 
@@ -547,6 +581,61 @@ export async function sendResponse(
         return true
     } catch (error) {
         console.error("[Unified Messaging] Error sending response:", error)
+        return false
+    }
+}
+
+// ============================================
+// Schedule helpers
+// ============================================
+
+interface DaySchedule {
+    from: string // "08:00"
+    to: string   // "18:00"
+}
+
+type ChannelSchedule = Record<string, DaySchedule | null>
+
+const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+
+/**
+ * Verifica si la hora actual está FUERA del horario configurado.
+ * Si el día no tiene horario (null), se considera fuera de horario.
+ * Si el día tiene horario, verifica si la hora actual está dentro del rango.
+ */
+function isOutsideSchedule(channelSchedule: ChannelSchedule, timezone: string): boolean {
+    try {
+        const now = new Date()
+        const formatter = new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            weekday: "short",
+        })
+
+        const parts = formatter.formatToParts(now)
+        const weekday = parts.find(p => p.type === "weekday")?.value?.toLowerCase() || ""
+        const hour = parts.find(p => p.type === "hour")?.value || "00"
+        const minute = parts.find(p => p.type === "minute")?.value || "00"
+        const currentTime = `${hour}:${minute}`
+
+        // Mapear weekday corto de Intl a nuestras keys
+        const dayMap: Record<string, string> = {
+            sun: "sun", mon: "mon", tue: "tue", wed: "wed", thu: "thu", fri: "fri", sat: "sat",
+        }
+        const dayKey = dayMap[weekday] || DAY_KEYS[now.getDay()]
+
+        const daySchedule = channelSchedule[dayKey]
+
+        // Si no hay horario para este día, la IA está pausada
+        if (!daySchedule) return true
+
+        // Comparar hora actual con rango
+        return currentTime < daySchedule.from || currentTime >= daySchedule.to
+    } catch (error) {
+        console.error("[isOutsideSchedule] Error checking schedule:", error)
+        // En caso de error, no pausar la IA (fail-open)
         return false
     }
 }

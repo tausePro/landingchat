@@ -14,6 +14,8 @@ import {
     MessageSquare,
     StickyNote,
     Loader2,
+    Bot,
+    BotOff,
 } from "lucide-react"
 
 interface ChatPanelProps {
@@ -21,6 +23,7 @@ interface ChatPanelProps {
     loading: boolean
     onSendMessage: (content: string, isInternal?: boolean) => Promise<ActionResult<{ messageId: string }> | undefined>
     onStatusChange: (status: "active" | "closed" | "pending") => Promise<ActionResult<void> | undefined>
+    onToggleAi: (aiEnabled: boolean) => Promise<void>
 }
 
 interface Message {
@@ -49,7 +52,7 @@ function formatMessageDate(dateStr: string): string {
     return date.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" })
 }
 
-export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange }: ChatPanelProps) {
+export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange, onToggleAi }: ChatPanelProps) {
     const [messages, setMessages] = useState<Message[]>([])
     const [inputValue, setInputValue] = useState("")
     const [sending, setSending] = useState(false)
@@ -198,6 +201,22 @@ export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange }
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => onToggleAi(!chatDetail?.ai_enabled)}
+                        className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                            chatDetail?.ai_enabled
+                                ? "bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                                : "bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30"
+                        )}
+                        title={chatDetail?.ai_enabled ? "Pausar IA en esta conversación" : "Reactivar IA en esta conversación"}
+                    >
+                        {chatDetail?.ai_enabled ? (
+                            <><Bot className="size-3.5" /> IA activa</>
+                        ) : (
+                            <><BotOff className="size-3.5" /> IA pausada</>
+                        )}
+                    </button>
                     {isClosed ? (
                         <button
                             onClick={() => onStatusChange("active")}

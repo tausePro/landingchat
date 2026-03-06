@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge, updateAgentSkills } from "./actions"
+import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge, updateAgentSkills, updateAgentSchedule } from "./actions"
 import { ImageUploader } from "@/components/shared/image-uploader"
 import { SKILL_DEFINITIONS, getSkillsForMode, type SkillsConfig } from "@/lib/ai/skills"
 import type { OrgMode } from "@/lib/ai/agent-factory"
@@ -140,6 +140,37 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         tags: "",
     })
     const [showMediaForm, setShowMediaForm] = useState(false)
+
+    // Schedule state
+    const DAY_LABELS: Record<string, string> = {
+        mon: "Lunes", tue: "Martes", wed: "Miércoles", thu: "Jueves",
+        fri: "Viernes", sat: "Sábado", sun: "Domingo",
+    }
+    const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    const TIMEZONES = [
+        { value: "America/Bogota", label: "Colombia (GMT-5)" },
+        { value: "America/Mexico_City", label: "México Centro (GMT-6)" },
+        { value: "America/Lima", label: "Perú (GMT-5)" },
+        { value: "America/Santiago", label: "Chile (GMT-3)" },
+        { value: "America/Argentina/Buenos_Aires", label: "Argentina (GMT-3)" },
+        { value: "America/Sao_Paulo", label: "Brasil (GMT-3)" },
+        { value: "America/Guayaquil", label: "Ecuador (GMT-5)" },
+        { value: "America/Caracas", label: "Venezuela (GMT-4)" },
+        { value: "America/Panama", label: "Panamá (GMT-5)" },
+        { value: "America/Costa_Rica", label: "Costa Rica (GMT-6)" },
+    ]
+
+    const savedSchedule = agent.configuration?.schedule
+    const [scheduleEnabled, setScheduleEnabled] = useState(savedSchedule?.enabled || false)
+    const [scheduleTimezone, setScheduleTimezone] = useState(savedSchedule?.timezone || "America/Bogota")
+    const [scheduleChannels, setScheduleChannels] = useState<Record<string, Record<string, { from: string; to: string } | null>>>(() => {
+        const defaultDays: Record<string, { from: string; to: string } | null> = {}
+        for (const day of DAY_KEYS) {
+            defaultDays[day] = day === "sun" ? null : { from: "08:00", to: "18:00" }
+        }
+        return savedSchedule?.channels || { whatsapp: defaultDays }
+    })
+    const [scheduleSaving, setScheduleSaving] = useState(false)
 
     // Cargar documentos existentes
     const loadDocuments = useCallback(async () => {
@@ -1033,23 +1064,177 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                     )}
 
                     {activeTab === "schedule" && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Horario de Atención</CardTitle>
-                                <CardDescription>Define cuándo el agente responderá automáticamente</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex flex-col items-center justify-center py-12 text-center">
-                                    <div className="size-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                                        <span className="material-symbols-outlined text-3xl text-muted-foreground">calendar_clock</span>
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle>Horario de Atención por Canal</CardTitle>
+                                            <CardDescription>
+                                                Define cuándo la IA NO responderá automáticamente en cada canal.
+                                                Fuera de este horario, la IA atenderá las conversaciones.
+                                            </CardDescription>
+                                        </div>
+                                        <Switch
+                                            checked={scheduleEnabled}
+                                            onCheckedChange={setScheduleEnabled}
+                                        />
                                     </div>
-                                    <h3 className="text-lg font-semibold mb-2">Próximamente</h3>
-                                    <p className="text-muted-foreground max-w-sm">
-                                        Estamos trabajando en un sistema avanzado de horarios y turnos para tus agentes.
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </CardHeader>
+                                {scheduleEnabled && (
+                                    <CardContent className="space-y-6">
+                                        <div className="space-y-2">
+                                            <Label>Zona horaria</Label>
+                                            <Select value={scheduleTimezone} onValueChange={setScheduleTimezone}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {TIMEZONES.map((tz) => (
+                                                        <SelectItem key={tz.value} value={tz.value}>
+                                                            {tz.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="rounded-lg border border-border p-4 space-y-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="material-symbols-outlined text-green-500 text-lg">chat</span>
+                                                <h4 className="font-semibold text-sm">WhatsApp</h4>
+                                                <Badge variant="secondary" className="text-[10px]">
+                                                    IA pausada en horario activo
+                                                </Badge>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground -mt-2 mb-3">
+                                                Durante estas horas, tú atiendes WhatsApp manualmente. Fuera de ellas, la IA responde automáticamente.
+                                            </p>
+
+                                            <div className="space-y-2">
+                                                {DAY_KEYS.map((day) => {
+                                                    const whatsappSchedule = scheduleChannels.whatsapp || {}
+                                                    const dayData = whatsappSchedule[day]
+                                                    const isActive = dayData !== null && dayData !== undefined
+
+                                                    return (
+                                                        <div key={day} className="flex items-center gap-3 py-1.5">
+                                                            <Switch
+                                                                checked={isActive}
+                                                                onCheckedChange={(checked) => {
+                                                                    setScheduleChannels(prev => ({
+                                                                        ...prev,
+                                                                        whatsapp: {
+                                                                            ...prev.whatsapp,
+                                                                            [day]: checked ? { from: "08:00", to: "18:00" } : null
+                                                                        }
+                                                                    }))
+                                                                }}
+                                                            />
+                                                            <span className={`text-sm w-24 ${isActive ? "font-medium" : "text-muted-foreground"}`}>
+                                                                {DAY_LABELS[day]}
+                                                            </span>
+                                                            {isActive && dayData ? (
+                                                                <div className="flex items-center gap-2">
+                                                                    <Input
+                                                                        type="time"
+                                                                        value={dayData.from}
+                                                                        onChange={(e) => {
+                                                                            setScheduleChannels(prev => ({
+                                                                                ...prev,
+                                                                                whatsapp: {
+                                                                                    ...prev.whatsapp,
+                                                                                    [day]: { ...dayData, from: e.target.value }
+                                                                                }
+                                                                            }))
+                                                                        }}
+                                                                        className="w-32 h-8 text-sm"
+                                                                    />
+                                                                    <span className="text-xs text-muted-foreground">a</span>
+                                                                    <Input
+                                                                        type="time"
+                                                                        value={dayData.to}
+                                                                        onChange={(e) => {
+                                                                            setScheduleChannels(prev => ({
+                                                                                ...prev,
+                                                                                whatsapp: {
+                                                                                    ...prev.whatsapp,
+                                                                                    [day]: { ...dayData, to: e.target.value }
+                                                                                }
+                                                                            }))
+                                                                        }}
+                                                                        className="w-32 h-8 text-sm"
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-xs text-muted-foreground italic">IA responde todo el día</span>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4">
+                                            <div className="flex gap-3">
+                                                <span className="material-symbols-outlined text-blue-500 text-lg mt-0.5">info</span>
+                                                <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                                    <p className="font-medium">¿Cómo funciona?</p>
+                                                    <p>Los días <strong>activos</strong> definen cuándo <strong>tú</strong> atiendes WhatsApp manualmente. Durante esas horas la IA no responderá.</p>
+                                                    <p>Fuera de ese horario y los días <strong>inactivos</strong>, la IA responderá automáticamente 24/7.</p>
+                                                    <p>El chat web siempre usa IA, independiente del horario.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                )}
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Control por Conversación</CardTitle>
+                                    <CardDescription>
+                                        Además del horario, puedes pausar/reactivar la IA en cualquier conversación individual desde la vista de Chats.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 p-3">
+                                        <span className="material-symbols-outlined text-violet-500">smart_toy</span>
+                                        <div className="text-sm">
+                                            <p className="font-medium">Botón &quot;IA activa / IA pausada&quot;</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">
+                                                Disponible en el header de cada conversación en Live Chat → permite tomar el control de una conversación específica sin afectar las demás.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <div className="flex justify-end">
+                                <Button
+                                    onClick={async () => {
+                                        setScheduleSaving(true)
+                                        try {
+                                            await updateAgentSchedule(agent.id, {
+                                                enabled: scheduleEnabled,
+                                                timezone: scheduleTimezone,
+                                                channels: scheduleChannels,
+                                            })
+                                        } catch (err) {
+                                            console.error("Error saving schedule:", err)
+                                        }
+                                        setScheduleSaving(false)
+                                    }}
+                                    disabled={scheduleSaving}
+                                >
+                                    {scheduleSaving ? (
+                                        <><span className="material-symbols-outlined text-sm animate-spin mr-2">progress_activity</span> Guardando...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-sm mr-2">save</span> Guardar Horarios</>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
                     )}
                 </div>
 
