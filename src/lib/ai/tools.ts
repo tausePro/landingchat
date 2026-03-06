@@ -581,3 +581,8 @@ export const SearchPropertiesSchema = z.object({
 export const ShowPropertySchema = z.object({
     property_id: z.string()
 })
+
+export const SendMediaSchema = z.object({
+    media_id: z.string(),
+    context_message: z.string().optional()
+})

@@ -27,6 +27,21 @@ interface OrgContextData {
     planName: string | null
 }
 
+interface OrgMediaFile {
+    id: string
+    name: string
+    description: string | null
+    file_name: string
+    file_url: string
+    file_type: string
+    file_size: number
+    media_category: string
+    tags: string[]
+    is_active: boolean
+    usage_count: number
+    created_at: string
+}
+
 interface AgentConfigProps {
     agent: any
     orgContext: OrgContextData
@@ -58,7 +73,7 @@ const SHARED_MODULE = {
     label: "Compartidas",
     icon: "hub",
     description: "Identificación de clientes, historial, info de tienda, estado de órdenes",
-    tools: ["identify_customer", "get_store_info", "get_order_status", "get_customer_history", "escalate_to_human"],
+    tools: ["identify_customer", "get_store_info", "get_order_status", "get_customer_history", "escalate_to_human", "send_media"],
 }
 
 function getActiveMode(orgContext: OrgContextData): string {
@@ -112,6 +127,19 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
     const [editingSkill, setEditingSkill] = useState<string | null>(null)
 
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const mediaFileInputRef = useRef<HTMLInputElement>(null)
+
+    // Media files state
+    const [mediaFiles, setMediaFiles] = useState<OrgMediaFile[]>([])
+    const [mediaLoading, setMediaLoading] = useState(true)
+    const [mediaUploading, setMediaUploading] = useState(false)
+    const [mediaForm, setMediaForm] = useState({
+        name: "",
+        description: "",
+        category: "document",
+        tags: "",
+    })
+    const [showMediaForm, setShowMediaForm] = useState(false)
 
     // Cargar documentos existentes
     const loadDocuments = useCallback(async () => {
@@ -132,9 +160,25 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         }
     }, [agent.id])
 
+    const loadMediaFiles = useCallback(async () => {
+        setMediaLoading(true)
+        try {
+            const res = await fetch("/api/media")
+            const data = await res.json()
+            setMediaFiles(data.media || [])
+        } catch (err) {
+            console.error("Error loading media:", err)
+        } finally {
+            setMediaLoading(false)
+        }
+    }, [])
+
     useEffect(() => {
-        if (isMounted) loadDocuments()
-    }, [isMounted, loadDocuments])
+        if (isMounted) {
+            loadDocuments()
+            loadMediaFiles()
+        }
+    }, [isMounted, loadDocuments, loadMediaFiles])
 
     const handleUploadDocument = async (file: File) => {
         setUploading(true)
@@ -231,11 +275,67 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         }
     }
 
+    const handleUploadMedia = async (file: File) => {
+        if (!mediaForm.name.trim()) {
+            alert("El nombre es requerido")
+            return
+        }
+        setMediaUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append("file", file)
+            formData.append("name", mediaForm.name.trim())
+            formData.append("description", mediaForm.description.trim())
+            formData.append("media_category", mediaForm.category)
+            formData.append("tags", mediaForm.tags)
+
+            const res = await fetch("/api/media", { method: "POST", body: formData })
+            const data = await res.json()
+
+            if (data.success) {
+                setMediaFiles(prev => [data.media, ...prev])
+                setMediaForm({ name: "", description: "", category: "document", tags: "" })
+                setShowMediaForm(false)
+            } else {
+                alert(data.error || "Error al subir archivo")
+            }
+        } catch {
+            alert("Error de conexión al subir archivo")
+        } finally {
+            setMediaUploading(false)
+            if (mediaFileInputRef.current) mediaFileInputRef.current.value = ""
+        }
+    }
+
+    const handleDeleteMedia = async (id: string, name: string) => {
+        if (!confirm(`¿Eliminar "${name}"? El agente ya no podrá compartir este archivo.`)) return
+        try {
+            const res = await fetch(`/api/media?id=${id}`, { method: "DELETE" })
+            const data = await res.json()
+            if (data.success) {
+                setMediaFiles(prev => prev.filter(f => f.id !== id))
+            } else {
+                alert(data.error || "Error al eliminar")
+            }
+        } catch {
+            alert("Error de conexión")
+        }
+    }
+
+    const MEDIA_CATEGORIES = [
+        { value: "document", label: "Documento / PDF", icon: "description" },
+        { value: "audio", label: "Audio", icon: "audio_file" },
+        { value: "image", label: "Imagen", icon: "image" },
+        { value: "video", label: "Video", icon: "video_file" },
+        { value: "catalog", label: "Catálogo", icon: "menu_book" },
+    ]
+
     const tabs = [
         { id: "general", label: "General", icon: "settings" },
         { id: "personality", label: "Personalidad", icon: "psychology" },
         { id: "modules", label: "Módulos", icon: "extension" },
         { id: "knowledge", label: "Conocimiento", icon: "menu_book" },
+        { id: "media", label: "Archivos", icon: "attach_file" },
         { id: "schedule", label: "Horarios", icon: "schedule" },
     ]
 
@@ -701,6 +801,233 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                         {loading ? "Guardando..." : "Guardar Cambios"}
                                     </Button>
                                 </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {activeTab === "media" && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Archivos para Compartir</CardTitle>
+                                <CardDescription>
+                                    Archivos que el agente puede <strong>enviar a los clientes</strong> durante las conversaciones.
+                                    A diferencia de &quot;Conocimiento&quot; (documentos que el agente lee internamente),
+                                    estos archivos se comparten directamente con el cliente.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {/* Info box */}
+                                <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
+                                    <span className="material-symbols-outlined text-blue-500 mt-0.5">info</span>
+                                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                                        <p className="font-semibold mb-1">Ejemplos de uso:</p>
+                                        <ul className="list-disc list-inside space-y-0.5">
+                                            <li>PDF de requisitos de arriendo para inmobiliarias</li>
+                                            <li>Catálogo de productos para tiendas</li>
+                                            <li>Audios informativos o de bienvenida</li>
+                                            <li>Imágenes de referencia o tablas de tallas</li>
+                                        </ul>
+                                        <p className="mt-1.5">El agente decidirá cuándo enviar cada archivo basándose en la <em>instrucción</em> que configures.</p>
+                                    </div>
+                                </div>
+
+                                {/* Upload form toggle */}
+                                {!showMediaForm ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setShowMediaForm(true)}
+                                        className="w-full border-dashed"
+                                    >
+                                        <span className="material-symbols-outlined mr-2 text-lg">add</span>
+                                        Agregar archivo
+                                    </Button>
+                                ) : (
+                                    <div className="space-y-4 p-4 border border-primary/20 rounded-xl bg-primary/5">
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-semibold text-sm">Nuevo archivo</p>
+                                            <button
+                                                onClick={() => {
+                                                    setShowMediaForm(false)
+                                                    setMediaForm({ name: "", description: "", category: "document", tags: "" })
+                                                }}
+                                                className="text-muted-foreground hover:text-foreground"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">close</span>
+                                            </button>
+                                        </div>
+
+                                        {/* Nombre */}
+                                        <div className="space-y-1.5">
+                                            <Label>Nombre visible *</Label>
+                                            <Input
+                                                value={mediaForm.name}
+                                                onChange={(e) => setMediaForm(prev => ({ ...prev, name: e.target.value }))}
+                                                placeholder='Ej: "Requisitos de Arriendo", "Catálogo 2026"'
+                                            />
+                                        </div>
+
+                                        {/* Instrucción para el AI */}
+                                        <div className="space-y-1.5">
+                                            <Label>Instrucción para el agente</Label>
+                                            <p className="text-xs text-muted-foreground">¿Cuándo debe enviar este archivo?</p>
+                                            <Textarea
+                                                value={mediaForm.description}
+                                                onChange={(e) => setMediaForm(prev => ({ ...prev, description: e.target.value }))}
+                                                placeholder='Ej: "Enviar cuando el cliente pregunte por requisitos de arriendo o al mencionar documentos necesarios"'
+                                                rows={2}
+                                                className="resize-none text-sm"
+                                            />
+                                        </div>
+
+                                        {/* Categoría */}
+                                        <div className="space-y-1.5">
+                                            <Label>Categoría</Label>
+                                            <div className="grid grid-cols-5 gap-1.5">
+                                                {MEDIA_CATEGORIES.map((cat) => (
+                                                    <button
+                                                        key={cat.value}
+                                                        type="button"
+                                                        onClick={() => setMediaForm(prev => ({ ...prev, category: cat.value }))}
+                                                        className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs font-medium transition-colors ${
+                                                            mediaForm.category === cat.value
+                                                                ? "border-primary bg-primary/10 text-primary"
+                                                                : "border-border-light dark:border-border-dark text-muted-foreground hover:border-slate-300"
+                                                        }`}
+                                                    >
+                                                        <span className="material-symbols-outlined text-lg">{cat.icon}</span>
+                                                        {cat.label.split(" / ")[0]}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Tags */}
+                                        <div className="space-y-1.5">
+                                            <Label>Tags <span className="text-muted-foreground font-normal">(separados por coma)</span></Label>
+                                            <Input
+                                                value={mediaForm.tags}
+                                                onChange={(e) => setMediaForm(prev => ({ ...prev, tags: e.target.value }))}
+                                                placeholder="arriendo, requisitos, documentos"
+                                            />
+                                        </div>
+
+                                        {/* File input + submit */}
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                ref={mediaFileInputRef}
+                                                type="file"
+                                                className="hidden"
+                                                accept=".pdf,.mp3,.wav,.ogg,.webm,.mp4,.jpg,.jpeg,.png,.webp,.gif"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0]
+                                                    if (file) {
+                                                        if (!mediaForm.name) {
+                                                            setMediaForm(prev => ({
+                                                                ...prev,
+                                                                name: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
+                                                            }))
+                                                        }
+                                                        handleUploadMedia(file)
+                                                    }
+                                                }}
+                                            />
+                                            <Button
+                                                onClick={() => {
+                                                    if (!mediaForm.name.trim()) {
+                                                        alert("Escribe un nombre antes de seleccionar el archivo")
+                                                        return
+                                                    }
+                                                    mediaFileInputRef.current?.click()
+                                                }}
+                                                disabled={mediaUploading || !mediaForm.name.trim()}
+                                            >
+                                                <span className="material-symbols-outlined mr-2 text-sm">
+                                                    {mediaUploading ? "sync" : "upload_file"}
+                                                </span>
+                                                {mediaUploading ? "Subiendo..." : "Seleccionar y subir archivo"}
+                                            </Button>
+                                            <p className="text-xs text-muted-foreground">PDF, audio, imagen o video (máx 10MB)</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Files list */}
+                                {mediaLoading ? (
+                                    <div className="p-6 text-center text-muted-foreground text-sm">
+                                        Cargando archivos...
+                                    </div>
+                                ) : mediaFiles.length === 0 && !showMediaForm ? (
+                                    <div
+                                        className="p-8 border-2 border-dashed border-border-light dark:border-border-dark rounded-xl flex flex-col items-center justify-center text-center text-muted-foreground bg-slate-50 dark:bg-slate-900/20 cursor-pointer hover:border-primary/50 transition-colors"
+                                        onClick={() => setShowMediaForm(true)}
+                                    >
+                                        <span className="material-symbols-outlined text-4xl mb-2 opacity-50">attach_file</span>
+                                        <p className="font-medium">No hay archivos configurados</p>
+                                        <p className="text-xs">Sube PDFs, catálogos, audios u otros archivos que el agente pueda compartir</p>
+                                        <p className="text-xs text-primary mt-2 font-medium">Haz clic para agregar</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {mediaFiles.map((file) => {
+                                            const catInfo = MEDIA_CATEGORIES.find(c => c.value === file.media_category)
+                                            return (
+                                                <div
+                                                    key={file.id}
+                                                    className="flex items-center justify-between p-3 border rounded-lg bg-card-light dark:bg-card-dark"
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                        <div className="p-1.5 rounded-lg bg-primary/10 text-primary flex-shrink-0">
+                                                            <span className="material-symbols-outlined text-base">
+                                                                {catInfo?.icon || "description"}
+                                                            </span>
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-sm font-medium truncate">{file.name}</p>
+                                                            {file.description && (
+                                                                <p className="text-xs text-muted-foreground truncate">{file.description}</p>
+                                                            )}
+                                                            <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                                                <span>{(file.file_size / 1024).toFixed(0)} KB</span>
+                                                                <span>·</span>
+                                                                <span className="capitalize">{file.media_category}</span>
+                                                                {file.usage_count > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span>Enviado {file.usage_count}x</span>
+                                                                    </>
+                                                                )}
+                                                                {file.tags?.length > 0 && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span>{file.tags.join(", ")}</span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                                        <a
+                                                            href={file.file_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-primary transition-colors"
+                                                            title="Ver archivo"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">visibility</span>
+                                                        </a>
+                                                        <button
+                                                            onClick={() => handleDeleteMedia(file.id, file.name)}
+                                                            className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-500 transition-colors"
+                                                            title="Eliminar"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">delete</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}

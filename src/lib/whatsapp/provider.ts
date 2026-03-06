@@ -245,6 +245,37 @@ export async function sendWhatsAppList(
 }
 
 /**
+ * Envía un archivo media (documento, audio, video) por WhatsApp
+ */
+export async function sendWhatsAppMedia(
+  organizationId: string,
+  to: string,
+  mediaUrl: string,
+  mediaType: "document" | "audio" | "video",
+  caption?: string,
+  filename?: string
+): Promise<{ messageId?: string }> {
+  const instance = await getConnectedInstance(organizationId)
+  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
+    // Fallback: enviar como texto con link
+    return sendViaMeta(instance, to, `${caption || ""}\n📎 ${mediaUrl}`)
+  }
+
+  const client = new MetaCloudClient()
+  const response = await client.sendMediaMessage(
+    instance.meta_phone_number_id,
+    instance.meta_access_token,
+    to,
+    mediaType,
+    mediaUrl,
+    caption,
+    filename
+  )
+
+  return { messageId: response.messages?.[0]?.id }
+}
+
+/**
  * Obtiene la instancia conectada (helper reutilizable)
  * Intenta corporate primero, luego fallback a cualquier instancia conectada
  */

@@ -198,6 +198,32 @@ IMPORTANTE: Si la respuesta está en estos documentos, cita la información. Si 
             console.warn("[processMessage] Error loading agent documents:", docsError)
         }
 
+        // 7.6. Inyectar archivos media disponibles (para tool send_media)
+        try {
+            const { data: orgMedia } = await supabase
+                .from("organization_media")
+                .select("id, name, description, media_category, tags")
+                .eq("organization_id", input.organizationId)
+                .eq("is_active", true)
+                .order("created_at", { ascending: true })
+
+            if (orgMedia && orgMedia.length > 0) {
+                const mediaList = orgMedia.map(m =>
+                    `- ID: "${m.id}" | Nombre: "${m.name}" | Tipo: ${m.media_category}${m.description ? ` | Cuándo usar: ${m.description}` : ""}${m.tags?.length ? ` | Tags: ${m.tags.join(", ")}` : ""}`
+                ).join("\n")
+
+                systemPrompt += `\n\nARCHIVOS DISPONIBLES PARA ENVIAR AL CLIENTE:
+Puedes usar la herramienta send_media con el ID del archivo para compartirlo con el cliente.
+${mediaList}
+
+INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción. No los envíes todos de golpe, solo cuando el contexto de la conversación lo amerite.`
+
+                console.log(`[processMessage] Injected ${orgMedia.length} media files into prompt`)
+            }
+        } catch (mediaError) {
+            console.warn("[processMessage] Error loading org media:", mediaError)
+        }
+
         // Determinar modo de la org via factory (prioridad: features → industry → conteo)
         const orgMode = getOrgMode({
             industry: organization?.industry,
