@@ -35,15 +35,35 @@ export default async function PropertyDetailPage({
 
   const { organization, products, pages, properties: allProperties, badges } = storeData
 
-  // Obtener la propiedad específica
+  // Obtener la propiedad específica (por external_code o por UUID)
   const serviceClient = createServiceClient()
-  const { data: property } = await serviceClient
+  let property = null
+
+  // 1. Buscar por external_code
+  const { data: byCode } = await serviceClient
     .from("properties")
     .select("*")
     .eq("organization_id", organization.id)
     .eq("external_code", code)
     .eq("status", "active")
     .single()
+
+  if (byCode) {
+    property = byCode
+  } else {
+    // 2. Fallback: buscar por UUID
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
+    if (isUUID) {
+      const { data: byId } = await serviceClient
+        .from("properties")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .eq("id", code)
+        .eq("status", "active")
+        .single()
+      if (byId) property = byId
+    }
+  }
 
   if (!property) return notFound()
 

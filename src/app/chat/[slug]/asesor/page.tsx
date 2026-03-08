@@ -65,27 +65,64 @@ function PropertyCardComponent({ prop, primaryColor }: { prop: PropertyCard; pri
     const allImages = prop.images && prop.images.length > 0 ? prop.images : (prop.image_url ? [prop.image_url] : [])
     const hasMultiple = allImages.length > 1
     const isDetailCard = !!prop.images && prop.images.length > 0
+    const [showGallery, setShowGallery] = useState(isDetailCard && hasMultiple)
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
     return (
-        <div className={`flex-none ${isDetailCard ? "w-72" : "w-64"} bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden`}>
-            {allImages.length > 0 && (
-                <div className="aspect-video bg-gray-200 relative group">
+        <>
+        {/* Lightbox overlay */}
+        {lightboxIndex !== null && (
+            <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={() => setLightboxIndex(null)}>
+                <div className="relative w-full h-full flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
+                    <Image src={allImages[lightboxIndex]} alt={`${prop.title} - foto ${lightboxIndex + 1}`} fill className="object-contain" unoptimized />
+                    <button onClick={() => setLightboxIndex(null)} className="absolute top-4 right-4 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center text-lg hover:bg-black/80 z-10">✕</button>
+                    {hasMultiple && (
+                        <>
+                            <button onClick={() => setLightboxIndex(i => i !== null ? (i > 0 ? i - 1 : allImages.length - 1) : 0)} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl hover:bg-black/80 z-10">‹</button>
+                            <button onClick={() => setLightboxIndex(i => i !== null ? (i < allImages.length - 1 ? i + 1 : 0) : 0)} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/60 text-white rounded-full w-10 h-10 flex items-center justify-center text-xl hover:bg-black/80 z-10">›</button>
+                        </>
+                    )}
+                    <span className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-3 py-1 rounded-full z-10">{lightboxIndex + 1} / {allImages.length}</span>
+                </div>
+            </div>
+        )}
+        <div className={`flex-none ${isDetailCard ? "w-80" : "w-64"} bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden`}>
+            {allImages.length > 0 && !showGallery && (
+                <div className="aspect-video bg-gray-200 relative group cursor-pointer" onClick={() => setLightboxIndex(imgIndex)}>
                     <Image src={allImages[imgIndex]} alt={prop.title} fill className="object-cover" unoptimized />
                     {hasMultiple && (
                         <>
                             <button
-                                onClick={() => setImgIndex(i => i > 0 ? i - 1 : allImages.length - 1)}
+                                onClick={(e) => { e.stopPropagation(); setImgIndex(i => i > 0 ? i - 1 : allImages.length - 1) }}
                                 className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             >‹</button>
                             <button
-                                onClick={() => setImgIndex(i => i < allImages.length - 1 ? i + 1 : 0)}
+                                onClick={(e) => { e.stopPropagation(); setImgIndex(i => i < allImages.length - 1 ? i + 1 : 0) }}
                                 className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                             >›</button>
-                            <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                                {imgIndex + 1}/{allImages.length}
-                            </span>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setShowGallery(true) }}
+                                className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full hover:bg-black/80 transition-colors cursor-pointer"
+                            >
+                                📷 {allImages.length} fotos
+                            </button>
                         </>
                     )}
+                </div>
+            )}
+            {showGallery && allImages.length > 0 && (
+                <div className="relative">
+                    <div className="grid grid-cols-2 gap-0.5 max-h-64 overflow-y-auto">
+                        {allImages.map((img, i) => (
+                            <div key={i} className="aspect-square bg-gray-200 relative cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setLightboxIndex(i)}>
+                                <Image src={img} alt={`${prop.title} - foto ${i + 1}`} fill className="object-cover" unoptimized />
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setShowGallery(false)}
+                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-black/80"
+                    >✕</button>
                 </div>
             )}
             <div className="p-3">
@@ -129,25 +166,31 @@ function PropertyCardComponent({ prop, primaryColor }: { prop: PropertyCard; pri
                             <span className="material-symbols-outlined text-sm">open_in_new</span>
                             Ver ficha
                         </a>
+                        <a
+                            href={`https://wa.me/?text=${encodeURIComponent(`${prop.title}\n${prop.url}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center text-xs font-medium py-1.5 px-3 rounded-lg transition-colors bg-[#25D366] text-white hover:bg-[#1da851]"
+                            title="Compartir por WhatsApp"
+                        >
+                            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.325 0-4.47-.744-6.227-2.01l-.255-.19-3.64 1.22 1.22-3.64-.19-.255A9.955 9.955 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+                        </a>
                         <button
                             onClick={async () => {
-                                try {
-                                    if (navigator.share) {
-                                        await navigator.share({ title: prop.title, url: prop.url! })
-                                    } else {
-                                        await navigator.clipboard.writeText(prop.url!)
-                                        alert("Link copiado al portapapeles")
-                                    }
-                                } catch { /* user cancelled */ }
+                                await navigator.clipboard.writeText(prop.url!)
+                                const btn = document.activeElement as HTMLButtonElement
+                                if (btn) { btn.textContent = "✓"; setTimeout(() => { btn.innerHTML = '<span class="material-symbols-outlined text-sm">content_copy</span>' }, 1500) }
                             }}
-                            className="flex items-center justify-center gap-1 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            className="flex items-center justify-center text-xs font-medium py-1.5 px-3 rounded-lg transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            title="Copiar link"
                         >
-                            <span className="material-symbols-outlined text-sm">share</span>
+                            <span className="material-symbols-outlined text-sm">content_copy</span>
                         </button>
                     </div>
                 )}
             </div>
         </div>
+        </>
     )
 }
 
