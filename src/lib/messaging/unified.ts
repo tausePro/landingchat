@@ -285,6 +285,68 @@ async function sendRichWhatsAppAction(
             break
         }
 
+        case "show_property": {
+            const property = data.property
+            if (!property) return
+
+            // Enviar imagen principal con caption estilo Wasi
+            const mainImage = Array.isArray(property.images) ? property.images[0] : null
+            const specs = []
+            if (property.specs?.bedrooms) specs.push(`🛏️ ${property.specs.bedrooms} hab`)
+            if (property.specs?.bathrooms) specs.push(`🚿 ${property.specs.bathrooms} baños`)
+            if (property.specs?.area) specs.push(`📐 ${property.specs.area}`)
+
+            let caption = `🏠 *${property.title || "Propiedad"}*\n`
+            if (property.location?.neighborhood || property.location?.city) {
+                caption += `📍 ${property.location.neighborhood || ""}${property.location.neighborhood && property.location.city ? ", " : ""}${property.location.city || ""}\n`
+            }
+            if (specs.length > 0) caption += `${specs.join(" | ")}\n`
+            if (property.prices?.rent) caption += `💰 Arriendo: *${property.prices.rent}*\n`
+            if (property.prices?.sale) caption += `💰 Venta: *${property.prices.sale}*\n`
+            if (property.prices?.admin) caption += `📋 Admin: ${property.prices.admin}\n`
+            if (property.url) caption += `\n👉 Ver ficha completa: ${property.url}`
+
+            if (mainImage) {
+                await sendWhatsAppImage(organizationId, phoneNumber, mainImage, caption)
+            }
+
+            // Enviar botones de acción
+            await sendWhatsAppButtons(
+                organizationId,
+                phoneNumber,
+                `¿Qué te gustaría hacer con *${property.title || "esta propiedad"}*?`,
+                [
+                    { id: "schedule_visit", title: "Agendar visita" },
+                    { id: "more_options", title: "Ver más opciones" },
+                ]
+            )
+            break
+        }
+
+        case "search_properties": {
+            const properties = data.properties
+            if (!Array.isArray(properties) || properties.length === 0) return
+
+            // Enviar lista interactiva con las propiedades encontradas
+            if (properties.length >= 2) {
+                await sendWhatsAppList(
+                    organizationId,
+                    phoneNumber,
+                    `🏠 Encontré ${properties.length} propiedad${properties.length > 1 ? "es" : ""} para ti`,
+                    "Ver propiedades",
+                    [{
+                        title: "Resultados",
+                        rows: properties.slice(0, 10).map((p: { id: string; title: string; priceRent?: string; priceSale?: string; location?: string }) => ({
+                            id: `property_${p.id}`,
+                            title: (p.title || "Propiedad").substring(0, 24),
+                            description: `${p.priceRent || p.priceSale || ""} ${p.location ? `· ${p.location}` : ""}`.substring(0, 72)
+                        }))
+                    }]
+                )
+            }
+            break
+        }
+
         case "send_media": {
             const media = data.media
             if (!media?.file_url) return

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use, useRef } from "react"
+import { useState, useEffect, use, useRef, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getAdvisorData } from "./actions"
 import { getStoredUUID, getStoredString, setStoredUUID } from "@/lib/utils/storage"
@@ -35,6 +35,8 @@ interface PropertyCard {
     priceSale?: string
     priceAdmin?: string
     image_url?: string
+    images?: string[]
+    url?: string
 }
 
 interface AppointmentCard {
@@ -56,6 +58,97 @@ interface MediaAttachment {
     file_type: string
     file_name: string
     category: string
+}
+
+function PropertyCardComponent({ prop, primaryColor }: { prop: PropertyCard; primaryColor: string }) {
+    const [imgIndex, setImgIndex] = useState(0)
+    const allImages = prop.images && prop.images.length > 0 ? prop.images : (prop.image_url ? [prop.image_url] : [])
+    const hasMultiple = allImages.length > 1
+    const isDetailCard = !!prop.images && prop.images.length > 0
+
+    return (
+        <div className={`flex-none ${isDetailCard ? "w-72" : "w-64"} bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden`}>
+            {allImages.length > 0 && (
+                <div className="aspect-video bg-gray-200 relative group">
+                    <Image src={allImages[imgIndex]} alt={prop.title} fill className="object-cover" unoptimized />
+                    {hasMultiple && (
+                        <>
+                            <button
+                                onClick={() => setImgIndex(i => i > 0 ? i - 1 : allImages.length - 1)}
+                                className="absolute left-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            >‹</button>
+                            <button
+                                onClick={() => setImgIndex(i => i < allImages.length - 1 ? i + 1 : 0)}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            >›</button>
+                            <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                                {imgIndex + 1}/{allImages.length}
+                            </span>
+                        </>
+                    )}
+                </div>
+            )}
+            <div className="p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                    {prop.class && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}>
+                            {prop.class}
+                        </span>
+                    )}
+                    {prop.type && (
+                        <span className="text-[10px] text-gray-500 font-medium">{prop.type}</span>
+                    )}
+                </div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">{prop.title}</h4>
+                {prop.location && (
+                    <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-xs">location_on</span>
+                        {prop.location}
+                    </p>
+                )}
+                <div className="flex gap-3 mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    {prop.bedrooms && <span>{prop.bedrooms} hab</span>}
+                    {prop.bathrooms && <span>{prop.bathrooms} baños</span>}
+                    {prop.area && <span>{prop.area}</span>}
+                    {prop.stratum && <span>E{prop.stratum}</span>}
+                </div>
+                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    {prop.priceSale && <p className="text-sm font-bold" style={{ color: primaryColor }}>Venta: {prop.priceSale}</p>}
+                    {prop.priceRent && <p className="text-sm font-bold" style={{ color: primaryColor }}>Arriendo: {prop.priceRent}</p>}
+                    {prop.priceAdmin && <p className="text-[10px] text-gray-400">Admin: {prop.priceAdmin}</p>}
+                </div>
+                {prop.url && (
+                    <div className="mt-2 flex gap-1.5">
+                        <a
+                            href={prop.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 flex items-center justify-center gap-1 text-xs font-medium py-1.5 rounded-lg transition-colors"
+                            style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
+                        >
+                            <span className="material-symbols-outlined text-sm">open_in_new</span>
+                            Ver ficha
+                        </a>
+                        <button
+                            onClick={async () => {
+                                try {
+                                    if (navigator.share) {
+                                        await navigator.share({ title: prop.title, url: prop.url! })
+                                    } else {
+                                        await navigator.clipboard.writeText(prop.url!)
+                                        alert("Link copiado al portapapeles")
+                                    }
+                                } catch { /* user cancelled */ }
+                            }}
+                            className="flex items-center justify-center gap-1 text-xs font-medium py-1.5 px-3 rounded-lg transition-colors bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                        >
+                            <span className="material-symbols-outlined text-sm">share</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
 }
 
 export default function AdvisorChatPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -263,7 +356,9 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                             priceRent: p.prices?.rent,
                             priceSale: p.prices?.sale,
                             priceAdmin: p.prices?.admin,
-                            image_url: p.images?.[0]
+                            image_url: p.images?.[0],
+                            images: Array.isArray(p.images) ? p.images : undefined,
+                            url: p.url
                         }]
                     }
                     if (action.type === "schedule_appointment" && action.data?.appointment) {
@@ -433,43 +528,7 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                                     {msg.properties && msg.properties.length > 0 && (
                                         <div className="flex overflow-x-auto gap-3 pb-2 max-w-[85vw] md:max-w-xl">
                                             {msg.properties.map((prop) => (
-                                                <div key={prop.id} className="flex-none w-64 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
-                                                    {prop.image_url && (
-                                                        <div className="aspect-video bg-gray-200 relative">
-                                                            <Image src={prop.image_url} alt={prop.title} fill className="object-cover" unoptimized />
-                                                        </div>
-                                                    )}
-                                                    <div className="p-3">
-                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                            {prop.class && (
-                                                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}>
-                                                                    {prop.class}
-                                                                </span>
-                                                            )}
-                                                            {prop.type && (
-                                                                <span className="text-[10px] text-gray-500 font-medium">{prop.type}</span>
-                                                            )}
-                                                        </div>
-                                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white line-clamp-1">{prop.title}</h4>
-                                                        {prop.location && (
-                                                            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
-                                                                <span className="material-symbols-outlined text-xs">location_on</span>
-                                                                {prop.location}
-                                                            </p>
-                                                        )}
-                                                        <div className="flex gap-3 mt-2 text-xs text-gray-600 dark:text-gray-400">
-                                                            {prop.bedrooms && <span>{prop.bedrooms} hab</span>}
-                                                            {prop.bathrooms && <span>{prop.bathrooms} baños</span>}
-                                                            {prop.area && <span>{prop.area}</span>}
-                                                            {prop.stratum && <span>E{prop.stratum}</span>}
-                                                        </div>
-                                                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-                                                            {prop.priceSale && <p className="text-sm font-bold" style={{ color: primaryColor }}>Venta: {prop.priceSale}</p>}
-                                                            {prop.priceRent && <p className="text-sm font-bold" style={{ color: primaryColor }}>Arriendo: {prop.priceRent}</p>}
-                                                            {prop.priceAdmin && <p className="text-[10px] text-gray-400">Admin: {prop.priceAdmin}</p>}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                <PropertyCardComponent key={prop.id} prop={prop} primaryColor={primaryColor} />
                                             ))}
                                         </div>
                                     )}
