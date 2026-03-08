@@ -1957,9 +1957,9 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
         .single()
 
     const buildPropertyUrl = (id: string) => org?.custom_domain
-        ? `https://${org.custom_domain}/p/${id}`
+        ? `https://${org.custom_domain}/property/${id}`
         : org?.slug
-            ? `https://${org.slug}.landingchat.co/p/${id}`
+            ? `https://${org.slug}.landingchat.co/property/${id}`
             : null
 
     return {
@@ -2043,9 +2043,9 @@ async function showProperty(supabase: any, input: any, context: ToolContext): Pr
         .eq("id", context.organizationId)
         .single()
     const propertyUrl = org?.custom_domain
-        ? `https://${org.custom_domain}/p/${property.id}`
+        ? `https://${org.custom_domain}/property/${property.id}`
         : org?.slug
-            ? `https://${org.slug}.landingchat.co/p/${property.id}`
+            ? `https://${org.slug}.landingchat.co/property/${property.id}`
             : null
 
     const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
