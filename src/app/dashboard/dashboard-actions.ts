@@ -2,9 +2,22 @@
 
 import { createClient } from "@/lib/supabase/server"
 
+export interface RealEstateStats {
+    activeProperties: number
+    newLeads: number
+    appointmentsScheduled: number
+    appointmentsPending: number
+    appointmentsCompleted: number
+    chatToLeadRate: number
+    chatToAppointmentRate: number
+    leadsByChannel: { name: string; value: number; color: string }[]
+    topZones: { zone: string; count: number }[]
+}
+
 export interface DashboardStats {
     userName: string
     organizationSlug: string
+    industry: string
     revenue: {
         total: number
         growth: number // vs last month
@@ -30,6 +43,7 @@ export interface DashboardStats {
         newCustomers: number
         repeatPurchaseRate: number
     }
+    realEstate?: RealEstateStats
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -172,18 +186,93 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuario"
 
-    // Get Organization Slug for Realtime
+    // Get Organization data
     const { data: org } = await supabase
         .from("organizations")
-        .select("slug")
+        .select("slug, industry, enabled_modules")
         .eq("id", orgId)
         .single()
 
     const organizationSlug = org?.slug || ""
+    const industry = org?.industry || "ecommerce"
+    const enabledModules = org?.enabled_modules || []
+    const isRealEstate = industry === "real_estate" || enabledModules.includes("properties")
+
+    // Real Estate KPIs
+    let realEstateStats: RealEstateStats | undefined
+    if (isRealEstate) {
+        const [propertiesResult, leadsResult, appointmentsResult] = await Promise.all([
+            supabase
+                .from("properties")
+                .select("id, city, neighborhood", { count: "exact", head: false })
+                .eq("organization_id", orgId)
+                .eq("status", "active"),
+            supabase
+                .from("customers")
+                .select("id, channel", { count: "exact", head: false })
+                .eq("organization_id", orgId)
+                .gte("created_at", thirtyDaysAgo),
+            supabase
+                .from("appointments")
+                .select("id, status")
+                .eq("organization_id", orgId)
+                .gte("created_at", thirtyDaysAgo),
+        ])
+
+        const activeProperties = propertiesResult.count || 0
+        const newLeads = leadsResult.count || 0
+        const appointments = appointmentsResult.data || []
+        const appointmentsScheduled = appointments.length
+        const appointmentsPending = appointments.filter(a => a.status === "pending" || a.status === "confirmed").length
+        const appointmentsCompleted = appointments.filter(a => a.status === "completed").length
+
+        // Conversión chat → lead
+        const chatToLeadRate = totalChats > 0 ? (newLeads / totalChats) * 100 : 0
+        // Conversión chat → cita
+        const chatToAppointmentRate = totalChats > 0 ? (appointmentsScheduled / totalChats) * 100 : 0
+
+        // Leads por canal
+        const leads = leadsResult.data || []
+        const leadChannels: Record<string, number> = {}
+        leads.forEach((l: { channel?: string }) => {
+            const ch = l.channel || "web"
+            leadChannels[ch] = (leadChannels[ch] || 0) + 1
+        })
+
+        // Zonas más buscadas (propiedades activas por barrio)
+        const properties = propertiesResult.data || []
+        const zoneCounts: Record<string, number> = {}
+        properties.forEach((p: { neighborhood?: string; city?: string }) => {
+            const zone = p.neighborhood || p.city || "Sin zona"
+            zoneCounts[zone] = (zoneCounts[zone] || 0) + 1
+        })
+        const topZones = Object.entries(zoneCounts)
+            .map(([zone, count]) => ({ zone, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5)
+
+        realEstateStats = {
+            activeProperties,
+            newLeads,
+            appointmentsScheduled,
+            appointmentsPending,
+            appointmentsCompleted,
+            chatToLeadRate: parseFloat(chatToLeadRate.toFixed(1)),
+            chatToAppointmentRate: parseFloat(chatToAppointmentRate.toFixed(1)),
+            leadsByChannel: [
+                { name: "WhatsApp", value: leadChannels["whatsapp"] || 0, color: "#22c55e" },
+                { name: "Web", value: leadChannels["web"] || 0, color: "#3b82f6" },
+                { name: "Instagram", value: leadChannels["instagram"] || 0, color: "#e11d48" },
+            ],
+            topZones,
+        }
+    }
 
         return {
             userName,
             organizationSlug,
+            industry,
+            realEstate: realEstateStats,
             revenue: {
                 total: totalRevenue,
                 growth: 12.5, // Dummy growth for now
@@ -223,6 +312,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         return {
             userName: "Usuario",
             organizationSlug: "",
+            industry: "ecommerce",
             revenue: { total: 0, growth: 0, history: [] },
             orders: { total: 0, growth: 0 },
             chats: { conversionRate: 0, growth: 0, total: 0, byChannel: [] },
