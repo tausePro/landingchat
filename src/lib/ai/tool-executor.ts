@@ -1,4 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
+
+const log = logger("ai/tool-executor")
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import {
     IdentifyCustomerSchema,
@@ -43,7 +46,7 @@ export async function executeTool(
     input: any,
     context: ToolContext
 ): Promise<ToolResult> {
-    console.log(`[Tool] Executing: ${toolName}`, input)
+    log.info(`Executing: ${toolName}`, { input: typeof input === 'object' ? Object.keys(input) : input })
 
     const supabase = createServiceClient()
 
@@ -122,7 +125,7 @@ export async function executeTool(
                 return { success: false, error: `Unknown tool: ${toolName}` }
         }
     } catch (error: any) {
-        console.error(`[Tool] Error in ${toolName}:`, error)
+        log.error(`Error in ${toolName}`, { error: error.message })
         return { success: false, error: error.message }
     }
 }
@@ -176,7 +179,7 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
             // Solo actualizar si el customer no tiene ya este social ID
             if (!existingCustomer[idColumn]) {
                 updateFields[idColumn] = socialPlatformUserId
-                console.log(`[identifyCustomer] Cross-channel merge: linking ${idColumn}=${socialPlatformUserId} to customer ${existingCustomer.id}`)
+                log.info("Cross-channel merge", { idColumn, socialPlatformUserId, customerId: existingCustomer.id })
             }
 
             // Guardar @username de Instagram si está disponible
@@ -223,7 +226,7 @@ async function identifyCustomer(supabase: any, input: any, context: ToolContext)
                     .from("customers")
                     .delete()
                     .eq("id", shellCustomerId)
-                console.log(`[identifyCustomer] Deleted shell customer ${shellCustomerId}, merged into ${existingCustomer.id}`)
+                log.info("Deleted shell customer, merged", { shellCustomerId, mergedInto: existingCustomer.id })
             }
         }
 
@@ -1298,8 +1301,8 @@ async function renderCheckoutSummary(supabase: any, input: any, context: ToolCon
 // ==================== CREACIÓN DE LINK DE PAGO ====================
 
 async function createPaymentLink(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
-    console.log("[createPaymentLink] Starting with input:", input)
-    console.log("[createPaymentLink] Context:", { chatId: context.chatId, organizationId: context.organizationId })
+    const payLog = log.withContext({ chatId: context.chatId, orgId: context.organizationId })
+    payLog.info("createPaymentLink starting")
 
     const { payment_method, customer_message } = CreatePaymentLinkSchema.parse(input)
 
@@ -1311,10 +1314,10 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
         .eq("status", "active")
         .single()
 
-    console.log("[createPaymentLink] Cart query result:", { cart: cart?.id, items: cart?.items?.length, error: cartError })
+    payLog.debug("Cart query result", { cartId: cart?.id, items: cart?.items?.length, error: cartError?.message })
 
     if (!cart || !cart.items?.length) {
-        console.log("[createPaymentLink] ERROR: No cart or empty items")
+        payLog.warn("No cart or empty items")
         return {
             success: false,
             error: "No hay productos en el carrito. Agrega productos antes de proceder al pago."
@@ -1328,13 +1331,12 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
         .eq("id", context.chatId)
         .single()
 
-    console.log("[createPaymentLink] Chat metadata:", chat?.metadata)
-    console.log("[createPaymentLink] Confirmed shipping:", chat?.metadata?.confirmed_shipping)
+    payLog.debug("Chat metadata loaded", { hasShipping: !!chat?.metadata?.confirmed_shipping })
 
     const shippingInfo = chat?.metadata?.confirmed_shipping
 
     if (!shippingInfo) {
-        console.log("[createPaymentLink] ERROR: No confirmed_shipping in metadata")
+        payLog.warn("No confirmed_shipping in metadata")
         return {
             success: false,
             error: "No hay datos de envío confirmados. Usa confirm_shipping_details primero."
@@ -1409,7 +1411,7 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
         .single()
 
     if (orderError) {
-        console.error("[createPaymentLink] Error creating order:", orderError)
+        payLog.error("Error creating order", { error: orderError.message })
         return {
             success: false,
             error: "Error al crear la orden. Por favor intenta de nuevo."
@@ -1530,7 +1532,7 @@ async function checkAvailability(supabase: any, input: any, context: ToolContext
             if (busy) gcalBusy = busy
         }
     } catch (gcalError) {
-        console.warn("[checkAvailability] GCal query failed:", gcalError)
+        log.warn("GCal query failed", { error: gcalError instanceof Error ? gcalError.message : String(gcalError) })
     }
 
     // 3. Combinar todos los slots ocupados
@@ -1627,30 +1629,30 @@ async function checkAvailability(supabase: any, input: any, context: ToolContext
 // ==================== CITAS ====================
 
 async function scheduleAppointment(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
-    console.log("[scheduleAppointment] Raw input:", JSON.stringify(input))
-    console.log("[scheduleAppointment] Context:", { chatId: context.chatId, orgId: context.organizationId, customerId: context.customerId })
+    const apptLog = log.withContext({ chatId: context.chatId, orgId: context.organizationId })
+    apptLog.info("scheduleAppointment starting")
 
     let validated
     try {
         validated = ScheduleAppointmentSchema.parse(input)
     } catch (zodError: any) {
-        console.error("[scheduleAppointment] Zod validation error:", zodError.message)
+        apptLog.warn("Zod validation error", { error: zodError.message })
         return { success: false, error: `Datos incompletos para agendar: ${zodError.message}. Necesito al menos: título, fecha/hora y nombre del cliente.` }
     }
 
-    console.log("[scheduleAppointment] Validated:", validated)
+    apptLog.debug("Validated input", { title: validated.title, date: validated.proposed_date })
 
     // Parsear y validar la fecha propuesta
     const proposedDate = new Date(validated.proposed_date)
     if (isNaN(proposedDate.getTime())) {
-        console.error("[scheduleAppointment] Invalid date:", validated.proposed_date)
+        apptLog.warn("Invalid date", { date: validated.proposed_date })
         return { success: false, error: "Fecha inválida. Usa formato ISO 8601 (ej: 2025-02-20T10:00:00)" }
     }
 
     // Validar que no sea más de 24h en el pasado (permitir citas de hoy)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
     if (proposedDate < yesterday) {
-        console.error("[scheduleAppointment] Date in the past:", proposedDate.toISOString())
+        apptLog.warn("Date in the past", { date: proposedDate.toISOString() })
         return { success: false, error: "No se puede agendar una cita en el pasado. Por favor sugiere una fecha futura." }
     }
 
@@ -1696,7 +1698,7 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
             if (!propertyAddress) {
                 propertyAddress = [property.address, property.neighborhood, property.city].filter(Boolean).join(", ")
             }
-            console.log("[scheduleAppointment] Linked to property:", property.id, property.title)
+            apptLog.debug("Linked to property", { propertyId: property.id, title: property.title })
         }
     }
 
@@ -1707,7 +1709,7 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
         const advisor = await assignAdvisor(context.organizationId, proposedDate, propertyType)
         if (advisor) {
             assignedAdvisor = { id: advisor.id, name: advisor.name, google_calendar_id: advisor.google_calendar_id }
-            console.log("[scheduleAppointment] Assigned to advisor:", advisor.name)
+            apptLog.debug("Assigned to advisor", { advisorName: advisor.name })
         }
     } catch {
         // tabla advisors puede no existir aún
@@ -1748,7 +1750,7 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
         .single()
 
     if (error) {
-        console.error("[scheduleAppointment] Error:", error)
+        apptLog.error("Error creating appointment", { error: error.message })
         return { success: false, error: `Error agendando la cita: ${error.message}` }
     }
 
@@ -1771,11 +1773,11 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
                 .from("appointments")
                 .update({ google_event_id: googleEventId })
                 .eq("id", appointment.id)
-            console.log("[scheduleAppointment] Google Calendar event created:", googleEventId, advisorCalId ? `in ${assignedAdvisor?.name}'s calendar` : "in primary")
+            apptLog.info("Google Calendar event created", { eventId: googleEventId, advisor: assignedAdvisor?.name })
         }
     } catch (gcalError) {
         // No bloquear la cita si GCal falla
-        console.warn("[scheduleAppointment] Google Calendar sync failed (non-blocking):", gcalError)
+        apptLog.warn("Google Calendar sync failed (non-blocking)", { error: gcalError instanceof Error ? gcalError.message : String(gcalError) })
     }
 
     // Notificación WhatsApp al admin (non-blocking)
@@ -1793,7 +1795,7 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
             }
         )
     } catch (notifError) {
-        console.warn("[scheduleAppointment] WhatsApp notification failed (non-blocking):", notifError)
+        apptLog.warn("WhatsApp notification failed (non-blocking)", { error: notifError instanceof Error ? notifError.message : String(notifError) })
     }
 
     // Formatear la respuesta
@@ -1879,8 +1881,7 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
         }
     }
 
-    console.log("[searchProperties] Input:", { query, property_type, city, neighborhood, min_price, max_price, bedrooms, property_class, limit })
-    console.log("[searchProperties] Auto-detected: property_class=", property_class, "property_type=", property_type)
+    log.debug("searchProperties input", { query, property_type, city, neighborhood, min_price, max_price, bedrooms, property_class, limit })
 
     const buildQuery = (applyTextFilter: boolean) => {
         let q = supabase
@@ -1900,7 +1901,7 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
                     `title.ilike.%${kw}%,neighborhood.ilike.%${kw}%,address.ilike.%${kw}%,city.ilike.%${kw}%`
                 ).join(",")
                 q = q.or(orConditions)
-                console.log("[searchProperties] Text filter keywords:", keywords)
+                log.debug("searchProperties text filter", { keywords })
             }
         }
 
@@ -1932,18 +1933,18 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
 
     // Intentar con filtros de texto primero
     let { data: properties, error } = await buildQuery(true).limit(limit)
-    console.log("[searchProperties] Results with text filter:", properties?.length || 0, error ? `Error: ${error.message}` : "")
+    log.debug("searchProperties results", { count: properties?.length || 0, withTextFilter: true, error: error?.message })
 
     // Fallback: si no hay resultados, intentar sin filtro de texto
     if ((!properties || properties.length === 0) && !error) {
         const fallback = await buildQuery(false).limit(limit)
         properties = fallback.data
         error = fallback.error
-        console.log("[searchProperties] Fallback without text filter:", properties?.length || 0)
+        log.debug("searchProperties fallback", { count: properties?.length || 0, withTextFilter: false })
     }
 
     if (error) {
-        console.error("[searchProperties] Error:", error)
+        log.error("searchProperties error", { error: error.message })
         return { success: false, error: error.message }
     }
 
@@ -2110,7 +2111,7 @@ async function sendMedia(supabase: any, input: any, context: ToolContext): Promi
         .single()
 
     if (error || !media) {
-        console.error("[sendMedia] Media not found:", media_id, error)
+        log.warn("sendMedia: media not found", { mediaId: media_id, error: error?.message })
         return { success: false, error: "Archivo no encontrado o no disponible." }
     }
 
@@ -2119,10 +2120,10 @@ async function sendMedia(supabase: any, input: any, context: ToolContext): Promi
         .from("organization_media")
         .update({ usage_count: media.usage_count + 1 || 1 })
         .eq("id", media_id)
-        .then(() => console.log("[sendMedia] Usage count updated"))
-        .catch((e: any) => console.warn("[sendMedia] Failed to update usage count:", e))
+        .then(() => log.debug("sendMedia: usage count updated"))
+        .catch((e: any) => log.warn("sendMedia: failed to update usage count", { error: e?.message }))
 
-    console.log("[sendMedia] Sending media:", media.name, media.file_type, media.file_url)
+    log.info("sendMedia: sending", { name: media.name, type: media.file_type })
 
     // Determinar tipo de UI component según categoría
     const categoryMap: Record<string, string> = {
