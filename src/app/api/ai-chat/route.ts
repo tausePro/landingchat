@@ -4,6 +4,9 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { canCreateResource } from "@/lib/utils/subscription"
 import { z } from "zod"
+import { logger } from "@/lib/logger"
+
+const log = logger("api/ai-chat")
 
 const cartItemSchema = z.object({
     id: z.string(),
@@ -116,7 +119,7 @@ export async function POST(request: NextRequest) {
                 .single()
 
             if (chatError || !newChat) {
-                console.error("Chat creation error:", chatError)
+                log.error("Chat creation error", { error: chatError?.message })
                 return NextResponse.json(
                     { error: "Failed to create chat", details: chatError?.message },
                     { status: 500, headers }
@@ -136,7 +139,7 @@ export async function POST(request: NextRequest) {
                 .single()
 
             if (chatQueryError || !chat) {
-                console.error("Chat query error:", chatQueryError)
+                log.error("Chat query error", { error: chatQueryError?.message })
                 return NextResponse.json(
                     { error: "Chat not found" },
                     { status: 404, headers }
@@ -219,8 +222,7 @@ export async function POST(request: NextRequest) {
         }, { headers })
 
     } catch (error: any) {
-        console.error("Error in chat API:", error)
-        console.error("Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error)))
+        log.error("Error in chat API", { name: error.name, message: error.message })
         return NextResponse.json(
             { error: "Internal server error", details: error.message },
             { status: 500, headers }
