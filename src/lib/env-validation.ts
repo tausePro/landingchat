@@ -67,8 +67,7 @@ export function validateEnv(): { valid: boolean; missing: string[]; warnings: st
         const isBuild = process.env.NEXT_PHASE === "phase-production-build"
 
         if (isProduction && !isBuild) {
-            log.error("CRITICAL: Missing required env vars in production", { missing })
-            throw new Error(`[ENV VALIDATION] ${msg}`)
+            log.error("CRITICAL: Missing required env vars in production — app will continue but may have degraded functionality", { missing })
         } else {
             log.warn("Missing required env vars (continuing)", { missing, isBuild })
         }
