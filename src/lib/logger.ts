@@ -46,15 +46,17 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 }
 
 // En producción solo info+, en dev todo
-const MIN_LEVEL: LogLevel = process.env.NODE_ENV === "production" ? "info" : "debug"
+function getMinLevel(): LogLevel {
+    return process.env.NODE_ENV === "production" ? "info" : "debug"
+}
 
 // Patrones de secretos a redactar
 const REDACT_PATTERNS = [
-    /\b(sk-[a-zA-Z0-9]{20,})\b/g,           // API keys tipo sk-...
-    /\b(key_[a-zA-Z0-9]{20,})\b/g,           // Keys genéricas
-    /\b(whsec_[a-zA-Z0-9]{20,})\b/g,         // Webhook secrets
-    /\b(eyJ[a-zA-Z0-9_-]{50,})\b/g,          // JWTs
-    /\b([a-f0-9]{64})\b/g,                    // Hashes/tokens hex largos
+    /(sk-[a-zA-Z0-9_-]{20,})/g,               // API keys tipo sk-...
+    /(key_[a-zA-Z0-9]{20,})/g,                // Keys genéricas
+    /(whsec_[a-zA-Z0-9]{20,})/g,              // Webhook secrets
+    /(eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+)/g, // JWTs (header.payload.signature)
+    /([a-f0-9]{64})/g,                    // Hashes/tokens hex largos
 ]
 
 function redactSecrets(value: string): string {
@@ -75,7 +77,7 @@ function safeStringify(obj: Record<string, unknown>): string {
 }
 
 function shouldLog(level: LogLevel): boolean {
-    return LOG_LEVELS[level] >= LOG_LEVELS[MIN_LEVEL]
+    return LOG_LEVELS[level] >= LOG_LEVELS[getMinLevel()]
 }
 
 function formatEntry(entry: LogEntry): string {
@@ -109,7 +111,7 @@ function formatEntry(entry: LogEntry): string {
     if (entry.context?.channel) ctxParts.push(`ch:${entry.context.channel}`)
     const ctxStr = ctxParts.length > 0 ? ` {${ctxParts.join(", ")}}` : ""
 
-    const prefix = `[${entry.level.toUpperCase()}] [${entry.source}]${ctxStr}`
+    const prefix = `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.source}]${ctxStr}`
     if (entry.data && Object.keys(entry.data).length > 0) {
         return `${prefix} ${entry.message} ${safeStringify(entry.data)}`
     }

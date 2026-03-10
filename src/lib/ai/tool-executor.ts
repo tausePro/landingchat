@@ -1,7 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
-
-const log = logger("ai/tool-executor")
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import {
     IdentifyCustomerSchema,
@@ -27,6 +25,8 @@ import {
     ShowPropertySchema,
     SendMediaSchema
 } from "./tools"
+
+const log = logger("ai/tool-executor")
 
 interface ToolContext {
     chatId: string
