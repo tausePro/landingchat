@@ -9,6 +9,9 @@ import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppMedia, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
 import { sendSocialMessage, sendSocialImage, sendSocialQuickReplies } from "@/lib/messaging/meta-social-client"
+import { logger } from "@/lib/logger"
+
+const log = logger("messaging/unified")
 
 export type MessageChannel = "web" | "whatsapp" | "instagram" | "messenger"
 
@@ -50,7 +53,7 @@ export async function processIncomingMessage(
 
         // Check 1: IA desactivada manualmente en esta conversación
         if (chat.ai_enabled === false) {
-            console.log("[Unified Messaging] AI disabled for chat:", message.chatId)
+            log.info("AI disabled for chat", { chatId: message.chatId })
             return {
                 success: true,
                 response: undefined,
@@ -107,7 +110,7 @@ export async function processIncomingMessage(
                 if (channelSchedule) {
                     const isOutsideHours = isOutsideSchedule(channelSchedule, schedule.timezone || "America/Bogota")
                     if (isOutsideHours) {
-                        console.log("[Unified Messaging] AI paused by schedule for channel:", message.channel)
+                        log.info("AI paused by schedule", { chatId: message.chatId, channel: message.channel })
                         return {
                             success: true,
                             response: undefined,
@@ -140,7 +143,7 @@ export async function processIncomingMessage(
             response: result.response,
         }
     } catch (error) {
-        console.error("[Unified Messaging] Error processing message:", error)
+        log.error("Error processing message", { chatId: message.chatId, error: error instanceof Error ? error.message : String(error) })
         return {
             success: false,
             error: error instanceof Error ? error.message : "Error desconocido",
@@ -172,7 +175,7 @@ async function sendWhatsAppResponse(
         const phoneNumber = chat?.phone_number || chat?.whatsapp_chat_id
 
         if (!phoneNumber) {
-            console.error("[Unified Messaging] No phone number in chat:", chatId)
+            log.error("No phone number in chat", { chatId })
             return
         }
 
@@ -186,14 +189,14 @@ async function sendWhatsAppResponse(
                     await sendRichWhatsAppAction(organizationId, phoneNumber, action)
                 } catch (richError) {
                     // No fallar si el mensaje rico no se envía
-                    console.error("[Unified Messaging] Error sending rich message:", richError)
+                    log.warn("Error sending rich WhatsApp message", { chatId, error: richError instanceof Error ? richError.message : String(richError) })
                 }
             }
         }
     } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
-        console.error("[Unified Messaging] FAILED to send WhatsApp response:", {
-            organizationId,
+        log.error("FAILED to send WhatsApp response", {
+            orgId: organizationId,
             chatId,
             error: errorMsg,
             responseLength: response?.length,
@@ -395,7 +398,7 @@ async function sendSocialResponse(
         const recipientId = chat?.whatsapp_chat_id || (chat?.metadata as any)?.platform_user_id
 
         if (!recipientId) {
-            console.error(`[Unified Messaging] No recipient ID in ${platform} chat:`, chatId)
+            log.error("No recipient ID in social chat", { chatId, platform })
             return
         }
 
@@ -408,12 +411,12 @@ async function sendSocialResponse(
                 try {
                     await sendRichSocialAction(organizationId, platform, recipientId, action)
                 } catch (richError) {
-                    console.error(`[Unified Messaging] Error sending ${platform} rich message:`, richError)
+                    log.warn("Error sending social rich message", { chatId, platform, error: richError instanceof Error ? richError.message : String(richError) })
                 }
             }
         }
     } catch (error) {
-        console.error(`[Unified Messaging] Error sending ${platform} response:`, error)
+        log.error("Error sending social response", { platform, error: error instanceof Error ? error.message : String(error) })
     }
 }
 
@@ -594,13 +597,13 @@ export async function identifyCustomer(
             .single()
 
         if (error) {
-            console.error("[Unified Messaging] Error creating customer:", error)
+            log.error("Error creating customer", { error: error instanceof Error ? error.message : String(error) })
             return null
         }
 
         return { id: newCustomer.id, isNew: true }
     } catch (error) {
-        console.error("[Unified Messaging] Error identifying customer:", error)
+        log.error("Error identifying customer", { error: error instanceof Error ? error.message : String(error) })
         return null
     }
 }
@@ -642,7 +645,7 @@ export async function sendResponse(
 
         return true
     } catch (error) {
-        console.error("[Unified Messaging] Error sending response:", error)
+        log.error("Error sending response", { error: error instanceof Error ? error.message : String(error) })
         return false
     }
 }
@@ -696,7 +699,7 @@ function isOutsideSchedule(channelSchedule: ChannelSchedule, timezone: string): 
         // Comparar hora actual con rango
         return currentTime < daySchedule.from || currentTime >= daySchedule.to
     } catch (error) {
-        console.error("[isOutsideSchedule] Error checking schedule:", error)
+        log.error("Error checking schedule", { error: error instanceof Error ? error.message : String(error) })
         // En caso de error, no pausar la IA (fail-open)
         return false
     }

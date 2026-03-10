@@ -4,6 +4,7 @@ import { getOrgMode, getToolsForMode, getModePromptAddendum } from "./agent-fact
 import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
+import { logger } from "@/lib/logger"
 
 const AI_MODEL = "claude-haiku-4-5-20251001"
 
@@ -40,7 +41,8 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
     const actions: Array<{ type: string; data: Record<string, unknown> }> = []
 
     try {
-        console.log("[processMessage] Starting with input:", { chatId: input.chatId, agentId: input.agentId, currentProductId: input.currentProductId })
+        const log = logger("ai/chat-agent").withContext({ orgId: input.organizationId, chatId: input.chatId })
+        log.info("Starting processMessage", { agentId: input.agentId, currentProductId: input.currentProductId })
         const supabase = createServiceClient()
 
         // 1. Load agent configuration
@@ -52,8 +54,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
 
         if (!agent) throw new Error("Agent not found")
 
-        // Debug: Log agent configuration to verify custom prompt is loaded
-        console.log("[processMessage] Agent loaded:", {
+        log.debug("Agent loaded", {
             name: agent.name,
             hasSystemPrompt: !!agent.system_prompt,
             hasConfig: !!agent.configuration,
@@ -98,7 +99,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         // 3.1 Load current product context if available
         let currentProduct = null
         if (input.currentProductId) {
-            console.log("[processMessage] Loading current product:", input.currentProductId, "for org:", input.organizationId)
+            log.debug("Loading current product", { productId: input.currentProductId })
             const { data: product, error: productError } = await supabase
                 .from("products")
                 .select("*")
@@ -107,13 +108,13 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
                 .single()
 
             if (productError) {
-                console.error("[processMessage] Error loading current product:", productError)
+                log.warn("Error loading current product", { error: productError.message })
             } else {
-                console.log("[processMessage] Current product loaded:", product?.name, "| Price:", product?.price)
+                log.debug("Current product loaded", { name: product?.name, price: product?.price })
                 currentProduct = product
             }
         } else {
-            console.log("[processMessage] No currentProductId provided")
+            log.debug("No currentProductId provided")
         }
 
         // 4. Load conversation history
@@ -161,7 +162,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 7. Build system prompt (optimized: only pass product count, not all products)
-        console.log("[processMessage] Building system prompt with currentProduct:", currentProduct?.name || "NONE")
+        log.debug("Building system prompt", { currentProduct: currentProduct?.name || "NONE" })
         let systemPrompt = buildSystemPromptOptimized(
             agent,
             organization?.name || "la tienda",
@@ -192,10 +193,10 @@ ${docsText}
 
 IMPORTANTE: Si la respuesta está en estos documentos, cita la información. Si no está, di que no tienes esa información específica.`
 
-                console.log(`[processMessage] Injected ${agentDocs.length} knowledge docs (${docsText.length} chars)`)
+                log.debug("Injected knowledge docs", { count: agentDocs.length, chars: docsText.length })
             }
         } catch (docsError) {
-            console.warn("[processMessage] Error loading agent documents:", docsError)
+            log.warn("Error loading agent documents", { error: docsError instanceof Error ? docsError.message : String(docsError) })
         }
 
         // 7.6. Inyectar archivos media disponibles (para tool send_media)
@@ -218,10 +219,10 @@ ${mediaList}
 
 INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción. No los envíes todos de golpe, solo cuando el contexto de la conversación lo amerite.`
 
-                console.log(`[processMessage] Injected ${orgMedia.length} media files into prompt`)
+                log.debug("Injected media files into prompt", { count: orgMedia.length })
             }
         } catch (mediaError) {
-            console.warn("[processMessage] Error loading org media:", mediaError)
+            log.warn("Error loading org media", { error: mediaError instanceof Error ? mediaError.message : String(mediaError) })
         }
 
         // Determinar modo de la org via factory (prioridad: features → industry → conteo)
@@ -232,7 +233,7 @@ INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción
             propertyCount: propertyCount || 0,
         })
         const agentSkillsConfig = agent.configuration?.skills || null
-        console.log(`[processMessage] Org mode: ${orgMode} (industry: ${organization?.industry}, features: ${JSON.stringify(planFeatures)}, products: ${productCount}, properties: ${propertyCount})`)
+        log.info("Org mode resolved", { mode: orgMode, industry: organization?.industry, products: productCount, properties: propertyCount })
         systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig)
 
         // Add channel-specific instructions
@@ -351,7 +352,7 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
         // 9. Main Loop
         while (loopCount < MAX_LOOPS) {
             loopCount++
-            console.log(`[processMessage] Loop ${loopCount}, calling Claude...`)
+            log.debug(`Loop ${loopCount}, calling Claude`)
 
             const response = await createMessage({
                 model: AI_MODEL,
@@ -387,7 +388,7 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             for (const toolBlock of toolUseBlocks) {
                 const toolUse = toolBlock as Anthropic.ToolUseBlock
                 toolsUsed.push(toolUse.name)
-                console.log(`[processMessage] Executing tool: ${toolUse.name}`)
+                log.info("Executing tool", { tool: toolUse.name })
 
                 const toolResult = await executeTool(
                     toolUse.name,
@@ -464,12 +465,8 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
 
     } catch (error) {
         const err = error as Error
-        console.error("[processMessage] ========== ERROR DETAILS ==========")
-        console.error("[processMessage] Error name:", err.name)
-        console.error("[processMessage] Error message:", err.message)
-        console.error("[processMessage] Error stack:", err.stack)
-        console.error("[processMessage] Full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2))
-        console.error("[processMessage] =====================================")
+        const log = logger("ai/chat-agent").withContext({ orgId: input.organizationId, chatId: input.chatId })
+        log.error("processMessage failed", { name: err.name, message: err.message, stack: err.stack?.split("\n").slice(0, 3).join(" | ") })
 
         return {
             response: "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",

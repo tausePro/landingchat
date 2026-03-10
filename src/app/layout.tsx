@@ -4,6 +4,10 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PosthogInit } from "@/components/analytics/posthog-init";
 import { Toaster } from "sonner";
+import { validateEnv } from "@/lib/env-validation";
+
+// Validar variables de entorno al boot (fail-fast en producción)
+validateEnv();
 
 const manrope = Manrope({
   subsets: ["latin"],
