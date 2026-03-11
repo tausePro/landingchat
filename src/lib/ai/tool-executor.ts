@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
+import { searchProperties as repoSearchProperties, findProperty, getOrgUrlInfo, buildPropertyUrl } from "@/lib/repositories/properties"
 import {
     IdentifyCustomerSchema,
     SearchProductsSchema,
@@ -1848,10 +1849,8 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
     const validated = SearchPropertiesSchema.parse(input)
     let { query, property_type, city, neighborhood, min_price, max_price, bedrooms, property_class, limit = 5 } = validated
 
-    // Auto-extraer filtros estructurados del query libre
+    // Auto-extraer filtros estructurados del query libre (lógica de negocio del tool)
     const queryLower = (query || "").toLowerCase()
-    const stopwords = ["busco", "quiero", "necesito", "en", "de", "un", "una", "el", "la", "los", "las", "con", "para", "por", "que", "me", "mi", "al", "del", "y", "o", "a", "su"]
-
     const classMap: Record<string, string> = {
         "apartamento": "Apartamento", "apto": "Apartamento", "aptos": "Apartamento",
         "casa": "Casa", "casas": "Casa",
@@ -1862,111 +1861,32 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
         "finca": "Finca", "fincas": "Finca"
     }
 
-    // Detectar clase de propiedad del query si no viene como param
     if (!property_class) {
         for (const [keyword, cls] of Object.entries(classMap)) {
-            if (queryLower.includes(keyword)) {
-                property_class = cls
-                break
-            }
+            if (queryLower.includes(keyword)) { property_class = cls; break }
         }
     }
-
-    // Detectar tipo (arriendo/venta) del query si no viene como param
     if (!property_type) {
-        if (queryLower.includes("arriendo") || queryLower.includes("arrendar") || queryLower.includes("alquiler")) {
-            property_type = "arriendo"
-        } else if (queryLower.includes("venta") || queryLower.includes("comprar") || queryLower.includes("compra")) {
-            property_type = "venta"
-        }
+        if (queryLower.includes("arriendo") || queryLower.includes("arrendar") || queryLower.includes("alquiler")) property_type = "arriendo"
+        else if (queryLower.includes("venta") || queryLower.includes("comprar") || queryLower.includes("compra")) property_type = "venta"
     }
 
-    log.debug("searchProperties input", { query, property_type, city, neighborhood, min_price, max_price, bedrooms, property_class, limit })
+    // Delegar query al repositorio
+    const { data: properties, error } = await repoSearchProperties(supabase, context.organizationId, {
+        query, propertyType: property_type, city, neighborhood,
+        minPrice: min_price, maxPrice: max_price, bedrooms, propertyClass: property_class, limit
+    })
 
-    const buildQuery = (applyTextFilter: boolean) => {
-        let q = supabase
-            .from("properties")
-            .select("id, title, property_type, property_class, city, neighborhood, address, bedrooms, bathrooms, area_m2, price_sale, price_rent, price_admin, images, stratum, status, external_code")
-            .eq("organization_id", context.organizationId)
-            .eq("status", "active")
+    if (error) return { success: false, error }
 
-        // Filtro por texto libre: dividir en palabras clave relevantes
-        if (applyTextFilter && query) {
-            const keywords = query.toLowerCase().split(/\s+/)
-                .filter(w => w.length > 2 && !stopwords.includes(w))
-                .filter(w => !classMap[w] && !["arriendo", "arrendar", "venta", "comprar", "alquiler", "compra"].includes(w))
-
-            if (keywords.length > 0) {
-                const orConditions = keywords.map(kw =>
-                    `title.ilike.%${kw}%,neighborhood.ilike.%${kw}%,address.ilike.%${kw}%,city.ilike.%${kw}%`
-                ).join(",")
-                q = q.or(orConditions)
-                log.debug("searchProperties text filter", { keywords })
-            }
-        }
-
-        // Filtro por tipo (arriendo/venta) — usa campos de precio, no property_type column
-        if (property_type) {
-            if (property_type.toLowerCase().includes("arriendo")) {
-                q = q.not("price_rent", "is", null).gt("price_rent", 0)
-            } else if (property_type.toLowerCase().includes("venta")) {
-                q = q.not("price_sale", "is", null).gt("price_sale", 0)
-            }
-        }
-
-        if (city) q = q.ilike("city", `%${city}%`)
-        if (neighborhood) q = q.ilike("neighborhood", `%${neighborhood}%`)
-        if (bedrooms) q = q.gte("bedrooms", bedrooms)
-        if (property_class) q = q.ilike("property_class", `%${property_class}%`)
-
-        if (max_price) {
-            if (property_type?.toLowerCase().includes("arriendo")) q = q.lte("price_rent", max_price)
-            else if (property_type?.toLowerCase().includes("venta")) q = q.lte("price_sale", max_price)
-        }
-        if (min_price) {
-            if (property_type?.toLowerCase().includes("arriendo")) q = q.gte("price_rent", min_price)
-            else if (property_type?.toLowerCase().includes("venta")) q = q.gte("price_sale", min_price)
-        }
-
-        return q
-    }
-
-    // Intentar con filtros de texto primero
-    let { data: properties, error } = await buildQuery(true).limit(limit)
-    log.debug("searchProperties results", { count: properties?.length || 0, withTextFilter: true, error: error?.message })
-
-    // Fallback: si no hay resultados, intentar sin filtro de texto
-    if ((!properties || properties.length === 0) && !error) {
-        const fallback = await buildQuery(false).limit(limit)
-        properties = fallback.data
-        error = fallback.error
-        log.debug("searchProperties fallback", { count: properties?.length || 0, withTextFilter: false })
-    }
-
-    if (error) {
-        log.error("searchProperties error", { error: error.message })
-        return { success: false, error: error.message }
-    }
-
+    // Formateo de respuesta (lógica de presentación del tool)
     const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
-
-    // Obtener slug de la organización para construir URLs
-    const { data: org } = await supabase
-        .from("organizations")
-        .select("slug, custom_domain")
-        .eq("id", context.organizationId)
-        .single()
-
-    const buildPropertyUrl = (id: string) => org?.custom_domain
-        ? `https://${org.custom_domain}/property/${id}`
-        : org?.slug
-            ? `https://${org.slug}.landingchat.co/property/${id}`
-            : null
+    const { slug: orgSlug, customDomain } = await getOrgUrlInfo(supabase, context.organizationId)
 
     return {
         success: true,
         data: {
-            properties: (properties || []).map((p: any) => ({
+            properties: properties.map((p: any) => ({
                 id: p.id,
                 title: p.title,
                 external_code: p.external_code || null,
@@ -1982,9 +1902,9 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
                 priceSale: p.price_sale ? formatPrice(p.price_sale) : null,
                 priceAdmin: p.price_admin ? formatPrice(p.price_admin) : null,
                 image_url: p.images?.[0]?.url || null,
-                url: buildPropertyUrl(p.id)
+                url: buildPropertyUrl(p.id, orgSlug, customDomain)
             })),
-            totalFound: properties?.length || 0,
+            totalFound: properties.length,
             tip: "Usa show_property con el ID para mostrar la ficha completa al cliente. Comparte la URL de la propiedad para que el cliente pueda verla."
         }
     }
@@ -1993,65 +1913,18 @@ async function searchProperties(supabase: any, input: any, context: ToolContext)
 async function showProperty(supabase: any, input: any, context: ToolContext): Promise<ToolResult> {
     const { property_id } = ShowPropertySchema.parse(input)
 
-    // Intentar buscar por UUID primero, luego por external_code/external_id, luego por título
-    let property = null
-
-    // 1. Buscar por UUID
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(property_id)
-    if (isUUID) {
-        const { data: byId } = await supabase
-            .from("properties")
-            .select("*")
-            .eq("id", property_id)
-            .eq("organization_id", context.organizationId)
-            .single()
-        if (byId) property = byId
-    }
-
-    // 2. Buscar por external_code o external_id
+    // Delegar búsqueda al repositorio (UUID, external_code, título)
+    const { data: property, error } = await findProperty(supabase, context.organizationId, property_id)
     if (!property) {
-        const { data: byCode } = await supabase
-            .from("properties")
-            .select("*")
-            .eq("organization_id", context.organizationId)
-            .or(`external_code.eq.${property_id},external_id.eq.${property_id}`)
-            .limit(1)
-            .single()
-        if (byCode) property = byCode
+        return { success: false, error: error || `Propiedad "${property_id}" no encontrada. Usa el ID exacto de los resultados de búsqueda.` }
     }
 
-    // 3. Fallback: buscar por título (el AI a veces pasa el nombre en vez del ID)
-    if (!property) {
-        const { data: byTitle } = await supabase
-            .from("properties")
-            .select("*")
-            .eq("organization_id", context.organizationId)
-            .ilike("title", `%${property_id}%`)
-            .eq("status", "active")
-            .limit(1)
-            .single()
-        if (byTitle) property = byTitle
-    }
-
-    if (!property) {
-        return { success: false, error: `Propiedad "${property_id}" no encontrada. Usa el ID exacto de los resultados de búsqueda.` }
-    }
-
-    // Obtener slug de la organización para construir URL
-    const { data: org } = await supabase
-        .from("organizations")
-        .select("slug, custom_domain")
-        .eq("id", context.organizationId)
-        .single()
-    const propertyUrl = org?.custom_domain
-        ? `https://${org.custom_domain}/property/${property.id}`
-        : org?.slug
-            ? `https://${org.slug}.landingchat.co/property/${property.id}`
-            : null
+    // Construir URL
+    const { slug: orgSlug, customDomain } = await getOrgUrlInfo(supabase, context.organizationId)
+    const propertyUrl = buildPropertyUrl(property.id, orgSlug, customDomain)
 
     const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
 
-    // Extraer características relevantes
     const features = (property.features || [])
         .filter((f: any) => f.value && f.value !== "0" && f.value !== "No")
         .map((f: any) => `${f.description}: ${f.valueText || f.value}`)
