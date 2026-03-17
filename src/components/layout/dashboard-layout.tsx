@@ -31,6 +31,7 @@ import {
     Tag,
     ImageIcon,
     UserCog,
+    Store,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -66,6 +67,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
     payments: CreditCard,
     // Media
     media: ImageIcon,
+    storefront: Store,
 }
 
 interface NavItem {
@@ -75,10 +77,19 @@ interface NavItem {
     icon: LucideIcon
 }
 
+type NavSectionKey = "principal" | "store" | "distribution" | "footer"
+
+interface NavSection {
+    key: Exclude<NavSectionKey, "footer">
+    label: string
+    items: NavItem[]
+}
+
 // Items base que siempre aparecen
 const BASE_NAV_ITEMS: NavItem[] = [
     { slug: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { slug: "analytics", label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+    { slug: "storefront", label: "Storefront", href: "/dashboard/storefront", icon: Store },
 ]
 
 // Mapeo de módulos a items de navegación
@@ -107,6 +118,34 @@ const FOOTER_NAV_ITEMS: NavItem[] = [
     { slug: "integrations", label: "Integraciones", href: "/dashboard/integrations", icon: Puzzle },
     { slug: "subscription", label: "Suscripción", href: "/dashboard/subscription", icon: CreditCard },
 ]
+
+const NAV_SECTION_ORDER: Exclude<NavSectionKey, "footer">[] = ["principal", "store", "distribution"]
+
+const NAV_SECTION_LABELS: Record<Exclude<NavSectionKey, "footer">, string> = {
+    principal: "PRINCIPAL",
+    store: "TIENDA",
+    distribution: "DISTRIBUCIÓN",
+}
+
+function getNavSectionKey(item: NavItem): NavSectionKey {
+    if (FOOTER_NAV_ITEMS.some((footerItem) => footerItem.slug === item.slug)) {
+        return "footer"
+    }
+
+    if (["dashboard", "analytics", "conversations", "chats", "agent", "agents", "leads", "appointments", "advisors"].includes(item.slug)) {
+        return "principal"
+    }
+
+    if (["storefront", "products", "categories", "media", "orders", "customers", "properties", "documents"].includes(item.slug)) {
+        return "store"
+    }
+
+    if (["marketing", "shipping", "coupons"].includes(item.slug)) {
+        return "distribution"
+    }
+
+    return "principal"
+}
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
     const pathname = usePathname()
@@ -206,6 +245,54 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         return items
     }, [enabledModules])
 
+    const { navSections, footerItems } = React.useMemo(() => {
+        const sections: Record<Exclude<NavSectionKey, "footer">, NavItem[]> = {
+            principal: [],
+            store: [],
+            distribution: [],
+        }
+        const footerItems: NavItem[] = []
+
+        for (const item of navItems) {
+            const sectionKey = getNavSectionKey(item)
+
+            if (sectionKey === "footer") {
+                footerItems.push(item)
+                continue
+            }
+
+            sections[sectionKey].push(item)
+        }
+
+        const navSections: NavSection[] = NAV_SECTION_ORDER
+            .map((key) => ({ key, label: NAV_SECTION_LABELS[key], items: sections[key] }))
+            .filter((section) => section.items.length > 0)
+
+        return { navSections, footerItems }
+    }, [navItems])
+
+    const renderNavItem = (item: NavItem) => {
+        const Icon = item.icon
+        const isActive = pathname === item.href ||
+            (item.href !== "/dashboard" && pathname.startsWith(item.href))
+
+        return (
+            <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                    "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all",
+                    isActive
+                        ? "bg-primary/10 text-primary font-medium shadow-sm"
+                        : "text-text-light-secondary dark:text-text-dark-secondary hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary"
+                )}
+            >
+                <Icon className="size-5" />
+                <p className="text-sm">{item.label}</p>
+            </Link>
+        )
+    }
+
     return (
         <div className="relative flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark">
             {/* Sidebar */}
@@ -220,28 +307,24 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
 
                 <div className="flex h-full flex-col justify-between mt-8">
-                    <nav className="flex flex-col gap-1">
-                        {navItems.map((item) => {
-                            const Icon = item.icon
-                            const isActive = pathname === item.href ||
-                                (item.href !== "/dashboard" && pathname.startsWith(item.href))
-
-                            return (
-                                <Link
-                                    key={item.href}
-                                    href={item.href}
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all",
-                                        isActive
-                                            ? "bg-primary/10 text-primary font-medium shadow-sm"
-                                            : "text-text-light-secondary dark:text-text-dark-secondary hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary"
-                                    )}
-                                >
-                                    <Icon className="size-5" />
-                                    <p className="text-sm">{item.label}</p>
-                                </Link>
-                            )
-                        })}
+                    <nav className="flex flex-col gap-6">
+                        {navSections.map((section) => (
+                            <div key={section.key} className="space-y-2">
+                                <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-light-secondary/80 dark:text-text-dark-secondary/80">
+                                    {section.label}
+                                </p>
+                                <div className="flex flex-col gap-1">
+                                    {section.items.map((item) => renderNavItem(item))}
+                                </div>
+                            </div>
+                        ))}
+                        {footerItems.length > 0 && (
+                            <div className="space-y-2 border-t border-border-light pt-4 dark:border-border-dark">
+                                <div className="flex flex-col gap-1">
+                                    {footerItems.map((item) => renderNavItem(item))}
+                                </div>
+                            </div>
+                        )}
                     </nav>
 
                     <div className="flex flex-col gap-4">
