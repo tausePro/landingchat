@@ -39,6 +39,7 @@ export function MinimalTemplate({
     useEffect(() => {
         // Initial load
         setDisplayProducts(products.slice(0, ITEMS_PER_PAGE))
+        setPage(1)
     }, [products])
 
     useEffect(() => {
@@ -110,24 +111,45 @@ export function MinimalTemplate({
             <section id="products" className="py-20 bg-gray-50">
                 <div className="container mx-auto px-4">
                     <h2 className="text-3xl font-bold text-center mb-12">Nuestros Productos</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8 max-w-7xl mx-auto">
-                        {displayProducts.map((product) => {
-                            const productUrl = getStoreLink(`/producto/${product.slug || product.id}`, isSubdomain, organization.slug)
-                            return (
-                                <ProductCard
-                                    key={product.id}
-                                    product={product}
-                                    productUrl={productUrl}
-                                    badges={badges}
-                                    primaryColor={primaryColor}
-                                />
-                            )
-                        })}
-                    </div>
-                    {/* Infinite Scroll Trigger */}
-                    {displayProducts.length < products.length && (
-                        <div ref={observerTarget} className="mt-12 flex justify-center">
-                            <div className="w-8 h-8 border-4 border-gray-200 border-t-primary rounded-full animate-spin"></div>
+                    {displayProducts.length > 0 ? (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8 max-w-7xl mx-auto">
+                                {displayProducts.map((product) => {
+                                    const productUrl = getStoreLink(`/producto/${product.slug || product.id}`, isSubdomain, organization.slug)
+                                    return (
+                                        <ProductCard
+                                            key={product.id}
+                                            product={product}
+                                            productUrl={productUrl}
+                                            badges={badges}
+                                            primaryColor={primaryColor}
+                                        />
+                                    )
+                                })}
+                            </div>
+                            {/* Infinite Scroll Trigger */}
+                            {displayProducts.length < products.length && (
+                                <div ref={observerTarget} className="mt-12 flex justify-center">
+                                    <div className="w-8 h-8 border-4 border-gray-200 border-t-primary rounded-full animate-spin"></div>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="max-w-2xl mx-auto rounded-3xl border border-dashed border-gray-300 bg-white px-8 py-14 text-center shadow-sm">
+                            <h3 className="text-2xl font-bold text-gray-900">Estamos preparando el catálogo</h3>
+                            <p className="mt-3 text-base text-gray-600">
+                                Aún no hay productos publicados en esta tienda.
+                            </p>
+                            {showChatButton && (
+                                <Button
+                                    onClick={() => onStartChat()}
+                                    size="lg"
+                                    style={{ backgroundColor: primaryColor }}
+                                    className="mt-6 text-lg px-10 h-14 shadow-xl hover:scale-105 transition-transform"
+                                >
+                                    {chatButtonText}
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>
