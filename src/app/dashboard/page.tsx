@@ -463,34 +463,36 @@ export default async function DashboardPage() {
 
                 {/* Tu Sitio */}
                 {!isRealEstate && (
-                    <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80">
-                        <CardHeader className="flex flex-col gap-3 pb-0 sm:flex-row sm:items-center sm:justify-between">
-                            <CardTitle className="text-base font-semibold">Tu Sitio</CardTitle>
-                            <Link href="/dashboard/settings" className="inline-flex items-center gap-1 text-sm font-medium text-text-light-secondary transition-colors hover:text-primary dark:text-text-dark-secondary">
-                                Gestionar
-                                <span className="material-symbols-outlined text-sm">chevron_right</span>
-                            </Link>
-                        </CardHeader>
-                        <CardContent className="pt-5">
-                            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                                        <span className="material-symbols-outlined text-primary">storefront</span>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-semibold text-text-light-primary dark:text-text-dark-primary">
-                                                {stats.siteStatus.name}
-                                            </p>
-                                            {stats.siteStatus.isLive && (
-                                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                                                    Live
-                                                </span>
-                                            )}
+                    <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+                        <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80">
+                            <CardHeader className="flex flex-col gap-3 pb-0 sm:flex-row sm:items-center sm:justify-between">
+                                <CardTitle className="text-base font-semibold">Tu Sitio</CardTitle>
+                                <Link href="/dashboard/storefront" className="inline-flex items-center gap-1 text-sm font-medium text-text-light-secondary transition-colors hover:text-primary dark:text-text-dark-secondary">
+                                    Gestionar
+                                    <span className="material-symbols-outlined text-sm">chevron_right</span>
+                                </Link>
+                            </CardHeader>
+                            <CardContent className="pt-5">
+                                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                                            <span className="material-symbols-outlined text-primary">storefront</span>
                                         </div>
-                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                                            {displaySiteUrl}
-                                        </p>
+                                        <div className="space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-semibold text-text-light-primary dark:text-text-dark-primary">
+                                                    {stats.siteStatus.name}
+                                                </p>
+                                                {stats.siteStatus.isLive && (
+                                                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                        Live
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                                                {displaySiteUrl}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -512,9 +514,9 @@ export default async function DashboardPage() {
                                         </p>
                                     </div>
                                 </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    </div>
                 )}
 
                 {!isRealEstate && (
