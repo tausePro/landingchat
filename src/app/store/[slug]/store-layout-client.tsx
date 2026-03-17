@@ -19,6 +19,7 @@ import { useTrackingParams } from "@/hooks/use-tracking-params"
 import { ConversationalLayout } from "@/components/store/layouts/conversational-layout"
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
+import { getSafeStorefrontTemplate, isRealEstateIndustry } from "@/lib/storefront-templates"
 
 // ... (in render)
 
@@ -46,14 +47,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const [showGateModal, setShowGateModal] = useState(false)
 
     // --- DUMMY DATA FOR TESTING UI (If no products found) ---
-    const dummyProducts = products.length > 0 ? products : [
-        { id: "d1", name: "Sérum Hidratante", price: 85000, image_url: "https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&q=80&w=200", slug: "serum-hidratante" },
-        { id: "d2", name: "Crema Facial", price: 65000, image_url: "https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?auto=format&fit=crop&q=80&w=200", slug: "crema-facial" },
-        { id: "d3", name: "Tónico Revitalizante", price: 45000, image_url: "https://images.unsplash.com/photo-1608248597279-f99d160bfbc8?auto=format&fit=crop&q=80&w=200", slug: "tonico-revitalizante" },
-        { id: "d4", name: "Mascarilla Arcilla", price: 55000, image_url: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&q=80&w=200", slug: "mascarilla-arcilla" },
-        { id: "d5", name: "Aceite Esencial", price: 35000, image_url: "https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?auto=format&fit=crop&q=80&w=200", slug: "aceite-esencial" }
-    ]
-    const productsToUse = dummyProducts
+    const productsToUse = products
     // --------------------------------------------------------
 
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
@@ -76,16 +70,14 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
 
     // Detectar vertical de la org
-    const isRealEstate = organization.settings?.industry === 'real_estate' ||
-        organization.storefront_template === 'real-estate' ||
-        organization.settings?.storefront?.template === 'real-estate'
+    const isRealEstate = isRealEstateIndustry(organization)
 
     // Storefront customization settings
     const storefrontSettings = organization.settings?.storefront || {}
     const heroSettings = storefrontSettings.hero || {}
     const typographySettings = storefrontSettings.typography || {}
     const headerSettings = storefrontSettings.header || {}
-    const selectedTemplate = storefrontSettings.template || "minimal"
+    const selectedTemplate = getSafeStorefrontTemplate(storefrontSettings.template, organization)
     const showStoreName = headerSettings.showStoreName ?? true
 
     // Defaults de menú según vertical (el admin puede personalizar)
@@ -228,7 +220,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     <TemplateRenderer
                         template={selectedTemplate}
                         organization={organization}
-                        products={products}
+                        products={productsToUse}
                         properties={properties}
                         badges={badges}
                         pages={pages}
@@ -318,7 +310,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                 }
                 productTray={
                     <ProductStoryTray
-                        products={products}
+                        products={productsToUse}
                         primaryColor={primaryColor}
                         onProductSelect={(prod) => handleStartChat(prod.id, `Me interesa el producto ${prod.name}`)}
                     />

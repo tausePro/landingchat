@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { isRealEstateIndustry } from "@/lib/storefront-templates"
 
 export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
@@ -8,7 +9,7 @@ export async function getStoreData(slug: string, limit?: number) {
     // 1. Fetch Organization by Slug
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, settings, tracking_config, custom_domain")
+        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, industry, settings, tracking_config, custom_domain")
         .eq("slug", slug)
         .single()
 
@@ -58,7 +59,7 @@ export async function getStoreData(slug: string, limit?: number) {
 
     // 5. Fetch Properties for real estate organizations
     let properties: any[] = []
-    const isRealEstate = org.settings?.industry === 'real_estate' || 
+    const isRealEstate = isRealEstateIndustry(org) || 
         org.storefront_template === 'real-estate' ||
         org.settings?.storefront?.template === 'real-estate'
     
@@ -125,7 +126,7 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     // 1. Fetch Organization
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, storefront_config, storefront_template, settings, tracking_config, custom_domain, logo_url")
+        .select("id, name, slug, industry, storefront_config, storefront_template, settings, tracking_config, custom_domain, logo_url")
         .eq("slug", slug)
         .single()
 

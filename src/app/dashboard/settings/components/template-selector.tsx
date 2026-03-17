@@ -5,57 +5,22 @@ import { Button } from "@/components/ui/button"
 import { updateOrganization } from "../actions"
 import { useRouter } from "next/navigation"
 import { Check } from "lucide-react"
+import { getAllowedStorefrontTemplates, getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 
 interface TemplateSelectorProps {
     organization: {
         id: string
         name: string
         slug: string
+        industry?: string | null
         settings: any
     }
 }
 
-const TEMPLATES = [
-    {
-        id: "minimal",
-        name: "Minimal",
-        description: "Diseño limpio y simple enfocado en productos",
-        preview: "/templates/minimal-preview.png",
-        features: ["Hero destacado", "Productos featured", "Footer simple"]
-    },
-    {
-        id: "complete",
-        name: "Completo",
-        description: "Storefront completo con todas las secciones",
-        preview: "/templates/complete-preview.png",
-        features: ["Hero", "Cómo funciona", "Características", "Productos", "Testimonios", "Footer"]
-    },
-    {
-        id: "single-product",
-        name: "Producto Único",
-        description: "Perfecto para destacar un solo producto o servicio",
-        preview: "/templates/single-product-preview.png",
-        features: ["Hero centrado", "Producto destacado", "Detalles ampliados"]
-    },
-    {
-        id: "services",
-        name: "Servicios",
-        description: "Optimizado para negocios basados en servicios",
-        preview: "/templates/services-preview.png",
-        features: ["Hero", "Lista de servicios", "Testimonios", "Contacto"]
-    },
-    {
-        id: "real-estate",
-        name: "Inmobiliaria",
-        description: "Diseñado para mostrar propiedades con filtros y búsqueda",
-        preview: "/templates/real-estate-preview.png",
-        features: ["Buscador", "Filtros por tipo/ciudad/precio", "Galería", "Detalle de propiedad"]
-    }
-]
-
 export function TemplateSelector({ organization }: TemplateSelectorProps) {
     const router = useRouter()
-    const currentTemplate = organization.settings?.storefront?.template || "minimal"
+    const currentTemplate = getSafeStorefrontTemplate(organization.settings?.storefront?.template, organization)
+    const availableTemplates = getAllowedStorefrontTemplates(organization)
     const [selectedTemplate, setSelectedTemplate] = useState(currentTemplate)
     const [isSaving, setIsSaving] = useState(false)
 
@@ -97,7 +62,7 @@ export function TemplateSelector({ organization }: TemplateSelectorProps) {
                 </div>
                 <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {TEMPLATES.map((template) => (
+                        {availableTemplates.map((template) => (
                             <div
                                 key={template.id}
                                 onClick={() => setSelectedTemplate(template.id)}

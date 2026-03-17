@@ -14,14 +14,39 @@ export interface RealEstateStats {
     topZones: { zone: string; count: number }[]
 }
 
+export interface RecentActivity {
+    type: 'sale' | 'conversation' | 'stock_alert' | 'payment' | 'escalation'
+    title: string
+    description: string
+    amount?: number
+    timeAgo: string
+}
+
+export interface SiteStatus {
+    name: string
+    url: string
+    isLive: boolean
+    revenue: number
+    visits: number
+}
+
+export interface AgentStatus {
+    name: string
+    isActive: boolean
+    resolutionRate: number
+}
+
 export interface DashboardStats {
     userName: string
     organizationSlug: string
+    organizationName: string
     industry: string
     revenue: {
         total: number
+        today: number
         growth: number // vs last month
         history: { date: string; value: number }[]
+        weeklyHistory: { day: string; value: number }[]
     }
     orders: {
         total: number
@@ -43,6 +68,9 @@ export interface DashboardStats {
         newCustomers: number
         repeatPurchaseRate: number
     }
+    recentActivity: RecentActivity[]
+    siteStatus: SiteStatus
+    agentStatus: AgentStatus
     realEstate?: RealEstateStats
 }
 
@@ -84,7 +112,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Ideally we should aggregate in SQL but for MVP we fetch and process
     const { data: orders } = await supabase
         .from("orders")
-        .select("total, created_at, status, customer_id")
+        .select("id, order_number, total, created_at, status, customer_id")
         .eq("organization_id", orgId)
         .in("status", ["pending", "confirmed", "processing", "shipped", "delivered", "completed"])
         .order("created_at", { ascending: true })
@@ -156,7 +184,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Calculate real response time from recent messages
     const { data: recentMessages } = await supabase
         .from("messages")
-        .select("metadata")
+        .select("metadata, sender_type")
         .eq("sender_type", "bot")
         .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()) // Last 24h
         .not("metadata", "is", null)
@@ -189,14 +217,97 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Get Organization data
     const { data: org } = await supabase
         .from("organizations")
-        .select("slug, industry, enabled_modules")
+        .select("slug, name, industry, enabled_modules, custom_domain")
         .eq("id", orgId)
         .single()
 
     const organizationSlug = org?.slug || ""
+    const organizationName = org?.name || "Mi Tienda"
     const industry = org?.industry || "ecommerce"
     const enabledModules = org?.enabled_modules || []
     const isRealEstate = industry === "real_estate" || enabledModules.includes("properties")
+
+    // Revenue Today
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const revenueToday = validOrders
+        .filter(o => o.created_at >= todayStart.toISOString())
+        .reduce((sum, o) => sum + (o.total || 0), 0)
+
+    // Weekly Revenue History (L M X J V S D)
+    const dayLabels = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
+    const weeklyHistory: { day: string; value: number }[] = []
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date()
+        d.setDate(d.getDate() - i)
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString()
+        const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString()
+        const dayRevenue = validOrders
+            .filter(o => o.created_at >= dayStart && o.created_at < dayEnd)
+            .reduce((sum, o) => sum + (o.total || 0), 0)
+        weeklyHistory.push({ day: dayLabels[d.getDay()], value: dayRevenue })
+    }
+
+    // Recent Activity (últimos 5 eventos)
+    const recentActivity: RecentActivity[] = []
+    const recentOrders = validOrders
+        .filter(o => o.created_at >= thirtyDaysAgo)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5)
+
+    for (const order of recentOrders) {
+        const minutesAgo = Math.round((Date.now() - new Date(order.created_at).getTime()) / 60000)
+        const timeAgo = minutesAgo < 60 ? `hace ${minutesAgo} min` : minutesAgo < 1440 ? `hace ${Math.round(minutesAgo / 60)} h` : `hace ${Math.round(minutesAgo / 1440)} días`
+
+        if (order.status === 'completed' || order.status === 'confirmed' || order.status === 'delivered') {
+            recentActivity.push({
+                type: 'sale',
+                title: `Nueva venta`,
+                description: `Orden #${order.order_number || order.id.slice(0, 8)}`,
+                amount: order.total,
+                timeAgo,
+            })
+        } else if (order.status === 'pending') {
+            recentActivity.push({
+                type: 'payment',
+                title: `Pago pendiente`,
+                description: `Orden #${order.order_number || order.id.slice(0, 8)}`,
+                amount: order.total,
+                timeAgo,
+            })
+        }
+    }
+
+    // Agent Status
+    const { data: defaultAgent } = await supabase
+        .from("agents")
+        .select("name, status")
+        .eq("organization_id", orgId)
+        .limit(1)
+        .single()
+
+    const totalBotMessages = recentMessages?.filter(m => m.sender_type === 'bot').length || 0
+    const totalUserMessages = recentMessages?.filter(m => m.sender_type === 'user').length || 0
+    const resolutionRate = totalUserMessages > 0 ? Math.round((totalBotMessages / totalUserMessages) * 100) : 0
+
+    // Site Status
+    const siteUrl = org?.custom_domain
+        ? `https://${org.custom_domain}`
+        : organizationSlug ? `${organizationSlug}.landingchat.co` : ""
+
+    const siteStatus: SiteStatus = {
+        name: organizationName,
+        url: siteUrl,
+        isLive: true,
+        revenue: totalRevenue,
+        visits: totalChats,
+    }
+
+    const agentStatus: AgentStatus = {
+        name: defaultAgent?.name || "Agente IA",
+        isActive: (defaultAgent?.status === "available"),
+        resolutionRate: Math.min(resolutionRate, 100),
+    }
 
     // Real Estate KPIs
     let realEstateStats: RealEstateStats | undefined
@@ -271,12 +382,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         return {
             userName,
             organizationSlug,
+            organizationName,
             industry,
             realEstate: realEstateStats,
             revenue: {
                 total: totalRevenue,
+                today: revenueToday,
                 growth: 12.5, // Dummy growth for now
-                history
+                history,
+                weeklyHistory,
             },
             orders: {
                 total: totalOrders,
@@ -287,12 +401,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
                 growth: -0.5,
                 total: totalChats,
                 byChannel: [
-                    { name: 'Web', value: webChats, color: '#3b82f6' }, // blue-500
-                    { name: 'WhatsApp', value: whatsappChats, color: '#22c55e' } // green-500
+                    { name: 'Web', value: webChats, color: '#3b82f6' },
+                    { name: 'WhatsApp', value: whatsappChats, color: '#22c55e' }
                 ]
             },
             agents: {
-                active: activeAgents || 1, // Default to 1 if 0/null to look good in demo
+                active: activeAgents || 1,
                 responseTime: avgResponseTime
             },
             insights: {
@@ -300,7 +414,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
                 pendingOrders,
                 newCustomers: newCustomersCount || 0,
                 repeatPurchaseRate: parseFloat(repeatPurchaseRate.toFixed(1)),
-            }
+            },
+            recentActivity,
+            siteStatus,
+            agentStatus,
         }
     } catch (error) {
         console.error("[getDashboardStats] Error:", error)
@@ -312,8 +429,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         return {
             userName: "Usuario",
             organizationSlug: "",
+            organizationName: "Mi Tienda",
             industry: "ecommerce",
-            revenue: { total: 0, growth: 0, history: [] },
+            revenue: { total: 0, today: 0, growth: 0, history: [], weeklyHistory: [] },
             orders: { total: 0, growth: 0 },
             chats: { conversionRate: 0, growth: 0, total: 0, byChannel: [] },
             agents: { active: 0, responseTime: "N/A" },
@@ -322,7 +440,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
                 pendingOrders: 0,
                 newCustomers: 0,
                 repeatPurchaseRate: 0,
-            }
+            },
+            recentActivity: [],
+            siteStatus: { name: "Mi Tienda", url: "", isLive: false, revenue: 0, visits: 0 },
+            agentStatus: { name: "Agente IA", isActive: false, resolutionRate: 0 },
         }
     }
 }

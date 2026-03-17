@@ -19,7 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { createCustomer, type CreateCustomerInput } from "../actions"
+import { createCustomer } from "../actions"
 
 interface CustomerFormProps {
     open: boolean

@@ -2,7 +2,8 @@
 
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { importCustomers, type ImportCustomerRow } from "../actions"
+import type { ImportCustomerRow } from "@/types/customer"
+import { importCustomers } from "../actions"
 import { CustomerForm } from "./customer-form"
 import Papa from "papaparse"
 import { toast } from "sonner"
