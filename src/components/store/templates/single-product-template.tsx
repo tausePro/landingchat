@@ -24,13 +24,7 @@ export function SingleProductTemplate({
     const chatButtonText = heroSettings.chatButtonText || "Comprar Ahora"
 
     // Use the first product as the featured one, or a placeholder if none exist
-    const featuredProduct = products.length > 0 ? products[0] : {
-        id: "placeholder",
-        name: "Producto Destacado",
-        description: "Este es un producto de ejemplo. Agrega productos en tu dashboard para verlos aquí.",
-        price: 0,
-        image_url: null
-    }
+    const featuredProduct = products[0]
 
     const templateConfig = organization.settings?.storefront?.templateConfig?.singleProduct || {}
     const specs = templateConfig.specs || [
@@ -39,6 +33,83 @@ export function SingleProductTemplate({
         { id: "3", title: "Característica 3", description: "Descripción detallada de la característica 3" },
         { id: "4", title: "Característica 4", description: "Descripción detallada de la característica 4" }
     ]
+
+    if (!featuredProduct) {
+        return (
+            <>
+                <section className="relative overflow-hidden min-h-[90vh] flex items-center bg-white">
+                    <div className="container mx-auto px-4 py-12 lg:py-0">
+                        <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+                            <div className="order-2 lg:order-1 relative">
+                                <div className="relative aspect-square rounded-3xl overflow-hidden bg-gray-50 border border-dashed border-gray-200 shadow-2xl flex items-center justify-center px-8 text-center">
+                                    <div>
+                                        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-gray-400">Próximamente</p>
+                                        <p className="mt-4 text-2xl font-semibold text-gray-700">
+                                            Aquí aparecerá tu producto destacado
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-tr from-blue-50 to-purple-50 rounded-full blur-3xl opacity-50" />
+                            </div>
+
+                            <div className="order-1 lg:order-2">
+                                <Badge variant="outline" className="mb-6 px-3 py-1 text-sm border-gray-200 text-gray-600">
+                                    {organization.name} presenta
+                                </Badge>
+                                <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight text-gray-900 mb-6 leading-[1.1]">
+                                    {heroTitle}
+                                </h1>
+                                <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+                                    {heroSubtitle}
+                                </p>
+                                <div className="mb-8 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6">
+                                    <p className="text-lg font-semibold text-gray-900">Estamos preparando este lanzamiento</p>
+                                    <p className="mt-2 text-gray-600">
+                                        Publica tu primer producto desde el dashboard para destacarlo aquí.
+                                    </p>
+                                </div>
+                                {showChatButton && (
+                                    <div className="flex flex-col sm:flex-row gap-4 mb-10">
+                                        <Button
+                                            onClick={() => onStartChat()}
+                                            size="lg"
+                                            style={{ backgroundColor: primaryColor }}
+                                            className="w-full sm:w-auto text-lg px-10 h-16 shadow-xl hover:scale-105 transition-transform"
+                                        >
+                                            {chatButtonText}
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="py-24 bg-gray-50">
+                    <div className="container mx-auto px-4">
+                        <div className="max-w-3xl mx-auto">
+                            <h2 className="text-3xl font-bold mb-8 text-center">Producto destacado en preparación</h2>
+                            <div className="bg-white rounded-2xl shadow-sm p-8 lg:p-12 text-center">
+                                <p className="text-lg font-semibold text-gray-900">Todavía no hay un producto publicado para esta plantilla.</p>
+                                <p className="mt-3 text-gray-600">
+                                    Cuando publiques el primer producto en el dashboard, se mostrará aquí automáticamente.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <footer className="bg-white py-12 border-t border-gray-100">
+                    <div className="container mx-auto px-4 text-center">
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                            <span className="text-xl font-bold">{organization.name}</span>
+                        </div>
+                        <p className="text-gray-400 text-sm">© {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.</p>
+                    </div>
+                </footer>
+            </>
+        )
+    }
 
     return (
         <>

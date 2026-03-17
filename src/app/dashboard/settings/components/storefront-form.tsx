@@ -13,18 +13,20 @@ import { CompleteTemplateEditor } from "./complete-template-editor"
 import { ServicesTemplateEditor } from "./services-template-editor"
 import { SingleProductTemplateEditor } from "./single-product-template-editor"
 import { TestimonialsEditor } from "./testimonials-editor"
+import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 
 interface StorefrontFormProps {
     organization: {
         id: string
         name: string
         slug: string
+        industry?: string | null
         settings: any
     }
 }
 
 export function StorefrontForm({ organization }: StorefrontFormProps) {
-    const selectedTemplate = organization.settings?.storefront?.template || "minimal"
+    const selectedTemplate = getSafeStorefrontTemplate(organization.settings?.storefront?.template, organization)
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

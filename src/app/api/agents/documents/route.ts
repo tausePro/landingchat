@@ -4,7 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const MAX_TEXT_LENGTH = 50000 // ~50k chars para no saturar el contexto
 
-const VALID_EXTENSIONS = [".pdf", ".txt", ".md", ".xlsx", ".xls", ".csv"]
+const VALID_EXTENSIONS = [".pdf", ".txt", ".md", ".csv"]
 
 /**
  * POST /api/agents/documents
@@ -106,18 +106,9 @@ export async function POST(request: NextRequest) {
                 const pdfParse = require("pdf-parse/lib/pdf-parse.js")
                 const pdfData = await pdfParse(buffer)
                 extractedText = pdfData.text
-            } else if (fileExt === ".xlsx" || fileExt === ".xls" || fileExt === ".csv") {
+            } else if (fileExt === ".csv") {
                 // xlsx: parse Excel/CSV to text
-                // eslint-disable-next-line @typescript-eslint/no-require-imports
-                const XLSX = require("xlsx")
-                const workbook = XLSX.read(buffer, { type: "buffer" })
-                const sheets: string[] = []
-                for (const sheetName of workbook.SheetNames) {
-                    const sheet = workbook.Sheets[sheetName]
-                    const csv = XLSX.utils.sheet_to_csv(sheet)
-                    sheets.push(`--- Hoja: ${sheetName} ---\n${csv}`)
-                }
-                extractedText = sheets.join("\n\n")
+                extractedText = buffer.toString("utf-8")
             } else {
                 // TXT, MD: read as UTF-8
                 extractedText = buffer.toString("utf-8")

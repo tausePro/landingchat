@@ -117,6 +117,19 @@ export interface GetCustomersParams {
   intentScores?: IntentScoreFilter[]
 }
 
+export interface ImportCustomerRow {
+  full_name?: string
+  nombre?: string
+  email?: string
+  phone?: string
+  telefono?: string
+  category?: string
+  categoria?: string
+  channel?: string
+  canal?: string
+  tags?: string
+}
+
 // ============================================================================
 // Customer Stats (KPIs + Segment Counts)
 // ============================================================================

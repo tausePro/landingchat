@@ -514,6 +514,41 @@ export function CompleteTemplate({
                                 )
                             })}
                         </div>
+                        {filteredProducts.length === 0 && (
+                            <div className="rounded-3xl border border-dashed border-gray-300 bg-white px-8 py-14 text-center shadow-sm">
+                                <h3
+                                    className="text-2xl font-bold"
+                                    style={{
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor)
+                                    }}
+                                >
+                                    {products.length > 0 ? "No encontramos productos para este filtro" : "Estamos preparando el catálogo"}
+                                </h3>
+                                <p
+                                    className="mt-3 text-base text-gray-600"
+                                    style={{
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor),
+                                        opacity: 0.7
+                                    }}
+                                >
+                                    {products.length > 0
+                                        ? "Prueba otra categoría o vuelve al catálogo completo."
+                                        : "Aún no hay productos publicados en esta tienda."}
+                                </p>
+                                {showChatButton && (
+                                    <Button
+                                        onClick={() => onStartChat()}
+                                        size="lg"
+                                        style={{ backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) }}
+                                        className="mt-6 text-base font-bold px-8 h-14 shadow-xl hover:scale-105 transition-transform"
+                                    >
+                                        {chatButtonText}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </section>
             )}

@@ -43,6 +43,20 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
     const [currentPrice, setCurrentPrice] = useState(product.price)
     const [activePromotion, setActivePromotion] = useState<any>(null)
+    const [quantity, setQuantity] = useState(product.minimum_quantity || 1)
+
+    // Calcular precio unitario según tier de cantidad
+    const getUnitPriceForQuantity = (qty: number): number => {
+        if (!product.has_quantity_pricing || !product.price_tiers?.length) return product.sale_price || product.price
+        // Buscar el tier que aplica para esta cantidad
+        const sorted = [...product.price_tiers].sort((a: any, b: any) => b.min_quantity - a.min_quantity)
+        for (const tier of sorted) {
+            if (qty >= tier.min_quantity) return tier.unit_price
+        }
+        return product.sale_price || product.price
+    }
+    const unitPrice = getUnitPriceForQuantity(quantity)
+    const totalPrice = unitPrice * quantity
 
     // Track ViewContent event when product loads
     useEffect(() => {
@@ -157,22 +171,16 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     }
 
     const handleBuyNow = () => {
-        // Add product to cart with current price and variants
+        const priceToUse = product.has_quantity_pricing ? unitPrice : currentPrice
         const productToAdd = {
             id: product.id,
             name: product.name,
-            price: currentPrice,
+            price: priceToUse,
             image_url: product.image_url || selectedImage
         }
 
-        // Track AddToCart event
-        trackAddToCart(product.id, product.name, currentPrice, "COP")
-
-        // Add to cart (this will automatically open the cart sidebar)
-        addItem(productToAdd, 1)
-
-        // Don't open checkout modal automatically - let user continue shopping
-        // They can access checkout from the cart sidebar when ready
+        trackAddToCart(product.id, product.name, priceToUse * quantity, "COP")
+        addItem(productToAdd, quantity)
     }
 
     // Logic for Brand/Category Label
@@ -208,6 +216,24 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     return (
         <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-8">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+                {/* Breadcrumbs */}
+                <nav className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+                    <Link href={getStoreLink("/", isSubdomain, slug)} className="hover:text-primary transition-colors">
+                        {organization.name}
+                    </Link>
+                    {product.categories?.[0] && (
+                        <>
+                            <span className="material-symbols-outlined text-xs">chevron_right</span>
+                            <Link href={getStoreLink(`/productos?category=${encodeURIComponent(product.categories[0])}`, isSubdomain, slug)} className="hover:text-primary transition-colors">
+                                {product.categories[0]}
+                            </Link>
+                        </>
+                    )}
+                    <span className="material-symbols-outlined text-xs">chevron_right</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[200px]">{product.name}</span>
+                </nav>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
 
                     {/* Left Column: Gallery */}
@@ -274,31 +300,56 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         </div>
 
                         {images.length > 1 && (
-                            <div className="grid grid-cols-5 gap-3 w-full">
-                                {images.map((img: string, idx: number) => {
-                                    const isOOS = outOfStockImages.has(img)
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() => {
-                                                setSelectedImage(img)
-                                                // Sync: si la imagen corresponde a un color, seleccionarlo
-                                                const mapped = imageToVariant.get(img)
-                                                if (mapped && !isOOS) {
-                                                    handleVariantChange(mapped.type, mapped.value)
-                                                }
-                                            }}
-                                            className={`w-full relative aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${isOOS ? 'opacity-50' : ''} ${selectedImage === img ? 'ring-2 ring-primary ring-offset-2 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
-                                        >
-                                            <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
-                                            {isOOS && (
-                                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                                                    <span className="text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded">Agotado</span>
-                                                </div>
-                                            )}
-                                        </button>
-                                    )
-                                })}
+                            <div className="relative w-full group/thumbs">
+                                {/* Flecha izquierda */}
+                                {images.length > 5 && (
+                                    <button
+                                        onClick={() => {
+                                            const el = document.getElementById('thumb-scroll')
+                                            if (el) el.scrollBy({ left: -200, behavior: 'smooth' })
+                                        }}
+                                        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 dark:bg-slate-800/90 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">chevron_left</span>
+                                    </button>
+                                )}
+                                <div id="thumb-scroll" className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth py-1 px-1">
+                                    {images.map((img: string, idx: number) => {
+                                        const isOOS = outOfStockImages.has(img)
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => {
+                                                    setSelectedImage(img)
+                                                    const mapped = imageToVariant.get(img)
+                                                    if (mapped && !isOOS) {
+                                                        handleVariantChange(mapped.type, mapped.value)
+                                                    }
+                                                }}
+                                                className={`flex-none w-16 h-16 relative rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${isOOS ? 'opacity-50' : ''} ${selectedImage === img ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
+                                            >
+                                                <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
+                                                {isOOS && (
+                                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                                        <span className="text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded">Agotado</span>
+                                                    </div>
+                                                )}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                                {/* Flecha derecha */}
+                                {images.length > 5 && (
+                                    <button
+                                        onClick={() => {
+                                            const el = document.getElementById('thumb-scroll')
+                                            if (el) el.scrollBy({ left: 200, behavior: 'smooth' })
+                                        }}
+                                        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 dark:bg-slate-800/90 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">chevron_right</span>
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -325,7 +376,7 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                 )}
                             </div>
 
-                            {/* Precios por cantidad (mayoreo) */}
+                            {/* Selector de cantidad + Precios por tier */}
                             {product.has_quantity_pricing && product.price_tiers && product.price_tiers.length > 0 && (
                                 <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                                     <div className="flex items-center gap-2 mb-3">
@@ -337,54 +388,80 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                                             </span>
                                         )}
                                     </div>
-                                    <div className="space-y-2">
-                                        {product.price_tiers.map((tier: any, idx: number) => (
-                                            <div key={idx} className="flex items-center justify-between text-sm">
-                                                <span className="text-slate-600 dark:text-slate-300">
-                                                    {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} unidades
-                                                    {tier.label && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">({tier.label})</span>}
-                                                </span>
-                                                <span className="font-bold text-slate-900 dark:text-white">
-                                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(tier.unit_price)}/u
-                                                </span>
-                                            </div>
-                                        ))}
+                                    <div className="space-y-1.5">
+                                        {product.price_tiers.map((tier: any, idx: number) => {
+                                            const isActive = quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)
+                                            return (
+                                                <div key={idx} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 dark:bg-blue-800/40 ring-1 ring-blue-300 dark:ring-blue-600' : ''}`}>
+                                                    <span className={isActive ? 'font-medium text-blue-800 dark:text-blue-200' : 'text-slate-600 dark:text-slate-300'}>
+                                                        {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} unidades
+                                                        {tier.label && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">({tier.label})</span>}
+                                                    </span>
+                                                    <span className={`font-bold ${isActive ? 'text-blue-800 dark:text-blue-200' : 'text-slate-900 dark:text-white'}`}>
+                                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(tier.unit_price)}/u
+                                                    </span>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-3 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-sm">chat</span>
-                                        Consulta por cantidades especiales
-                                    </p>
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2">
-                                <div className="flex text-yellow-400">
-                                    {[1, 2, 3, 4, 5].map(i => (
-                                        <span key={i} className="material-symbols-outlined text-xl" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                                    ))}
+                            {/* Selector de cantidad */}
+                            <div className="mt-4 flex items-center gap-4">
+                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cantidad</span>
+                                <div className="flex items-center border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden">
+                                    <button
+                                        onClick={() => setQuantity((q: number) => Math.max(product.minimum_quantity || 1, q - 1))}
+                                        className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">remove</span>
+                                    </button>
+                                    <input
+                                        type="number"
+                                        value={quantity}
+                                        onChange={(e) => {
+                                            const val = parseInt(e.target.value) || (product.minimum_quantity || 1)
+                                            setQuantity(Math.max(product.minimum_quantity || 1, val))
+                                        }}
+                                        className="w-16 h-10 text-center font-bold text-slate-900 dark:text-white bg-transparent border-x border-slate-300 dark:border-slate-600 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        min={product.minimum_quantity || 1}
+                                    />
+                                    <button
+                                        onClick={() => setQuantity((q: number) => q + 1)}
+                                        className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">add</span>
+                                    </button>
                                 </div>
-                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium hover:text-primary cursor-pointer">
-                                    23 reseñas
-                                </span>
+                                {product.has_quantity_pricing && (
+                                    <div className="text-right">
+                                        <p className="text-lg font-bold text-slate-900 dark:text-white">
+                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(totalPrice)}
+                                        </p>
+                                        <p className="text-xs text-slate-500">
+                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(unitPrice)}/u
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Social Proof Badges */}
-                            <div className="flex flex-wrap gap-3 mt-2">
-                                {/* Simulated Sold Count (Stable based on ID) */}
-                                <div className="px-3 py-1.5 rounded-full bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm font-medium flex items-center gap-1.5">
-                                    <span className="material-symbols-outlined text-[18px]">local_fire_department</span>
-                                    {(product.id.charCodeAt(0) % 15) + 5} vendidos esta semana
-                                </div>
+                            {/* Info Badges (solo datos reales) */}
+                            <div className="flex flex-wrap gap-3 mt-3">
+                                {product.stock > 0 && (
+                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                        En stock
+                                    </div>
+                                )}
 
-                                {/* Free Shipping */}
                                 {hasFreeShipping && (
                                     <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">check</span>
+                                        <span className="material-symbols-outlined text-[18px]">local_shipping</span>
                                         Envío gratis
                                     </div>
                                 )}
 
-                                {/* Low Stock Warning */}
                                 {(product.stock > 0 && product.stock < 20) && (
                                     <div className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-1.5">
                                         <span className="material-symbols-outlined text-[18px]">bolt</span>
@@ -559,23 +636,30 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                             </div>
                         )}
 
+                        {/* Specifications as Cards (estilo Playful) */}
+                        {product.specifications && product.specifications.length > 0 && (
+                            <div className="mt-8">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {product.specifications.map((spec: any, idx: number) => (
+                                        <div key={idx} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{spec.label}</p>
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white mt-1">{spec.value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Accordions */}
                         <div className="mt-8 border-t border-slate-200 dark:border-slate-800">
-                            {/* Specifications */}
-                            {product.specifications && product.specifications.length > 0 && (
-                                <details className="group border-b border-slate-200 dark:border-slate-800 py-4">
+                            {/* Description accordion (para contenido largo) */}
+                            {product.description && product.description.length > 300 && (
+                                <details className="group border-b border-slate-200 dark:border-slate-800 py-4" open>
                                     <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
-                                        <span>Especificaciones</span>
+                                        <span>Descripción completa</span>
                                         <span className="material-symbols-outlined transform group-open:rotate-180 transition-transform">expand_more</span>
                                     </summary>
-                                    <div className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                                        {product.specifications.map((spec: any, idx: number) => (
-                                            <div key={idx} className="flex justify-between border-b border-gray-100 dark:border-gray-800 pb-2 last:border-0">
-                                                <span className="font-medium">{spec.label}</span>
-                                                <span>{spec.value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <div className="mt-4 text-sm text-slate-600 dark:text-slate-400 prose prose-slate dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
                                 </details>
                             )}
 
@@ -599,6 +683,33 @@ export function ProductDetailClient({ product, organization, badges, promotions,
                         </div>
                     </div>
                 </div>
+
+                {/* Bundle / Qué incluye — full width debajo del grid principal */}
+                {product.is_bundle && product.bundle_items && product.bundle_items.length > 0 && (
+                    <div className="mt-12 border-t border-slate-200 dark:border-slate-800 pt-8">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Qué incluye</h2>
+                            <span className="text-sm text-slate-500 dark:text-slate-400">
+                                {product.bundle_items.length} productos
+                                {product.bundle_discount_type && product.bundle_discount_value > 0 && (
+                                    <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                                        {product.bundle_discount_type === 'percentage' ? `-${product.bundle_discount_value}%` : `Ahorra ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.bundle_discount_value)}`}
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                            {product.bundle_items.map((item: any, idx: number) => (
+                                <div key={idx} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                    <span className="material-symbols-outlined text-primary text-lg">inventory_2</span>
+                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                        {item.quantity > 1 && `${item.quantity}x `}{item.product_name || `Producto`}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Customers Also Bought */}
                 {relatedProducts.length > 0 && (
