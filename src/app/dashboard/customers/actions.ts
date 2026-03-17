@@ -10,12 +10,10 @@ import {
   type CreateCustomerInput,
   type UpdateCustomerInput,
   type GetCustomersParams,
+  type ImportCustomerRow,
   type CustomerStats,
 } from "@/types/customer"
 import { computeIntentScore, type IntentScore } from "./lib/intent-score"
-
-// Re-export types for backward compatibility
-export type { Customer, GetCustomersParams, CreateCustomerInput }
 
 // ============================================================================
 // Query Actions
@@ -446,19 +444,6 @@ export async function deleteCustomer(
 // ============================================================================
 // Bulk Import Action
 // ============================================================================
-
-export interface ImportCustomerRow {
-  full_name?: string
-  nombre?: string
-  email?: string
-  phone?: string
-  telefono?: string
-  category?: string
-  categoria?: string
-  channel?: string
-  canal?: string
-  tags?: string
-}
 
 export async function importCustomers(
   customers: ImportCustomerRow[]
