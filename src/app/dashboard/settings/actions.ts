@@ -215,6 +215,7 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
     }
 
     revalidatePath("/dashboard/settings")
+    revalidatePath("/dashboard/storefront")
     revalidatePath(`/store/${data.slug}`)
     return { success: true }
 }
