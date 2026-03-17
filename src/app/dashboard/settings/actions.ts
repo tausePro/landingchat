@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import type { OrganizationSettingsOverrides, OrganizationTrackingConfig, Organization } from "@/types"
+import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 
 export interface SettingsData {
     profile: {
@@ -152,6 +153,46 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
 
     if (!profile?.organization_id) throw new Error("No organization found")
 
+    const { data: currentOrganization, error: currentOrganizationError } = await supabase
+        .from("organizations")
+        .select("industry, settings")
+        .eq("id", profile.organization_id)
+        .single()
+
+    if (currentOrganizationError || !currentOrganization) {
+        throw new Error("Organization not found")
+    }
+
+    const currentSettings = (currentOrganization.settings as OrganizationSettingsOverrides | null) || {}
+    const incomingSettings = (data.settings ?? currentSettings) as OrganizationSettingsOverrides
+    const storefrontSettings =
+        ((incomingSettings.storefront as Record<string, unknown> | undefined) ?? {}) as Record<string, unknown>
+    const requestedTemplate = typeof storefrontSettings.template === "string" ? storefrontSettings.template : undefined
+    const currentSettingsRecord = currentSettings as Record<string, unknown>
+    const nextIndustry =
+        data.industry ??
+        currentOrganization.industry ??
+        (typeof currentSettingsRecord.industry === "string" ? currentSettingsRecord.industry : null)
+
+    let settingsToPersist = data.settings
+
+    if (requestedTemplate) {
+        const safeTemplate = getSafeStorefrontTemplate(requestedTemplate, {
+            industry: nextIndustry,
+            settings: incomingSettings,
+        })
+
+        if (safeTemplate !== requestedTemplate) {
+            settingsToPersist = {
+                ...incomingSettings,
+                storefront: {
+                    ...storefrontSettings,
+                    template: safeTemplate,
+                },
+            } as OrganizationSettingsOverrides
+        }
+    }
+
     const { error } = await supabase
         .from("organizations")
         .update({
@@ -165,7 +206,7 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
             seo_description: data.seo_description,
             seo_keywords: data.seo_keywords,
             tracking_config: data.tracking_config,
-            settings: data.settings
+            settings: settingsToPersist
         })
         .eq("id", profile.organization_id)
 

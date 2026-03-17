@@ -3,6 +3,7 @@ import { CompleteTemplate } from "./complete-template"
 import { SingleProductTemplate } from "./single-product-template"
 import { ServicesTemplate } from "./services-template"
 import { RealEstateTemplate } from "./real-estate-template"
+import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 
 interface TemplateRendererProps {
     template: string
@@ -29,6 +30,8 @@ export function TemplateRenderer({
     onStartChat,
     isSubdomain
 }: TemplateRendererProps) {
+    const safeTemplate = getSafeStorefrontTemplate(template, organization)
+
     const templateProps = {
         organization,
         products,
@@ -40,7 +43,7 @@ export function TemplateRenderer({
         isSubdomain
     }
 
-    switch (template) {
+    switch (safeTemplate) {
         case "minimal":
             return <MinimalTemplate {...templateProps} />
         case "complete":

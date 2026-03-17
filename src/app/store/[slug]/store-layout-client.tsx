@@ -19,6 +19,7 @@ import { useTrackingParams } from "@/hooks/use-tracking-params"
 import { ConversationalLayout } from "@/components/store/layouts/conversational-layout"
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
+import { getSafeStorefrontTemplate, isRealEstateIndustry } from "@/lib/storefront-templates"
 
 // ... (in render)
 
@@ -76,16 +77,14 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const primaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
 
     // Detectar vertical de la org
-    const isRealEstate = organization.settings?.industry === 'real_estate' ||
-        organization.storefront_template === 'real-estate' ||
-        organization.settings?.storefront?.template === 'real-estate'
+    const isRealEstate = isRealEstateIndustry(organization)
 
     // Storefront customization settings
     const storefrontSettings = organization.settings?.storefront || {}
     const heroSettings = storefrontSettings.hero || {}
     const typographySettings = storefrontSettings.typography || {}
     const headerSettings = storefrontSettings.header || {}
-    const selectedTemplate = storefrontSettings.template || "minimal"
+    const selectedTemplate = getSafeStorefrontTemplate(storefrontSettings.template, organization)
     const showStoreName = headerSettings.showStoreName ?? true
 
     // Defaults de menú según vertical (el admin puede personalizar)

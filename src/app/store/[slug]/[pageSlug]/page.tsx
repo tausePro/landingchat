@@ -16,7 +16,7 @@ async function getPageData(orgSlug: string, pageSlug: string) {
     // Get organization with complete data
     const { data: org } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, settings, tracking_config, custom_domain")
+        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, industry, settings, tracking_config, custom_domain")
         .eq("slug", orgSlug)
         .single()
 
