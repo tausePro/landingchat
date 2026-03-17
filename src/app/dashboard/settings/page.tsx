@@ -4,7 +4,6 @@ import { getSettingsData } from "./actions"
 import { ProfileForm } from "./components/profile-form"
 import { OrganizationForm } from "./components/organization-form"
 import { IdentificationForm } from "./components/identification-form"
-import { StorefrontForm } from "./components/storefront-form"
 import { CustomDomainForm } from "./components/custom-domain-form"
 import { StoreMaintenanceToggle } from "./components/store-maintenance-toggle"
 import { TaxSettingsForm } from "./components/tax-settings-form"
@@ -34,7 +33,6 @@ export default async function SettingsPage() {
                             <TabsTrigger value="profile">Mi Perfil</TabsTrigger>
                             <TabsTrigger value="organization">Organización</TabsTrigger>
                             <TabsTrigger value="identification">Identificación</TabsTrigger>
-                            <TabsTrigger value="storefront">Storefront</TabsTrigger>
                             <TabsTrigger value="domain">Dominio</TabsTrigger>
                             <TabsTrigger value="maintenance">Mantenimiento</TabsTrigger>
                             <TabsTrigger value="taxes">Impuestos</TabsTrigger>
@@ -50,9 +48,6 @@ export default async function SettingsPage() {
                         </TabsContent>
                         <TabsContent value="identification">
                             <IdentificationForm organization={data.organization as any} />
-                        </TabsContent>
-                        <TabsContent value="storefront">
-                            <StorefrontForm organization={data.organization as any} />
                         </TabsContent>
                         <TabsContent value="domain">
                             <CustomDomainForm
