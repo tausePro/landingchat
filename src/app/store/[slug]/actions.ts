@@ -1,7 +1,9 @@
 "use server"
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { buildStorefrontViewModel } from "@/lib/storefront/buildStorefrontViewModel"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
+import { normalizeHeroSliderConfig, type StorefrontHeroSliderProduct } from "@/types/storefront"
 
 export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
@@ -49,6 +51,30 @@ export async function getStoreData(slug: string, limit?: number) {
         console.error("Error fetching products:", productsError)
     }
 
+    const heroSliderConfig = normalizeHeroSliderConfig(org.settings?.storefront?.templateConfig?.complete?.heroSlider)
+    const heroSliderProductIds = Array.from(
+        new Set(
+            heroSliderConfig.slides
+                .map((slide) => slide.productId)
+                .filter((productId): productId is string => productId.length > 0)
+        )
+    )
+    let heroSliderProducts: StorefrontHeroSliderProduct[] = []
+
+    if (heroSliderConfig.enabled && heroSliderProductIds.length > 0) {
+        const { data: linkedProducts, error: linkedProductsError } = await supabase
+            .from("products")
+            .select("id, name, slug, price, sale_price, image_url, description")
+            .eq("organization_id", org.id)
+            .in("id", heroSliderProductIds)
+
+        if (linkedProductsError) {
+            console.error("Error fetching hero slider products:", linkedProductsError)
+        } else {
+            heroSliderProducts = linkedProducts || []
+        }
+    }
+
     // 4. Fetch Published Pages for footer/navigation
     const { data: pages } = await supabase
         .from("store_pages")
@@ -58,7 +84,7 @@ export async function getStoreData(slug: string, limit?: number) {
         .order("title", { ascending: true })
 
     // 5. Fetch Properties for real estate organizations
-    let properties: any[] = []
+    let properties: Array<Record<string, unknown>> = []
     const isRealEstate = isRealEstateIndustry(org) || 
         org.storefront_template === 'real-estate' ||
         org.settings?.storefront?.template === 'real-estate'
@@ -111,9 +137,20 @@ export async function getStoreData(slug: string, limit?: number) {
         }
     }
 
+    const storefrontViewModel = buildStorefrontViewModel({
+        organization: enrichedOrg,
+        pages: pages || [],
+        products: products || [],
+        heroSliderProducts,
+        properties,
+        badges: badges || []
+    })
+
     return {
         organization: enrichedOrg,
         products: products || [],
+        heroSliderProducts,
+        storefrontViewModel,
         pages: pages || [],
         properties,
         badges: badges || []

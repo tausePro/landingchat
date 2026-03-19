@@ -4,14 +4,15 @@ import { useState } from "react"
 
 interface LivePreviewProps {
     slug: string
+    previewToken?: string
 }
 
-export function LivePreview({ slug }: LivePreviewProps) {
+export function LivePreview({ slug, previewToken = "default" }: LivePreviewProps) {
     const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop")
-    const [key, setKey] = useState(0)
+    const [refreshCount, setRefreshCount] = useState(0)
 
     const handleRefresh = () => {
-        setKey(prev => prev + 1)
+        setRefreshCount((prev) => prev + 1)
     }
 
     return (
@@ -75,7 +76,7 @@ export function LivePreview({ slug }: LivePreviewProps) {
                     {/* Iframe */}
                     <div className={`${viewMode === "desktop" ? "h-[500px]" : "h-[600px]"} overflow-hidden`}>
                         <iframe
-                            key={key}
+                            key={`${slug}:${previewToken}:${refreshCount}`}
                             src={`/store/${slug}`}
                             className="w-full h-full border-0"
                             title="Storefront Preview"

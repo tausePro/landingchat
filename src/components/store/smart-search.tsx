@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import Image from "next/image"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Search, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ProductCard } from "@/components/store/product-card"
 import { useDebounce } from "use-debounce"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
@@ -15,6 +15,7 @@ interface SmartSearchProps {
     onStartChat: (query?: string) => void
     primaryColor: string
     placeholder?: string
+    visualVariant?: "default" | "glass"
 }
 
 interface Product {
@@ -25,7 +26,7 @@ interface Product {
     slug?: string
 }
 
-export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿Qué estás buscando hoy?" }: SmartSearchProps) {
+export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿Qué estás buscando hoy?", visualVariant = "default" }: SmartSearchProps) {
     const [query, setQuery] = useState("")
     const [debouncedQuery] = useDebounce(query, 300)
     const [results, setResults] = useState<Product[]>([])
@@ -35,29 +36,7 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
     const isSubdomain = useIsSubdomain()
     const { trackSearch } = useTracking()
 
-    // Buscar productos cuando cambie la query
-    useEffect(() => {
-        if (debouncedQuery.trim().length > 2) {
-            searchProducts(debouncedQuery)
-        } else {
-            setResults([])
-            setShowResults(false)
-        }
-    }, [debouncedQuery])
-
-    // Cerrar resultados al hacer click fuera
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-                setShowResults(false)
-            }
-        }
-
-        document.addEventListener('mousedown', handleClickOutside)
-        return () => document.removeEventListener('mousedown', handleClickOutside)
-    }, [])
-
-    const searchProducts = async (searchQuery: string) => {
+    const searchProducts = useCallback(async (searchQuery: string) => {
         setIsLoading(true)
         try {
             const response = await fetch(`/api/store/${slug}/products?search=${encodeURIComponent(searchQuery)}&limit=6`)
@@ -76,7 +55,29 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [slug, trackSearch])
+
+    // Buscar productos cuando cambie la query
+    useEffect(() => {
+        if (debouncedQuery.trim().length > 2) {
+            searchProducts(debouncedQuery)
+        } else {
+            setResults([])
+            setShowResults(false)
+        }
+    }, [debouncedQuery, searchProducts])
+
+    // Cerrar resultados al hacer click fuera
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setShowResults(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -94,11 +95,13 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
         setQuery("")
     }
 
+    const isGlassVariant = visualVariant === "glass"
+
     return (
-        <div ref={searchRef} className="relative flex-1 max-w-md mx-4">
+        <div ref={searchRef} className="relative mx-4 flex-1 max-w-md">
             <form onSubmit={handleSubmit} className="relative">
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Search className={`absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 ${isGlassVariant ? "text-slate-400" : "text-gray-400"}`} />
                     <Input
                         type="text"
                         placeholder={placeholder}
@@ -107,7 +110,10 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
                         onFocus={() => {
                             if (results.length > 0) setShowResults(true)
                         }}
-                        className="pl-10 pr-4 h-10 rounded-full border-gray-300 focus:ring-2 focus:ring-primary focus:border-transparent"
+                        className={isGlassVariant
+                            ? "h-12 rounded-full border-white/60 bg-white/70 pl-10 pr-4 text-sm text-slate-700 shadow-[0_12px_32px_rgba(15,23,42,0.08)] backdrop-blur-xl placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-offset-0"
+                            : "h-10 rounded-full border-gray-300 pl-10 pr-4 focus:border-transparent focus:ring-2 focus:ring-primary"
+                        }
                         style={{ 
                             '--tw-ring-color': primaryColor,
                             borderColor: showResults ? primaryColor : undefined
@@ -118,15 +124,18 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
 
             {/* Resultados de búsqueda */}
             {showResults && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+                <div className={isGlassVariant
+                    ? "absolute left-0 right-0 top-full z-50 mt-3 max-h-96 overflow-y-auto rounded-[28px] border border-white/70 bg-white/82 shadow-[0_28px_90px_rgba(15,23,42,0.18)] backdrop-blur-2xl"
+                    : "absolute top-full left-0 right-0 mt-2 z-50 max-h-96 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+                }>
                     {isLoading ? (
-                        <div className="p-4 text-center text-gray-500">
+                        <div className={`p-4 text-center ${isGlassVariant ? "text-slate-500" : "text-gray-500"}`}>
                             Buscando...
                         </div>
                     ) : results.length > 0 ? (
                         <>
-                            <div className="p-3 border-b border-gray-100">
-                                <h3 className="text-sm font-medium text-gray-900">Productos encontrados</h3>
+                            <div className={isGlassVariant ? "border-b border-white/60 p-4" : "border-b border-gray-100 p-3"}>
+                                <h3 className={isGlassVariant ? "text-sm font-semibold text-slate-900" : "text-sm font-medium text-gray-900"}>Productos encontrados</h3>
                             </div>
                             <div className="p-2 space-y-2">
                                 {results.map((product) => {
@@ -135,22 +144,29 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
                                     <a
                                         key={product.id}
                                         href={productUrl}
-                                        className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                                        className={isGlassVariant
+                                            ? "flex cursor-pointer items-center gap-3 rounded-2xl p-3 transition-colors hover:bg-white/70"
+                                            : "flex cursor-pointer items-center gap-3 rounded-lg p-2 hover:bg-gray-50"
+                                        }
                                         onClick={() => {
                                             setShowResults(false)
                                             setQuery("")
                                         }}
                                     >
                                         {product.image_url && (
-                                            <img 
-                                                src={product.image_url} 
-                                                alt={product.name}
-                                                className="w-12 h-12 object-cover rounded-lg"
-                                            />
+                                            <div className={isGlassVariant ? "relative h-14 w-14 overflow-hidden rounded-2xl border border-white/60 bg-white/70" : "relative h-12 w-12 overflow-hidden rounded-lg"}>
+                                                <Image
+                                                    src={product.image_url}
+                                                    alt={product.name}
+                                                    fill
+                                                    sizes={isGlassVariant ? "56px" : "48px"}
+                                                    className="object-cover"
+                                                />
+                                            </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
-                                            <p className="text-sm text-gray-500">
+                                            <p className={isGlassVariant ? "truncate text-sm font-semibold text-slate-900" : "truncate text-sm font-medium text-gray-900"}>{product.name}</p>
+                                            <p className={isGlassVariant ? "text-sm text-slate-500" : "text-sm text-gray-500"}>
                                                 {new Intl.NumberFormat('es-CO', {
                                                     style: 'currency',
                                                     currency: 'COP',
@@ -163,27 +179,30 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
                                 })}
                             </div>
                             {query.trim() && (
-                                <div className="p-3 border-t border-gray-100">
+                                <div className={isGlassVariant ? "border-t border-white/60 p-4" : "border-t border-gray-100 p-3"}>
                                     <Button
                                         onClick={handleChatWithQuery}
                                         variant="outline"
                                         size="sm"
-                                        className="w-full flex items-center gap-2"
+                                        className={isGlassVariant
+                                            ? "flex w-full items-center gap-2 rounded-full border-white/70 bg-white/70 font-medium text-slate-700 backdrop-blur hover:bg-white"
+                                            : "flex w-full items-center gap-2"
+                                        }
                                     >
                                         <MessageCircle className="w-4 h-4" />
-                                        Pregúntale al asistente sobre "{query}"
+                                        Pregúntale al asistente sobre &ldquo;{query}&rdquo;
                                     </Button>
                                 </div>
                             )}
                         </>
                     ) : query.trim().length > 2 ? (
                         <div className="p-4 text-center">
-                            <p className="text-gray-500 mb-3">No encontramos productos para "{query}"</p>
+                            <p className={isGlassVariant ? "mb-3 text-slate-500" : "mb-3 text-gray-500"}>No encontramos productos para &ldquo;{query}&rdquo;</p>
                             <Button
                                 onClick={handleChatWithQuery}
                                 size="sm"
                                 style={{ backgroundColor: primaryColor }}
-                                className="flex items-center gap-2"
+                                className={isGlassVariant ? "mx-auto flex items-center gap-2 rounded-full px-5 shadow-lg" : "flex items-center gap-2"}
                             >
                                 <MessageCircle className="w-4 h-4" />
                                 Pregúntale al asistente

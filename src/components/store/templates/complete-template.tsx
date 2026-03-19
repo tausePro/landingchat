@@ -4,11 +4,13 @@ import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
+import Link from "next/link"
 import Image from "next/image"
-import { ShoppingBag, MessageCircle, Truck, ShieldCheck, Instagram, Facebook } from "lucide-react"
+import { ShoppingBag, MessageCircle, Truck, ShieldCheck, Instagram, Facebook, ChevronLeft, ChevronRight } from "lucide-react"
 import { ProductCard } from "@/components/store/product-card"
-import { getStoreLink } from "@/lib/utils/store-urls"
+import { getProductUrl, getStoreLink } from "@/lib/utils/store-urls"
 import { getContrastTextColor } from "@/lib/utils"
+import { normalizeHeroSliderConfig, type StorefrontHeroSliderProduct, type StorefrontHeroSliderSlide } from "@/types/storefront"
 
 // Custom icons for TikTok and WhatsApp if not in lucide
 const TikTokIcon = ({ className }: { className?: string }) => (
@@ -26,11 +28,13 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
 interface CompleteTemplateProps {
     organization: any
     products: any[]
+    heroSliderProducts?: StorefrontHeroSliderProduct[]
     badges?: any[]
     pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
     onStartChat: (productId?: string) => void
+    hideHeroSection?: boolean
 }
 
 // Helper function to get text color based on configuration
@@ -44,6 +48,54 @@ function getTextColor(colorType: string): string {
         soft: "#6B7280"
     }
     return colors[colorType as keyof typeof colors] || colors.default
+}
+
+function getNumericValue(value: number | string | null | undefined): number | null {
+    if (value === null || value === undefined || value === "") {
+        return null
+    }
+
+    const parsedValue = typeof value === "number" ? value : Number(value)
+    return Number.isNaN(parsedValue) ? null : parsedValue
+}
+
+function formatPrice(value: number | string | null | undefined): string {
+    const numericValue = getNumericValue(value)
+
+    if (numericValue === null) {
+        return "Sin precio"
+    }
+
+    return new Intl.NumberFormat("es-CO", {
+        style: "currency",
+        currency: "COP",
+        minimumFractionDigits: 0,
+    }).format(numericValue)
+}
+
+function stripHtml(value: string | null | undefined): string {
+    if (!value) {
+        return ""
+    }
+
+    return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function createExcerpt(value: string | null | undefined, maxLength: number): string {
+    const cleanValue = stripHtml(value)
+
+    if (!cleanValue) {
+        return ""
+    }
+
+    if (cleanValue.length <= maxLength) {
+        return cleanValue
+    }
+
+    const truncated = cleanValue.slice(0, maxLength)
+    const lastSpace = truncated.lastIndexOf(" ")
+
+    return `${lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated}...`
 }
 
 // Component for critical image preloading (only hero + logo)
@@ -73,11 +125,13 @@ function CriticalImagePreloader({ heroImage, logoUrl }: { heroImage?: string, lo
 export function CompleteTemplate({
     organization,
     products,
+    heroSliderProducts = [],
     badges = [],
     pages = [],
     primaryColor,
     heroSettings,
     onStartChat,
+    hideHeroSection = false,
     isSubdomain = false
 }: CompleteTemplateProps & { isSubdomain?: boolean }) {
     const [mounted, setMounted] = useState(false)
@@ -92,6 +146,7 @@ export function CompleteTemplate({
     const chatButtonText = heroSettings.chatButtonText || "Chatear para Comprar"
 
     const templateConfig = organization.settings?.storefront?.templateConfig?.complete || {}
+    const heroSliderConfig = normalizeHeroSliderConfig(templateConfig.heroSlider)
 
     // Ensure we have a proper default config and merge with saved settings
     const defaultProductConfig = {
@@ -130,6 +185,61 @@ export function CompleteTemplate({
     ]
 
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+    const [activeHeroSlide, setActiveHeroSlide] = useState(0)
+
+    const heroSliderProductMap = useMemo(() => {
+        return new Map(heroSliderProducts.map((product) => [product.id, product]))
+    }, [heroSliderProducts])
+
+    const resolvedHeroSlides = useMemo<Array<{ slide: StorefrontHeroSliderSlide; product: StorefrontHeroSliderProduct }>>(() => {
+        return heroSliderConfig.slides.reduce<Array<{ slide: StorefrontHeroSliderSlide; product: StorefrontHeroSliderProduct }>>((accumulator, slide) => {
+            if (!slide.productId) {
+                return accumulator
+            }
+
+            const product = heroSliderProductMap.get(slide.productId)
+
+            if (!product) {
+                return accumulator
+            }
+
+            accumulator.push({ slide, product })
+            return accumulator
+        }, [])
+    }, [heroSliderConfig.slides, heroSliderProductMap])
+
+    const showHeroSlider = heroSliderConfig.enabled && resolvedHeroSlides.length > 0
+    const currentHeroSlide = showHeroSlider
+        ? resolvedHeroSlides[activeHeroSlide] ?? resolvedHeroSlides[0]
+        : null
+    const currentHeroImage = currentHeroSlide?.slide.imageUrl || currentHeroSlide?.product.image_url || ""
+    const currentHeroProductUrl = currentHeroSlide
+        ? getProductUrl(currentHeroSlide.product.slug || currentHeroSlide.product.id, isSubdomain, organization.slug)
+        : getStoreLink('/productos', isSubdomain, organization.slug)
+    const currentHeroBasePrice = getNumericValue(currentHeroSlide?.product.price)
+    const currentHeroSalePrice = getNumericValue(currentHeroSlide?.product.sale_price)
+    const currentHeroHasDiscount = currentHeroBasePrice !== null && currentHeroSalePrice !== null && currentHeroSalePrice < currentHeroBasePrice
+    const productsUrl = getStoreLink('/productos', isSubdomain, organization.slug)
+
+    useEffect(() => {
+        if (activeHeroSlide < resolvedHeroSlides.length) {
+            return
+        }
+
+        setActiveHeroSlide(0)
+    }, [activeHeroSlide, resolvedHeroSlides.length])
+
+    useEffect(() => {
+        if (!showHeroSlider || !heroSliderConfig.autoRotate || resolvedHeroSlides.length <= 1) {
+            return
+        }
+
+        const intervalId = window.setInterval(() => {
+            setActiveHeroSlide((currentSlide) => (currentSlide + 1) % resolvedHeroSlides.length)
+        }, heroSliderConfig.intervalMs)
+
+        return () => window.clearInterval(intervalId)
+    }, [heroSliderConfig.autoRotate, heroSliderConfig.intervalMs, resolvedHeroSlides.length, showHeroSlider])
 
     // Filter and Sort Products
     const filteredProducts = useMemo(() => {
@@ -188,155 +298,369 @@ export function CompleteTemplate({
     return (
         <>
             {/* Critical Image Preloader - Only hero + logo */}
-            <CriticalImagePreloader
-                heroImage={heroBackgroundImage || undefined}
-                logoUrl={organization.logo_url || undefined}
-            />
+            {!hideHeroSection && (
+                <CriticalImagePreloader
+                    heroImage={showHeroSlider ? (currentHeroImage || undefined) : (heroBackgroundImage || undefined)}
+                    logoUrl={organization.logo_url || undefined}
+                />
+            )}
 
             {/* Hero Section - Complete */}
-            <section
-                className="relative overflow-hidden pt-16 pb-24 lg:pt-32 lg:pb-40"
-                style={{
-                    backgroundImage: heroBackgroundImage ? `url(${heroBackgroundImage})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundColor: heroBackgroundImage ? 'transparent' : 'white'
-                }}
-            >
-                {heroBackgroundImage && (
-                    <div
-                        className="absolute inset-0"
-                        style={{
-                            backgroundColor: heroSettings.overlayColor || 'rgba(0, 0, 0, 0.4)'
-                        }}
-                    />
-                )}
-                <div className="container mx-auto px-4 relative z-10">
-                    <div className="grid lg:grid-cols-2 gap-12 items-center">
-                        <div className="max-w-2xl">
-                            <Badge variant="outline" className={`mb-6 px-3 py-1 text-sm ${heroBackgroundImage ? 'border-white/30 bg-white/20 text-white' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
-                                ✨ La nueva forma de comprar
-                            </Badge>
-                            <h1
-                                className={`text-4xl font-extrabold tracking-tight sm:text-6xl mb-6 leading-[1.1] ${heroBackgroundImage ? 'text-white' : 'text-gray-900'}`}
-                                style={{
-                                    fontFamily: typographyConfig.fontFamily,
-                                    color: heroBackgroundImage ? 'white' : getTextColor(typographyConfig.textColor)
-                                }}
-                            >
-                                {heroTitle}
-                            </h1>
-                            <p
-                                className={`text-lg mb-8 leading-relaxed ${heroBackgroundImage ? 'text-white/90' : 'text-slate-600'}`}
-                                style={{
-                                    fontFamily: typographyConfig.fontFamily,
-                                    color: heroBackgroundImage ? 'rgba(255,255,255,0.9)' : getTextColor(typographyConfig.textColor),
-                                    opacity: heroBackgroundImage ? 1 : 0.8
-                                }}
-                            >
-                                {heroSubtitle}
-                            </p>
-                            {showChatButton && (
-                                <div className="flex flex-col sm:flex-row gap-4">
+            {!hideHeroSection && (showHeroSlider && currentHeroSlide ? (
+                <section className="relative overflow-hidden bg-gradient-to-b from-white via-slate-50 to-white pt-14 pb-20 lg:pt-20 lg:pb-24">
+                    <div className="absolute -left-16 top-16 h-56 w-56 rounded-full blur-3xl opacity-10" style={{ backgroundColor: primaryColor }} />
+                    <div className="absolute -right-10 bottom-10 h-72 w-72 rounded-full bg-slate-200 blur-3xl opacity-40" />
+                    <div className="container relative z-10 mx-auto px-4">
+                        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                                {resolvedHeroSlides.map((heroSlide, index) => (
+                                    <button
+                                        key={heroSlide.slide.id}
+                                        type="button"
+                                        aria-label={`Ir al slide ${index + 1}`}
+                                        onClick={() => setActiveHeroSlide(index)}
+                                        className={`h-2.5 rounded-full transition-all ${index === activeHeroSlide ? 'w-10' : 'w-2.5 bg-slate-300'}`}
+                                        style={index === activeHeroSlide ? { backgroundColor: primaryColor } : undefined}
+                                    />
+                                ))}
+                            </div>
+
+                            {resolvedHeroSlides.length > 1 && (
+                                <div className="flex items-center gap-2 self-start sm:self-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveHeroSlide((currentSlide) => (currentSlide === 0 ? resolvedHeroSlides.length - 1 : currentSlide - 1))}
+                                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+                                        aria-label="Slide anterior"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setActiveHeroSlide((currentSlide) => (currentSlide + 1) % resolvedHeroSlides.length)}
+                                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+                                        aria-label="Siguiente slide"
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] lg:gap-14">
+                            <div className="max-w-2xl">
+                                <Badge variant="outline" className="mb-6 border-slate-200 bg-white/90 px-3 py-1 text-sm text-slate-700 backdrop-blur-sm">
+                                    {currentHeroSlide.slide.eyebrow || 'Selección curada'}
+                                </Badge>
+                                <h1
+                                    className="mb-6 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl"
+                                    style={{
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor)
+                                    }}
+                                >
+                                    {currentHeroSlide.slide.title || heroTitle}
+                                </h1>
+                                <p
+                                    className="mb-8 text-lg leading-relaxed text-slate-600"
+                                    style={{
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: getTextColor(typographyConfig.textColor),
+                                        opacity: 0.8
+                                    }}
+                                >
+                                    {currentHeroSlide.slide.description || heroSubtitle}
+                                </p>
+
+                                <div className="flex flex-col gap-4 sm:flex-row">
                                     <Button
-                                        onClick={() => onStartChat()}
+                                        asChild
                                         size="lg"
                                         style={{ backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) }}
-                                        className="w-full sm:w-auto text-base font-bold px-8 h-14 shadow-xl hover:scale-105 transition-transform"
+                                        className="w-full sm:w-auto px-8 text-base font-bold shadow-xl transition-transform hover:scale-[1.02]"
                                     >
-                                        {chatButtonText}
+                                        <Link href={currentHeroProductUrl}>
+                                            {currentHeroSlide.slide.ctaText || 'Ver producto'}
+                                        </Link>
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="lg"
-                                        className={`w-full sm:w-auto text-base font-bold h-14 ${heroBackgroundImage ? 'border-white text-white bg-transparent hover:bg-white/10 hover:text-white' : ''}`}
-                                        onClick={() => {
-                                            const productsUrl = getStoreLink('/productos', isSubdomain, organization.slug)
-                                            window.location.href = productsUrl
-                                        }}
+
+                                    {showChatButton && (
+                                        <Button
+                                            variant="outline"
+                                            size="lg"
+                                            className="w-full border-slate-200 bg-white/80 text-base font-bold text-slate-700 backdrop-blur-sm hover:bg-white sm:w-auto"
+                                            onClick={() => onStartChat(currentHeroSlide.product.id)}
+                                        >
+                                            {chatButtonText}
+                                        </Button>
+                                    )}
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap items-center gap-4">
+                                    <Link
+                                        href={productsUrl}
+                                        className="text-sm font-semibold text-slate-600 underline-offset-4 transition-colors hover:text-slate-900 hover:underline"
                                     >
-                                        {heroSettings.catalogButtonText || 'Ver Catálogo'}
-                                    </Button>
+                                        {heroSettings.catalogButtonText || 'Ver catálogo completo'}
+                                    </Link>
+
                                     {heroSettings.whatsappButton?.enabled && organization.settings?.whatsapp?.phone && (
                                         <a
                                             href={`https://wa.me/${organization.settings.whatsapp.phone.replace(/\D/g, '')}?text=${encodeURIComponent(heroSettings.whatsappButton.message || 'Hola, quiero más información')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto text-base font-bold h-14 px-8 rounded-md transition-transform hover:scale-105 ${
-                                                heroBackgroundImage
-                                                    ? 'bg-green-500 text-white hover:bg-green-600'
-                                                    : 'bg-green-500 text-white hover:bg-green-600'
-                                            }`}
+                                            className="inline-flex items-center gap-2 text-sm font-semibold text-green-600 transition-colors hover:text-green-700"
                                         >
-                                            <WhatsAppIcon className="w-5 h-5" />
+                                            <WhatsAppIcon className="h-4 w-4" />
                                             {heroSettings.whatsappButton.text || 'WhatsApp'}
                                         </a>
                                     )}
                                 </div>
-                            )}
 
-                            {/* Stats - Configurable */}
-                            {heroSettings.showStats !== false && (
-                                <div
-                                    className={`mt-10 flex items-center gap-6 text-sm font-medium ${heroBackgroundImage ? 'text-white/80' : 'text-slate-500'}`}
-                                    style={{
-                                        fontFamily: typographyConfig.fontFamily,
-                                        color: heroBackgroundImage ? 'rgba(255,255,255,0.8)' : getTextColor(typographyConfig.textColor),
-                                        opacity: heroBackgroundImage ? 1 : 0.7
-                                    }}
-                                >
-                                    {(heroSettings.stats || [
-                                        { icon: 'Truck', text: 'Envíos Nacionales' },
-                                        { icon: 'ShieldCheck', text: 'Compra Segura' }
-                                    ]).map((stat: any, index: number) => (
-                                        <div key={index} className="flex items-center gap-2">
-                                            <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
-                                                {stat.icon === 'Truck' && <Truck className="w-4 h-4" />}
-                                                {stat.icon === 'ShieldCheck' && <ShieldCheck className="w-4 h-4" />}
-                                                {stat.icon === 'MessageCircle' && <MessageCircle className="w-4 h-4" />}
+                                {heroSettings.showStats !== false && (
+                                    <div
+                                        className="mt-10 flex flex-wrap items-center gap-4 text-sm font-medium text-slate-500"
+                                        style={{
+                                            fontFamily: typographyConfig.fontFamily,
+                                            color: getTextColor(typographyConfig.textColor),
+                                            opacity: 0.7
+                                        }}
+                                    >
+                                        {(heroSettings.stats || [
+                                            { icon: 'Truck', text: 'Envíos Nacionales' },
+                                            { icon: 'ShieldCheck', text: 'Compra Segura' }
+                                        ]).map((stat: any, index: number) => (
+                                            <div key={index} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm">
+                                                {stat.icon === 'Truck' && <Truck className="h-4 w-4" />}
+                                                {stat.icon === 'ShieldCheck' && <ShieldCheck className="h-4 w-4" />}
+                                                {stat.icon === 'MessageCircle' && <MessageCircle className="h-4 w-4" />}
+                                                <span>{stat.text}</span>
                                             </div>
-                                            <span>{stat.text}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                        {/* Hero Image/Illustration (only if no background image) */}
-                        {!heroBackgroundImage && (
-                            <div className="hidden lg:block relative">
-                                <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-purple-100 rounded-3xl transform rotate-3 scale-95 opacity-70" />
-                                <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-8">
-                                    <div className="space-y-4">
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">IA</div>
-                                            <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4 text-sm text-gray-700 max-w-[80%]">
-                                                ¡Hola! 👋 Soy tu asistente personal. ¿Qué estás buscando hoy?
+                            <div className="relative">
+                                <div className="absolute inset-0 translate-x-4 translate-y-4 rounded-[32px] bg-slate-200/70 blur-xl" />
+                                <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+                                    <div className="relative aspect-[4/5] bg-slate-100 sm:aspect-[16/11] lg:aspect-[4/5]">
+                                        {currentHeroImage ? (
+                                            <Image
+                                                src={currentHeroImage}
+                                                alt={currentHeroSlide.product.name}
+                                                fill
+                                                sizes="(max-width: 1024px) 100vw, 45vw"
+                                                className="object-cover"
+                                                priority
+                                            />
+                                        ) : (
+                                            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-100 via-white to-slate-200 px-10 text-center text-2xl font-semibold text-slate-400">
+                                                {currentHeroSlide.product.name}
                                             </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
+                                        <div className="absolute left-5 top-5 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-slate-700 backdrop-blur-sm">
+                                            {activeHeroSlide + 1} / {resolvedHeroSlides.length}
                                         </div>
-                                        <div className="flex items-start gap-4 flex-row-reverse">
-                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">Tú</div>
-                                            <div className="bg-blue-600 rounded-2xl rounded-tr-none p-4 text-sm text-white max-w-[80%]">
-                                                Busco un regalo para mi novia, le gusta la tecnología.
+                                    </div>
+
+                                    <div className="grid gap-4 p-5 sm:grid-cols-[104px_minmax(0,1fr)] sm:p-6">
+                                        <div className="relative h-24 overflow-hidden rounded-2xl bg-slate-100">
+                                            {currentHeroSlide.product.image_url ? (
+                                                <Image
+                                                    src={currentHeroSlide.product.image_url}
+                                                    alt={currentHeroSlide.product.name}
+                                                    fill
+                                                    sizes="104px"
+                                                    className="object-cover"
+                                                    loading="lazy"
+                                                />
+                                            ) : null}
+                                        </div>
+
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: primaryColor }}>
+                                                Producto vinculado
+                                            </p>
+                                            <div className="mt-2 flex items-start justify-between gap-4">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-lg font-semibold text-slate-900">
+                                                        {currentHeroSlide.product.name}
+                                                    </p>
+                                                    <p className="mt-2 line-clamp-2 text-sm text-slate-500">
+                                                        {createExcerpt(currentHeroSlide.product.description, 120) || 'Producto destacado del catálogo enlazado al hero.'}
+                                                    </p>
+                                                </div>
+
+                                                <div className="shrink-0 text-right">
+                                                    <p className="text-sm font-semibold" style={{ color: primaryColor }}>
+                                                        {formatPrice(currentHeroSlide.product.sale_price ?? currentHeroSlide.product.price)}
+                                                    </p>
+                                                    {currentHeroHasDiscount && currentHeroBasePrice !== null && (
+                                                        <p className="mt-1 text-xs text-slate-400 line-through">
+                                                            {formatPrice(currentHeroBasePrice)}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">IA</div>
-                                            <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4 text-sm text-gray-700 max-w-[80%]">
-                                                ¡Perfecto! Tengo unas opciones geniales. ¿Qué tal estos audífonos con cancelación de ruido? 🎧
+
+                                            <div className="mt-4 flex flex-wrap gap-3">
+                                                <Button asChild variant="outline" size="sm" className="border-slate-200 bg-white hover:bg-slate-50">
+                                                    <Link href={currentHeroProductUrl}>Abrir ficha</Link>
+                                                </Button>
+                                                <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900" onClick={() => onStartChat(currentHeroSlide.product.id)}>
+                                                    Hablar con IA
+                                                </Button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
+            ) : (
+                <section
+                    className="relative overflow-hidden pt-16 pb-24 lg:pt-32 lg:pb-40"
+                    style={{
+                        backgroundImage: heroBackgroundImage ? `url(${heroBackgroundImage})` : 'none',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                        backgroundColor: heroBackgroundImage ? 'transparent' : 'white'
+                    }}
+                >
+                    {heroBackgroundImage && (
+                        <div
+                            className="absolute inset-0"
+                            style={{
+                                backgroundColor: heroSettings.overlayColor || 'rgba(0, 0, 0, 0.4)'
+                            }}
+                        />
+                    )}
+                    <div className="container mx-auto px-4 relative z-10">
+                        <div className="grid lg:grid-cols-2 gap-12 items-center">
+                            <div className="max-w-2xl">
+                                <Badge variant="outline" className={`mb-6 px-3 py-1 text-sm ${heroBackgroundImage ? 'border-white/30 bg-white/20 text-white' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
+                                    ✨ La nueva forma de comprar
+                                </Badge>
+                                <h1
+                                    className={`text-4xl font-extrabold tracking-tight sm:text-6xl mb-6 leading-[1.1] ${heroBackgroundImage ? 'text-white' : 'text-gray-900'}`}
+                                    style={{
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: heroBackgroundImage ? 'white' : getTextColor(typographyConfig.textColor)
+                                    }}
+                                >
+                                    {heroTitle}
+                                </h1>
+                                <p
+                                    className={`text-lg mb-8 leading-relaxed ${heroBackgroundImage ? 'text-white/90' : 'text-slate-600'}`}
+                                    style={{
+                                        fontFamily: typographyConfig.fontFamily,
+                                        color: heroBackgroundImage ? 'rgba(255,255,255,0.9)' : getTextColor(typographyConfig.textColor),
+                                        opacity: heroBackgroundImage ? 1 : 0.8
+                                    }}
+                                >
+                                    {heroSubtitle}
+                                </p>
+                                {showChatButton && (
+                                    <div className="flex flex-col sm:flex-row gap-4">
+                                        <Button
+                                            onClick={() => onStartChat()}
+                                            size="lg"
+                                            style={{ backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) }}
+                                            className="w-full sm:w-auto text-base font-bold px-8 h-14 shadow-xl hover:scale-105 transition-transform"
+                                        >
+                                            {chatButtonText}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="lg"
+                                            className={`w-full sm:w-auto text-base font-bold h-14 ${heroBackgroundImage ? 'border-white text-white bg-transparent hover:bg-white/10 hover:text-white' : ''}`}
+                                            onClick={() => {
+                                                window.location.href = productsUrl
+                                            }}
+                                        >
+                                            {heroSettings.catalogButtonText || 'Ver Catálogo'}
+                                        </Button>
+                                        {heroSettings.whatsappButton?.enabled && organization.settings?.whatsapp?.phone && (
+                                            <a
+                                                href={`https://wa.me/${organization.settings.whatsapp.phone.replace(/\D/g, '')}?text=${encodeURIComponent(heroSettings.whatsappButton.message || 'Hola, quiero más información')}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto text-base font-bold h-14 px-8 rounded-md transition-transform hover:scale-105 ${
+                                                    heroBackgroundImage
+                                                        ? 'bg-green-500 text-white hover:bg-green-600'
+                                                        : 'bg-green-500 text-white hover:bg-green-600'
+                                                }`}
+                                            >
+                                                <WhatsAppIcon className="w-5 h-5" />
+                                                {heroSettings.whatsappButton.text || 'WhatsApp'}
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
 
-            {/* Features / How it works */}
-            <section className="py-20 bg-white">
-                <div className="container mx-auto px-4">
+                                {heroSettings.showStats !== false && (
+                                    <div
+                                        className={`mt-10 flex items-center gap-6 text-sm font-medium ${heroBackgroundImage ? 'text-white/80' : 'text-slate-500'}`}
+                                        style={{
+                                            fontFamily: typographyConfig.fontFamily,
+                                            color: heroBackgroundImage ? 'rgba(255,255,255,0.8)' : getTextColor(typographyConfig.textColor),
+                                            opacity: heroBackgroundImage ? 1 : 0.7
+                                        }}
+                                    >
+                                        {(heroSettings.stats || [
+                                            { icon: 'Truck', text: 'Envíos Nacionales' },
+                                            { icon: 'ShieldCheck', text: 'Compra Segura' }
+                                        ]).map((stat: any, index: number) => (
+                                            <div key={index} className="flex items-center gap-2">
+                                                <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
+                                                    {stat.icon === 'Truck' && <Truck className="w-4 h-4" />}
+                                                    {stat.icon === 'ShieldCheck' && <ShieldCheck className="w-4 h-4" />}
+                                                    {stat.icon === 'MessageCircle' && <MessageCircle className="w-4 h-4" />}
+                                                </div>
+                                                <span>{stat.text}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {!heroBackgroundImage && (
+                                <div className="hidden lg:block relative">
+                                    <div className="absolute inset-0 bg-gradient-to-tr from-blue-100 to-purple-100 rounded-3xl transform rotate-3 scale-95 opacity-70" />
+                                    <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-8">
+                                        <div className="space-y-4">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">IA</div>
+                                                <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4 text-sm text-gray-700 max-w-[80%]">
+                                                    ¡Hola! 👋 Soy tu asistente personal. ¿Qué estás buscando hoy?
+                                                </div>
+                                            </div>
+                                             <div className="flex items-start gap-4 flex-row-reverse">
+                                                 <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">Tú</div>
+                                                 <div className="bg-blue-600 rounded-2xl rounded-tr-none p-4 text-sm text-white max-w-[80%]">
+                                                     Busco un regalo para mi novia, le gusta la tecnología.
+                                                 </div>
+                                             </div>
+                                             <div className="flex items-start gap-4">
+                                                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">IA</div>
+                                                 <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4 text-sm text-gray-700 max-w-[80%]">
+                                                     ¡Perfecto! Tengo unas opciones geniales. ¿Qué tal estos audífonos con cancelación de ruido? 🎧
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             )}
+                         </div>
+                     </div>
+                 </section>
+             ))}
+             {/* Features / How it works */}
+             <section className="py-20 bg-white">
+                 <div className="container mx-auto px-4">
                     <div className="text-center max-w-3xl mx-auto mb-16">
                         <h2
                             className="text-3xl font-bold mb-4"

@@ -1,11 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { CustomerGateModal } from "@/components/store/customer-gate-modal"
 import { TemplateRenderer } from "@/components/store/templates/template-renderer"
-import { StoreHeader } from "@/components/store/store-header"
 import { EnhancedStoreHeader } from "@/components/store/enhanced-store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
@@ -20,26 +18,109 @@ import { ConversationalLayout } from "@/components/store/layouts/conversational-
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
 import { getSafeStorefrontTemplate, isRealEstateIndustry } from "@/lib/storefront-templates"
+import type { Organization } from "@/types/organization"
+import { normalizeStorefrontTemplateVersion, type StorefrontHeroSliderProduct, type StorefrontViewModel } from "@/types/storefront"
 
-// ... (in render)
+interface StoreMenuItem {
+    id: string
+    label: string
+    url: string
+    openInNewTab?: boolean
+    children?: StoreMenuItem[]
+}
 
+interface StoreProduct {
+    id: string
+    name: string
+    price: number
+    image_url: string
+    slug: string
+    [key: string]: unknown
+}
 
+interface StoreProperty {
+    id: string
+    external_code: string
+    title: string
+    description: string
+    property_type: string
+    property_class: string
+    price_rent: number | null
+    price_sale: number | null
+    price_admin: number | null
+    city: string
+    neighborhood: string
+    address: string
+    bedrooms: number | null
+    bathrooms: number | null
+    area_m2: number | null
+    parking_spots: number | null
+    stratum: string | null
+    images: Array<{ url: string; position: number }>
+    is_featured: boolean
+}
+
+interface StoreShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
+    default_shipping_rate: number
+}
+
+type HeaderLogoSize = "sm" | "md" | "lg" | "xl"
+
+interface HeaderSettings {
+    showStoreName?: boolean
+    menuItems?: StoreMenuItem[]
+    logoSize?: HeaderLogoSize
+}
+
+interface TypographySettings {
+    fontFamily?: string
+}
+
+interface IdentifiedCustomer {
+    id: string
+    full_name: string
+    phone: string
+    email?: string | null
+}
+
+interface StoreLayoutOrganization extends Pick<Organization, "slug" | "name" | "industry" | "logo_url"> {
+    settings?: {
+        branding?: {
+            primaryColor?: string
+        } | null
+        storefront?: {
+            template?: string
+            templateVersion?: StorefrontViewModel["tenant"]["templateVersion"]
+            hero?: Record<string, unknown>
+            typography?: TypographySettings | null
+            header?: HeaderSettings | null
+        } | null
+        whatsapp?: {
+            phone?: string | null
+        } | null
+    } | null
+}
 
 interface StoreLayoutClientProps {
     slug: string
-    organization: any
-    products: any[]
-    properties?: any[]
-    badges?: any[]
+    organization: StoreLayoutOrganization
+    products: StoreProduct[]
+    heroSliderProducts?: StorefrontHeroSliderProduct[]
+    storefrontViewModel?: StorefrontViewModel
+    properties?: StoreProperty[]
+    badges?: unknown[]
     pages?: Array<{ id: string; slug: string; title: string }>
-    children?: React.ReactNode
+    children?: ReactNode
     hideNavigation?: boolean
     hideHeaderOnMobile?: boolean
     initialIsSubdomain?: boolean
     defaultChatProductId?: string
 }
 
-export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, heroSliderProducts = [], storefrontViewModel, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientIsSubdomain = useIsSubdomain()
@@ -53,7 +134,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
-    const [shippingConfig, setShippingConfig] = useState<any>(null)
+    const [shippingConfig, setShippingConfig] = useState<StoreShippingConfig | null>(null)
     const { setIsOpen: setCartOpen, setOrganizationSlug } = useCartStore()
 
     // Clear cart if switching organizations
@@ -75,10 +156,22 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     // Storefront customization settings
     const storefrontSettings = organization.settings?.storefront || {}
     const heroSettings = storefrontSettings.hero || {}
-    const typographySettings = storefrontSettings.typography || {}
-    const headerSettings = storefrontSettings.header || {}
+    const typographySettings: TypographySettings = storefrontSettings.typography || {}
+    const headerSettings: HeaderSettings = storefrontSettings.header || {}
     const selectedTemplate = getSafeStorefrontTemplate(storefrontSettings.template, organization)
+    const templateVersion = storefrontViewModel?.tenant.templateVersion || normalizeStorefrontTemplateVersion(storefrontSettings.templateVersion)
+    const templateKey = storefrontViewModel?.tenant.templateKey || selectedTemplate
+    const showTemplateVersionBadge = process.env.NODE_ENV !== "production" && templateVersion === "v2"
     const showStoreName = headerSettings.showStoreName ?? true
+    const headerLogoSize = headerSettings.logoSize
+    const headerVisualVariant = templateKey === "complete" && templateVersion === "v2" ? "glass" : "default"
+    const headerShippingConfig = shippingConfig
+        ? {
+            free_shipping_enabled: shippingConfig.free_shipping_enabled,
+            free_shipping_min_amount: shippingConfig.free_shipping_min_amount ?? undefined,
+            default_shipping_rate: shippingConfig.default_shipping_rate,
+        }
+        : undefined
 
     // Defaults de menú según vertical (el admin puede personalizar)
     const defaultMenuItems = isRealEstate
@@ -101,8 +194,15 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
             try {
                 const response = await fetch(`/api/store/${slug}/shipping-config`)
                 if (response.ok) {
-                    const config = await response.json()
-                    setShippingConfig(config)
+                    const config = await response.json() as Partial<StoreShippingConfig>
+                    setShippingConfig({
+                        free_shipping_enabled: Boolean(config.free_shipping_enabled),
+                        free_shipping_min_amount: typeof config.free_shipping_min_amount === "number" ? config.free_shipping_min_amount : null,
+                        free_shipping_zones: Array.isArray(config.free_shipping_zones)
+                            ? config.free_shipping_zones.filter((zone): zone is string => typeof zone === "string")
+                            : null,
+                        default_shipping_rate: typeof config.default_shipping_rate === "number" ? config.default_shipping_rate : 0,
+                    })
                 }
             } catch (error) {
                 console.error('Error loading shipping config:', error)
@@ -117,27 +217,33 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
         const productId = searchParams.get('product')
         const context = searchParams.get('context')
 
-        if (action === 'chat') {
-            // Verificar si ya está identificado (con validación de UUID)
-            const customerId = getStoredUUID(`customer_${organization.slug}`)
-
-            if (customerId) {
-                // Ya identificado, ir directamente al chat
-                let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
-                const params = new URLSearchParams()
-                if (productId) params.set('product', productId)
-                if (context) params.set('context', context)
-                if (params.toString()) chatUrl += `?${params.toString()}`
-
-                router.push(chatUrl)
-            } else {
-                // No identificado, guardar contexto y mostrar modal
-                if (productId) setPendingProductId(productId)
-                if (context) setPendingContext(context)
-                setShowGateModal(true)
-            }
+        if (action !== 'chat') {
+            return
         }
-    }, [searchParams, organization.slug, router, isSubdomain])
+
+        // Verificar si ya está identificado (con validación de UUID)
+        const customerId = getStoredUUID(`customer_${organization.slug}`)
+
+        if (customerId) {
+            // Ya identificado, ir directamente al chat
+            let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
+            const params = new URLSearchParams()
+            if (productId) params.set('product', productId)
+            if (context) params.set('context', context)
+            if (params.toString()) chatUrl += `?${params.toString()}`
+
+            router.push(chatUrl)
+            return
+        }
+
+        const frameId = window.requestAnimationFrame(() => {
+            if (productId) setPendingProductId(productId)
+            if (context) setPendingContext(context)
+            setShowGateModal(true)
+        })
+
+        return () => window.cancelAnimationFrame(frameId)
+    }, [searchParams, organization.slug, router, isSubdomain, isRealEstate])
 
     const handleStartChat = (productId?: string, query?: string) => {
         // Verificar si ya está identificado (con validación de UUID)
@@ -164,7 +270,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
         }
     }
 
-    const handleCustomerIdentified = (customer: any) => {
+    const handleCustomerIdentified = (customer: IdentifiedCustomer) => {
         // Guardar en localStorage (con validación)
         setStoredUUID(`customer_${organization.slug}`, customer.id)
         setStoredString(`customer_name_${organization.slug}`, customer.full_name)
@@ -199,19 +305,26 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const USE_CONVERSATIONAL_LAYOUT = false
 
     const content = (
-        <div className="min-h-screen bg-white dark:bg-gray-950 text-slate-900 dark:text-slate-100" style={{ fontFamily: fontFamily }}>
+        <div className="min-h-screen bg-white dark:bg-gray-950 text-slate-900 dark:text-slate-100" style={{ fontFamily: fontFamily }} data-template-key={templateKey} data-template-version={templateVersion}>
+            {showTemplateVersionBadge && (
+                <div className="fixed bottom-4 left-4 z-[60] rounded-full border border-primary/30 bg-white/95 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary shadow-lg backdrop-blur dark:bg-gray-950/95">
+                    Preview local · {templateKey} · v2
+                </div>
+            )}
             {/* --- Header --- */}
             {!hideNavigation && (
                 <EnhancedStoreHeader
                     slug={slug}
                     organization={organization}
-                    onStartChat={handleStartChat}
+                    onStartChat={(query) => handleStartChat(undefined, query)}
                     primaryColor={primaryColor}
                     showStoreName={showStoreName}
                     menuItems={menuItems}
                     hideOnMobile={hideHeaderOnMobile}
-                    shippingConfig={shippingConfig}
+                    shippingConfig={headerShippingConfig}
+                    logoSize={headerLogoSize}
                     isRealEstate={isRealEstate}
+                    visualVariant={headerVisualVariant}
                 />
             )}
 
@@ -221,6 +334,8 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                         template={selectedTemplate}
                         organization={organization}
                         products={productsToUse}
+                        heroSliderProducts={heroSliderProducts}
+                        storefrontViewModel={storefrontViewModel}
                         properties={properties}
                         badges={badges}
                         pages={pages}

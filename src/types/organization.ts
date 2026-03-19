@@ -4,6 +4,7 @@
  */
 
 import { z } from "zod"
+import type { StorefrontHeroSliderConfig, StorefrontTemplateVersion } from "./storefront"
 
 // ============================================================================
 // Organization Details Schema (for onboarding)
@@ -131,11 +132,40 @@ export interface OrganizationBrandingSettings {
   [key: string]: unknown
 }
 
+export interface OrganizationStorefrontCompleteTemplateConfig {
+  steps?: Array<{
+    id?: string
+    title?: string
+    description?: string
+  }>
+  heroSlider?: StorefrontHeroSliderConfig
+  [key: string]: unknown
+}
+
+export interface OrganizationStorefrontTemplateConfig {
+  complete?: OrganizationStorefrontCompleteTemplateConfig
+  [key: string]: unknown
+}
+
+export interface OrganizationStorefrontSettings {
+  template?: string
+  templateVersion?: StorefrontTemplateVersion
+  templateConfig?: OrganizationStorefrontTemplateConfig
+  hero?: Record<string, unknown>
+  products?: Record<string, unknown>
+  testimonials?: unknown[]
+  footer?: Record<string, unknown>
+  typography?: Record<string, unknown>
+  header?: Record<string, unknown>
+  [key: string]: unknown
+}
+
 export interface OrganizationSettingsOverrides {
   branding?: OrganizationBrandingSettings
   shipping?: {
     free_shipping_threshold?: number
     [key: string]: unknown
   }
+  storefront?: OrganizationStorefrontSettings
   [key: string]: unknown
 }

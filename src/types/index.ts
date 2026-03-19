@@ -199,6 +199,25 @@ export {
   type LandingFooterColumn,
 } from "./landing"
 
+// Storefront domain types
+export {
+  type StorefrontHeroSliderProduct,
+  type StorefrontHeroSliderSlide,
+  type StorefrontHeroSliderConfig,
+  type StorefrontTemplateVersion,
+  type StorefrontViewModel,
+  type StorefrontViewModelPage,
+  type StorefrontViewModelCta,
+  type StorefrontViewModelCtaKind,
+  type StorefrontViewModelOfferItem,
+  type StorefrontViewModelPropertyItem,
+  type StorefrontViewModelHeroSliderItem,
+  createDefaultHeroSliderSlides,
+  getDefaultHeroSliderConfig,
+  normalizeHeroSliderConfig,
+  normalizeStorefrontTemplateVersion,
+} from "./storefront"
+
 // Founding Members / Early Adopters domain types
 export {
   FoundingSlotStatusEnum,

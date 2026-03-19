@@ -10,9 +10,10 @@ interface AnnouncementBarProps {
         default_shipping_rate?: number
     }
     primaryColor: string
+    visualVariant?: "default" | "glass"
 }
 
-export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBarProps) {
+export function AnnouncementBar({ shippingConfig, primaryColor, visualVariant = "default" }: AnnouncementBarProps) {
     // Generar mensaje dinámico basado en configuración de envío
     const getMessage = () => {
         // Si no hay configuración, mostrar mensaje por defecto
@@ -49,13 +50,23 @@ export function AnnouncementBar({ shippingConfig, primaryColor }: AnnouncementBa
 
     return (
         <div
-            className="w-full py-2 px-4 text-center text-white text-sm font-medium"
+            className={visualVariant === "glass"
+                ? "w-full px-4 py-2 text-center text-sm font-medium text-white"
+                : "w-full py-2 px-4 text-center text-white text-sm font-medium"
+            }
             style={{ backgroundColor: primaryColor }}
         >
-            <div className="flex items-center justify-center gap-2">
-                <Zap className="w-4 h-4" />
-                <span>{getMessage()}</span>
-            </div>
+            {visualVariant === "glass" ? (
+                <div className="flex items-center justify-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    <span>{getMessage()}</span>
+                </div>
+            ) : (
+                <div className="flex items-center justify-center gap-2">
+                    <Zap className="w-4 h-4" />
+                    <span>{getMessage()}</span>
+                </div>
+            )}
         </div>
     )
 }

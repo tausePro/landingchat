@@ -25,6 +25,7 @@ export function CompleteTemplateEditor({ organization }: CompleteTemplateEditorP
     const handleSave = async () => {
         setIsSaving(true)
         try {
+            const completeTemplateConfig = organization.settings?.storefront?.templateConfig?.complete || {}
             const updatedSettings = {
                 ...organization.settings,
                 storefront: {
@@ -32,6 +33,7 @@ export function CompleteTemplateEditor({ organization }: CompleteTemplateEditorP
                     templateConfig: {
                         ...organization.settings?.storefront?.templateConfig,
                         complete: {
+                            ...completeTemplateConfig,
                             steps
                         }
                     }

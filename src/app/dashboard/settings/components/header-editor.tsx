@@ -5,19 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { updateOrganization } from "../actions"
 import { Button } from "@/components/ui/button"
 import { ChevronUp, ChevronDown, Trash2, Plus, ExternalLink, Zap, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
-
-interface HeaderEditorProps {
-    organization: {
-        id: string
-        name: string
-        slug: string
-        settings: any
-    }
-}
 
 interface MenuItem {
     id: string
@@ -27,10 +19,36 @@ interface MenuItem {
     children?: MenuItem[]
 }
 
+type HeaderLogoSize = "sm" | "md" | "lg" | "xl"
+
+interface HeaderEditorProps {
+    organization: {
+        id: string
+        name: string
+        slug: string
+        settings?: {
+            storefront?: {
+                header?: {
+                    showStoreName?: boolean
+                    menuItems?: MenuItem[]
+                    logoSize?: HeaderLogoSize
+                } | null
+            } | null
+        } | null
+    }
+}
+
 interface QuickLink {
     label: string
     url: string
 }
+
+const HEADER_LOGO_SIZE_OPTIONS: Array<{ value: HeaderLogoSize; label: string }> = [
+    { value: "sm", label: "Pequeño" },
+    { value: "md", label: "Mediano" },
+    { value: "lg", label: "Grande" },
+    { value: "xl", label: "Extra grande" },
+]
 
 const DEFAULT_MENU_ITEMS: MenuItem[] = [
     { id: "home", label: "Inicio", url: "/" },
@@ -55,6 +73,9 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
     const [loading, setLoading] = useState(false)
     const [showStoreName, setShowStoreName] = useState(
         organization.settings?.storefront?.header?.showStoreName ?? true
+    )
+    const [logoSize, setLogoSize] = useState<HeaderLogoSize>(
+        organization.settings?.storefront?.header?.logoSize ?? "lg"
     )
     const [menuItems, setMenuItems] = useState<MenuItem[]>(
         organization.settings?.storefront?.header?.menuItems || DEFAULT_MENU_ITEMS
@@ -233,6 +254,7 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                         header: {
                             ...organization.settings?.storefront?.header,
                             showStoreName,
+                            logoSize,
                             menuItems: validMenuItems
                         }
                     }
@@ -240,8 +262,8 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
             })
             setMenuItems(validMenuItems.length > 0 ? validMenuItems : DEFAULT_MENU_ITEMS)
             toast.success("Configuración guardada correctamente")
-        } catch (error: any) {
-            toast.error(`Error: ${error.message}`)
+        } catch (error: unknown) {
+            toast.error(`Error: ${error instanceof Error ? error.message : "No fue posible guardar la configuración"}`)
         } finally {
             setLoading(false)
         }
@@ -279,6 +301,30 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                         checked={showStoreName}
                         onCheckedChange={setShowStoreName}
                     />
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                    <div className="space-y-0.5">
+                        <Label className="text-base">Tamaño del logo</Label>
+                        <p className="text-sm text-muted-foreground">
+                            Ajusta cuánto espacio ocupa el logo dentro del header de la tienda.
+                        </p>
+                    </div>
+                    <Select value={logoSize} onValueChange={(value) => setLogoSize(value as HeaderLogoSize)}>
+                        <SelectTrigger className="bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-700">
+                            <SelectValue placeholder="Selecciona un tamaño" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {HEADER_LOGO_SIZE_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                        Para logos horizontales como `tez`, normalmente funciona mejor `grande` o `extra grande`.
+                    </p>
                 </div>
 
                 {/* Separador */}

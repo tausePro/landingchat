@@ -10,6 +10,10 @@ export async function GET(
         const { searchParams } = new URL(request.url)
         const search = searchParams.get('search')
         const limit = parseInt(searchParams.get('limit') || '20')
+        const ids = (searchParams.get('ids') || '')
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean)
 
         const supabase = await createClient()
 
@@ -30,8 +34,12 @@ export async function GET(
         // 2. Build products query
         let query = supabase
             .from("products")
-            .select("id, name, price, image_url, slug, description")
+            .select("id, name, price, sale_price, image_url, slug, description")
             .eq("organization_id", org.id)
+
+        if (ids.length > 0) {
+            query = query.in('id', ids)
+        }
 
         // 3. Apply search filter if provided
         if (search && search.trim()) {
@@ -42,7 +50,7 @@ export async function GET(
         // 4. Apply limit and ordering
         query = query
             .order("created_at", { ascending: false })
-            .limit(limit)
+            .limit(ids.length > 0 ? Math.max(limit, ids.length) : limit)
 
         const { data: products, error: productsError } = await query
 

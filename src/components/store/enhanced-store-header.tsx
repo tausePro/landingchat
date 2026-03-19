@@ -20,9 +20,16 @@ interface MenuItem {
     children?: MenuItem[]
 }
 
+type HeaderLogoSize = "sm" | "md" | "lg" | "xl"
+
+interface HeaderOrganization {
+    name: string
+    logo_url?: string | null
+}
+
 interface EnhancedStoreHeaderProps {
     slug: string
-    organization: any
+    organization: HeaderOrganization
     onStartChat: (query?: string) => void
     hideOnMobile?: boolean
     primaryColor: string
@@ -36,6 +43,8 @@ interface EnhancedStoreHeaderProps {
         free_shipping_min_amount?: number
         default_shipping_rate?: number
     }
+    logoSize?: HeaderLogoSize
+    visualVariant?: "default" | "glass"
 }
 
 export function EnhancedStoreHeader({
@@ -49,7 +58,9 @@ export function EnhancedStoreHeader({
     className = "",
     hideChatButton = false,
     isRealEstate = false,
-    shippingConfig
+    shippingConfig,
+    logoSize,
+    visualVariant = "default"
 }: EnhancedStoreHeaderProps) {
     const router = useRouter()
     const pathname = usePathname()
@@ -59,7 +70,13 @@ export function EnhancedStoreHeader({
     // Prevent hydration mismatch for cart count
     const [mounted, setMounted] = useState(false)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-    useEffect(() => setMounted(true), [])
+    useEffect(() => {
+        const frameId = window.requestAnimationFrame(() => {
+            setMounted(true)
+        })
+
+        return () => window.cancelAnimationFrame(frameId)
+    }, [])
 
     const cartCount = items.reduce((acc, item) => acc + item.quantity, 0)
 
@@ -86,6 +103,37 @@ export function EnhancedStoreHeader({
     }
 
     const hasMenuItems = menuItems.length > 0
+    const isGlassVariant = visualVariant === "glass"
+    const resolvedLogoSize: HeaderLogoSize = logoSize ?? (isGlassVariant ? "lg" : "md")
+    const iconButtonClassName = isGlassVariant
+        ? "rounded-full border border-white/60 bg-white/65 p-2 text-slate-600 shadow-sm backdrop-blur-xl transition-all hover:bg-white hover:text-slate-900"
+        : "p-2 text-slate-600 transition-colors hover:text-slate-900"
+    const logoPresentation = {
+        sm: {
+            width: 112,
+            height: 32,
+            imageClassName: "h-7 w-auto object-contain max-w-[96px] md:h-8 md:max-w-[112px]",
+            markClassName: isGlassVariant ? "h-8 w-8 rounded-xl shadow-sm" : "h-8 w-8 rounded-lg",
+        },
+        md: {
+            width: 132,
+            height: 38,
+            imageClassName: "h-8 w-auto object-contain max-w-[108px] md:h-9 md:max-w-[132px]",
+            markClassName: isGlassVariant ? "h-9 w-9 rounded-2xl shadow-sm" : "h-8 w-8 rounded-lg",
+        },
+        lg: {
+            width: 156,
+            height: 44,
+            imageClassName: "h-9 w-auto object-contain max-w-[126px] md:h-10 md:max-w-[156px]",
+            markClassName: isGlassVariant ? "h-10 w-10 rounded-2xl shadow-sm" : "h-9 w-9 rounded-xl",
+        },
+        xl: {
+            width: 184,
+            height: 52,
+            imageClassName: "h-10 w-auto object-contain max-w-[144px] md:h-12 md:max-w-[184px]",
+            markClassName: isGlassVariant ? "h-11 w-11 rounded-[1.35rem] shadow-sm" : "h-10 w-10 rounded-2xl",
+        },
+    }[resolvedLogoSize]
 
     return (
         <div className={`sticky top-0 z-50 w-full ${hideOnMobile ? 'hidden md:block' : ''} ${className}`}>
@@ -94,38 +142,57 @@ export function EnhancedStoreHeader({
                 <AnnouncementBar
                     shippingConfig={shippingConfig}
                     primaryColor={primaryColor}
+                    visualVariant={visualVariant}
                 />
             )}
 
             {/* Header principal */}
-            <header className="w-full border-b bg-white/95 backdrop-blur-md">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
+            <header className={cn(
+                "w-full",
+                isGlassVariant
+                    ? "border-b border-white/40 bg-white/35 backdrop-blur-2xl shadow-[0_18px_60px_rgba(15,23,42,0.08)]"
+                    : "border-b bg-white/95 backdrop-blur-md"
+            )}>
+                <div className={cn(
+                    "container mx-auto flex items-center justify-between gap-4 px-4",
+                    isGlassVariant ? "min-h-[4.75rem] py-3" : "h-16"
+                )}>
                     {/* Logo y nombre de la tienda */}
-                    <div className="flex items-center gap-3 cursor-pointer flex-shrink-0" onClick={() => router.push(homeLink)}>
+                    <div className={cn(
+                        "flex cursor-pointer flex-shrink-0 items-center gap-3",
+                        isGlassVariant && organization.logo_url && "py-1",
+                        isGlassVariant && !organization.logo_url && "rounded-full border border-white/60 bg-white/55 px-3.5 py-2 shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+                    )} onClick={() => router.push(homeLink)}>
                         {organization.logo_url ? (
                             <Image
                                 src={organization.logo_url}
                                 alt={organization.name}
-                                width={120}
-                                height={32}
-                                className="h-8 w-auto object-contain max-w-[100px] md:max-w-[120px]"
+                                width={logoPresentation.width}
+                                height={logoPresentation.height}
+                                className={logoPresentation.imageClassName}
                                 loading="eager"
                                 quality={90}
                                 priority
                             />
                         ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-bold text-sm" style={{ backgroundColor: primaryColor }}>
+                            <div className={cn(
+                                "flex items-center justify-center text-white font-bold text-sm",
+                                logoPresentation.markClassName
+                            )} style={{ backgroundColor: primaryColor }}>
                                 {organization.name.substring(0, 1)}
                             </div>
                         )}
                         {showStoreName && (
-                            <span className="hidden sm:block text-lg font-bold tracking-tight">{organization.name}</span>
+                            <span className={cn("hidden text-lg font-bold tracking-tight sm:block", isGlassVariant ? "text-slate-900" : "")}>{organization.name}</span>
                         )}
                     </div>
 
                     {/* Navegación desktop */}
                     {hasMenuItems && (
-                        <nav className="hidden md:flex items-center gap-1">
+                        <nav className={cn(
+                            "hidden items-center gap-1 md:flex",
+                            isGlassVariant && "rounded-full border border-white/60 bg-white/55 p-1 shadow-sm backdrop-blur-xl"
+                        )}>
                             {menuItems.map((item) => {
                                 const hasChildren = item.children && item.children.length > 0
                                 if (hasChildren) {
@@ -135,6 +202,7 @@ export function EnhancedStoreHeader({
                                             item={item}
                                             resolveMenuUrl={resolveMenuUrl}
                                             isActiveLink={isActiveLink}
+                                            visualVariant={visualVariant}
                                         />
                                     )
                                 }
@@ -145,10 +213,16 @@ export function EnhancedStoreHeader({
                                         target={item.openInNewTab ? '_blank' : undefined}
                                         rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
                                         className={cn(
-                                            "px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap",
+                                            isGlassVariant
+                                                ? "rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition-all"
+                                                : "rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
                                             isActiveLink(item.url)
-                                                ? "text-slate-900 bg-slate-100"
-                                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                                                ? isGlassVariant
+                                                    ? "bg-white text-slate-900 shadow-sm"
+                                                    : "bg-slate-100 text-slate-900"
+                                                : isGlassVariant
+                                                    ? "text-slate-600 hover:bg-white/85 hover:text-slate-900"
+                                                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                         )}
                                     >
                                         {item.label}
@@ -160,23 +234,27 @@ export function EnhancedStoreHeader({
 
                     {/* Buscador inteligente - Solo en desktop */}
                     <div className={cn(
-                        "hidden md:flex flex-1 justify-center",
-                        hasMenuItems ? "max-w-sm" : ""
+                        "hidden flex-1 justify-center md:flex",
+                        hasMenuItems ? (isGlassVariant ? "max-w-[27rem]" : "max-w-sm") : ""
                     )}>
                         <SmartSearch
                             slug={slug}
                             onStartChat={onStartChat}
                             primaryColor={primaryColor}
+                            visualVariant={visualVariant}
                         />
                     </div>
 
                     {/* Acciones del usuario */}
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div className={cn(
+                        "flex items-center gap-2 md:gap-3",
+                        isGlassVariant && "rounded-full border border-white/60 bg-white/55 px-2 py-2 shadow-[0_14px_34px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+                    )}>
                         {/* Hamburguesa mobile */}
                         {hasMenuItems && (
                             <button
                                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                                className="md:hidden p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                                className={cn("md:hidden", iconButtonClassName)}
                                 aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
                             >
                                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -189,7 +267,7 @@ export function EnhancedStoreHeader({
                                 onClick={() => onStartChat()}
                                 variant="ghost"
                                 size="sm"
-                                className="md:hidden text-xs px-2"
+                                className={cn("text-xs px-2 md:hidden", isGlassVariant && "rounded-full border border-white/60 bg-white/65 px-3 text-slate-700 shadow-sm backdrop-blur-xl hover:bg-white")}
                             >
                                 Pregúntale a la IA
                             </Button>
@@ -198,7 +276,7 @@ export function EnhancedStoreHeader({
                         {/* Profile Button */}
                         <a
                             href={profileLink}
-                            className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                            className={iconButtonClassName}
                             aria-label="Mi perfil"
                         >
                             <User className="w-5 h-5" />
@@ -208,12 +286,15 @@ export function EnhancedStoreHeader({
                         {!isRealEstate && (
                             <button
                                 onClick={() => toggleCart()}
-                                className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                                className={cn("relative", iconButtonClassName)}
                                 aria-label="Ver carrito"
                             >
                                 <ShoppingBag className="w-5 h-5" />
                                 {mounted && cartCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center border-2 border-white">
+                                    <span className={cn(
+                                        "absolute -right-1 -top-1 min-w-[18px] rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold text-white",
+                                        isGlassVariant ? "border-2 border-slate-50" : "border-2 border-white"
+                                    )}>
                                         {cartCount}
                                     </span>
                                 )}
@@ -225,7 +306,10 @@ export function EnhancedStoreHeader({
                             <Button
                                 onClick={() => onStartChat()}
                                 style={{ backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) }}
-                                className="hidden md:flex font-bold shadow-lg text-sm px-6 h-10 rounded-full items-center gap-2"
+                                className={cn(
+                                    "hidden items-center gap-2 rounded-full text-sm font-bold md:flex",
+                                    isGlassVariant ? "h-11 border border-white/50 px-6 shadow-[0_18px_36px_rgba(15,23,42,0.16)]" : "h-10 px-6 shadow-lg"
+                                )}
                             >
                                 <MessageCircle className="w-4 h-4" />
                                 {isRealEstate ? "Agenda tu visita" : "Iniciar Chat"}
@@ -242,15 +326,17 @@ export function EnhancedStoreHeader({
                         isActiveLink={isActiveLink}
                         onNavClick={handleMobileNavClick}
                         onStartChat={onStartChat}
+                        visualVariant={visualVariant}
                     />
                 )}
 
                 {/* Buscador móvil */}
-                <div className="md:hidden px-4 pb-3">
+                <div className={cn("px-4 pb-3 md:hidden", isGlassVariant && "pt-1")}>
                     <SmartSearch
                         slug={slug}
                         onStartChat={onStartChat}
                         primaryColor={primaryColor}
+                        visualVariant={visualVariant}
                     />
                 </div>
             </header>
@@ -265,14 +351,17 @@ function DropdownNavItem({
     item,
     resolveMenuUrl,
     isActiveLink,
+    visualVariant,
 }: {
     item: MenuItem
     resolveMenuUrl: (url: string) => string
     isActiveLink: (url: string) => boolean
+    visualVariant: "default" | "glass"
 }) {
     const [open, setOpen] = useState(false)
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const isGlassVariant = visualVariant === "glass"
 
     const handleEnter = () => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
@@ -296,10 +385,16 @@ function DropdownNavItem({
             <a
                 href={resolveMenuUrl(item.url)}
                 className={cn(
-                    "inline-flex items-center gap-1 px-3 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap",
+                    isGlassVariant
+                        ? "inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition-all"
+                        : "inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
                     isActiveLink(item.url) || isChildActive
-                        ? "text-slate-900 bg-slate-100"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                        ? isGlassVariant
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "bg-slate-100 text-slate-900"
+                        : isGlassVariant
+                            ? "text-slate-600 hover:bg-white/85 hover:text-slate-900"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 )}
             >
                 {item.label}
@@ -308,8 +403,13 @@ function DropdownNavItem({
 
             {/* Dropdown panel */}
             {open && (
-                <div className="absolute left-0 top-full pt-1 z-50">
-                    <div className="bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px] animate-in fade-in slide-in-from-top-1 duration-150">
+                <div className="absolute left-0 top-full z-50 pt-2">
+                    <div className={cn(
+                        "min-w-[180px] py-1 animate-in fade-in slide-in-from-top-1 duration-150",
+                        isGlassVariant
+                            ? "rounded-2xl border border-white/70 bg-white/80 shadow-[0_24px_60px_rgba(15,23,42,0.12)] backdrop-blur-2xl"
+                            : "rounded-lg border border-slate-200 bg-white shadow-lg"
+                    )}>
                         {item.children!.map((child) => (
                             <a
                                 key={child.id}
@@ -317,10 +417,16 @@ function DropdownNavItem({
                                 target={child.openInNewTab ? '_blank' : undefined}
                                 rel={child.openInNewTab ? 'noopener noreferrer' : undefined}
                                 className={cn(
-                                    "block px-4 py-2 text-sm transition-colors",
+                                    isGlassVariant
+                                        ? "block rounded-xl px-4 py-2 text-sm transition-colors"
+                                        : "block px-4 py-2 text-sm transition-colors",
                                     isActiveLink(child.url)
-                                        ? "text-slate-900 bg-slate-50 font-medium"
-                                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                                        ? isGlassVariant
+                                            ? "bg-white/90 font-medium text-slate-900"
+                                            : "bg-slate-50 font-medium text-slate-900"
+                                        : isGlassVariant
+                                            ? "text-slate-600 hover:bg-white/75 hover:text-slate-900"
+                                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 )}
                                 onClick={() => setOpen(false)}
                             >
@@ -343,17 +449,25 @@ function MobileMenu({
     isActiveLink,
     onNavClick,
     onStartChat,
+    visualVariant,
 }: {
     menuItems: MenuItem[]
     resolveMenuUrl: (url: string) => string
     isActiveLink: (url: string) => boolean
     onNavClick: () => void
     onStartChat: (query?: string) => void
+    visualVariant: "default" | "glass"
 }) {
     const [expandedId, setExpandedId] = useState<string | null>(null)
+    const isGlassVariant = visualVariant === "glass"
 
     return (
-        <div className="md:hidden border-t bg-white px-4 py-2 space-y-1 animate-in slide-in-from-top-2 duration-200">
+        <div className={cn(
+            "space-y-1 px-4 py-2 animate-in slide-in-from-top-2 duration-200 md:hidden",
+            isGlassVariant
+                ? "border-t border-white/50 bg-white/55 backdrop-blur-2xl"
+                : "border-t bg-white"
+        )}>
             {menuItems.map((item) => {
                 const hasChildren = item.children && item.children.length > 0
                 const isExpanded = expandedId === item.id
@@ -365,10 +479,16 @@ function MobileMenu({
                             <button
                                 onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                 className={cn(
-                                    "w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-md transition-colors",
+                                    isGlassVariant
+                                        ? "flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors"
+                                        : "flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                                     isActiveLink(item.url) || item.children?.some(c => isActiveLink(c.url))
-                                        ? "text-slate-900 bg-slate-100"
-                                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                                        ? isGlassVariant
+                                            ? "bg-white/85 text-slate-900"
+                                            : "bg-slate-100 text-slate-900"
+                                        : isGlassVariant
+                                            ? "text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                                 )}
                             >
                                 {item.label}
@@ -377,7 +497,10 @@ function MobileMenu({
 
                             {/* Children accordion */}
                             {isExpanded && (
-                                <div className="ml-4 border-l-2 border-slate-100 pl-2 space-y-0.5 py-1 animate-in slide-in-from-top-1 duration-150">
+                                <div className={cn(
+                                    "ml-4 space-y-0.5 py-1 pl-2 animate-in slide-in-from-top-1 duration-150",
+                                    isGlassVariant ? "border-l-2 border-white/50" : "border-l-2 border-slate-100"
+                                )}>
                                     {/* Link al padre también */}
                                     <a
                                         href={resolveMenuUrl(item.url)}
@@ -385,10 +508,16 @@ function MobileMenu({
                                         rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
                                         onClick={onNavClick}
                                         className={cn(
-                                            "block px-3 py-2 text-sm rounded-md transition-colors",
+                                            isGlassVariant
+                                                ? "block rounded-xl px-3 py-2 text-sm transition-colors"
+                                                : "block rounded-md px-3 py-2 text-sm transition-colors",
                                             isActiveLink(item.url)
-                                                ? "text-slate-900 bg-slate-50 font-medium"
-                                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                                ? isGlassVariant
+                                                    ? "bg-white/80 font-medium text-slate-900"
+                                                    : "bg-slate-50 font-medium text-slate-900"
+                                                : isGlassVariant
+                                                    ? "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+                                                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                         )}
                                     >
                                         Ver todo
@@ -401,10 +530,16 @@ function MobileMenu({
                                             rel={child.openInNewTab ? 'noopener noreferrer' : undefined}
                                             onClick={onNavClick}
                                             className={cn(
-                                                "block px-3 py-2 text-sm rounded-md transition-colors",
+                                                isGlassVariant
+                                                    ? "block rounded-xl px-3 py-2 text-sm transition-colors"
+                                                    : "block rounded-md px-3 py-2 text-sm transition-colors",
                                                 isActiveLink(child.url)
-                                                    ? "text-slate-900 bg-slate-50 font-medium"
-                                                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                                    ? isGlassVariant
+                                                        ? "bg-white/80 font-medium text-slate-900"
+                                                        : "bg-slate-50 font-medium text-slate-900"
+                                                    : isGlassVariant
+                                                        ? "text-slate-500 hover:bg-white/70 hover:text-slate-900"
+                                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                             )}
                                         >
                                             {child.label}
@@ -424,10 +559,16 @@ function MobileMenu({
                         rel={item.openInNewTab ? 'noopener noreferrer' : undefined}
                         onClick={onNavClick}
                         className={cn(
-                            "block px-3 py-2.5 text-sm font-medium rounded-md transition-colors",
+                            isGlassVariant
+                                ? "block rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors"
+                                : "block rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                             isActiveLink(item.url)
-                                ? "text-slate-900 bg-slate-100"
-                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                                ? isGlassVariant
+                                    ? "bg-white/85 text-slate-900"
+                                    : "bg-slate-100 text-slate-900"
+                                : isGlassVariant
+                                    ? "text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                         )}
                     >
                         {item.label}
@@ -437,7 +578,12 @@ function MobileMenu({
             {/* Botón IA en menú mobile */}
             <button
                 onClick={() => { onNavClick(); onStartChat(); }}
-                className="w-full text-left px-3 py-2.5 text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+                className={cn(
+                    "w-full text-left px-3 py-2.5 text-sm font-medium transition-colors",
+                    isGlassVariant
+                        ? "rounded-2xl text-slate-600 hover:bg-white/80 hover:text-slate-900"
+                        : "rounded-md text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                )}
             >
                 Pregúntale a la IA
             </button>
