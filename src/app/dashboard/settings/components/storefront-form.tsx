@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { CompleteTemplateFeaturedProductsEditor } from "./complete-template-featured-products-editor"
 import { HeroEditor } from "./hero-editor"
 import { TypographySelector } from "./typography-selector"
 import { TemplateSelector } from "./template-selector"
@@ -76,6 +77,7 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
                         {selectedTemplate === "complete" && (
                             <>
                                 <HeroSliderEditor organization={organization} />
+                                <CompleteTemplateFeaturedProductsEditor organization={organization} />
                                 <CompleteTemplateEditor organization={organization} />
                                 <ProductFeaturesEditor organization={organization} />
                                 <TestimonialsEditor organization={organization} />

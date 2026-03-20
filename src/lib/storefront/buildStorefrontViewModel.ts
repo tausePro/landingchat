@@ -29,6 +29,7 @@ interface StorefrontBuilderOrganization {
             templateConfig?: {
                 complete?: {
                     heroSlider?: unknown
+                    featuredProductIds?: unknown
                 }
                 [key: string]: unknown
             }
@@ -46,6 +47,7 @@ interface StorefrontBuilderInput {
     organization: StorefrontBuilderOrganization
     pages?: Array<{ id?: string | null; slug?: string | null; title?: string | null }> | null
     products?: Array<Record<string, unknown>> | null
+    configuredFeaturedProducts?: StorefrontHeroSliderProduct[] | null
     heroSliderProducts?: StorefrontHeroSliderProduct[] | null
     properties?: StorefrontProperty[] | null
     badges?: unknown[] | null
@@ -145,6 +147,7 @@ export function buildStorefrontViewModel({
     organization,
     pages,
     products,
+    configuredFeaturedProducts,
     heroSliderProducts,
     properties,
     badges,
@@ -161,7 +164,18 @@ export function buildStorefrontViewModel({
     const whatsappSettings = isRecord(organization.settings?.whatsapp) ? organization.settings?.whatsapp : null
     const whatsappPhone = whatsappSettings ? getOptionalString(whatsappSettings.phone) : undefined
     const starterPrompts = getStringArray(storefrontSettings?.starterPrompts)
-    const featuredProducts = (products ?? []).map(mapProduct).filter((item) => item.id.length > 0)
+    const configuredFeaturedProductIds = getStringArray(storefrontSettings?.templateConfig?.complete?.featuredProductIds)
+    const automaticFeaturedProducts = (products ?? []).map(mapProduct).filter((item) => item.id.length > 0)
+    const automaticFeaturedProductMap = new Map(automaticFeaturedProducts.map((item) => [item.id, item]))
+    const configuredFeaturedProductMap = new Map((configuredFeaturedProducts ?? []).map((product) => [product.id, mapHeroSliderProduct(product)]))
+    const featuredProducts = configuredFeaturedProductIds.length > 0
+        ? [
+            ...configuredFeaturedProductIds
+                .map((productId) => configuredFeaturedProductMap.get(productId) ?? automaticFeaturedProductMap.get(productId) ?? null)
+                .filter((item): item is StorefrontViewModelOfferItem => item !== null),
+            ...automaticFeaturedProducts.filter((item) => !configuredFeaturedProductIds.includes(item.id)),
+        ]
+        : automaticFeaturedProducts
     const featuredProperties = (properties ?? []).map(mapProperty).filter((item) => item.id.length > 0)
     const heroSliderConfig = normalizeHeroSliderConfig(storefrontSettings?.templateConfig?.complete?.heroSlider)
     const heroSliderProductMap = new Map((heroSliderProducts ?? []).map((product) => [product.id, mapHeroSliderProduct(product)]))

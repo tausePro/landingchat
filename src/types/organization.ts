@@ -139,6 +139,7 @@ export interface OrganizationStorefrontCompleteTemplateConfig {
     description?: string
   }>
   heroSlider?: StorefrontHeroSliderConfig
+  featuredProductIds?: string[]
   [key: string]: unknown
 }
 

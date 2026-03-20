@@ -24,6 +24,16 @@ export async function getStoreData(slug: string, limit?: number) {
     const productConfig = org.settings?.storefront?.products
     const itemsToShow = limit || productConfig?.itemsToShow || 20 // Default to 20 if no config
     const orderBy = productConfig?.orderBy || "recent"
+    const rawFeaturedProductIds = Array.isArray(org.settings?.storefront?.templateConfig?.complete?.featuredProductIds)
+        ? org.settings.storefront.templateConfig.complete.featuredProductIds as unknown[]
+        : []
+    const featuredProductIds = Array.from(
+        new Set(
+            rawFeaturedProductIds.filter(
+                (productId): productId is string => typeof productId === "string" && productId.length > 0
+            )
+        )
+    ).slice(0, 3)
 
     // 3. Fetch Active Products with proper ordering
     let query = supabase
@@ -49,6 +59,34 @@ export async function getStoreData(slug: string, limit?: number) {
 
     if (productsError) {
         console.error("Error fetching products:", productsError)
+    }
+
+    let configuredFeaturedProducts: StorefrontHeroSliderProduct[] = []
+
+    if (featuredProductIds.length > 0) {
+        const { data: featuredBandProducts, error: featuredBandProductsError } = await supabase
+            .from("products")
+            .select("id, name, slug, price, sale_price, image_url, description")
+            .eq("organization_id", org.id)
+            .in("id", featuredProductIds)
+
+        if (featuredBandProductsError) {
+            console.error("Error fetching complete-v2 featured products:", featuredBandProductsError)
+        } else {
+            const featuredProductsData = (featuredBandProducts ?? []) as StorefrontHeroSliderProduct[]
+            const featuredProductMap = new Map<string, StorefrontHeroSliderProduct>(
+                featuredProductsData.map((product) => [product.id, product])
+            )
+            configuredFeaturedProducts = featuredProductIds.reduce<StorefrontHeroSliderProduct[]>((accumulator, productId) => {
+                const product = featuredProductMap.get(productId)
+
+                if (product) {
+                    accumulator.push(product)
+                }
+
+                return accumulator
+            }, [])
+        }
     }
 
     const heroSliderConfig = normalizeHeroSliderConfig(org.settings?.storefront?.templateConfig?.complete?.heroSlider)
@@ -141,6 +179,7 @@ export async function getStoreData(slug: string, limit?: number) {
         organization: enrichedOrg,
         pages: pages || [],
         products: products || [],
+        configuredFeaturedProducts,
         heroSliderProducts,
         properties,
         badges: badges || []

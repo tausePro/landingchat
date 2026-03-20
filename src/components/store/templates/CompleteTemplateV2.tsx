@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react"
 import { CompleteTemplate } from "./complete-template"
 import { CompleteTemplateV2Hero } from "./CompleteTemplateV2Hero"
+import { CompleteTemplateV2FeaturedBand } from "./CompleteTemplateV2FeaturedBand"
 import type { StorefrontViewModel } from "@/types/storefront"
 
 type CompleteTemplateV2Props = ComponentProps<typeof CompleteTemplate> & {
@@ -18,6 +19,14 @@ export function CompleteTemplateV2({ storefrontViewModel, ...props }: CompleteTe
                 organization={props.organization}
                 primaryColor={props.primaryColor}
                 heroSettings={props.heroSettings}
+                onStartChat={props.onStartChat}
+                storefrontViewModel={storefrontViewModel}
+                isSubdomain={props.isSubdomain ?? false}
+            />
+            <CompleteTemplateV2FeaturedBand
+                organization={props.organization}
+                products={props.products}
+                primaryColor={props.primaryColor}
                 onStartChat={props.onStartChat}
                 storefrontViewModel={storefrontViewModel}
                 isSubdomain={props.isSubdomain ?? false}
