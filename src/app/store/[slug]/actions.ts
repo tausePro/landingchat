@@ -3,7 +3,7 @@
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { buildStorefrontViewModel } from "@/lib/storefront/buildStorefrontViewModel"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
-import { normalizeHeroSliderConfig, type StorefrontHeroSliderProduct } from "@/types/storefront"
+import { normalizeHeroSliderConfig, type StorefrontHeroSliderProduct, type StorefrontProperty } from "@/types/storefront"
 
 export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
@@ -84,7 +84,7 @@ export async function getStoreData(slug: string, limit?: number) {
         .order("title", { ascending: true })
 
     // 5. Fetch Properties for real estate organizations
-    let properties: Array<Record<string, unknown>> = []
+    let properties: StorefrontProperty[] = []
     const isRealEstate = isRealEstateIndustry(org) || 
         org.storefront_template === 'real-estate' ||
         org.settings?.storefront?.template === 'real-estate'
@@ -100,7 +100,7 @@ export async function getStoreData(slug: string, limit?: number) {
             .order('is_featured', { ascending: false })
             .order('created_at', { ascending: false })
         
-        properties = props || []
+        properties = (props ?? []) as StorefrontProperty[]
     }
 
     // 6. Fetch Badges for product cards

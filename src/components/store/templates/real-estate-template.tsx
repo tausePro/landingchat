@@ -3,29 +3,10 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import type { StorefrontProperty } from "@/types/storefront"
 
 // ─── Types ───────────────────────────────────────────────────────────
-interface Property {
-  id: string
-  external_code: string
-  title: string
-  description: string
-  property_type: string
-  property_class: string
-  price_rent: number | null
-  price_sale: number | null
-  price_admin: number | null
-  city: string
-  neighborhood: string
-  address: string
-  bedrooms: number | null
-  bathrooms: number | null
-  area_m2: number | null
-  parking_spots: number | null
-  stratum: string | null
-  images: Array<{ url: string; position: number }>
-  is_featured: boolean
-}
+type Property = StorefrontProperty
 
 interface RealEstateTemplateProps {
   organization: any

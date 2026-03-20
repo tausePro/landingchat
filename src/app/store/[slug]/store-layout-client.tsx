@@ -19,7 +19,7 @@ import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
 import { getSafeStorefrontTemplate, isRealEstateIndustry } from "@/lib/storefront-templates"
 import type { Organization } from "@/types/organization"
-import { normalizeStorefrontTemplateVersion, type StorefrontHeroSliderProduct, type StorefrontViewModel } from "@/types/storefront"
+import { normalizeStorefrontTemplateVersion, type StorefrontHeroSliderProduct, type StorefrontProperty, type StorefrontViewModel } from "@/types/storefront"
 
 interface StoreMenuItem {
     id: string
@@ -38,27 +38,7 @@ interface StoreProduct {
     [key: string]: unknown
 }
 
-interface StoreProperty {
-    id: string
-    external_code: string
-    title: string
-    description: string
-    property_type: string
-    property_class: string
-    price_rent: number | null
-    price_sale: number | null
-    price_admin: number | null
-    city: string
-    neighborhood: string
-    address: string
-    bedrooms: number | null
-    bathrooms: number | null
-    area_m2: number | null
-    parking_spots: number | null
-    stratum: string | null
-    images: Array<{ url: string; position: number }>
-    is_featured: boolean
-}
+type StoreProperty = StorefrontProperty
 
 interface StoreShippingConfig {
     free_shipping_enabled: boolean

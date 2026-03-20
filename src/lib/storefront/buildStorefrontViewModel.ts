@@ -2,6 +2,7 @@ import {
     normalizeHeroSliderConfig,
     normalizeStorefrontTemplateVersion,
     type StorefrontHeroSliderProduct,
+    type StorefrontProperty,
     type StorefrontViewModel,
     type StorefrontViewModelHeroSliderItem,
     type StorefrontViewModelOfferItem,
@@ -46,7 +47,7 @@ interface StorefrontBuilderInput {
     pages?: Array<{ id?: string | null; slug?: string | null; title?: string | null }> | null
     products?: Array<Record<string, unknown>> | null
     heroSliderProducts?: StorefrontHeroSliderProduct[] | null
-    properties?: Array<Record<string, unknown>> | null
+    properties?: StorefrontProperty[] | null
     badges?: unknown[] | null
 }
 
