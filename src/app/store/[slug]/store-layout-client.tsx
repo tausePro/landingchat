@@ -18,6 +18,7 @@ import { ConversationalLayout } from "@/components/store/layouts/conversational-
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
 import { getSafeStorefrontTemplate, isRealEstateIndustry } from "@/lib/storefront-templates"
+import { StorefrontChatPanel } from "@/components/store/StorefrontChatPanel"
 import type { Organization } from "@/types/organization"
 import { normalizeStorefrontTemplateVersion, type StorefrontHeroSliderProduct, type StorefrontProperty, type StorefrontViewModel } from "@/types/storefront"
 
@@ -114,6 +115,7 @@ export function StoreLayoutClient({ slug, organization, products, heroSliderProd
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
+    const [chatPanelOpen, setChatPanelOpen] = useState(false)
     const [shippingConfig, setShippingConfig] = useState<StoreShippingConfig | null>(null)
     const { setIsOpen: setCartOpen, setOrganizationSlug } = useCartStore()
 
@@ -225,15 +227,29 @@ export function StoreLayoutClient({ slug, organization, products, heroSliderProd
         return () => window.cancelAnimationFrame(frameId)
     }, [searchParams, organization.slug, router, isSubdomain, isRealEstate])
 
+    // Detectar si usamos chat inline (complete-v2)
+    const useInlineChatPanel = templateKey === "complete" && templateVersion === "v2"
+
     const handleStartChat = (productId?: string, query?: string) => {
         // Verificar si ya está identificado (con validación de UUID)
         const customerId = getStoredUUID(`customer_${organization.slug}`)
         const effectiveProductId = productId || defaultChatProductId
 
-        if (customerId) {
-            // Ya identificado, ir al chat
-            // Se mantiene el chatId anterior para continuar la conversación
+        if (useInlineChatPanel) {
+            // v2: abrir panel inline en lugar de navegar
+            if (effectiveProductId) setPendingProductId(effectiveProductId)
+            if (query) setPendingContext(query)
 
+            if (customerId) {
+                setChatPanelOpen(true)
+            } else {
+                setShowGateModal(true)
+            }
+            return
+        }
+
+        // Legacy: navegar a /chat/[slug]
+        if (customerId) {
             let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
             const params = new URLSearchParams()
             if (effectiveProductId) params.set('product', effectiveProductId)
@@ -242,10 +258,8 @@ export function StoreLayoutClient({ slug, organization, products, heroSliderProd
 
             router.push(chatUrl)
         } else {
-            // Guardar producto y contexto pendientes si existen
             if (effectiveProductId) setPendingProductId(effectiveProductId)
             if (query) setPendingContext(query)
-            // Mostrar modal de identificación
             setShowGateModal(true)
         }
     }
@@ -267,10 +281,16 @@ export function StoreLayoutClient({ slug, organization, products, heroSliderProd
 
         // Se mantiene el chatId anterior si existe para continuar la conversación
 
-        // Cerrar modal e ir al chat
+        // Cerrar modal
         setShowGateModal(false)
 
-        // Construir URL del chat con producto y contexto si existen
+        if (useInlineChatPanel) {
+            // v2: abrir panel inline después de identificarse
+            setChatPanelOpen(true)
+            return
+        }
+
+        // Legacy: ir al chat
         let chatUrl = getChatUrl(isSubdomain, organization.slug, isRealEstate)
         const params = new URLSearchParams()
         if (pendingProductId) params.set('product', pendingProductId)
@@ -362,8 +382,26 @@ export function StoreLayoutClient({ slug, organization, products, heroSliderProd
             {/* Presence Tracking */}
             <StorePresence slug={organization.slug} />
 
-            {/* Floating WhatsApp/Chat Button - Only show if NOT in Conversational Layout */}
-            {!USE_CONVERSATIONAL_LAYOUT && (
+            {/* Chat Panel or Floating Button */}
+            {useInlineChatPanel ? (
+                <StorefrontChatPanel
+                    slug={slug}
+                    organizationName={organization.name}
+                    primaryColor={primaryColor}
+                    externalOpen={chatPanelOpen}
+                    pendingProductId={pendingProductId}
+                    pendingContext={pendingContext}
+                    onPendingConsumed={() => {
+                        setPendingProductId(null)
+                        setPendingContext(null)
+                    }}
+                    onNeedIdentification={(productId, context) => {
+                        if (productId) setPendingProductId(productId)
+                        if (context) setPendingContext(context)
+                        setShowGateModal(true)
+                    }}
+                />
+            ) : !USE_CONVERSATIONAL_LAYOUT && (
                 <div className="fixed bottom-6 right-6 z-50">
                     {organization.settings?.whatsapp?.phone ? (
                         <a
