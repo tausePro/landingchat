@@ -21,6 +21,8 @@ interface StorefrontChatPanelProps {
     slug: string
     organizationName: string
     primaryColor: string
+    /** Nombre del agente desde org settings */
+    initialAgentName?: string
     /** Cuando se pide abrir el chat desde un CTA externo */
     externalOpen?: boolean
     /** Producto pendiente para contextualizar */
@@ -41,6 +43,7 @@ export function StorefrontChatPanel({
     slug,
     organizationName,
     primaryColor,
+    initialAgentName,
     externalOpen = false,
     pendingProductId,
     pendingContext,
@@ -50,7 +53,7 @@ export function StorefrontChatPanel({
 }: StorefrontChatPanelProps) {
     const [panelState, setPanelState] = useState<PanelState>("bubble")
     const [chatId, setChatId] = useState<string | null>(null)
-    const [agentName, setAgentName] = useState("Asistente")
+    const [agentName, setAgentName] = useState(initialAgentName || "Asistente")
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -170,19 +173,24 @@ export function StorefrontChatPanel({
     const fetchHistory = async (id: string): Promise<boolean> => {
         try {
             const res = await fetch(`/api/store/${slug}/chat/${id}/messages`)
-            if (!res.ok) return false
+            if (!res.ok) {
+                console.warn(`[StorefrontChat] fetchHistory failed: ${res.status}`)
+                return false
+            }
             const data = await res.json()
-            if (data.messages) {
-                setMessages(
-                    data.messages.map((m: any) => ({
+            if (data.messages && data.messages.length > 0) {
+                const validMessages = data.messages
+                    .filter((m: any) => m.content && m.content.trim().length > 0)
+                    .map((m: any) => ({
                         ...m,
                         timestamp: new Date(m.timestamp),
                     }))
-                )
+                setMessages(validMessages)
                 return true
             }
             return false
-        } catch {
+        } catch (err) {
+            console.error("[StorefrontChat] fetchHistory error:", err)
             return false
         }
     }
@@ -268,17 +276,26 @@ export function StorefrontChatPanel({
                 }),
             })
 
-            if (!response.ok) throw new Error("AI response failed")
+            if (!response.ok) {
+                const errText = await response.text().catch(() => "")
+                console.error(`[StorefrontChat] AI response failed: ${response.status}`, errText)
+                throw new Error(`AI response failed: ${response.status}`)
+            }
 
             const data = await response.json()
-            const aiMsg: ChatMessage = {
-                id: `ai-${Date.now()}`,
-                role: "assistant",
-                content: data.message,
-                timestamp: new Date(),
+            if (data.message && data.message.trim()) {
+                const aiMsg: ChatMessage = {
+                    id: `ai-${Date.now()}`,
+                    role: "assistant",
+                    content: data.message,
+                    timestamp: new Date(),
+                }
+                setMessages((prev) => [...prev, aiMsg])
+            } else {
+                console.warn("[StorefrontChat] AI returned empty message:", data)
             }
-            setMessages((prev) => [...prev, aiMsg])
-        } catch {
+        } catch (err) {
+            console.error("[StorefrontChat] handleSend error:", err)
             const errorMsg: ChatMessage = {
                 id: `err-${Date.now()}`,
                 role: "assistant",

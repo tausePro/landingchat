@@ -82,6 +82,10 @@ interface StoreLayoutOrganization extends Pick<Organization, "slug" | "name" | "
         whatsapp?: {
             phone?: string | null
         } | null
+        agent?: {
+            name?: string
+            avatar?: string
+        } | null
     } | null
 }
 
@@ -388,6 +392,7 @@ export function StoreLayoutClient({ slug, organization, products, heroSliderProd
                     slug={slug}
                     organizationName={organization.name}
                     primaryColor={primaryColor}
+                    initialAgentName={organization.settings?.agent?.name}
                     externalOpen={chatPanelOpen}
                     pendingProductId={pendingProductId}
                     pendingContext={pendingContext}
