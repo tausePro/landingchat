@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { MessageCircle, X, Minimize2, Send, Loader2, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn, getContrastTextColor } from "@/lib/utils"
-import { getStoredUUID, setStoredUUID } from "@/lib/utils/storage"
+import { getStoredUUID, setStoredUUID, getStoredString } from "@/lib/utils/storage"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
@@ -56,10 +56,18 @@ export function StorefrontChatPanel({
     const [isLoading, setIsLoading] = useState(false)
     const [isInitializing, setIsInitializing] = useState(false)
     const [hasUnread, setHasUnread] = useState(false)
+    const [initError, setInitError] = useState<string | null>(null)
+    const [customerName, setCustomerName] = useState<string | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const initRef = useRef(false)
     const processedProductRef = useRef<string | null>(null)
+
+    // Leer nombre del cliente de localStorage al montar
+    useEffect(() => {
+        const storedName = getStoredString(`customer_name_${slug}`)
+        if (storedName) setCustomerName(storedName)
+    }, [slug])
 
     // Scroll al fondo cuando llegan mensajes
     useEffect(() => {
@@ -119,7 +127,7 @@ export function StorefrontChatPanel({
                     setIsInitializing(false)
                     return
                 }
-                throw new Error("Failed to init chat")
+                throw new Error(`Failed to init chat: ${response.status}`)
             }
 
             const data = await response.json()
@@ -128,12 +136,30 @@ export function StorefrontChatPanel({
                 setStoredUUID(`chatId_${slug}`, data.chatId)
                 if (data.agent?.name) setAgentName(data.agent.name)
 
-                // Cargar historial (incluye saludo)
-                await fetchHistory(data.chatId)
+                // Usar el greeting del init directamente (no depender solo de fetchHistory)
+                if (data.greeting) {
+                    const greetingMsg: ChatMessage = {
+                        id: `greeting-${data.chatId}`,
+                        role: "assistant",
+                        content: data.greeting,
+                        timestamp: new Date(),
+                    }
+                    setMessages([greetingMsg])
+                }
+
+                // Intentar cargar historial completo (puede sobrescribir el greeting si hay más mensajes)
+                const historyLoaded = await fetchHistory(data.chatId)
+                if (!historyLoaded && !data.greeting) {
+                    console.warn("No se pudo cargar historial ni greeting")
+                }
+
                 await processProductContext(data.chatId, customerId)
+            } else {
+                setInitError("No se pudo crear la conversación.")
             }
         } catch (error) {
             console.error("Error initializing inline chat:", error)
+            setInitError("Error al conectar. Intenta de nuevo.")
         } finally {
             setIsInitializing(false)
         }
@@ -305,10 +331,13 @@ export function StorefrontChatPanel({
                     )}
                 </button>
 
-                {/* Tooltip */}
+                {/* Tooltip proactivo personalizado */}
                 <div className="absolute bottom-full right-0 mb-3 hidden animate-bounce-slow md:block">
                     <div className="rounded-xl bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-lg ring-1 ring-slate-200/60">
-                        💬 ¿Necesitas ayuda?
+                        {customerName
+                            ? `¡Hola ${customerName.split(" ")[0]}! 👋 ¿Te ayudo?`
+                            : "💬 ¿Necesitas ayuda?"
+                        }
                         <div className="absolute -bottom-1 right-5 h-2 w-2 rotate-45 bg-white ring-1 ring-slate-200/60 ring-t-0 ring-l-0" />
                     </div>
                 </div>
@@ -391,6 +420,19 @@ export function StorefrontChatPanel({
                         </div>
                         <p className="text-sm font-semibold text-slate-900">¡Hola! Soy {agentName}</p>
                         <p className="mt-1 text-xs text-slate-500">¿En qué puedo ayudarte hoy?</p>
+                        {initError && (
+                            <button
+                                onClick={() => {
+                                    setInitError(null)
+                                    initRef.current = false
+                                    initializeChat()
+                                }}
+                                className="mt-3 rounded-lg px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+                                style={{ backgroundColor: primaryColor }}
+                            >
+                                Reintentar conexión
+                            </button>
+                        )}
                     </div>
                 )}
 
