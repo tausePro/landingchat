@@ -25,6 +25,8 @@ interface Product {
     slug?: string
 }
 
+const SEARCH_LIMIT = 20
+
 export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿Qué estás buscando hoy?" }: SmartSearchProps) {
     const [query, setQuery] = useState("")
     const [debouncedQuery] = useDebounce(query, 300)
@@ -60,7 +62,7 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
     const searchProducts = async (searchQuery: string) => {
         setIsLoading(true)
         try {
-            const response = await fetch(`/api/store/${slug}/products?search=${encodeURIComponent(searchQuery)}&limit=6`)
+            const response = await fetch(`/api/store/${slug}/products?search=${encodeURIComponent(searchQuery)}&limit=${SEARCH_LIMIT}`)
             if (response.ok) {
                 const data = await response.json()
                 const products = data.products || []
