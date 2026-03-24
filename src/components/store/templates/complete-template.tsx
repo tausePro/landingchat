@@ -35,6 +35,8 @@ interface CompleteTemplateProps {
     heroSettings: any
     onStartChat: (productId?: string) => void
     hideHeroSection?: boolean
+    hideProductSection?: boolean
+    hideMiddleSections?: boolean
 }
 
 // Helper function to get text color based on configuration
@@ -132,6 +134,8 @@ export function CompleteTemplate({
     heroSettings,
     onStartChat,
     hideHeroSection = false,
+    hideProductSection = false,
+    hideMiddleSections = false,
     isSubdomain = false
 }: CompleteTemplateProps & { isSubdomain?: boolean }) {
     const [mounted, setMounted] = useState(false)
@@ -659,7 +663,7 @@ export function CompleteTemplate({
                  </section>
              ))}
              {/* Features / How it works */}
-             <section className="py-20 bg-white">
+            {!hideMiddleSections && <section className="py-20 bg-white">
                  <div className="container mx-auto px-4">
                     <div className="text-center max-w-3xl mx-auto mb-16">
                         <h2
@@ -717,10 +721,10 @@ export function CompleteTemplate({
                         ))}
                     </div>
                 </div>
-            </section>
+            </section>}
 
             {/* Product Features Section */}
-            {productFeatures && productFeatures.length > 0 && (
+            {!hideMiddleSections && productFeatures && productFeatures.length > 0 && (
                 <section className="py-16 bg-gray-50">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-12">
@@ -769,7 +773,7 @@ export function CompleteTemplate({
             )}
 
             {/* Featured Products */}
-            {productConfig.showSection && (
+            {!hideProductSection && productConfig.showSection && (
                 <section id="products" className="py-20 bg-gray-50">
                     <div className="container mx-auto px-4">
                         <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
@@ -878,7 +882,7 @@ export function CompleteTemplate({
             )}
 
             {/* Social Proof / Testimonials Section */}
-            {testimonials && testimonials.length > 0 && (
+            {!hideMiddleSections && testimonials && testimonials.length > 0 && (
                 <section className="py-20 bg-white">
                     <div className="container mx-auto px-4">
                         <div className="text-center mb-16">
@@ -965,7 +969,7 @@ export function CompleteTemplate({
             )}
 
             {/* CTA Section */}
-            <section className="py-20 bg-gray-900 text-white relative overflow-hidden">
+            {!hideMiddleSections && <section className="py-20 bg-gray-900 text-white relative overflow-hidden">
                 <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                 <div className="container mx-auto px-4 text-center relative z-10">
                     <h2
@@ -999,7 +1003,7 @@ export function CompleteTemplate({
                         {chatButtonText}
                     </Button>
                 </div>
-            </section>
+            </section>}
 
             {/* Footer */}
             <footer className="bg-white border-t border-gray-100 py-12">
