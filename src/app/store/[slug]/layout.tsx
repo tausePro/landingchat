@@ -4,6 +4,7 @@ import { getStoreData } from "./actions"
 import { MetaPixel } from "@/components/analytics/meta-pixel"
 import { TrackingProvider } from "@/components/analytics/tracking-provider"
 import { OrganizationJsonLd } from "@/components/seo/organization-json-ld"
+import { ForceLightTheme } from "@/components/store/force-light-theme"
 
 type Props = {
     params: Promise<{ slug: string }>
@@ -68,6 +69,9 @@ export default async function StoreLayout({
 
     return (
         <>
+            {/* Forzar light mode en storefront público */}
+            <ForceLightTheme />
+
             {/* Schema.org Organization - SEO */}
             {organization && (
                 <OrganizationJsonLd
