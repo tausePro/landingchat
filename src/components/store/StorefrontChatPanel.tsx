@@ -53,7 +53,17 @@ export function StorefrontChatPanel({
 }: StorefrontChatPanelProps) {
     const [panelState, setPanelState] = useState<PanelState>("bubble")
     const [chatId, setChatId] = useState<string | null>(null)
-    const [agentName, setAgentName] = useState(initialAgentName || "Asistente")
+    const [agentName, setAgentName] = useState(() => {
+        // Prioridad: prop > localStorage > default
+        if (initialAgentName) return initialAgentName
+        if (typeof window !== "undefined") {
+            try {
+                const stored = localStorage.getItem(`agentName_${slug}`)
+                if (stored) return stored
+            } catch { /* ignore */ }
+        }
+        return "Asistente"
+    })
     const [messages, setMessages] = useState<ChatMessage[]>([])
     const [input, setInput] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -66,11 +76,18 @@ export function StorefrontChatPanel({
     const initRef = useRef(false)
     const processedProductRef = useRef<string | null>(null)
 
-    // Leer nombre del cliente de localStorage al montar
+    // Leer nombre del cliente y agente de localStorage al montar
     useEffect(() => {
         const storedName = getStoredString(`customer_name_${slug}`)
         if (storedName) setCustomerName(storedName)
-    }, [slug])
+        // Agente: si no vino por prop, intentar localStorage
+        if (!initialAgentName) {
+            try {
+                const storedAgent = localStorage.getItem(`agentName_${slug}`)
+                if (storedAgent) setAgentName(storedAgent)
+            } catch { /* ignore */ }
+        }
+    }, [slug, initialAgentName])
 
     // Scroll al fondo cuando llegan mensajes
     useEffect(() => {
@@ -137,7 +154,10 @@ export function StorefrontChatPanel({
             if (data.chatId) {
                 setChatId(data.chatId)
                 setStoredUUID(`chatId_${slug}`, data.chatId)
-                if (data.agent?.name) setAgentName(data.agent.name)
+                if (data.agent?.name) {
+                    setAgentName(data.agent.name)
+                    try { localStorage.setItem(`agentName_${slug}`, data.agent.name) } catch { /* ignore */ }
+                }
 
                 // Usar el greeting del init directamente (no depender solo de fetchHistory)
                 if (data.greeting) {
@@ -178,15 +198,31 @@ export function StorefrontChatPanel({
                 return false
             }
             const data = await res.json()
-            if (data.messages && data.messages.length > 0) {
+
+            // Actualizar nombre del agente si viene en la respuesta
+            if (data.agent?.name) {
+                setAgentName(data.agent.name)
+                try { localStorage.setItem(`agentName_${slug}`, data.agent.name) } catch { /* ignore */ }
+            }
+
+            if (data.messages && Array.isArray(data.messages)) {
                 const validMessages = data.messages
-                    .filter((m: any) => m.content && m.content.trim().length > 0)
+                    .filter((m: any) => {
+                        const content = m.content
+                        return content != null && typeof content === "string" && content.trim().length > 0
+                    })
                     .map((m: any) => ({
-                        ...m,
+                        id: m.id,
+                        role: m.role as "user" | "assistant",
+                        content: m.content,
                         timestamp: new Date(m.timestamp),
                     }))
-                setMessages(validMessages)
-                return true
+                if (validMessages.length > 0) {
+                    setMessages(validMessages)
+                    return true
+                }
+                console.warn(`[StorefrontChat] ${data.messages.length} messages loaded but all were empty`)
+                return false
             }
             return false
         } catch (err) {
@@ -230,13 +266,19 @@ export function StorefrontChatPanel({
 
             if (response.ok) {
                 const data = await response.json()
-                const aiMsg: ChatMessage = {
-                    id: `ai-ctx-${Date.now()}`,
-                    role: "assistant",
-                    content: data.message,
-                    timestamp: new Date(),
+                if (data.message && data.message.trim()) {
+                    const aiMsg: ChatMessage = {
+                        id: `ai-ctx-${Date.now()}`,
+                        role: "assistant",
+                        content: data.message,
+                        timestamp: new Date(),
+                    }
+                    setMessages((prev) => [...prev, aiMsg])
+                } else {
+                    console.warn("[StorefrontChat] Product context AI response was empty")
                 }
-                setMessages((prev) => [...prev, aiMsg])
+            } else {
+                console.error(`[StorefrontChat] Product context failed: ${response.status}`)
             }
         } catch (error) {
             console.error("Error sending product context:", error)
@@ -283,17 +325,14 @@ export function StorefrontChatPanel({
             }
 
             const data = await response.json()
-            if (data.message && data.message.trim()) {
-                const aiMsg: ChatMessage = {
-                    id: `ai-${Date.now()}`,
-                    role: "assistant",
-                    content: data.message,
-                    timestamp: new Date(),
-                }
-                setMessages((prev) => [...prev, aiMsg])
-            } else {
-                console.warn("[StorefrontChat] AI returned empty message:", data)
+            const aiText = data.message?.trim()
+            const aiMsg: ChatMessage = {
+                id: `ai-${Date.now()}`,
+                role: "assistant",
+                content: aiText || "¡Estoy procesando tu solicitud! ¿Hay algo más en lo que pueda ayudarte?",
+                timestamp: new Date(),
             }
+            setMessages((prev) => [...prev, aiMsg])
         } catch (err) {
             console.error("[StorefrontChat] handleSend error:", err)
             const errorMsg: ChatMessage = {
@@ -486,7 +525,9 @@ export function StorefrontChatPanel({
                                         ol: ({ children }) => <ol className="list-decimal pl-4 mb-1.5 space-y-0.5">{children}</ol>,
                                         strong: ({ children }) => <strong className="font-bold">{children}</strong>,
                                     }}
-                                />
+                                >
+                                    {msg.content}
+                                </ReactMarkdown>
                             )}
                         </div>
                     </div>

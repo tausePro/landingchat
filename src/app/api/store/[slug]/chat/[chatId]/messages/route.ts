@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ slug: string; chatId: string }> }
 ) {
     const { slug, chatId } = await params
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Verify organization
     const { data: organization } = await supabase
@@ -22,7 +22,7 @@ export async function GET(
     // Security: Verify chat belongs to this organization
     const { data: chat } = await supabase
         .from("chats")
-        .select("id")
+        .select("id, assigned_agent_id")
         .eq("id", chatId)
         .eq("organization_id", organization.id)
         .single()
@@ -31,7 +31,20 @@ export async function GET(
         return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
-    // Fetch messages (now secure - chat ownership verified)
+    // Fetch agent info
+    let agent: { name: string; avatar_url: string | null } | null = null
+    if (chat.assigned_agent_id) {
+        const { data: agentData } = await supabase
+            .from("agents")
+            .select("name, avatar_url")
+            .eq("id", chat.assigned_agent_id)
+            .single()
+        if (agentData) {
+            agent = { name: agentData.name, avatar_url: agentData.avatar_url }
+        }
+    }
+
+    // Fetch messages
     const { data: messages, error } = await supabase
         .from("messages")
         .select("*")
@@ -49,10 +62,7 @@ export async function GET(
         role: msg.sender_type === "user" ? "user" : "assistant",
         content: msg.content,
         timestamp: msg.created_at,
-        // Note: Product cards are currently ephemeral in the frontend state 
-        // and might not be fully persisted in message content.
-        // Future improvement: Store structured content or actions in metadata.
     }))
 
-    return NextResponse.json({ messages: formattedMessages })
+    return NextResponse.json({ messages: formattedMessages, agent })
 }
