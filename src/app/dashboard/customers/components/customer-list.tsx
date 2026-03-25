@@ -1,16 +1,19 @@
 "use client"
 
+import { useState } from "react"
 import { type Customer } from "@/types/customer"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 import {
     computeIntentScore,
     getIntentScoreLabel,
     getIntentScoreColor,
 } from "../lib/intent-score"
+import { deleteCustomer, deleteCustomers } from "../actions"
 
 interface CustomerListProps {
     customers: Customer[]
@@ -24,6 +27,52 @@ const COP_FORMAT = new Intl.NumberFormat("es-CO", {
 })
 
 export function CustomerList({ customers, isLoading }: CustomerListProps) {
+    const router = useRouter()
+    const [selected, setSelected] = useState<Set<string>>(new Set())
+    const [deleting, setDeleting] = useState<string | null>(null)
+    const [bulkDeleting, setBulkDeleting] = useState(false)
+
+    const toggleSelect = (id: string) => {
+        setSelected((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const toggleAll = () => {
+        if (selected.size === customers.length) {
+            setSelected(new Set())
+        } else {
+            setSelected(new Set(customers.map((c) => c.id)))
+        }
+    }
+
+    const handleDelete = async (id: string, name: string) => {
+        if (!confirm(`¿Eliminar a "${name || 'Sin Nombre'}"? Esta acción no se puede deshacer.`)) return
+        setDeleting(id)
+        const result = await deleteCustomer(id)
+        if (!result.success) alert(`Error: ${result.error}`)
+        setDeleting(null)
+        setSelected((prev) => { const next = new Set(prev); next.delete(id); return next })
+        router.refresh()
+    }
+
+    const handleBulkDelete = async () => {
+        const count = selected.size
+        if (!confirm(`¿Eliminar ${count} cliente${count > 1 ? "s" : ""}? Esta acción no se puede deshacer.`)) return
+        setBulkDeleting(true)
+        const result = await deleteCustomers(Array.from(selected))
+        if (result.success) {
+            setSelected(new Set())
+        } else {
+            alert(`Error: ${result.error}`)
+        }
+        setBulkDeleting(false)
+        router.refresh()
+    }
+
     if (isLoading) {
         return <div className="p-8 text-center text-text-light-secondary dark:text-text-dark-secondary">Cargando clientes...</div>
     }
@@ -46,25 +95,60 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
 
     return (
         <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-hidden">
-            {/* Header de la tabla */}
-            <div className="px-6 py-3 border-b border-border-light dark:border-border-dark bg-background-light/50 dark:bg-background-dark/50">
-                <h3 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary">
-                    Lista de Clientes
-                    <span className="text-text-light-secondary dark:text-text-dark-secondary font-normal ml-2 text-xs">
-                        {customers.length} resultados
+            {/* Bulk action bar */}
+            {selected.size > 0 && (
+                <div className="px-6 py-3 bg-primary/10 border-b border-primary/20 flex items-center justify-between">
+                    <span className="text-sm font-medium text-primary">
+                        {selected.size} cliente{selected.size > 1 ? "s" : ""} seleccionado{selected.size > 1 ? "s" : ""}
                     </span>
-                </h3>
-            </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setSelected(new Set())}
+                            className="text-sm text-text-light-secondary dark:text-text-dark-secondary hover:text-text-light-primary dark:hover:text-text-dark-primary"
+                        >
+                            Deseleccionar
+                        </button>
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={bulkDeleting}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                        >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                            {bulkDeleting ? "Eliminando..." : `Eliminar (${selected.size})`}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Header de la tabla */}
+            {selected.size === 0 && (
+                <div className="px-6 py-3 border-b border-border-light dark:border-border-dark bg-background-light/50 dark:bg-background-dark/50">
+                    <h3 className="text-sm font-bold text-text-light-primary dark:text-text-dark-primary">
+                        Lista de Clientes
+                        <span className="text-text-light-secondary dark:text-text-dark-secondary font-normal ml-2 text-xs">
+                            {customers.length} resultados
+                        </span>
+                    </h3>
+                </div>
+            )}
 
             <div className="w-full overflow-x-auto">
                 <table className="w-full text-sm text-left">
                     <thead className="text-xs text-text-light-secondary dark:text-text-dark-secondary uppercase bg-background-light dark:bg-background-dark">
                         <tr>
-                            <th className="px-6 py-3" scope="col">Nombre del Cliente</th>
-                            <th className="px-6 py-3" scope="col">Última Actividad</th>
-                            <th className="px-6 py-3" scope="col">Score de Intención</th>
-                            <th className="px-6 py-3" scope="col">Total Gastado</th>
-                            <th className="px-6 py-3 text-right" scope="col">Acciones</th>
+                            <th className="px-4 py-3 w-10" scope="col">
+                                <input
+                                    type="checkbox"
+                                    checked={selected.size === customers.length && customers.length > 0}
+                                    onChange={toggleAll}
+                                    className="size-4 rounded border-border-light dark:border-border-dark text-primary focus:ring-primary cursor-pointer"
+                                />
+                            </th>
+                            <th className="px-4 py-3" scope="col">Nombre del Cliente</th>
+                            <th className="px-4 py-3" scope="col">Última Actividad</th>
+                            <th className="px-4 py-3" scope="col">Score de Intención</th>
+                            <th className="px-4 py-3" scope="col">Total Gastado</th>
+                            <th className="px-4 py-3 text-right" scope="col">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -90,10 +174,22 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                             return (
                                 <tr
                                     key={customer.id}
-                                    className="border-b border-border-light dark:border-border-dark hover:bg-background-light/50 dark:hover:bg-background-dark/50 transition-colors"
+                                    className={cn(
+                                        "border-b border-border-light dark:border-border-dark hover:bg-background-light/50 dark:hover:bg-background-dark/50 transition-colors",
+                                        selected.has(customer.id) && "bg-primary/5"
+                                    )}
                                 >
+                                    {/* Checkbox */}
+                                    <td className="px-4 py-4 w-10">
+                                        <input
+                                            type="checkbox"
+                                            checked={selected.has(customer.id)}
+                                            onChange={() => toggleSelect(customer.id)}
+                                            className="size-4 rounded border-border-light dark:border-border-dark text-primary focus:ring-primary cursor-pointer"
+                                        />
+                                    </td>
                                     {/* Nombre del Cliente */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="relative">
                                                 <div className="bg-primary/20 rounded-full size-10 flex items-center justify-center shrink-0">
@@ -132,7 +228,7 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                                     </td>
 
                                     {/* Última Actividad */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <div className="flex flex-col">
                                             <span className="text-sm text-text-light-primary dark:text-text-dark-primary">
                                                 {activityLabel}
@@ -144,7 +240,7 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                                     </td>
 
                                     {/* Score de Intención */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <Badge
                                             variant="outline"
                                             className={cn(
@@ -160,7 +256,7 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                                     </td>
 
                                     {/* Total Gastado */}
-                                    <td className="px-6 py-4">
+                                    <td className="px-4 py-4">
                                         <div className="flex flex-col">
                                             <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">
                                                 {COP_FORMAT.format(customer.total_spent || 0)}
@@ -172,14 +268,26 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                                     </td>
 
                                     {/* Acciones */}
-                                    <td className="px-6 py-4 text-right">
-                                        <Link
-                                            href={`/dashboard/chats/console?search=${encodeURIComponent(customer.full_name || customer.phone || "")}`}
-                                            className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 text-sm font-medium transition-colors"
-                                        >
-                                            Ver Chats
-                                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                                        </Link>
+                                    <td className="px-4 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            <Link
+                                                href={`/dashboard/chats/console?search=${encodeURIComponent(customer.full_name || customer.phone || "")}`}
+                                                className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                                            >
+                                                Ver Chats
+                                                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                            </Link>
+                                            <button
+                                                onClick={() => handleDelete(customer.id, customer.full_name || "")}
+                                                disabled={deleting === customer.id}
+                                                className="p-1.5 rounded-lg text-text-light-secondary dark:text-text-dark-secondary hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors disabled:opacity-50"
+                                                title="Eliminar cliente"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">
+                                                    {deleting === customer.id ? "hourglass_empty" : "delete"}
+                                                </span>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             )
