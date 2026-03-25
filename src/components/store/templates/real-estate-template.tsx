@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import Image from "next/image"
+import { PropertyImage } from "@/components/store/PropertyImage"
 import Link from "next/link"
 import type { StorefrontProperty } from "@/types/storefront"
 
@@ -501,11 +502,9 @@ function PropertyCard({
       {/* Image */}
       <div className="relative h-56">
         {isValidImageUrl(mainImage?.url) ? (
-          <Image
+          <PropertyImage
             src={mainImage!.url}
             alt={property.title}
-            fill
-            className="object-cover"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             unoptimized={shouldBypassOptimization(mainImage?.url)}
           />
@@ -616,10 +615,9 @@ function FeaturedCard({
     >
       <div className="w-full md:w-2/5 h-48 md:h-auto overflow-hidden relative">
         {isValidImageUrl(mainImage?.url) ? (
-          <Image
+          <PropertyImage
             src={mainImage!.url}
             alt={property.title}
-            fill
             className="object-cover hover:scale-105 transition-transform duration-500"
             sizes="200px"
             unoptimized={shouldBypassOptimization(mainImage?.url)}

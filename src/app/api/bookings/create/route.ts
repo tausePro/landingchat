@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { createCalendarEvent } from "@/lib/calendar/google-calendar"
 import { assignAdvisor } from "@/lib/advisors/assignment"
 import { bookingsRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 
 /**
  * POST /api/bookings/create
@@ -24,11 +25,11 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json()
-        const { organizationId, propertyCode, proposedDate, customerName, customerPhone, customerEmail } = body
+        const { organizationId, slug, propertyCode, proposedDate, customerName, customerPhone, customerEmail } = body
 
-        if (!organizationId || !proposedDate || !customerName || !customerPhone) {
+        if ((!organizationId && !slug) || !proposedDate || !customerName || !customerPhone) {
             return NextResponse.json(
-                { error: "Faltan campos requeridos: organizationId, proposedDate, customerName, customerPhone" },
+                { error: "Faltan campos requeridos: slug u organizationId, proposedDate, customerName, customerPhone" },
                 { status: 400 }
             )
         }
@@ -44,6 +45,12 @@ export async function POST(request: NextRequest) {
         }
 
         const supabase = createServiceClient()
+        const organization = await resolvePublicOrganization(supabase, { slug, organizationId })
+
+        if (!organization) {
+            return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 })
+        }
+
         const DURATION_MINUTES = 60
         const endDate = new Date(startDate.getTime() + DURATION_MINUTES * 60 * 1000)
 
@@ -56,7 +63,7 @@ export async function POST(request: NextRequest) {
             const { data: property } = await supabase
                 .from("properties")
                 .select("id, title, address, neighborhood, city")
-                .eq("organization_id", organizationId)
+                .eq("organization_id", organization.id)
                 .eq("external_code", propertyCode)
                 .single()
 
@@ -77,10 +84,11 @@ export async function POST(request: NextRequest) {
                     .from("properties")
                     .select("property_type")
                     .eq("id", propertyId)
+                    .eq("organization_id", organization.id)
                     .single()
                 propType = prop?.property_type
             }
-            assignedAdvisor = await assignAdvisor(organizationId, startDate, propType)
+            assignedAdvisor = await assignAdvisor(organization.id, startDate, propType)
         } catch {
             // tabla advisors puede no existir aún
         }
@@ -89,7 +97,7 @@ export async function POST(request: NextRequest) {
         const { data: conflicts } = await supabase
             .from("appointments")
             .select("id")
-            .eq("organization_id", organizationId)
+            .eq("organization_id", organization.id)
             .in("status", ["pending", "confirmed"])
             .lt("proposed_date", endDate.toISOString())
             .gt("proposed_end_date", startDate.toISOString())
@@ -107,7 +115,7 @@ export async function POST(request: NextRequest) {
             : `Visita programada — ${customerName}`
 
         const insertData: Record<string, unknown> = {
-            organization_id: organizationId,
+            organization_id: organization.id,
             property_id: propertyId,
             title,
             appointment_type: "visit",
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest) {
         // Google Calendar (non-blocking) — ruta al sub-calendario del asesor si existe
         try {
             const advisorCalId = assignedAdvisor?.google_calendar_id || undefined
-            const googleEventId = await createCalendarEvent(organizationId, {
+            const googleEventId = await createCalendarEvent(organization.id, {
                 title: assignedAdvisor ? `${title} — ${assignedAdvisor.name}` : title,
                 description: `Cita desde web con ${customerName}\nTeléfono: ${customerPhone}${propertyCode ? `\nPropiedad: ${propertyCode}` : ""}${assignedAdvisor ? `\nAsesor: ${assignedAdvisor.name}` : ""}`,
                 startDate,
@@ -168,7 +176,7 @@ export async function POST(request: NextRequest) {
         try {
             const { sendAppointmentNotification } = await import("@/lib/notifications/whatsapp")
             await sendAppointmentNotification(
-                { organizationId },
+                { organizationId: organization.id },
                 {
                     title,
                     customerName,

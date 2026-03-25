@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { chatInitRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { createServiceClient } from "@/lib/supabase/server"
+import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 
 const chatInitSchema = z.object({
     customerId: z.string().uuid("Customer ID inválido")
@@ -39,17 +40,9 @@ export async function POST(
 
         const { customerId } = validation.data
 
-        // Use service role key to bypass RLS
-        const supabase = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-        )
+        const supabase = createServiceClient()
 
-        const { data: organization } = await supabase
-            .from("organizations")
-            .select("id, name")
-            .eq("slug", slug)
-            .single()
+        const organization = await resolvePublicOrganization(supabase, { slug })
 
         if (!organization) {
             return NextResponse.json({ error: "Tienda no encontrada" }, { status: 404 })
@@ -59,6 +52,7 @@ export async function POST(
             .from("customers")
             .select("id, full_name, total_orders")
             .eq("id", customerId)
+            .eq("organization_id", organization.id)
             .single()
 
         if (!customer) {

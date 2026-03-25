@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
+import { PropertyImage } from "@/components/store/PropertyImage"
 import { headers } from "next/headers"
 import { BookingPanel } from "./booking-panel"
 import { PhotoGallery } from "./photo-gallery"
@@ -113,13 +114,12 @@ export default async function PropertyDetailPage({
           <div className="md:col-span-2 md:row-span-2 relative group">
             <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-all z-10" />
             {isValidImageUrl(images[0]?.url) ? (
-              <Image
+              <PropertyImage
                 src={images[0].url}
                 alt={property.title}
-                fill
-                className="object-cover"
                 priority
                 unoptimized={shouldBypassOptimization(images[0]?.url)}
+                placeholderIconSize={64}
               />
             ) : (
               <div className="w-full h-full bg-slate-200 flex items-center justify-center">
@@ -131,11 +131,9 @@ export default async function PropertyDetailPage({
           {[1, 2, 3].map((idx) => (
             <div key={idx} className="md:col-span-1 md:row-span-1 relative">
               {isValidImageUrl(images[idx]?.url) ? (
-                <Image
+                <PropertyImage
                   src={images[idx].url}
                   alt={`${property.title} - ${idx + 1}`}
-                  fill
-                  className="object-cover"
                   unoptimized={shouldBypassOptimization(images[idx]?.url)}
                 />
               ) : (
@@ -146,11 +144,9 @@ export default async function PropertyDetailPage({
           {/* Last slot with "Ver X fotos" button */}
           <div className="md:col-span-1 md:row-span-1 relative">
             {isValidImageUrl(images[4]?.url) ? (
-              <Image
+              <PropertyImage
                 src={images[4].url}
                 alt={`${property.title} - 5`}
-                fill
-                className="object-cover"
                 unoptimized={shouldBypassOptimization(images[4]?.url)}
               />
             ) : (
