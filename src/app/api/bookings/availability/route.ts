@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { getFreeBusySlots, isCalendarConnected } from "@/lib/calendar/google-calendar"
 import { getAdvisors, type WorkingHours } from "@/lib/advisors/assignment"
+import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 
 const DAY_KEYS: Record<number, keyof WorkingHours> = {
     0: "sunday", 1: "monday", 2: "tuesday", 3: "wednesday",
@@ -16,10 +17,10 @@ const DAY_KEYS: Record<number, keyof WorkingHours> = {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
-        const { organizationId, date, daysAhead = 7, propertyType } = body
+        const { organizationId, slug, date, daysAhead = 7, propertyType } = body
 
-        if (!organizationId || !date) {
-            return NextResponse.json({ error: "organizationId y date son requeridos" }, { status: 400 })
+        if ((!organizationId && !slug) || !date) {
+            return NextResponse.json({ error: "slug u organizationId y date son requeridos" }, { status: 400 })
         }
 
         const daysToCheck = Math.min(Math.max(daysAhead, 1), 14)
@@ -36,11 +37,16 @@ export async function POST(request: NextRequest) {
         const DEFAULT_END = 18
 
         const supabase = createServiceClient()
+        const organization = await resolvePublicOrganization(supabase, { slug, organizationId })
+
+        if (!organization) {
+            return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 })
+        }
 
         // Cargar asesores (si existen)
         let advisors: Awaited<ReturnType<typeof getAdvisors>> = []
         try {
-            advisors = await getAdvisors(organizationId)
+            advisors = await getAdvisors(organization.id)
         } catch {
             // tabla advisors puede no existir aún
         }
@@ -61,7 +67,7 @@ export async function POST(request: NextRequest) {
         const { data: localAppointments } = await supabase
             .from("appointments")
             .select("proposed_date, proposed_end_date, status")
-            .eq("organization_id", organizationId)
+            .eq("organization_id", organization.id)
             .in("status", ["pending", "confirmed"])
             .gte("proposed_date", startDate.toISOString())
             .lte("proposed_date", endDate.toISOString())
@@ -69,9 +75,9 @@ export async function POST(request: NextRequest) {
         // 2. Google Calendar busy slots
         let gcalBusy: Array<{ start: string; end: string }> = []
         try {
-            const connected = await isCalendarConnected(organizationId)
+            const connected = await isCalendarConnected(organization.id)
             if (connected) {
-                const busy = await getFreeBusySlots(organizationId, startDate, endDate)
+                const busy = await getFreeBusySlots(organization.id, startDate, endDate)
                 if (busy) gcalBusy = busy
             }
         } catch {

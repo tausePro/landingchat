@@ -41,6 +41,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          slug,
           organizationId,
           date: today.toISOString(),
           daysAhead: 8,
@@ -58,7 +59,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
     } finally {
       setLoadingSlots(false)
     }
-  }, [organizationId])
+  }, [organizationId, slug])
 
   useEffect(() => {
     fetchAvailability()
@@ -89,6 +90,7 @@ export function BookingPanel({ slug, propertyCode, propertyTitle, primaryColor, 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          slug,
           organizationId,
           propertyCode,
           proposedDate: selectedSlot.isoDate,
