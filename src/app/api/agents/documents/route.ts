@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const MAX_TEXT_LENGTH = 50000 // ~50k chars para no saturar el contexto
 
 const VALID_EXTENSIONS = [".pdf", ".txt", ".md", ".csv"]
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
         // Validar archivo
         if (file.size > MAX_FILE_SIZE) {
-            return NextResponse.json({ error: "El archivo supera el límite de 5MB" }, { status: 400 })
+            return NextResponse.json({ error: "El archivo supera el límite de 50MB" }, { status: 400 })
         }
 
         const fileExt = "." + (file.name.split(".").pop()?.toLowerCase() || "")
