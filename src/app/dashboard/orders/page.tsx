@@ -28,11 +28,12 @@ export const dynamic = 'force-dynamic'
 export default async function OrdersPage({
     searchParams,
 }: {
-    searchParams: { page?: string; status?: string; search?: string }
+    searchParams: Promise<{ page?: string; status?: string; search?: string }>
 }) {
-    const page = Number(searchParams.page) || 1
-    const status = searchParams.status || "Todos los estados"
-    const search = searchParams.search || ""
+    const params = await searchParams
+    const page = Number(params.page) || 1
+    const status = params.status || "Todos los estados"
+    const search = params.search || ""
 
     const { orders, total, totalPages } = await getOrders({ page, status, search })
 
@@ -213,21 +214,56 @@ export default async function OrdersPage({
                         </table>
                     </div>
 
-                    {/* Pagination (Static for now based on prototype style) */}
-                    <div className="p-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
-                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                            Mostrando <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">1-{orders.length}</span> de <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">{total}</span>
-                        </p>
-                        <nav className="flex items-center gap-2">
-                            <button className="inline-flex items-center justify-center size-8 rounded-lg border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark">
-                                <span className="material-symbols-outlined text-xl">chevron_left</span>
-                            </button>
-                            <button className="inline-flex items-center justify-center size-8 rounded-lg bg-primary text-white text-sm">1</button>
-                            <button className="inline-flex items-center justify-center size-8 rounded-lg border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark">
-                                <span className="material-symbols-outlined text-xl">chevron_right</span>
-                            </button>
-                        </nav>
-                    </div>
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                        <div className="p-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
+                            <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                                Mostrando <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">{(page - 1) * 10 + 1}-{Math.min(page * 10, total)}</span> de <span className="font-semibold text-text-light-primary dark:text-text-dark-primary">{total}</span>
+                            </p>
+                            <nav className="flex items-center gap-1">
+                                {page > 1 && (
+                                    <Link
+                                        href={`/dashboard/orders?page=${page - 1}${status !== "Todos los estados" ? `&status=${status}` : ""}${search ? `&search=${search}` : ""}`}
+                                        className="inline-flex items-center justify-center size-8 rounded-lg border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark"
+                                    >
+                                        <span className="material-symbols-outlined text-xl">chevron_left</span>
+                                    </Link>
+                                )}
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                                    .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...")
+                                        acc.push(p)
+                                        return acc
+                                    }, [])
+                                    .map((p, idx) =>
+                                        p === "..." ? (
+                                            <span key={`ellipsis-${idx}`} className="inline-flex items-center justify-center size-8 text-text-light-secondary dark:text-text-dark-secondary text-sm">...</span>
+                                        ) : (
+                                            <Link
+                                                key={p}
+                                                href={`/dashboard/orders?page=${p}${status !== "Todos los estados" ? `&status=${status}` : ""}${search ? `&search=${search}` : ""}`}
+                                                className={`inline-flex items-center justify-center size-8 rounded-lg text-sm ${
+                                                    p === page
+                                                        ? "bg-primary text-white"
+                                                        : "border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark"
+                                                }`}
+                                            >
+                                                {p}
+                                            </Link>
+                                        )
+                                    )}
+                                {page < totalPages && (
+                                    <Link
+                                        href={`/dashboard/orders?page=${page + 1}${status !== "Todos los estados" ? `&status=${status}` : ""}${search ? `&search=${search}` : ""}`}
+                                        className="inline-flex items-center justify-center size-8 rounded-lg border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark"
+                                    >
+                                        <span className="material-symbols-outlined text-xl">chevron_right</span>
+                                    </Link>
+                                )}
+                            </nav>
+                        </div>
+                    )}
                 </div>
             </div>
         </DashboardLayout>
