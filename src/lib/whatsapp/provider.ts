@@ -146,7 +146,7 @@ async function sendViaEvolution(
 }
 
 // ============================================
-// Mensajes ricos (solo Meta Cloud API)
+// Mensajes ricos (Meta Cloud API + Evolution fallbacks)
 // ============================================
 
 /**
@@ -159,9 +159,25 @@ export async function sendWhatsAppImage(
   caption?: string
 ): Promise<{ messageId?: string }> {
   const instance = await getConnectedInstance(organizationId)
-  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
-    // Fallback: enviar como texto con link
-    return sendViaMeta(instance, to, `${caption || ""}\n${imageUrl}`)
+
+  // Evolution: enviar imagen vía Evolution API
+  if (instance.provider === "evolution") {
+    const supabase = await createServiceClient()
+    const config = await getEvolutionConfig(supabase)
+    if (!config) throw new Error("Evolution API not configured")
+    const client = new EvolutionClient({ baseUrl: config.url, apiKey: config.apiKey })
+    const response = await client.sendMediaMessage(instance.instance_name, {
+      number: to,
+      mediatype: "image",
+      media: imageUrl,
+      caption,
+    })
+    return { messageId: response?.key?.id }
+  }
+
+  // Meta Cloud API
+  if (!instance.meta_phone_number_id || !instance.meta_access_token) {
+    throw new Error("Meta Cloud API credentials not configured for this instance")
   }
 
   const client = new MetaCloudClient()
@@ -188,10 +204,17 @@ export async function sendWhatsAppButtons(
   header?: string
 ): Promise<{ messageId?: string }> {
   const instance = await getConnectedInstance(organizationId)
-  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
-    // Fallback: enviar como texto
+
+  // Evolution: enviar como texto plano (botones interactivos no soportados nativamente)
+  if (instance.provider === "evolution") {
     const buttonText = buttons.map((b, i) => `${i + 1}. ${b.title}`).join("\n")
-    return sendViaMeta(instance, to, `${body}\n\n${buttonText}`)
+    const supabase = await createServiceClient()
+    return sendViaEvolution(instance, to, `${header ? `*${header}*\n\n` : ""}${body}\n\n${buttonText}`, supabase)
+  }
+
+  // Meta Cloud API
+  if (!instance.meta_phone_number_id || !instance.meta_access_token) {
+    throw new Error("Meta Cloud API credentials not configured for this instance")
   }
 
   const client = new MetaCloudClient()
@@ -222,12 +245,19 @@ export async function sendWhatsAppList(
   header?: string
 ): Promise<{ messageId?: string }> {
   const instance = await getConnectedInstance(organizationId)
-  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
-    // Fallback: enviar como texto
+
+  // Evolution: enviar como texto plano (listas interactivas no soportadas nativamente)
+  if (instance.provider === "evolution") {
     const listText = sections.map(s =>
       s.rows.map(r => `• ${r.title}${r.description ? ` - ${r.description}` : ""}`).join("\n")
     ).join("\n")
-    return sendViaMeta(instance, to, `${body}\n\n${listText}`)
+    const supabase = await createServiceClient()
+    return sendViaEvolution(instance, to, `${header ? `*${header}*\n\n` : ""}${body}\n\n${listText}`, supabase)
+  }
+
+  // Meta Cloud API
+  if (!instance.meta_phone_number_id || !instance.meta_access_token) {
+    throw new Error("Meta Cloud API credentials not configured for this instance")
   }
 
   const client = new MetaCloudClient()
@@ -256,9 +286,26 @@ export async function sendWhatsAppMedia(
   filename?: string
 ): Promise<{ messageId?: string }> {
   const instance = await getConnectedInstance(organizationId)
-  if (instance.provider !== "meta" || !instance.meta_phone_number_id || !instance.meta_access_token) {
-    // Fallback: enviar como texto con link
-    return sendViaMeta(instance, to, `${caption || ""}\n📎 ${mediaUrl}`)
+
+  // Evolution: enviar media vía Evolution API
+  if (instance.provider === "evolution") {
+    const supabase = await createServiceClient()
+    const config = await getEvolutionConfig(supabase)
+    if (!config) throw new Error("Evolution API not configured")
+    const client = new EvolutionClient({ baseUrl: config.url, apiKey: config.apiKey })
+    const response = await client.sendMediaMessage(instance.instance_name, {
+      number: to,
+      mediatype: mediaType,
+      media: mediaUrl,
+      caption,
+      fileName: filename,
+    })
+    return { messageId: response?.key?.id }
+  }
+
+  // Meta Cloud API
+  if (!instance.meta_phone_number_id || !instance.meta_access_token) {
+    throw new Error("Meta Cloud API credentials not configured for this instance")
   }
 
   const client = new MetaCloudClient()

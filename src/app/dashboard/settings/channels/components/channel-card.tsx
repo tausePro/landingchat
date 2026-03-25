@@ -14,6 +14,7 @@ import {
     AlertTriangle,
     TrendingUp,
     Unplug,
+    QrCode,
 } from "lucide-react"
 import { SocialLoginButton } from "./social-login-button"
 import { disconnectSocialChannel } from "../actions"
@@ -323,6 +324,36 @@ function WhatsAppDisconnectedContent({
     planLimit: number
     onUpdate: () => void
 }) {
+    const [isConnecting, setIsConnecting] = useState(false)
+    const [showQRModal, setShowQRModal] = useState(false)
+    const [qrCode, setQrCode] = useState<string>("")
+    const [instanceId, setInstanceId] = useState<string>("")
+
+    const handleConnectEvolution = async () => {
+        setIsConnecting(true)
+        try {
+            const { connectWhatsApp } = await import("../../whatsapp/actions")
+            const result = await connectWhatsApp()
+            if (result.success && result.data) {
+                setQrCode(result.data.qr_code)
+                setInstanceId(result.data.instance_id)
+                setShowQRModal(true)
+                toast.success("Escanea el código QR con tu WhatsApp")
+            } else {
+                toast.error("error" in result ? result.error : "Error al conectar")
+            }
+        } catch {
+            toast.error("Error al conectar WhatsApp")
+        } finally {
+            setIsConnecting(false)
+        }
+    }
+
+    const handleQRModalClose = () => {
+        setShowQRModal(false)
+        onUpdate()
+    }
+
     if (planLimit === 0) {
         return (
             <p className="text-sm text-muted-foreground">
@@ -332,35 +363,84 @@ function WhatsAppDisconnectedContent({
     }
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <TrendingUp className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <p>
-                    Tu plan incluye hasta{" "}
-                    <strong>{planLimit === -1 ? "ilimitadas" : planLimit}</strong>{" "}
-                    conversaciones por mes.
-                </p>
-            </div>
-
-            {metaAppId && metaConfigId && (
-                <div className="space-y-2">
-                    <EmbeddedSignupWrapper
-                        appId={metaAppId}
-                        configId={metaConfigId}
-                        onSuccess={onUpdate}
-                    />
-                    <p className="text-xs text-muted-foreground text-center">
-                        Conexión oficial via Meta — sin riesgo de bloqueo
+        <>
+            <div className="space-y-3">
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <TrendingUp className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <p>
+                        Tu plan incluye hasta{" "}
+                        <strong>{planLimit === -1 ? "ilimitadas" : planLimit}</strong>{" "}
+                        conversaciones por mes.
                     </p>
                 </div>
-            )}
 
-            {!metaAppId && (
-                <p className="text-sm text-muted-foreground">
-                    Configura la app de Meta para conectar WhatsApp. Contacta al administrador.
-                </p>
+                {metaAppId && metaConfigId && (
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Shield className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-medium">Conexión oficial (recomendada)</span>
+                        </div>
+                        <EmbeddedSignupWrapper
+                            appId={metaAppId}
+                            configId={metaConfigId}
+                            onSuccess={onUpdate}
+                        />
+                        <p className="text-xs text-muted-foreground text-center">
+                            Conexión oficial via Meta — sin riesgo de bloqueo
+                        </p>
+                    </div>
+                )}
+
+                {metaAppId && metaConfigId && (
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-card px-2 text-muted-foreground">o</span>
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-2">
+                    {metaAppId && (
+                        <div className="flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-orange-500" />
+                            <span className="text-sm font-medium text-muted-foreground">
+                                Conexión por QR (no oficial)
+                            </span>
+                        </div>
+                    )}
+                    <Button
+                        variant={metaAppId ? "outline" : "default"}
+                        onClick={handleConnectEvolution}
+                        disabled={isConnecting}
+                        className="w-full"
+                        size="sm"
+                    >
+                        <QrCode className="mr-2 h-4 w-4" />
+                        {isConnecting
+                            ? "Conectando..."
+                            : metaAppId
+                                ? "Conectar con QR (Evolution)"
+                                : "Conectar WhatsApp"}
+                    </Button>
+                    {metaAppId && (
+                        <p className="text-xs text-orange-600 dark:text-orange-400 text-center">
+                            Usa API no oficial — Meta puede bloquear tu número
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            {showQRModal && (
+                <QRModalWrapper
+                    qrCode={qrCode}
+                    instanceId={instanceId}
+                    onClose={handleQRModalClose}
+                />
             )}
-        </div>
+        </>
     )
 }
 
@@ -376,4 +456,17 @@ function EmbeddedSignupWrapper({
     // Importar dinámicamente para no duplicar código
     const { EmbeddedSignup } = require("../../whatsapp/components/embedded-signup")
     return <EmbeddedSignup appId={appId} configId={configId} onSuccess={onSuccess} />
+}
+
+function QRModalWrapper({
+    qrCode,
+    instanceId,
+    onClose,
+}: {
+    qrCode: string
+    instanceId: string
+    onClose: () => void
+}) {
+    const { QRModal } = require("../../whatsapp/components/qr-modal")
+    return <QRModal qrCode={qrCode} instanceId={instanceId} onClose={onClose} />
 }
