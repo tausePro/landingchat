@@ -413,7 +413,6 @@ export async function deleteCustomer(
   customerId: string
 ): Promise<ActionResult<void>> {
   try {
-    // 1. Auth check
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -421,11 +420,21 @@ export async function deleteCustomer(
       return { success: false, error: "Unauthorized" }
     }
 
-    // 2. Execute operation
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return { success: false, error: "No organization found" }
+    }
+
     const { error } = await supabase
       .from("customers")
       .delete()
       .eq("id", customerId)
+      .eq("organization_id", profile.organization_id)
 
     if (error) {
       return { success: false, error: `Failed to delete customer: ${error.message}` }
@@ -437,6 +446,51 @@ export async function deleteCustomer(
     return {
       success: false,
       error: err instanceof Error ? err.message : "Unknown error deleting customer"
+    }
+  }
+}
+
+export async function deleteCustomers(
+  customerIds: string[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    if (customerIds.length === 0) {
+      return { success: false, error: "No customers selected" }
+    }
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" }
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) {
+      return { success: false, error: "No organization found" }
+    }
+
+    const { error, count } = await supabase
+      .from("customers")
+      .delete({ count: "exact" })
+      .in("id", customerIds)
+      .eq("organization_id", profile.organization_id)
+
+    if (error) {
+      return { success: false, error: `Failed to delete customers: ${error.message}` }
+    }
+
+    revalidatePath("/dashboard/customers")
+    return { success: true, data: { deleted: count || 0 } }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error deleting customers"
     }
   }
 }
