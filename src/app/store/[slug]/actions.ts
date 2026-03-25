@@ -40,6 +40,7 @@ export async function getStoreData(slug: string, limit?: number) {
         .from("products")
         .select("*")
         .eq("organization_id", org.id)
+        .neq("is_active", false)
 
     // Apply ordering based on configuration
     if (orderBy === "custom") {

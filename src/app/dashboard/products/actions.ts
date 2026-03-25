@@ -261,6 +261,94 @@ export async function deleteProduct(id: string): Promise<ActionResult<void>> {
 }
 
 /**
+ * Quick inline update for a single product field (price, stock, sale_price)
+ * @param id - Product UUID
+ * @param field - Field to update
+ * @param value - New value
+ * @returns Success or error
+ */
+export async function quickUpdateProduct(
+  id: string,
+  field: "price" | "stock" | "sale_price",
+  value: number
+): Promise<ActionResult<void>> {
+  try {
+    if (value < 0) return failure("El valor no puede ser negativo")
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return failure("No autenticado")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No se encontró organización")
+
+    const updateData: Record<string, number | null> = { [field]: value }
+    // Si el precio de venta es 0, limpiarlo
+    if (field === "sale_price" && value === 0) {
+      updateData.sale_price = null
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .update(updateData)
+      .eq("id", id)
+      .eq("organization_id", profile.organization_id)
+
+    if (error) return failure(error.message)
+
+    revalidatePath("/dashboard/products")
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error updating product")
+  }
+}
+
+/**
+ * Toggles a product's active status
+ * @param id - Product UUID
+ * @param isActive - New active status
+ * @returns Success or error
+ */
+export async function toggleProductStatus(
+  id: string,
+  isActive: boolean
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return failure("No autenticado")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No se encontró organización")
+
+    const { error } = await supabase
+      .from("products")
+      .update({ is_active: isActive })
+      .eq("id", id)
+      .eq("organization_id", profile.organization_id)
+
+    if (error) return failure(error.message)
+
+    revalidatePath("/dashboard/products")
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error toggling product status")
+  }
+}
+
+/**
  * Obtiene todas las categorías únicas de los productos de la organización
  * con el conteo de productos por categoría.
  * No requiere tabla dedicada — agrega desde el campo JSONB categories.
