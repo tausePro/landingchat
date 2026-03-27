@@ -63,17 +63,24 @@ export async function POST(request: Request) {
                 .select(`
                     id,
                     status,
+                    features,
                     plans!inner (
                         features
                     )
                 `)
                 .eq("organization_id", organizationId)
-                .eq("status", "active")
-                .single()
+                .in("status", ["active", "trialing", "past_due"])
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
 
-            if (!activeSubscription?.plans?.[0]?.features?.custom_domain) {
-                return NextResponse.json({ 
-                    error: "Tu plan actual no incluye dominios personalizados. Actualiza a Enterprise para usar esta función." 
+            const hasCustomDomainFeature =
+                activeSubscription?.features?.custom_domain === true ||
+                activeSubscription?.plans?.[0]?.features?.custom_domain === true
+
+            if (!hasCustomDomainFeature) {
+                return NextResponse.json({
+                    error: "Tu plan actual no incluye dominios personalizados. Actualiza tu plan para usar esta función."
                 }, { status: 403 })
             }
         }

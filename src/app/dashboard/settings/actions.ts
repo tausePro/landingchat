@@ -49,15 +49,20 @@ export async function getSettingsData(): Promise<SettingsData> {
         .from("subscriptions")
         .select(`
             status,
+            features,
             plans!inner (
                 features
             )
         `)
         .eq("organization_id", profile.organization_id)
-        .eq("status", "active")
-        .single()
+        .in("status", ["active", "trialing", "past_due"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    const hasCustomDomainFeature = activeSubscription?.plans?.[0]?.features?.custom_domain === true
+    const hasCustomDomainFeature =
+        activeSubscription?.features?.custom_domain === true ||
+        activeSubscription?.plans?.[0]?.features?.custom_domain === true
 
     return {
         profile: {
