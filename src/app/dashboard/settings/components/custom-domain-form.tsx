@@ -75,7 +75,7 @@ export function CustomDomainForm({ organization, hasCustomDomainFeature = false 
                         <Alert>
                             <AlertCircle className="size-4" />
                             <AlertDescription>
-                                <strong>Plan requerido:</strong> Los dominios personalizados están disponibles solo en el plan Enterprise. 
+                                <strong>Plan requerido:</strong> Los dominios personalizados no están incluidos en tu plan actual.
                                 <a href="/dashboard/billing" className="underline ml-1">Actualizar plan</a>
                             </AlertDescription>
                         </Alert>
