@@ -219,7 +219,8 @@ export async function createCalendarEvent(
     }
 
     const calendar = google.calendar({ version: "v3", auth })
-    const calendarId = advisorCalendarId || await getCalendarId(organizationId)
+    const defaultCalendarId = await getCalendarId(organizationId)
+    const calendarId = advisorCalendarId || defaultCalendarId
 
     const eventBody: calendar_v3.Schema$Event = {
         summary: event.title,
@@ -253,11 +254,65 @@ export async function createCalendarEvent(
             sendUpdates: event.attendeeEmail ? "all" : "none",
         })
 
-        console.log("[google-calendar] Event created:", response.data.id)
-        return response.data.id || null
+        console.log("[google-calendar] Event created:", {
+            calendarId,
+            eventId: response.data.id,
+        })
+        return response.data.id ? `${calendarId}:${response.data.id}` : null
     } catch (error) {
-        console.error("[google-calendar] Error creating event:", error)
+        console.error("[google-calendar] Error creating event:", {
+            calendarId,
+            advisorCalendarId,
+            defaultCalendarId,
+            error,
+        })
+
+        if (advisorCalendarId && advisorCalendarId !== defaultCalendarId) {
+            try {
+                const fallbackResponse = await calendar.events.insert({
+                    calendarId: defaultCalendarId,
+                    requestBody: eventBody,
+                    sendUpdates: event.attendeeEmail ? "all" : "none",
+                })
+
+                console.warn("[google-calendar] Event created on fallback calendar:", {
+                    advisorCalendarId,
+                    fallbackCalendarId: defaultCalendarId,
+                    eventId: fallbackResponse.data.id,
+                })
+
+                return fallbackResponse.data.id
+                    ? `${defaultCalendarId}:${fallbackResponse.data.id}`
+                    : null
+            } catch (fallbackError) {
+                console.error("[google-calendar] Error creating event on fallback calendar:", {
+                    advisorCalendarId,
+                    fallbackCalendarId: defaultCalendarId,
+                    error: fallbackError,
+                })
+            }
+        }
+
         return null
+    }
+}
+
+async function resolveGoogleEventReference(
+    organizationId: string,
+    googleEventId: string,
+): Promise<{ calendarId: string; eventId: string }> {
+    const separatorIndex = googleEventId.indexOf(":")
+
+    if (separatorIndex > -1) {
+        return {
+            calendarId: googleEventId.slice(0, separatorIndex),
+            eventId: googleEventId.slice(separatorIndex + 1),
+        }
+    }
+
+    return {
+        calendarId: await getCalendarId(organizationId),
+        eventId: googleEventId,
     }
 }
 
@@ -273,7 +328,7 @@ export async function updateCalendarEvent(
     if (!auth) return false
 
     const calendar = google.calendar({ version: "v3", auth })
-    const calendarId = await getCalendarId(organizationId)
+    const { calendarId, eventId } = await resolveGoogleEventReference(organizationId, googleEventId)
 
     const eventBody: calendar_v3.Schema$Event = {}
     if (event.title) eventBody.summary = event.title
@@ -295,7 +350,7 @@ export async function updateCalendarEvent(
     try {
         await calendar.events.patch({
             calendarId,
-            eventId: googleEventId,
+            eventId,
             requestBody: eventBody,
         })
         return true
@@ -316,12 +371,12 @@ export async function cancelCalendarEvent(
     if (!auth) return false
 
     const calendar = google.calendar({ version: "v3", auth })
-    const calendarId = await getCalendarId(organizationId)
+    const { calendarId, eventId } = await resolveGoogleEventReference(organizationId, googleEventId)
 
     try {
         await calendar.events.delete({
             calendarId,
-            eventId: googleEventId,
+            eventId,
         })
         return true
     } catch (error) {
@@ -340,7 +395,7 @@ export async function isCalendarConnected(organizationId: string): Promise<boole
         .select("id")
         .eq("organization_id", organizationId)
         .eq("provider", "google_calendar")
-        .in("status", ["connected", "error"])
+        .eq("status", "connected")
         .single()
 
     return !!data
