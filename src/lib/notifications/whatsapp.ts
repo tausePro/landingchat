@@ -35,7 +35,7 @@ export async function sendSaleNotification(
             .eq("status", "connected")
             .single()
 
-        if (!instance || !instance.notifications_enabled || !instance.notify_on_sale) {
+        if (!instance || instance.notifications_enabled === false || instance.notify_on_sale === false) {
             console.log("[WhatsApp Notifications] Sale notifications disabled for org:", context.organizationId)
             return false
         }
@@ -190,7 +190,7 @@ export async function sendAppointmentNotification(
             .eq("status", "connected")
             .single()
 
-        if (!instance || !instance.notifications_enabled) {
+        if (!instance || instance.notifications_enabled === false) {
             return false
         }
 

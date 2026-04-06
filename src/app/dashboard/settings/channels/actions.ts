@@ -9,6 +9,10 @@ import {
 } from "@/types"
 import type { WhatsAppInstance } from "@/types"
 import { deserializeWhatsAppInstance } from "@/types"
+import {
+    syncEvolutionCorporateInstanceStatus,
+    type EvolutionSyncInstanceRow,
+} from "@/lib/whatsapp/syncEvolutionStatus"
 
 // ============================================
 // Tipos
@@ -32,6 +36,10 @@ export interface ChannelsStatus {
     instagram: SocialChannel | null
     messenger: SocialChannel | null
     meta_config: { app_id: string; config_id?: string } | null
+}
+
+interface SubscriptionPlanLimitRow {
+    max_whatsapp_conversations?: number | null
 }
 
 // ============================================
@@ -74,7 +82,8 @@ export async function getChannelsStatus(): Promise<ActionResult<ChannelsStatus>>
             .select("*")
             .eq("organization_id", orgId)
 
-        const corporate = instances?.find((i: Record<string, unknown>) => i.instance_type === "corporate") || null
+        const corporateRaw = (instances?.find((i: Record<string, unknown>) => i.instance_type === "corporate") || null) as EvolutionSyncInstanceRow | null
+        const corporate = await syncEvolutionCorporateInstanceStatus(corporateRaw)
 
         // Límite del plan
         const { data: subscription } = await supabase
@@ -84,8 +93,8 @@ export async function getChannelsStatus(): Promise<ActionResult<ChannelsStatus>>
             .eq("status", "active")
             .single()
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 10
+        const subscriptionPlan = subscription?.plans as SubscriptionPlanLimitRow | null | undefined
+        const planLimit = subscriptionPlan?.max_whatsapp_conversations || 10
 
         // Conversaciones usadas
         const { data: orgData } = await supabase
@@ -124,7 +133,7 @@ export async function getChannelsStatus(): Promise<ActionResult<ChannelsStatus>>
 
         return success({
             whatsapp: {
-                instance: corporate ? deserializeWhatsAppInstance(corporate) : null,
+                instance: corporate ? deserializeWhatsAppInstance(corporate as unknown as Record<string, unknown>) : null,
                 plan_limit: planLimit,
                 conversations_used: orgData?.whatsapp_conversations_used || 0,
             },

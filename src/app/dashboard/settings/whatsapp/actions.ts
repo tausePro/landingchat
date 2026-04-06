@@ -10,6 +10,14 @@ import {
     type WhatsAppInstance,
     deserializeWhatsAppInstance,
 } from "@/types"
+import {
+    syncEvolutionCorporateInstanceStatus,
+    type EvolutionSyncInstanceRow,
+} from "@/lib/whatsapp/syncEvolutionStatus"
+
+interface SubscriptionPlanLimitRow {
+    max_whatsapp_conversations?: number | null
+}
 
 /**
  * Obtiene la organización del usuario actual
@@ -68,10 +76,12 @@ export async function getWhatsAppStatus(): Promise<
             .single()
 
         // Si no hay suscripción, usar plan gratuito por defecto (10 conversaciones)
-        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 10
+        const subscriptionPlan = subscription?.plans as SubscriptionPlanLimitRow | null | undefined
+        const planLimit = subscriptionPlan?.max_whatsapp_conversations || 10
 
-        const corporate =
-            instances?.find((i) => i.instance_type === "corporate") || null
+        const corporateRaw =
+            (instances?.find((i) => i.instance_type === "corporate") || null) as EvolutionSyncInstanceRow | null
+        const corporate = await syncEvolutionCorporateInstanceStatus(corporateRaw)
         const personal =
             instances?.find((i) => i.instance_type === "personal") || null
 
@@ -83,8 +93,8 @@ export async function getWhatsAppStatus(): Promise<
             .single()
 
         return success({
-            corporate: corporate ? deserializeWhatsAppInstance(corporate) : null,
-            personal: personal ? deserializeWhatsAppInstance(personal) : null,
+            corporate: corporate ? deserializeWhatsAppInstance(corporate as unknown as Record<string, unknown>) : null,
+            personal: personal ? deserializeWhatsAppInstance(personal as unknown as Record<string, unknown>) : null,
             plan_limit: planLimit,
             conversations_used: orgData?.whatsapp_conversations_used || 0,
         })
@@ -118,7 +128,8 @@ export async function connectWhatsApp(): Promise<
             .single()
 
         // Si no hay suscripción, usar plan gratuito por defecto (10 conversaciones)
-        const planLimit = (subscription?.plans as any)?.max_whatsapp_conversations || 10
+        const subscriptionPlan = subscription?.plans as SubscriptionPlanLimitRow | null | undefined
+        const planLimit = subscriptionPlan?.max_whatsapp_conversations || 10
 
         if (planLimit === 0) {
             return failure(
@@ -173,13 +184,46 @@ export async function connectWhatsApp(): Promise<
 
             const instanceName = `org_${orgId}`
 
-            // Si existe instancia, eliminarla primero
+            // Verificar estado real en Evolution antes de intentar recrear
+            let evolutionConnected = false
+            try {
+                const connState = await evolutionClient.getConnectionStatus(instanceName)
+                const rawState = connState?.state || ""
+                evolutionConnected = String(rawState).toLowerCase() === "open"
+                console.log("[connectWhatsApp] Evolution instance state:", rawState, "→ connected:", evolutionConnected)
+            } catch {
+                // La instancia no existe en Evolution, continuar con flujo normal
+                console.log("[connectWhatsApp] Instance not found in Evolution, will create fresh")
+            }
+
+            // Si ya está conectada en Evolution, sincronizar BD y retornar
+            if (evolutionConnected) {
+                const syncData = {
+                    organization_id: orgId,
+                    instance_name: instanceName,
+                    instance_type: "corporate" as const,
+                    provider: "evolution" as const,
+                    status: "connected" as const,
+                    updated_at: new Date().toISOString(),
+                    connected_at: new Date().toISOString(),
+                }
+                if (existing) {
+                    await supabase.from("whatsapp_instances").update(syncData).eq("id", existing.id)
+                } else {
+                    await supabase.from("whatsapp_instances").insert(syncData)
+                }
+                revalidatePath("/dashboard/settings/whatsapp")
+                revalidatePath("/dashboard/settings/channels")
+                return failure("Ya tienes WhatsApp conectado. Recarga la página para ver el estado actualizado.")
+            }
+
+            // Si existe instancia, eliminarla primero (solo si no está conectada)
             if (existing) {
                 try {
                     await evolutionClient.deleteInstance(instanceName)
                 } catch (deleteError) {
                     console.log("[connectWhatsApp] Could not delete existing instance:", deleteError)
-                    // Ignorar error si no existe
+                    // Ignorar error si no existe en Evolution
                 }
             }
 
@@ -240,6 +284,7 @@ export async function connectWhatsApp(): Promise<
                 organization_id: orgId,
                 instance_name: instanceName,
                 instance_type: "corporate" as const,
+                provider: "evolution" as const,
                 status: "connecting" as const,
                 qr_code: qrData.base64 || qrData.code,
                 qr_expires_at: qrExpiresAt.toISOString(),
@@ -541,6 +586,10 @@ export async function connectPersonalWhatsApp(
             status: "connected" as const,
             phone_number: phoneNumber,
             phone_number_display: phoneNumber.slice(-4),
+            notifications_enabled: true,
+            notify_on_sale: true,
+            notify_on_low_stock: false,
+            notify_on_new_conversation: false,
             connected_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         }

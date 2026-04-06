@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
-import { createCalendarEvent } from "@/lib/calendar/google-calendar"
-import { assignAdvisor } from "@/lib/advisors/assignment"
+import { createManagedAppointment } from "@/lib/appointments/service"
 import { bookingsRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 
@@ -51,143 +50,34 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 })
         }
 
-        const DURATION_MINUTES = 60
-        const endDate = new Date(startDate.getTime() + DURATION_MINUTES * 60 * 1000)
-
-        // Buscar la propiedad si se envió propertyCode
-        let propertyId: string | null = null
-        let propertyTitle = ""
-        let propertyAddress = ""
-
-        if (propertyCode) {
-            const { data: property } = await supabase
-                .from("properties")
-                .select("id, title, address, neighborhood, city")
-                .eq("organization_id", organization.id)
-                .eq("external_code", propertyCode)
-                .single()
-
-            if (property) {
-                propertyId = property.id
-                propertyTitle = property.title
-                propertyAddress = [property.address, property.neighborhood, property.city].filter(Boolean).join(", ")
-            }
-        }
-
-        // Asignar asesor automáticamente (si hay asesores configurados)
-        let assignedAdvisor: Awaited<ReturnType<typeof assignAdvisor>> = null
-        try {
-            // Obtener tipo de propiedad para filtrar por especialidad
-            let propType: string | undefined
-            if (propertyId) {
-                const { data: prop } = await supabase
-                    .from("properties")
-                    .select("property_type")
-                    .eq("id", propertyId)
-                    .eq("organization_id", organization.id)
-                    .single()
-                propType = prop?.property_type
-            }
-            assignedAdvisor = await assignAdvisor(organization.id, startDate, propType)
-        } catch {
-            // tabla advisors puede no existir aún
-        }
-
-        // Verificar conflictos
-        const { data: conflicts } = await supabase
-            .from("appointments")
-            .select("id")
-            .eq("organization_id", organization.id)
-            .in("status", ["pending", "confirmed"])
-            .lt("proposed_date", endDate.toISOString())
-            .gt("proposed_end_date", startDate.toISOString())
-
-        if (conflicts && conflicts.length > 0) {
-            return NextResponse.json(
-                { error: "Este horario ya no está disponible. Por favor selecciona otro." },
-                { status: 409 }
-            )
-        }
-
-        // Crear la cita
-        const title = propertyTitle
-            ? `Visita ${propertyTitle}`
-            : `Visita programada — ${customerName}`
-
-        const insertData: Record<string, unknown> = {
-            organization_id: organization.id,
-            property_id: propertyId,
-            title,
-            appointment_type: "visit",
-            status: "pending",
-            proposed_date: startDate.toISOString(),
-            proposed_end_date: endDate.toISOString(),
-            duration_minutes: DURATION_MINUTES,
-            customer_name: customerName,
-            customer_phone: customerPhone,
-            customer_email: customerEmail || null,
-            location: propertyAddress || null,
-            location_type: "in_person",
+        const result = await createManagedAppointment(supabase, {
+            organizationId: organization.id,
+            proposedDate: startDate,
+            durationMinutes: 60,
+            appointmentType: "visit",
+            locationType: "in_person",
+            customerName,
+            customerPhone,
+            customerEmail: customerEmail || null,
+            propertyCode: propertyCode || null,
             metadata: {
                 source: "storefront",
-                property_code: propertyCode,
-                ...(assignedAdvisor ? { advisor_name: assignedAdvisor.name } : {}),
             },
-        }
+        })
 
-        if (assignedAdvisor) {
-            insertData.assigned_to = assignedAdvisor.id
-        }
-
-        const { data: appointment, error } = await supabase
-            .from("appointments")
-            .insert(insertData)
-            .select("id")
-            .single()
-
-        if (error) {
-            console.error("[bookings/create] DB error:", error)
-            return NextResponse.json({ error: "Error creando la cita" }, { status: 500 })
-        }
-
-        // Google Calendar (non-blocking) — ruta al sub-calendario del asesor si existe
-        try {
-            const advisorCalId = assignedAdvisor?.google_calendar_id || undefined
-            const googleEventId = await createCalendarEvent(organization.id, {
-                title: assignedAdvisor ? `${title} — ${assignedAdvisor.name}` : title,
-                description: `Cita desde web con ${customerName}\nTeléfono: ${customerPhone}${propertyCode ? `\nPropiedad: ${propertyCode}` : ""}${assignedAdvisor ? `\nAsesor: ${assignedAdvisor.name}` : ""}`,
-                startDate,
-                endDate,
-                location: propertyAddress || undefined,
-                attendeeEmail: customerEmail || undefined,
-            }, advisorCalId)
-
-            if (googleEventId) {
-                await supabase
-                    .from("appointments")
-                    .update({ google_event_id: googleEventId })
-                    .eq("id", appointment.id)
+        if (!result.success) {
+            if (result.code === "conflict") {
+                return NextResponse.json(
+                    { error: "Este horario ya no está disponible. Por favor selecciona otro." },
+                    { status: 409 }
+                )
             }
-        } catch (gcalError) {
-            console.warn("[bookings/create] GCal sync failed:", gcalError)
-        }
 
-        // WhatsApp notification al admin (non-blocking)
-        try {
-            const { sendAppointmentNotification } = await import("@/lib/notifications/whatsapp")
-            await sendAppointmentNotification(
-                { organizationId: organization.id },
-                {
-                    title,
-                    customerName,
-                    customerPhone,
-                    proposedDate: startDate,
-                    appointmentType: "visit",
-                    location: propertyAddress || null,
-                }
-            )
-        } catch (notifError) {
-            console.warn("[bookings/create] WhatsApp notification failed:", notifError)
+            if (result.code === "invalid_date" || result.code === "past_date") {
+                return NextResponse.json({ error: result.error }, { status: 400 })
+            }
+
+            return NextResponse.json({ error: result.error }, { status: 500 })
         }
 
         const dateFormatted = startDate.toLocaleDateString("es-CO", {
@@ -200,13 +90,13 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             appointment: {
-                id: appointment.id,
-                title,
+                id: result.appointment.id,
+                title: result.appointment.title,
                 date: dateFormatted,
                 time: timeFormatted,
-                advisor: assignedAdvisor ? assignedAdvisor.name : null,
+                advisor: result.assignedAdvisor ? result.assignedAdvisor.name : null,
             },
-            message: `Tu visita ha sido agendada para el ${dateFormatted} a las ${timeFormatted}.${assignedAdvisor ? ` Tu asesor será ${assignedAdvisor.name}.` : " Un asesor confirmará en breve."}`,
+            message: `Tu visita ha sido agendada para el ${dateFormatted} a las ${timeFormatted}.${result.assignedAdvisor ? ` Tu asesor será ${result.assignedAdvisor.name}.` : " Un asesor confirmará en breve."}`,
         })
     } catch (error) {
         console.error("[bookings/create] Error:", error)
