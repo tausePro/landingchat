@@ -6,6 +6,7 @@ import { redirect } from "next/navigation"
 import { DashboardCharts } from "./components/dashboard-charts"
 import { VisitorsCard } from "./components/visitors-card"
 import { StatWidget } from "./components/stat-widget"
+import { Greeting } from "./components/greeting"
 
 export const dynamic = 'force-dynamic'
 
@@ -53,9 +54,7 @@ export default async function DashboardPage() {
     const isRealEstate = stats.industry === "real_estate" && !!stats.realEstate
     const re = stats.realEstate
 
-    // Hora del día para saludo
-    const hour = new Date().getHours()
-    const greeting = hour < 12 ? "Buenos días" : hour < 18 ? "Buenas tardes" : "Buenas noches"
+    // Saludo se calcula en el cliente (Greeting component) para usar timezone local
 
     // Formato de trend badge
     const TrendBadge = ({ value, suffix = "%" }: { value: number; suffix?: string }) => (
@@ -115,7 +114,7 @@ export default async function DashboardPage() {
                 {isRealEstate ? (
                     <div>
                         <h1 className="text-2xl font-bold text-text-light-primary dark:text-text-dark-primary">
-                            {greeting}, {stats.userName} ✦
+                            <Greeting userName={stats.userName} />
                         </h1>
                         <p className="text-text-light-secondary dark:text-text-dark-secondary mt-1">
                             {stats.revenue.today > 0
@@ -128,7 +127,7 @@ export default async function DashboardPage() {
                 ) : (
                     <div className="space-y-2">
                         <h1 className="text-3xl font-bold tracking-tight text-text-light-primary dark:text-text-dark-primary">
-                            {greeting}, {stats.userName} ✦
+                            <Greeting userName={stats.userName} />
                         </h1>
                         <p className="max-w-3xl text-sm leading-6 text-text-light-secondary dark:text-text-dark-secondary sm:text-base">
                             {stats.revenue.today > 0 ? (

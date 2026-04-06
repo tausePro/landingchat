@@ -261,6 +261,94 @@ export async function deleteProduct(id: string): Promise<ActionResult<void>> {
 }
 
 /**
+ * Quick inline update for a single product field (price, stock, sale_price)
+ * @param id - Product UUID
+ * @param field - Field to update
+ * @param value - New value
+ * @returns Success or error
+ */
+export async function quickUpdateProduct(
+  id: string,
+  field: "price" | "stock" | "sale_price",
+  value: number
+): Promise<ActionResult<void>> {
+  try {
+    if (value < 0) return failure("El valor no puede ser negativo")
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return failure("No autenticado")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No se encontró organización")
+
+    const updateData: Record<string, number | null> = { [field]: value }
+    // Si el precio de venta es 0, limpiarlo
+    if (field === "sale_price" && value === 0) {
+      updateData.sale_price = null
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .update(updateData)
+      .eq("id", id)
+      .eq("organization_id", profile.organization_id)
+
+    if (error) return failure(error.message)
+
+    revalidatePath("/dashboard/products")
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error updating product")
+  }
+}
+
+/**
+ * Toggles a product's active status
+ * @param id - Product UUID
+ * @param isActive - New active status
+ * @returns Success or error
+ */
+export async function toggleProductStatus(
+  id: string,
+  isActive: boolean
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) return failure("No autenticado")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No se encontró organización")
+
+    const { error } = await supabase
+      .from("products")
+      .update({ is_active: isActive })
+      .eq("id", id)
+      .eq("organization_id", profile.organization_id)
+
+    if (error) return failure(error.message)
+
+    revalidatePath("/dashboard/products")
+    return success(undefined)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error toggling product status")
+  }
+}
+
+/**
  * Obtiene todas las categorías únicas de los productos de la organización
  * con el conteo de productos por categoría.
  * No requiere tabla dedicada — agrega desde el campo JSONB categories.
@@ -486,5 +574,223 @@ export async function updateProductOrder(orderedIds: string[]): Promise<ActionRe
     return success(undefined)
   } catch (err) {
     return failure(err instanceof Error ? err.message : "Unknown error updating product order")
+  }
+}
+
+// ============================================================================
+// CSV Export / Import
+// ============================================================================
+
+const CSV_HEADERS = [
+  "id",
+  "name",
+  "description",
+  "price",
+  "sale_price",
+  "stock",
+  "sku",
+  "categories",
+  "is_active",
+] as const
+
+function escapeCsvField(value: string | number | boolean | null | undefined): string {
+  if (value === null || value === undefined) return ""
+  const str = String(value)
+  if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+/**
+ * Exports all products as CSV string
+ */
+export async function exportProductsCsv(): Promise<ActionResult<string>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return failure("No autenticado")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No se encontró organización")
+
+    const { data: products, error } = await supabase
+      .from("products")
+      .select("id, name, description, price, sale_price, stock, sku, categories, is_active")
+      .eq("organization_id", profile.organization_id)
+      .order("created_at", { ascending: false })
+
+    if (error) return failure(error.message)
+
+    const rows = (products || []).map((p) =>
+      CSV_HEADERS.map((h) => {
+        if (h === "categories") {
+          return escapeCsvField(
+            Array.isArray(p.categories) ? (p.categories as string[]).join("; ") : ""
+          )
+        }
+        return escapeCsvField(p[h as keyof typeof p] as string | number | boolean | null)
+      }).join(",")
+    )
+
+    // BOM para que Excel reconozca UTF-8
+    const bom = "\uFEFF"
+    const csv = bom + CSV_HEADERS.join(",") + "\n" + rows.join("\n")
+
+    return success(csv)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error exporting products")
+  }
+}
+
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = []
+  let current = ""
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (inQuotes) {
+      if (char === '"' && line[i + 1] === '"') {
+        current += '"'
+        i++
+      } else if (char === '"') {
+        inQuotes = false
+      } else {
+        current += char
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true
+      } else if (char === ",") {
+        fields.push(current.trim())
+        current = ""
+      } else {
+        current += char
+      }
+    }
+  }
+  fields.push(current.trim())
+  return fields
+}
+
+interface CsvImportResult {
+  updated: number
+  errors: string[]
+}
+
+/**
+ * Imports products from CSV string, updating existing products by ID
+ */
+export async function importProductsCsv(csvContent: string): Promise<ActionResult<CsvImportResult>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return failure("No autenticado")
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (!profile?.organization_id) return failure("No se encontró organización")
+
+    // Parse CSV
+    const lines = csvContent
+      .replace(/^\uFEFF/, "") // Remove BOM
+      .split(/\r?\n/)
+      .filter((l) => l.trim())
+
+    if (lines.length < 2) return failure("El archivo CSV está vacío o no tiene datos")
+
+    const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().trim())
+    const idIndex = headers.indexOf("id")
+    if (idIndex === -1) return failure("El CSV debe tener una columna 'id'")
+
+    const result: CsvImportResult = { updated: 0, errors: [] }
+
+    for (let i = 1; i < lines.length; i++) {
+      const fields = parseCsvLine(lines[i])
+      const id = fields[idIndex]
+      if (!id) continue
+
+      const updateData: Record<string, unknown> = {}
+
+      headers.forEach((header, idx) => {
+        const value = fields[idx] ?? ""
+        switch (header) {
+          case "id":
+            break // Skip, used for matching
+          case "name":
+            if (value) updateData.name = value
+            break
+          case "description":
+            updateData.description = value || null
+            break
+          case "price":
+            if (value) {
+              const n = parseFloat(value)
+              if (!isNaN(n) && n >= 0) updateData.price = n
+            }
+            break
+          case "sale_price":
+            if (value) {
+              const n = parseFloat(value)
+              if (!isNaN(n) && n >= 0) updateData.sale_price = n
+            } else {
+              updateData.sale_price = null
+            }
+            break
+          case "stock":
+            if (value !== "") {
+              const n = parseInt(value, 10)
+              if (!isNaN(n) && n >= 0) updateData.stock = n
+            }
+            break
+          case "sku":
+            updateData.sku = value || null
+            break
+          case "categories":
+            if (value) {
+              updateData.categories = value.split(";").map((c: string) => c.trim()).filter(Boolean)
+            } else {
+              updateData.categories = []
+            }
+            break
+          case "is_active":
+            if (value.toLowerCase() === "false" || value === "0") {
+              updateData.is_active = false
+            } else if (value.toLowerCase() === "true" || value === "1") {
+              updateData.is_active = true
+            }
+            break
+        }
+      })
+
+      if (Object.keys(updateData).length === 0) continue
+
+      const { error } = await supabase
+        .from("products")
+        .update(updateData)
+        .eq("id", id)
+        .eq("organization_id", profile.organization_id)
+
+      if (error) {
+        result.errors.push(`Fila ${i + 1} (${id}): ${error.message}`)
+      } else {
+        result.updated++
+      }
+    }
+
+    revalidatePath("/dashboard/products")
+    return success(result)
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error importing products")
   }
 }

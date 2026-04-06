@@ -306,8 +306,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     </h2>
                 </Link>
 
-                <div className="flex h-full flex-col justify-between mt-8">
-                    <nav className="flex flex-col gap-6">
+                <div className="flex min-h-0 flex-1 flex-col justify-between mt-8">
+                    <nav className="flex flex-col gap-6 overflow-y-auto min-h-0 pb-4">
                         {navSections.map((section) => (
                             <div key={section.key} className="space-y-2">
                                 <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-text-light-secondary/80 dark:text-text-dark-secondary/80">
@@ -327,7 +327,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         )}
                     </nav>
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex shrink-0 flex-col gap-4 pt-4 border-t border-border-light dark:border-border-dark">
                         <div className="flex gap-3 items-center p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                             {userAvatar ? (
                                 <div
