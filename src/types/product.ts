@@ -200,3 +200,110 @@ export interface ProductData {
   created_at: string
   tax_rate?: number | null
 }
+
+// ============================================================================
+// TARGET TYPES — Commerce Core Reset (Fase 1)
+// Ref: docs-private/RFC_PRICING_VARIANTS_PROMOTIONS.md §6
+//
+// Estos tipos representan el modelo variant-centric objetivo.
+// Conviven temporalmente con los tipos legacy de arriba.
+// NO reemplazan aún ningún consumer productivo.
+// ============================================================================
+
+/**
+ * Valor de opción asociado a una variante vendible.
+ * Ej: { option_name: "Color", value: "Rojo" }
+ */
+export interface VariantOptionValue {
+  option_name: string
+  value: string
+}
+
+/**
+ * Variante vendible real — unidad mínima de venta.
+ * Cada producto tendrá al menos una variante (is_default=true para simples).
+ * Ref: RFC §6.2
+ */
+export interface ProductVariantRow {
+  id: string
+  product_id: string
+  organization_id: string
+  title: string
+  sku: string | null
+  position: number
+  is_default: boolean
+  is_active: boolean
+  price: number
+  compare_at_price: number | null
+  stock_quantity: number
+  image_url: string | null
+  option_values: VariantOptionValue[]
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Promoción normalizada con scopes canónicos.
+ * Ref: RFC §6.3
+ */
+export interface NormalizedPromotion {
+  id: string
+  applies_to: 'all' | 'product' | 'variant' | 'category'
+  target_ids: string[]
+  type: 'percentage' | 'fixed'
+  value: number
+  is_active: boolean
+  start_date?: string | null
+  end_date?: string | null
+}
+
+/**
+ * Resultado del resolver variant-centric.
+ * Ref: RFC §7.1
+ */
+export interface VariantResolvedPricing {
+  variant_id: string
+  /** Precio de catálogo de la variante */
+  price: number
+  /** Precio comparativo opcional (para mostrar tachado) */
+  compare_at_price: number | null
+  /** Precio con promoción activa, null si no aplica */
+  promotion_price: number | null
+  /** Precio final = min(price, promotion_price) o price si no hay promoción */
+  final_price: number
+  /** Lo que se muestra tachado en UI */
+  compare_at_to_show: number | null
+  /** Precio por tier de cantidad, null si no aplica */
+  tier_price: number | null
+  /** Fuente del precio final */
+  source: 'catalog' | 'promotion' | 'tier'
+  /** Promoción activa si aplica */
+  active_promotion: NormalizedPromotion | null
+}
+
+/**
+ * Rango de precios para un producto con múltiples variantes.
+ * Ref: RFC §5.5
+ */
+export interface VariantPriceRange {
+  has_range: boolean
+  min_price: number
+  max_price: number
+  min_compare_at: number | null
+  max_compare_at: number | null
+}
+
+/**
+ * Item del carrito con variante explícita (target).
+ * Ref: ANALISIS_COMMERCE_RESET.md §2.2
+ */
+export interface CartLineItem {
+  product_id: string
+  variant_id: string
+  variant_title: string
+  product_name: string
+  unit_price: number
+  compare_at_price: number | null
+  quantity: number
+  image_url: string | null
+}
