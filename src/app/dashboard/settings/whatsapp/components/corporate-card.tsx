@@ -57,8 +57,15 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
                 setInstanceId(result.data.instance_id)
                 setShowQRModal(true)
                 toast.success("Escanea el código QR con tu WhatsApp")
+            } else if (
+                "error" in result &&
+                typeof result.error === "string" &&
+                result.error.includes("Ya tienes WhatsApp conectado")
+            ) {
+                toast.success("WhatsApp ya estaba conectado")
+                onUpdate()
             } else {
-                toast.error("Error al conectar")
+                toast.error("error" in result ? result.error : "Error al conectar")
             }
         } catch {
             toast.error("Error al conectar WhatsApp")

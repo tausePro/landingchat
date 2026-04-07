@@ -14,6 +14,7 @@ import {
     syncEvolutionCorporateInstanceStatus,
     type EvolutionSyncInstanceRow,
 } from "@/lib/whatsapp/syncEvolutionStatus"
+import { resolveEvolutionInstanceStatus } from "@/lib/whatsapp/evolutionStatus"
 
 interface SubscriptionPlanLimitRow {
     max_whatsapp_conversations?: number | null
@@ -186,11 +187,19 @@ export async function connectWhatsApp(): Promise<
 
             // Verificar estado real en Evolution antes de intentar recrear
             let evolutionConnected = false
+            let resolvedEvolutionStatus: Awaited<ReturnType<typeof resolveEvolutionInstanceStatus>> | null = null
             try {
-                const connState = await evolutionClient.getConnectionStatus(instanceName)
-                const rawState = connState?.state || ""
-                evolutionConnected = String(rawState).toLowerCase() === "open"
-                console.log("[connectWhatsApp] Evolution instance state:", rawState, "→ connected:", evolutionConnected)
+                resolvedEvolutionStatus = await resolveEvolutionInstanceStatus(
+                    evolutionClient,
+                    instanceName
+                )
+                evolutionConnected = resolvedEvolutionStatus.status === "connected"
+                console.log(
+                    "[connectWhatsApp] Evolution instance state:",
+                    resolvedEvolutionStatus.rawState,
+                    "→ connected:",
+                    evolutionConnected
+                )
             } catch {
                 // La instancia no existe en Evolution, continuar con flujo normal
                 console.log("[connectWhatsApp] Instance not found in Evolution, will create fresh")
@@ -198,14 +207,23 @@ export async function connectWhatsApp(): Promise<
 
             // Si ya está conectada en Evolution, sincronizar BD y retornar
             if (evolutionConnected) {
-                const syncData = {
+                const now = new Date().toISOString()
+                const syncData: Record<string, string | null> = {
                     organization_id: orgId,
                     instance_name: instanceName,
-                    instance_type: "corporate" as const,
-                    provider: "evolution" as const,
-                    status: "connected" as const,
-                    updated_at: new Date().toISOString(),
-                    connected_at: new Date().toISOString(),
+                    instance_type: "corporate",
+                    provider: "evolution",
+                    status: "connected",
+                    updated_at: now,
+                    connected_at: now,
+                    disconnected_at: null,
+                    qr_code: null,
+                    qr_expires_at: null,
+                }
+                if (resolvedEvolutionStatus?.phoneNumber) {
+                    syncData.phone_number = resolvedEvolutionStatus.phoneNumber
+                    syncData.phone_number_display =
+                        resolvedEvolutionStatus.phoneNumberDisplay
                 }
                 if (existing) {
                     await supabase.from("whatsapp_instances").update(syncData).eq("id", existing.id)

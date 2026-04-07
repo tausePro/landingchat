@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { EvolutionClient } from "@/lib/evolution"
+import { resolveEvolutionInstanceStatus } from "@/lib/whatsapp/evolutionStatus"
 
 export async function POST(request: NextRequest) {
     try {
@@ -73,12 +74,13 @@ export async function POST(request: NextRequest) {
         }
 
         // 3. Obtener estado desde Evolution API
-        let evolutionState: any
-        let evolutionInstance: any
-        
+        let evolutionState: Awaited<ReturnType<typeof resolveEvolutionInstanceStatus>>
+
         try {
-            evolutionState = await evolutionClient.getConnectionStatus(instanceName)
-            evolutionInstance = await evolutionClient.getInstance(instanceName)
+            evolutionState = await resolveEvolutionInstanceStatus(
+                evolutionClient,
+                instanceName
+            )
         } catch (error) {
             return NextResponse.json(
                 {
@@ -91,30 +93,23 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. Mapear estado de Evolution a nuestro estado
-        const statusMap: Record<string, string> = {
-            open: "connected",
-            close: "disconnected",
-            closed: "disconnected",
-            connecting: "connecting",
-        }
-
-        const evolutionStatus = statusMap[evolutionState.state] || "disconnected"
+        const evolutionStatus = evolutionState.status
         const dbStatus = dbInstance.status
 
         // 5. Preparar datos de actualización
-        const updateData: Record<string, any> = {
+        const updateData: Record<string, string> = {
             status: evolutionStatus,
             updated_at: new Date().toISOString(),
         }
 
         if (evolutionStatus === "connected") {
             updateData.connected_at = new Date().toISOString()
-            
-            // Extraer número de teléfono
-            if (evolutionInstance.phoneNumber) {
-                const phoneNumber = evolutionInstance.phoneNumber.replace(/\D/g, "")
-                updateData.phone_number = phoneNumber
-                updateData.phone_number_display = phoneNumber.slice(-4)
+
+            if (evolutionState.phoneNumber) {
+                updateData.phone_number = evolutionState.phoneNumber
+                updateData.phone_number_display =
+                    evolutionState.phoneNumberDisplay ||
+                    evolutionState.phoneNumber.slice(-4)
             }
         } else if (evolutionStatus === "disconnected") {
             updateData.disconnected_at = new Date().toISOString()
@@ -149,8 +144,8 @@ export async function POST(request: NextRequest) {
                 phone_number_display: updateData.phone_number_display || null,
             },
             evolution: {
-                state: evolutionState.state,
-                phoneNumber: evolutionInstance.phoneNumber || null,
+                state: evolutionState.rawState,
+                phoneNumber: evolutionState.phoneNumber,
             },
             synced: true,
             syncedAt: new Date().toISOString(),

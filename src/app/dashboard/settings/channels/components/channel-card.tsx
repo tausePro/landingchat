@@ -17,6 +17,8 @@ import {
     QrCode,
 } from "lucide-react"
 import { SocialLoginButton } from "./social-login-button"
+import { EmbeddedSignup } from "../../whatsapp/components/embedded-signup"
+import { QRModal } from "../../whatsapp/components/qr-modal"
 import { disconnectSocialChannel } from "../actions"
 import type { SocialChannel } from "../actions"
 
@@ -339,6 +341,13 @@ function WhatsAppDisconnectedContent({
                 setInstanceId(result.data.instance_id)
                 setShowQRModal(true)
                 toast.success("Escanea el código QR con tu WhatsApp")
+            } else if (
+                "error" in result &&
+                typeof result.error === "string" &&
+                result.error.includes("Ya tienes WhatsApp conectado")
+            ) {
+                toast.success("WhatsApp ya estaba conectado")
+                onUpdate()
             } else {
                 toast.error("error" in result ? result.error : "Error al conectar")
             }
@@ -380,7 +389,7 @@ function WhatsAppDisconnectedContent({
                             <Shield className="h-4 w-4 text-blue-600" />
                             <span className="text-sm font-medium">Conexión oficial (recomendada)</span>
                         </div>
-                        <EmbeddedSignupWrapper
+                        <EmbeddedSignup
                             appId={metaAppId}
                             configId={metaConfigId}
                             onSuccess={onUpdate}
@@ -434,7 +443,7 @@ function WhatsAppDisconnectedContent({
             </div>
 
             {showQRModal && (
-                <QRModalWrapper
+                <QRModal
                     qrCode={qrCode}
                     instanceId={instanceId}
                     onClose={handleQRModalClose}
@@ -442,31 +451,4 @@ function WhatsAppDisconnectedContent({
             )}
         </>
     )
-}
-
-function EmbeddedSignupWrapper({
-    appId,
-    configId,
-    onSuccess,
-}: {
-    appId: string
-    configId: string
-    onSuccess: () => void
-}) {
-    // Importar dinámicamente para no duplicar código
-    const { EmbeddedSignup } = require("../../whatsapp/components/embedded-signup")
-    return <EmbeddedSignup appId={appId} configId={configId} onSuccess={onSuccess} />
-}
-
-function QRModalWrapper({
-    qrCode,
-    instanceId,
-    onClose,
-}: {
-    qrCode: string
-    instanceId: string
-    onClose: () => void
-}) {
-    const { QRModal } = require("../../whatsapp/components/qr-modal")
-    return <QRModal qrCode={qrCode} instanceId={instanceId} onClose={onClose} />
 }

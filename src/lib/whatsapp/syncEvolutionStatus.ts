@@ -1,5 +1,6 @@
 import { EvolutionClient } from "@/lib/evolution"
 import { createServiceClient } from "@/lib/supabase/server"
+import { resolveEvolutionInstanceStatus } from "@/lib/whatsapp/evolutionStatus"
 
 export interface EvolutionSyncInstanceRow {
     id: string
@@ -12,39 +13,6 @@ export interface EvolutionSyncInstanceRow {
     phone_number_display: string | null
     connected_at?: string | null
     disconnected_at?: string | null
-}
-
-function normalizeEvolutionStatus(state: string | null | undefined): "connected" | "disconnected" | "connecting" {
-    const normalized = String(state || "").toLowerCase()
-
-    if (normalized === "open") {
-        return "connected"
-    }
-
-    if (normalized === "connecting") {
-        return "connecting"
-    }
-
-    return "disconnected"
-}
-
-function normalizePhoneNumber(value: string | null | undefined): {
-    phoneNumber: string | null
-    phoneNumberDisplay: string | null
-} {
-    if (!value) {
-        return { phoneNumber: null, phoneNumberDisplay: null }
-    }
-
-    const phoneNumber = value.replace("@s.whatsapp.net", "").replace(/\D/g, "")
-    if (!phoneNumber) {
-        return { phoneNumber: null, phoneNumberDisplay: null }
-    }
-
-    return {
-        phoneNumber,
-        phoneNumberDisplay: phoneNumber.length >= 4 ? phoneNumber.slice(-4) : phoneNumber,
-    }
 }
 
 export async function syncEvolutionCorporateInstanceStatus(
@@ -71,30 +39,25 @@ export async function syncEvolutionCorporateInstanceStatus(
         apiKey: config.apiKey,
     })
 
-    let state: string
+    let resolvedStatus: Awaited<ReturnType<typeof resolveEvolutionInstanceStatus>>
     try {
-        const connectionState = await evolutionClient.getConnectionStatus(instance.instance_name)
-        state = connectionState.state
+        resolvedStatus = await resolveEvolutionInstanceStatus(
+            evolutionClient,
+            instance.instance_name
+        )
     } catch {
         return instance
     }
 
-    const nextStatus = normalizeEvolutionStatus(state)
-    let phoneNumber = instance.phone_number
-    let phoneNumberDisplay = instance.phone_number_display
-
-    if (nextStatus === "connected" && (!phoneNumber || !phoneNumberDisplay)) {
-        try {
-            const instanceInfo = await evolutionClient.getInstance(instance.instance_name)
-            const normalizedPhone = normalizePhoneNumber(instanceInfo.phoneNumber || instanceInfo.owner)
-            phoneNumber = normalizedPhone.phoneNumber
-            phoneNumberDisplay = normalizedPhone.phoneNumberDisplay
-        } catch {
-            const normalizedPhone = normalizePhoneNumber(instance.phone_number)
-            phoneNumber = normalizedPhone.phoneNumber
-            phoneNumberDisplay = normalizedPhone.phoneNumberDisplay
-        }
-    }
+    const nextStatus = resolvedStatus.status
+    const phoneNumber =
+        nextStatus === "connected"
+            ? (resolvedStatus.phoneNumber ?? instance.phone_number)
+            : instance.phone_number
+    const phoneNumberDisplay =
+        nextStatus === "connected"
+            ? (resolvedStatus.phoneNumberDisplay ?? instance.phone_number_display)
+            : instance.phone_number_display
 
     const needsUpdate =
         instance.status !== nextStatus ||
