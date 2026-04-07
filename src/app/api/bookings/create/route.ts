@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { createManagedAppointment } from "@/lib/appointments/service"
+import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import { bookingsRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 
@@ -80,10 +81,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: result.error }, { status: 500 })
         }
 
-        const dateFormatted = startDate.toLocaleDateString("es-CO", {
+        const dateFormatted = formatAppointmentDateTime(startDate, {
             weekday: "long", day: "numeric", month: "long"
         })
-        const timeFormatted = startDate.toLocaleTimeString("es-CO", {
+        const timeFormatted = formatAppointmentDateTime(startDate, {
             hour: "2-digit", minute: "2-digit"
         })
 

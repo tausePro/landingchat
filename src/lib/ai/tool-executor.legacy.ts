@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import { searchProperties as repoSearchProperties, findProperty, getOrgUrlInfo, buildPropertyUrl } from "@/lib/repositories/properties"
 import {
@@ -1374,7 +1375,7 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
     const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`
 
     // Crear la orden
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error } = await supabase
         .from("orders")
         .insert({
             organization_id: context.organizationId,
@@ -1414,8 +1415,8 @@ async function createPaymentLink(supabase: any, input: any, context: ToolContext
         .select("id, order_number")
         .single()
 
-    if (orderError) {
-        payLog.error("Error creating order", { error: orderError.message })
+    if (error) {
+        payLog.error("Error creating order", { error: error.message })
         return {
             success: false,
             error: "Error al crear la orden. Por favor intenta de nuevo."
@@ -1675,7 +1676,7 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
     if (conflicts && conflicts.length > 0) {
         const conflictInfo = conflicts.map((c: any) => {
             const d = new Date(c.proposed_date)
-            return `"${c.title}" el ${d.toLocaleDateString('es-CO')} a las ${d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+            return `"${c.title}" el ${formatAppointmentDateTime(d, { day: 'numeric', month: 'numeric', year: 'numeric' })} a las ${formatAppointmentDateTime(d, { hour: '2-digit', minute: '2-digit' })}`
         }).join(", ")
         return {
             success: false,
@@ -1803,13 +1804,13 @@ async function scheduleAppointment(supabase: any, input: any, context: ToolConte
     }
 
     // Formatear la respuesta
-    const dateFormatted = proposedDate.toLocaleDateString('es-CO', {
+    const dateFormatted = formatAppointmentDateTime(proposedDate, {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     })
-    const timeFormatted = proposedDate.toLocaleTimeString('es-CO', {
+    const timeFormatted = formatAppointmentDateTime(proposedDate, {
         hour: '2-digit',
         minute: '2-digit'
     })

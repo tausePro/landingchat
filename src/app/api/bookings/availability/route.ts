@@ -23,8 +23,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Fecha inválida" }, { status: 400 })
         }
 
-        startDate.setHours(0, 0, 0, 0)
-
         const supabase = createServiceClient()
         const organization = await resolvePublicOrganization(supabase, { slug, organizationId })
 

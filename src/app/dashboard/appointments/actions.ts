@@ -32,7 +32,6 @@ export async function getCalendarEvents(weekStart: string): Promise<{
     if (!profile?.organization_id) return { events: [], gcalConnected: false }
 
     const startDate = new Date(weekStart)
-    startDate.setHours(0, 0, 0, 0)
     return getCalendarEventsForRange(supabase, profile.organization_id, startDate)
 }
 
