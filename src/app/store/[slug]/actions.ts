@@ -2,6 +2,10 @@
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
+import {
+    getStorefrontCustomerSession,
+    verifyStorefrontOrderAccessToken,
+} from "@/lib/storefrontAccess"
 
 export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
@@ -59,7 +63,7 @@ export async function getStoreData(slug: string, limit?: number) {
         .order("title", { ascending: true })
 
     // 5. Fetch Properties for real estate organizations
-    let properties: any[] = []
+    let properties: Array<Record<string, unknown>> = []
     const isRealEstate = isRealEstateIndustry(org) || 
         org.storefront_template === 'real-estate' ||
         org.settings?.storefront?.template === 'real-estate'
@@ -194,27 +198,40 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     }
 }
 
-export async function getOrderDetails(slug: string, orderId: string) {
+async function getStorefrontOrganizationForOrder(slug: string) {
     const supabase = createServiceClient()
 
-    // 1. Fetch Organization
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain")
         .eq("slug", slug)
         .single()
 
     if (orgError || !org) {
-        console.error("[getOrderDetails] Organization error:", orgError)
+        console.error("[getStorefrontOrganizationForOrder] Organization error:", orgError)
         return null
     }
 
-    // 2. Fetch Order
+    return {
+        supabase,
+        organization: org,
+    }
+}
+
+export async function getOrderDetails(slug: string, orderId: string, accessToken?: string | null) {
+    const result = await getStorefrontOrganizationForOrder(slug)
+
+    if (!result) {
+        return null
+    }
+
+    const { supabase, organization } = result
+
     const { data: order, error: orderError } = await supabase
         .from("orders")
         .select("*")
         .eq("id", orderId)
-        .eq("organization_id", org.id)
+        .eq("organization_id", organization.id)
         .single()
 
     if (orderError || !order) {
@@ -222,11 +239,29 @@ export async function getOrderDetails(slug: string, orderId: string) {
         return null
     }
 
-    // 3. (Optional) Fetch Items details if needed, but they are stored in JSONB 'items' column usually.
-    // The current schema stores items in the JSONB column, so we might not need a join.
+    const customerSession = await getStorefrontCustomerSession(slug)
+    const hasCustomerSessionAccess = Boolean(
+        customerSession &&
+        customerSession.organizationId === organization.id &&
+        customerSession.customerId === order.customer_id
+    )
+
+    const hasSignedOrderAccess = Boolean(
+        accessToken &&
+        verifyStorefrontOrderAccessToken(accessToken, {
+            slug,
+            organizationId: organization.id,
+            orderId: order.id,
+            customerId: order.customer_id ?? null,
+        })
+    )
+
+    if (!hasCustomerSessionAccess && !hasSignedOrderAccess) {
+        return null
+    }
 
     return {
-        organization: org,
+        organization,
         order
     }
 }

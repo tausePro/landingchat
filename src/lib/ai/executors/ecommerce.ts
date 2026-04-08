@@ -7,6 +7,10 @@ import {
     RenderCheckoutSummarySchema,
 } from "@/lib/ai/tools"
 import type { ToolHandler } from "./types"
+import {
+    appendStorefrontAccessParam,
+    createStorefrontOrderAccessToken,
+} from "@/lib/storefrontAccess"
 
 const log = logger("ai/tool-executor")
 
@@ -371,7 +375,10 @@ const startCheckout: ToolHandler = async (supabase, _input, context) => {
         .single()
 
     if (!cart || !cart.items?.length) {
-        return { success: false, error: "El carrito está vacío" }
+        return {
+            success: false,
+            error: "El carrito está vacío"
+        }
     }
 
     const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
@@ -784,14 +791,21 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         ? `https://${customDomain}`
         : `https://${organization.slug}.landingchat.co`
 
+    const orderAccessToken = createStorefrontOrderAccessToken({
+        slug: organization.slug,
+        organizationId: context.organizationId,
+        orderId: order.id,
+        customerId: chat?.customer_id || null,
+    })
+
     let paymentUrl: string
     let paymentInstructions: string
 
     if (payment_method === "manual" || payment_method === "contraentrega") {
-        paymentUrl = `${storeBaseUrl}/order/${order.id}`
+        paymentUrl = appendStorefrontAccessParam(`${storeBaseUrl}/order/${order.id}`, orderAccessToken)
         paymentInstructions = "Tu pedido ha sido registrado. Puedes pagar contra entrega o por transferencia."
     } else {
-        paymentUrl = `${storeBaseUrl}/checkout/epayco/${order.id}`
+        paymentUrl = appendStorefrontAccessParam(`${storeBaseUrl}/checkout/epayco/${order.id}`, orderAccessToken)
         paymentInstructions = "Haz clic en el enlace para completar tu pago de forma segura."
     }
 

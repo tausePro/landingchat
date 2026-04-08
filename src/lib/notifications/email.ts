@@ -22,6 +22,7 @@ interface OrderEmailData {
     paymentMethod: string
     organizationName: string
     storeUrl: string
+    orderUrl: string
 }
 
 /**
@@ -192,7 +193,7 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
         <div style="text-align: center; padding-top: 30px; border-top: 1px solid #e5e7eb; color: #6b7280;">
             <p>¿Tienes preguntas? Contáctanos directamente desde la tienda.</p>
             <div style="margin: 16px 0 0 0; display: flex; justify-content: center; gap: 16px;">
-                <a href="${data.storeUrl}/profile?email=${encodeURIComponent(data.customerEmail)}" style="color: #3b82f6; text-decoration: none;">Ver Mi Perfil</a>
+                <a href="${data.orderUrl}" style="color: #3b82f6; text-decoration: none;">Ver Mi Pedido</a>
                 <span style="color: #d1d5db;">|</span>
                 <a href="${data.storeUrl}" style="color: #3b82f6; text-decoration: none;">Visitar Tienda</a>
             </div>

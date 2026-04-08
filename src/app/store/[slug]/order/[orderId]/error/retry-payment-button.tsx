@@ -7,16 +7,16 @@ import { Loader2 } from "lucide-react"
 interface RetryPaymentButtonProps {
     orderId: string
     slug: string
-    paymentMethod: string
+    accessToken?: string
 }
 
-export function RetryPaymentButton({ orderId, slug, paymentMethod }: RetryPaymentButtonProps) {
+export function RetryPaymentButton({ orderId, slug, accessToken }: RetryPaymentButtonProps) {
     const [isLoading, setIsLoading] = useState(false)
 
     const handleRetry = async () => {
         setIsLoading(true)
         try {
-            const result = await retryPayment(orderId, slug)
+            const result = await retryPayment(orderId, slug, accessToken)
             if (result.success && result.paymentUrl) {
                 window.location.href = result.paymentUrl
             } else {

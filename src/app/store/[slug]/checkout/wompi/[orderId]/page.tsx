@@ -6,53 +6,75 @@
 
 import crypto from "crypto"
 import { createServiceClient } from "@/lib/supabase/server"
+import {
+    appendStorefrontAccessParam,
+    createStorefrontOrderAccessToken,
+} from "@/lib/storefrontAccess"
 import { notFound, redirect } from "next/navigation"
 import { decrypt } from "@/lib/utils/encryption"
 import { WompiCheckoutClient } from "./components/wompi-checkout-client"
+import { getOrderDetails } from "../../../actions"
 
 interface PageProps {
     params: Promise<{
         slug: string
         orderId: string
     }>
+    searchParams: Promise<{
+        access?: string
+    }>
 }
 
-export default async function WompiCheckoutPage({ params }: PageProps) {
+export default async function WompiCheckoutPage({ params, searchParams }: PageProps) {
     const { slug, orderId } = await params
+    const { access } = await searchParams
+    const result = await getOrderDetails(slug, orderId, access)
+
+    if (!result) {
+        notFound()
+    }
+
+    const { order, organization } = result
     const supabase = createServiceClient()
+    const customDomain = organization.custom_domain
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
 
-    // 1. Obtener la orden con datos de la organización
-    const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .select("*, organization:organizations(id, name, slug, settings, custom_domain)")
-        .eq("id", orderId)
-        .single()
-
-    if (orderError || !order) {
-        notFound()
+    let baseUrl: string
+    if (customDomain) {
+        baseUrl = `https://${customDomain}`
+    } else if (appUrl.includes("localhost") || appUrl.includes("127.0.0.1")) {
+        baseUrl = `${appUrl}/store/${slug}`
+    } else {
+        baseUrl = `https://${slug}.landingchat.co`
     }
 
-    // 2. Verificar que la orden pertenece a la tienda correcta
-    if (order.organization?.slug !== slug) {
-        notFound()
-    }
+    const orderAccessToken = access || createStorefrontOrderAccessToken({
+        slug,
+        organizationId: organization.id,
+        orderId: order.id,
+        customerId: order.customer_id ?? null,
+    })
+    const orderUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}`, orderAccessToken)
+    const gatewayErrorUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}/error?reason=gateway_not_configured`, orderAccessToken)
+    const integrityErrorUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}/error?reason=integrity_secret_error`, orderAccessToken)
+    const integrityMissingUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}/error?reason=integrity_secret_missing`, orderAccessToken)
 
     // 3. Verificar que la orden está pendiente de pago
     if (order.payment_status !== "pending") {
-        redirect(`/store/${slug}/order/${orderId}`)
+        redirect(orderUrl)
     }
 
     // 4. Obtener configuración de Wompi
     const { data: gatewayConfig, error: gatewayError } = await supabase
         .from("payment_gateway_configs")
         .select("*")
-        .eq("organization_id", order.organization_id)
+        .eq("organization_id", organization.id)
         .eq("provider", "wompi")
         .eq("is_active", true)
         .single()
 
     if (gatewayError || !gatewayConfig) {
-        redirect(`/store/${slug}/order/${orderId}/error?reason=gateway_not_configured`)
+        redirect(gatewayErrorUrl)
     }
 
     // 5. Desencriptar el secreto de integridad para generar la firma
@@ -62,11 +84,11 @@ export default async function WompiCheckoutPage({ params }: PageProps) {
             integritySecret = decrypt(gatewayConfig.integrity_secret_encrypted)
         }
     } catch {
-        redirect(`/store/${slug}/order/${orderId}/error?reason=integrity_secret_error`)
+        redirect(integrityErrorUrl)
     }
 
     if (!integritySecret) {
-        redirect(`/store/${slug}/order/${orderId}/error?reason=integrity_secret_missing`)
+        redirect(integrityMissingUrl)
     }
 
     // 6. Generar la firma de integridad SHA256
@@ -79,16 +101,6 @@ export default async function WompiCheckoutPage({ params }: PageProps) {
         .update(concatenated)
         .digest("hex")
 
-    // 7. Construir la URL base correcta para redirección post-pago
-    const customDomain = (order.organization as { custom_domain?: string })?.custom_domain
-
-    let baseUrl: string
-    if (customDomain) {
-        baseUrl = `https://${customDomain}`
-    } else {
-        baseUrl = `https://${slug}.landingchat.co`
-    }
-
     // 8. Preparar datos para el Widget de Wompi
     const checkoutData = {
         publicKey: gatewayConfig.public_key,
@@ -96,11 +108,11 @@ export default async function WompiCheckoutPage({ params }: PageProps) {
         amountInCents,
         reference: orderId,
         signatureIntegrity,
-        redirectUrl: `${baseUrl}/order/${orderId}`,
+        redirectUrl: orderUrl,
         customerEmail: order.customer_info?.email || "",
         customerName: order.customer_info?.name || "",
         customerPhone: order.customer_info?.phone || "",
-        storeName: order.organization?.name || "Tienda",
+        storeName: organization.name || "Tienda",
     }
 
     return (

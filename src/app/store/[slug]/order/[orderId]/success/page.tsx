@@ -1,35 +1,26 @@
-import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { CheckCircle } from "lucide-react"
 import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
+import { getOrderDetails } from "../../../actions"
+import { appendStorefrontAccessParam } from "@/lib/storefrontAccess"
 
 interface SuccessPageProps {
     params: Promise<{ slug: string; orderId: string }>
+    searchParams: Promise<{ access?: string }>
 }
 
-export default async function OrderSuccessPage({ params }: SuccessPageProps) {
+export default async function OrderSuccessPage({ params, searchParams }: SuccessPageProps) {
     const { slug, orderId } = await params
-    const supabase = createServiceClient()
+    const { access } = await searchParams
+    const result = await getOrderDetails(slug, orderId, access)
 
-    // Get organization
-    const { data: org } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .eq("slug", slug)
-        .single()
+    if (!result) notFound()
 
-    if (!org) notFound()
-
-    // Get order
-    const { data: order } = await supabase
-        .from("orders")
-        .select("id, order_number, total, items, customer_info, status, payment_status")
-        .eq("id", orderId)
-        .eq("organization_id", org.id)
-        .single()
-
-    if (!order) notFound()
+    const { order } = result
+    const orderDetailsHref = access
+        ? appendStorefrontAccessParam(`/store/${slug}/order/${orderId}`, access)
+        : `/store/${slug}/order/${orderId}`
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -166,7 +157,7 @@ export default async function OrderSuccessPage({ params }: SuccessPageProps) {
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                         <Link
-                            href={`/store/${slug}/order/${orderId}`}
+                            href={orderDetailsHref}
                             className="px-6 py-3 rounded-lg bg-primary-light dark:bg-primary-dark text-white font-medium hover:opacity-90 transition-opacity"
                         >
                             Ver Detalles del Pedido

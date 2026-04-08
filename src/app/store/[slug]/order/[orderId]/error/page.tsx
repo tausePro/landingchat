@@ -1,35 +1,22 @@
-import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { XCircle } from "lucide-react"
+import { getOrderDetails } from "../../../actions"
 import { RetryPaymentButton } from "./retry-payment-button"
 
 interface ErrorPageProps {
     params: Promise<{ slug: string; orderId: string }>
+    searchParams: Promise<{ access?: string }>
 }
 
-export default async function OrderErrorPage({ params }: ErrorPageProps) {
+export default async function OrderErrorPage({ params, searchParams }: ErrorPageProps) {
     const { slug, orderId } = await params
-    const supabase = createServiceClient()
+    const { access } = await searchParams
+    const result = await getOrderDetails(slug, orderId, access)
 
-    // Get organization
-    const { data: org } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .eq("slug", slug)
-        .single()
+    if (!result) notFound()
 
-    if (!org) notFound()
-
-    // Get order
-    const { data: order } = await supabase
-        .from("orders")
-        .select("id, order_number, total, items, customer_info, status, payment_status, payment_method")
-        .eq("id", orderId)
-        .eq("organization_id", org.id)
-        .single()
-
-    if (!order) notFound()
+    const { order } = result
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -131,7 +118,7 @@ export default async function OrderErrorPage({ params }: ErrorPageProps) {
                         <RetryPaymentButton
                             orderId={orderId}
                             slug={slug}
-                            paymentMethod={order.payment_method}
+                            accessToken={access}
                         />
                         <Link
                             href={`/store/${slug}`}
