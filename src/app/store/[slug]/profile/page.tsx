@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { getStorefrontCustomerSession } from "@/lib/storefrontAccess"
+import { getPhoneVariants } from "@/lib/utils/phone"
 import { notFound } from "next/navigation"
 import { ProfileView } from "./components/profile-view"
 import { ProfileAccessForm } from "./components/profile-access-form"
@@ -53,14 +54,24 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         return <ProfileAccessForm slug={slug} organizationName={org.name} />
     }
 
+    const customerPhoneVariants = customer.phone ? getPhoneVariants(customer.phone) : []
+
     // Get customer orders and chats in parallel (async-parallel optimization)
-    const [ordersResult, chatsResult] = await Promise.all([
+    const [ordersResult, legacyOrdersResult, chatsResult] = await Promise.all([
         supabase
             .from("orders")
-            .select("id, order_number, total, status, payment_status, created_at, items")
+            .select("id, order_number, total, status, payment_status, created_at, items, customer_id")
             .eq("organization_id", org.id)
             .eq("customer_id", customer.id)
             .order("created_at", { ascending: false }),
+        customerPhoneVariants.length > 0
+            ? supabase
+                .from("orders")
+                .select("id, order_number, total, status, payment_status, created_at, items, customer_id")
+                .eq("organization_id", org.id)
+                .in("customer_info->>phone", customerPhoneVariants)
+                .order("created_at", { ascending: false })
+            : Promise.resolve({ data: [], error: null }),
         supabase
             .from("chats")
             .select("id, status, created_at, updated_at")
@@ -70,7 +81,21 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             .limit(5)
     ])
 
-    const orders = ordersResult.data
+    const ordersMap = new Map<string, NonNullable<typeof ordersResult.data>[number]>()
+
+    for (const order of ordersResult.data || []) {
+        ordersMap.set(order.id, order)
+    }
+
+    for (const order of legacyOrdersResult.data || []) {
+        if (!ordersMap.has(order.id)) {
+            ordersMap.set(order.id, order)
+        }
+    }
+
+    const orders = Array.from(ordersMap.values())
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
     const chats = chatsResult.data
 
     // Enrich organization with phone for WhatsApp button

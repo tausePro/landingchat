@@ -410,59 +410,70 @@ export async function createOrder(params: CreateOrderParams) {
         const phoneVariants = getPhoneVariants(params.customerInfo.phone)
         const storefrontSession = await getStorefrontCustomerSession(params.slug)
         let storefrontCustomerId: string | null = null
+        type ExistingCustomer = {
+            id: string
+            metadata: Record<string, unknown> | null
+            email: string | null
+            phone: string | null
+        }
 
         if (storefrontSession && storefrontSession.organizationId === org.id) {
             storefrontCustomerId = storefrontSession.customerId
         }
 
-        let matchedCustomer: { id: string; metadata: Record<string, unknown> | null } | null = null
+        let sessionCustomer: ExistingCustomer | null = null
+        let phoneCustomer: ExistingCustomer | null = null
+        let emailCustomer: ExistingCustomer | null = null
 
         if (storefrontCustomerId) {
-            const { data: sessionCustomer } = await supabase
+            const { data: sessionCustomerData } = await supabase
                 .from("customers")
-                .select("id, metadata")
+                .select("id, metadata, email, phone")
                 .eq("id", storefrontCustomerId)
                 .eq("organization_id", org.id)
-                .single()
+                .maybeSingle()
 
-            if (sessionCustomer) {
-                matchedCustomer = sessionCustomer
+            if (sessionCustomerData) {
+                sessionCustomer = sessionCustomerData
             }
         }
 
-        if (!matchedCustomer && normalizedEmail) {
-            const { data: emailCustomer } = await supabase
+        if (normalizedEmail) {
+            const { data: emailCustomerData } = await supabase
                 .from("customers")
-                .select("id, metadata")
+                .select("id, metadata, email, phone")
                 .eq("organization_id", org.id)
                 .eq("email", normalizedEmail)
                 .order("created_at", { ascending: true })
                 .limit(1)
                 .maybeSingle()
 
-            if (emailCustomer) {
-                matchedCustomer = emailCustomer
+            if (emailCustomerData) {
+                emailCustomer = emailCustomerData
             }
         }
 
-        if (!matchedCustomer) {
-            const { data: phoneCustomers } = await supabase
-                .from("customers")
-                .select("id, metadata")
-                .eq("organization_id", org.id)
-                .in("phone", phoneVariants)
-                .order("created_at", { ascending: true })
-                .limit(1)
+        const { data: phoneCustomers } = await supabase
+            .from("customers")
+            .select("id, metadata, email, phone")
+            .eq("organization_id", org.id)
+            .in("phone", phoneVariants)
+            .order("created_at", { ascending: true })
+            .limit(1)
 
-            if (phoneCustomers?.[0]) {
-                matchedCustomer = phoneCustomers[0]
-            }
+        if (phoneCustomers?.[0]) {
+            phoneCustomer = phoneCustomers[0]
         }
+
+        const matchedCustomer = phoneCustomer ?? sessionCustomer ?? emailCustomer
+        const conflictingEmailCustomer = emailCustomer && matchedCustomer && emailCustomer.id !== matchedCustomer.id
+            ? emailCustomer
+            : null
 
         const customerPayload: Record<string, unknown> = {
             organization_id: org.id,
             phone: canonicalPhone,
-            full_name: params.customerInfo.name,
+            full_name: params.customerInfo.name.trim(),
             document_type: params.customerInfo.document_type,
             document_number: params.customerInfo.document_number,
             person_type: params.customerInfo.person_type,
@@ -475,11 +486,11 @@ export async function createOrder(params: CreateOrderParams) {
             }
         }
 
-        if (normalizedEmail) {
+        if (normalizedEmail && !conflictingEmailCustomer) {
             customerPayload.email = normalizedEmail
         }
 
-        let customer: { id: string } | null = null
+        let customer: { id: string } | null = matchedCustomer ? { id: matchedCustomer.id } : null
 
         if (matchedCustomer) {
             const { data: updatedCustomer, error: customerUpdateError } = await supabase
@@ -487,7 +498,7 @@ export async function createOrder(params: CreateOrderParams) {
                 .update(customerPayload)
                 .eq("id", matchedCustomer.id)
                 .eq("organization_id", org.id)
-                .select()
+                .select("id")
                 .single()
 
             if (customerUpdateError) {
@@ -499,15 +510,42 @@ export async function createOrder(params: CreateOrderParams) {
             const { data: createdCustomer, error: customerCreateError } = await supabase
                 .from("customers")
                 .insert(customerPayload)
-                .select()
+                .select("id")
                 .single()
 
             if (customerCreateError) {
                 console.error("[createOrder] Error creating customer:", customerCreateError)
+
+                const { data: recoveredPhoneCustomers } = await supabase
+                    .from("customers")
+                    .select("id")
+                    .eq("organization_id", org.id)
+                    .in("phone", phoneVariants)
+                    .order("created_at", { ascending: true })
+                    .limit(1)
+
+                if (recoveredPhoneCustomers?.[0]) {
+                    customer = recoveredPhoneCustomers[0]
+                } else if (normalizedEmail) {
+                    const { data: recoveredEmailCustomer } = await supabase
+                        .from("customers")
+                        .select("id")
+                        .eq("organization_id", org.id)
+                        .eq("email", normalizedEmail)
+                        .order("created_at", { ascending: true })
+                        .limit(1)
+                        .maybeSingle()
+
+                    if (recoveredEmailCustomer) {
+                        customer = recoveredEmailCustomer
+                    }
+                }
             } else {
                 customer = createdCustomer
             }
         }
+
+        const resolvedCustomerId = customer?.id ?? null
 
         // 3. Generate unique order number
         const orderNumber = generateOrderNumber()
@@ -575,10 +613,13 @@ export async function createOrder(params: CreateOrderParams) {
             .from("orders")
             .insert({
                 organization_id: org.id,
-                customer_id: customer?.id,
+                customer_id: resolvedCustomerId,
                 order_number: orderNumber,
                 customer_info: {
                     ...params.customerInfo,
+                    name: params.customerInfo.name.trim(),
+                    email: normalizedEmail || null,
+                    phone: canonicalPhone,
                     payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined,
                     coupon_code: params.couponCode || undefined,
                     discount_amount: discountAmount > 0 ? discountAmount : undefined
@@ -604,11 +645,11 @@ export async function createOrder(params: CreateOrderParams) {
             return { success: false, error: "Error al crear la orden" }
         }
 
-        if (customer?.id) {
+        if (resolvedCustomerId) {
             await setStorefrontCustomerSession({
                 slug: params.slug,
                 organizationId: org.id,
-                customerId: customer.id,
+                customerId: resolvedCustomerId,
             })
         }
 
@@ -616,7 +657,7 @@ export async function createOrder(params: CreateOrderParams) {
             slug: params.slug,
             organizationId: org.id,
             orderId: order.id,
-            customerId: order.customer_id || customer?.id || null,
+            customerId: order.customer_id || resolvedCustomerId,
         })
 
         // Increment coupon usage if coupon was applied
