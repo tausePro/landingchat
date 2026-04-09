@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ProgressBar } from "@/components/onboarding/progress-bar"
@@ -30,7 +31,6 @@ export default function WhatsAppOnboardingPage() {
     } | null>(null)
     const [showQRModal, setShowQRModal] = useState(false)
     const [qrCode, setQrCode] = useState("")
-    const [instanceId, setInstanceId] = useState("")
 
     const supabase = createClient()
 
@@ -109,7 +109,6 @@ export default function WhatsAppOnboardingPage() {
 
             if (data.success && data.qr_code) {
                 setQrCode(data.qr_code)
-                setInstanceId(data.instance_id)
                 setShowQRModal(true)
             } else {
                 toast.error("Error al generar código QR")
@@ -122,7 +121,7 @@ export default function WhatsAppOnboardingPage() {
     }
 
     const handleSkip = () => {
-        router.push("/dashboard")
+        router.push("/onboarding/test")
     }
 
     const handleContinue = () => {
@@ -147,7 +146,7 @@ export default function WhatsAppOnboardingPage() {
                     Conecta tu WhatsApp
                 </h1>
                 <p className="text-base font-normal text-slate-600 dark:text-slate-400">
-                    Tu agente responderá automáticamente a los mensajes de tus clientes.
+                    Puedes conectar tu número ahora o omitir este paso y configurarlo más tarde desde el dashboard.
                 </p>
             </div>
 
@@ -291,13 +290,20 @@ export default function WhatsAppOnboardingPage() {
 
                 {/* Skip option */}
                 {!isConnected && (
-                    <div className="text-center pt-4">
-                        <button
+                    <div className="flex flex-col items-center gap-2 pt-2 text-center">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Si todavía no tienes Meta o WhatsApp listo, puedes seguir con la configuración.
+                        </p>
+                        <Button
+                            type="button"
+                            variant="ghost"
                             onClick={handleSkip}
-                            className="text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                            disabled={connecting}
+                            className="h-auto px-3 py-2 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 transition-colors"
                         >
-                            Omitir por ahora y configurar después →
-                        </button>
+                            Omitir por ahora
+                            <ArrowRight className="size-4" />
+                        </Button>
                     </div>
                 )}
             </div>
@@ -309,7 +315,7 @@ export default function WhatsAppOnboardingPage() {
                         <h3 className="text-xl font-bold text-center mb-4">Escanea el código QR</h3>
                         <div className="flex justify-center">
                             {qrCode && (
-                                <img src={qrCode} alt="QR Code" className="w-64 h-64" />
+                                <Image src={qrCode} alt="QR Code" width={256} height={256} unoptimized className="w-64 h-64" />
                             )}
                         </div>
                         <p className="text-sm text-slate-500 text-center mt-4">
