@@ -40,7 +40,7 @@ export async function processIncomingMessage(
         // Obtener información del chat
         const { data: chat, error: chatError } = await supabase
             .from("chats")
-            .select("organization_id, customer_id, agent_id, ai_enabled")
+            .select("organization_id, customer_id, assigned_agent_id, ai_enabled")
             .eq("id", message.chatId)
             .single()
 
@@ -61,7 +61,7 @@ export async function processIncomingMessage(
         }
 
         // Obtener agente asignado o el agente por defecto de la organización
-        let agentId = chat.agent_id
+        let agentId = chat.assigned_agent_id
 
         if (!agentId) {
             const { data: defaultAgent } = await supabase
@@ -109,8 +109,8 @@ export async function processIncomingMessage(
 
                 if (channelSchedule) {
                     const isOutsideHours = isOutsideSchedule(channelSchedule, schedule.timezone || "America/Bogota")
-                    if (isOutsideHours) {
-                        log.info("AI paused by schedule", { chatId: message.chatId, channel: message.channel })
+                    if (!isOutsideHours) {
+                        log.info("AI paused by schedule", { chatId: message.chatId, channel: message.channel, agentId })
                         return {
                             success: true,
                             response: undefined,
