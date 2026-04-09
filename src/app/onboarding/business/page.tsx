@@ -133,35 +133,43 @@ export default function BusinessConfigPage() {
         <>
             <ProgressBar currentStep={1} totalSteps={3} stepLabel="Información del Negocio" />
 
-            <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight sm:text-4xl">
+            <div className="flex flex-col gap-3">
+                <div className="w-fit rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                    Configuración inicial
+                </div>
+                <h1 className="text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
                     Cuéntanos sobre tu negocio
                 </h1>
-                <p className="text-base font-normal text-slate-600 dark:text-slate-400">
+                <p className="max-w-2xl text-base font-medium text-slate-600 dark:text-slate-300">
                     Esto nos ayuda a pre-configurar tu agente y dashboard según tus necesidades.
                 </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-8">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-8 rounded-3xl border border-slate-200/80 bg-white/70 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 sm:p-7">
                 {/* Business Name */}
                 <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                    <label className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         Nombre de tu negocio
                     </label>
                     <Input
                         placeholder="Ej: Mi Tienda Online"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="h-12 text-base"
+                        className="h-12 rounded-xl border border-slate-300 bg-white/95 px-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950/80 dark:text-slate-100 dark:placeholder:text-slate-500"
                         required
                     />
                 </div>
 
                 {/* Industry Selection */}
                 <div className="flex flex-col gap-3">
-                    <label className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                        ¿Qué tipo de negocio tienes?
-                    </label>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            ¿Qué tipo de negocio tienes?
+                        </label>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Selecciona la categoría principal para configurar módulos y lenguaje base.
+                        </p>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         {INDUSTRIES.map((industry) => {
                             const Icon = industry.icon
@@ -172,30 +180,31 @@ export default function BusinessConfigPage() {
                                     key={industry.slug}
                                     type="button"
                                     onClick={() => setFormData({ ...formData, industry: industry.slug })}
+                                    aria-pressed={isSelected}
                                     className={cn(
-                                        "flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all",
+                                        "flex min-h-[180px] flex-col items-center justify-center gap-4 rounded-2xl border p-6 text-center shadow-sm transition-all duration-200",
                                         isSelected
-                                            ? `${industry.borderActive} ring-4 ${industry.bgColor}`
-                                            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800"
+                                            ? `${industry.borderActive} ring-4 ${industry.bgColor} shadow-[0_18px_40px_-28px_rgba(43,124,238,0.7)]`
+                                            : "border-slate-200 bg-slate-50/80 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-950/80 dark:hover:border-slate-700 dark:hover:bg-slate-900"
                                     )}
                                 >
                                     <div className={cn(
-                                        "size-14 rounded-2xl flex items-center justify-center",
-                                        isSelected ? industry.bgColor : "bg-slate-100 dark:bg-slate-700"
+                                        "size-14 rounded-2xl flex items-center justify-center shadow-sm",
+                                        isSelected ? industry.bgColor : "bg-white dark:bg-slate-900"
                                     )}>
                                         <Icon className={cn(
                                             "size-7",
-                                            isSelected ? industry.color : "text-slate-500"
+                                            isSelected ? industry.color : "text-slate-500 dark:text-slate-400"
                                         )} />
                                     </div>
                                     <div className="text-center">
                                         <h3 className={cn(
-                                            "font-semibold",
-                                            isSelected ? "text-slate-900 dark:text-white" : "text-slate-700 dark:text-slate-300"
+                                            "text-base font-semibold",
+                                            isSelected ? "text-slate-950 dark:text-white" : "text-slate-800 dark:text-slate-200"
                                         )}>
                                             {industry.name}
                                         </h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
                                             {industry.description}
                                         </p>
                                     </div>
@@ -219,11 +228,11 @@ export default function BusinessConfigPage() {
                 )}
 
                 {/* Submit Button */}
-                <div className="flex flex-col items-center gap-4 border-t border-slate-200 pt-6 dark:border-slate-700">
+                <div className="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-950/70">
                     <Button
                         type="submit"
                         disabled={loading || !formData.name || !formData.industry}
-                        className="w-full sm:w-auto h-12 px-8 text-base font-semibold gap-2"
+                        className="w-full sm:w-auto h-12 px-8 text-base font-semibold gap-2 shadow-md shadow-primary/20"
                     >
                         {loading ? (
                             <>
@@ -239,7 +248,7 @@ export default function BusinessConfigPage() {
                     </Button>
 
                     {selectedIndustry && (
-                        <p className="text-sm text-slate-500 text-center">
+                        <p className="text-sm text-slate-600 dark:text-slate-300 text-center">
                             Pre-configuraremos tu dashboard para <strong>{selectedIndustry.name}</strong>
                         </p>
                     )}
