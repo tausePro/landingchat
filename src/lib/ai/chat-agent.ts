@@ -8,6 +8,97 @@ import { logger } from "@/lib/logger"
 
 const AI_MODEL = "claude-haiku-4-5-20251001"
 
+ interface OrgMediaPromptFile {
+     id: string
+     name: string
+     description: string | null
+     media_category: string
+     tags: string[] | null
+ }
+
+ const MEDIA_REQUEST_PATTERNS = [
+     "requisit",
+     "document",
+     "archivo",
+     "adjunt",
+     "pdf",
+     "formato",
+     "brochure",
+     "catalog",
+     "papel",
+     "documentacion",
+     "manual",
+     "enviame",
+     "mandame",
+     "compart",
+     "pasame",
+     "que necesito",
+     "necesito para",
+     "solicitud",
+ ]
+
+ function normalizeMediaText(value: string): string {
+     return value
+         .normalize("NFD")
+         .replace(/[\u0300-\u036f]/g, "")
+         .toLowerCase()
+ }
+
+ function formatMediaPromptLine(media: OrgMediaPromptFile): string {
+     return `- ID: "${media.id}" | Nombre: "${media.name}" | Tipo: ${media.media_category}${media.description ? ` | Cuándo usar: ${media.description}` : ""}${media.tags?.length ? ` | Tags: ${media.tags.join(", ")}` : ""}`
+ }
+
+ function getRelevantMediaForMessage(message: string, mediaFiles: OrgMediaPromptFile[]): OrgMediaPromptFile[] {
+     const normalizedMessage = normalizeMediaText(message)
+     if (!normalizedMessage) return []
+
+     const isMediaRequest = MEDIA_REQUEST_PATTERNS.some(pattern => normalizedMessage.includes(pattern))
+     if (!isMediaRequest) return []
+
+     const messageWords = Array.from(new Set(
+         normalizedMessage
+             .split(/[^a-z0-9]+/)
+             .filter(word => word.length >= 4)
+     ))
+
+     return mediaFiles
+         .map(media => {
+             const normalizedName = normalizeMediaText(media.name)
+             const normalizedDescription = normalizeMediaText(media.description || "")
+             const normalizedTags = (media.tags || []).map(tag => normalizeMediaText(tag))
+
+             let score = 0
+
+             if (normalizedName && normalizedMessage.includes(normalizedName)) {
+                 score += 10
+             }
+
+             for (const tag of normalizedTags) {
+                 if (tag && normalizedMessage.includes(tag)) {
+                     score += 6
+                 }
+             }
+
+             for (const word of messageWords) {
+                 if (normalizedName.includes(word)) {
+                     score += 3
+                 }
+                 if (normalizedDescription.includes(word)) {
+                     score += 2
+                 }
+                 if (normalizedTags.some(tag => tag.includes(word))) {
+                     score += 2
+                 }
+             }
+
+             return { media, score }
+         })
+         .filter(item => item.score >= 4)
+         .sort((a, b) => b.score - a.score)
+         .slice(0, 3)
+         .map(item => item.media)
+ }
+
 interface ProcessMessageInput {
     message: string
     chatId: string
@@ -209,9 +300,18 @@ IMPORTANTE: Si la respuesta está en estos documentos, cita la información. Si 
                 .order("created_at", { ascending: true })
 
             if (orgMedia && orgMedia.length > 0) {
-                const mediaList = orgMedia.map(m =>
-                    `- ID: "${m.id}" | Nombre: "${m.name}" | Tipo: ${m.media_category}${m.description ? ` | Cuándo usar: ${m.description}` : ""}${m.tags?.length ? ` | Tags: ${m.tags.join(", ")}` : ""}`
-                ).join("\n")
+                const typedOrgMedia = orgMedia as OrgMediaPromptFile[]
+                const relevantMedia = getRelevantMediaForMessage(input.message, typedOrgMedia)
+                const mediaList = typedOrgMedia.map(formatMediaPromptLine).join("\n")
+
+                if (relevantMedia.length > 0) {
+                    const relevantMediaList = relevantMedia.map(formatMediaPromptLine).join("\n")
+                    systemPrompt += `\n\nARCHIVOS PRIORITARIOS PARA ESTE MENSAJE:
+El último mensaje del cliente parece pedir un documento o archivo. Estos son los archivos más relevantes para responderle ahora mismo:
+${relevantMediaList}
+
+REGLA CRÍTICA: Si el cliente está pidiendo requisitos, documentos, PDF, adjuntos o un archivo que coincide con alguno de estos elementos, usa send_media con el ID correspondiente en esta misma respuesta y luego explica brevemente qué le estás compartiendo.`
+                }
 
                 systemPrompt += `\n\nARCHIVOS DISPONIBLES PARA ENVIAR AL CLIENTE:
 Puedes usar la herramienta send_media con el ID del archivo para compartirlo con el cliente.
@@ -219,7 +319,7 @@ ${mediaList}
 
 INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción. No los envíes todos de golpe, solo cuando el contexto de la conversación lo amerite.`
 
-                log.debug("Injected media files into prompt", { count: orgMedia.length })
+                log.debug("Injected media files into prompt", { count: typedOrgMedia.length, prioritized: relevantMedia.map(media => media.id) })
             }
         } catch (mediaError) {
             log.warn("Error loading org media", { error: mediaError instanceof Error ? mediaError.message : String(mediaError) })

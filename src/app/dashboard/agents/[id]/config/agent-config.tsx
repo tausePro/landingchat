@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { updateAgentGeneral, updateAgentPersonality, updateAgentKnowledge, updateAgentSkills, updateAgentSchedule } from "./actions"
 import { ImageUploader } from "@/components/shared/image-uploader"
-import { SKILL_DEFINITIONS, getSkillsForMode, type SkillsConfig } from "@/lib/ai/skills"
+import { getSkillsForMode, type SkillsConfig } from "@/lib/ai/skills"
 import type { OrgMode } from "@/lib/ai/agent-factory"
 
 interface OrgContextData {
@@ -42,8 +42,34 @@ interface OrgMediaFile {
     created_at: string
 }
 
+interface AgentConfiguration {
+    system_prompt?: string
+    personality?: {
+        tone?: string
+        instructions?: string
+    }
+    knowledge?: {
+        product_knowledge?: boolean
+    }
+    skills?: SkillsConfig
+    schedule?: {
+        enabled?: boolean
+        timezone?: string
+        channels?: Record<string, Record<string, { from: string; to: string } | null>>
+    }
+}
+
+interface AgentData {
+    id: string
+    organization_id: string
+    name: string
+    status: string
+    avatar_url?: string | null
+    configuration?: AgentConfiguration | null
+}
+
 interface AgentConfigProps {
-    agent: any
+    agent: AgentData
     orgContext: OrgContextData
 }
 
@@ -140,6 +166,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         tags: "",
     })
     const [showMediaForm, setShowMediaForm] = useState(false)
+    const [editingMediaId, setEditingMediaId] = useState<string | null>(null)
 
     // Schedule state
     const DAY_LABELS: Record<string, string> = {
@@ -262,7 +289,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         try {
             await updateAgentGeneral(agent.id, { name, avatar_url: avatarUrl, status })
             router.refresh()
-        } catch (error) {
+        } catch {
             alert("Error al guardar configuración general")
         } finally {
             setLoading(false)
@@ -274,7 +301,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         try {
             await updateAgentPersonality(agent.id, { tone, instructions })
             router.refresh()
-        } catch (error) {
+        } catch {
             alert("Error al guardar personalidad")
         } finally {
             setLoading(false)
@@ -286,7 +313,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         try {
             await updateAgentKnowledge(agent.id, { product_knowledge: productKnowledge })
             router.refresh()
-        } catch (error) {
+        } catch {
             alert("Error al guardar base de conocimiento")
         } finally {
             setLoading(false)
@@ -299,11 +326,18 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
             await updateAgentSkills(agent.id, skillsConfig)
             setEditingSkill(null)
             router.refresh()
-        } catch (error) {
+        } catch {
             alert("Error al guardar skills")
         } finally {
             setLoading(false)
         }
+    }
+
+    const resetMediaForm = () => {
+        setMediaForm({ name: "", description: "", category: "document", tags: "" })
+        setShowMediaForm(false)
+        setEditingMediaId(null)
+        if (mediaFileInputRef.current) mediaFileInputRef.current.value = ""
     }
 
     const handleUploadMedia = async (file: File) => {
@@ -325,8 +359,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
 
             if (data.success) {
                 setMediaFiles(prev => [data.media, ...prev])
-                setMediaForm({ name: "", description: "", category: "document", tags: "" })
-                setShowMediaForm(false)
+                resetMediaForm()
             } else {
                 alert(data.error || "Error al subir archivo")
             }
@@ -335,6 +368,52 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
         } finally {
             setMediaUploading(false)
             if (mediaFileInputRef.current) mediaFileInputRef.current.value = ""
+        }
+    }
+
+    const handleEditMedia = (file: OrgMediaFile) => {
+        setEditingMediaId(file.id)
+        setMediaForm({
+            name: file.name,
+            description: file.description || "",
+            category: file.media_category,
+            tags: file.tags.join(", "),
+        })
+        setShowMediaForm(true)
+    }
+
+    const handleSaveMediaDetails = async () => {
+        if (!editingMediaId) return
+        if (!mediaForm.name.trim()) {
+            alert("El nombre es requerido")
+            return
+        }
+
+        setMediaUploading(true)
+        try {
+            const res = await fetch("/api/media", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: editingMediaId,
+                    name: mediaForm.name.trim(),
+                    description: mediaForm.description.trim(),
+                    media_category: mediaForm.category,
+                    tags: mediaForm.tags,
+                }),
+            })
+            const data = await res.json()
+
+            if (data.success) {
+                setMediaFiles(prev => prev.map(file => file.id === editingMediaId ? data.media : file))
+                resetMediaForm()
+            } else {
+                alert(data.error || "Error al actualizar archivo")
+            }
+        } catch {
+            alert("Error de conexión al actualizar archivo")
+        } finally {
+            setMediaUploading(false)
         }
     }
 
@@ -866,7 +945,11 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                 {!showMediaForm ? (
                                     <Button
                                         variant="outline"
-                                        onClick={() => setShowMediaForm(true)}
+                                        onClick={() => {
+                                            setEditingMediaId(null)
+                                            setMediaForm({ name: "", description: "", category: "document", tags: "" })
+                                            setShowMediaForm(true)
+                                        }}
                                         className="w-full border-dashed"
                                     >
                                         <span className="material-symbols-outlined mr-2 text-lg">add</span>
@@ -875,12 +958,9 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                 ) : (
                                     <div className="space-y-4 p-4 border border-primary/20 rounded-xl bg-primary/5">
                                         <div className="flex items-center justify-between">
-                                            <p className="font-semibold text-sm">Nuevo archivo</p>
+                                            <p className="font-semibold text-sm">{editingMediaId ? "Editar archivo" : "Nuevo archivo"}</p>
                                             <button
-                                                onClick={() => {
-                                                    setShowMediaForm(false)
-                                                    setMediaForm({ name: "", description: "", category: "document", tags: "" })
-                                                }}
+                                                onClick={resetMediaForm}
                                                 className="text-muted-foreground hover:text-foreground"
                                             >
                                                 <span className="material-symbols-outlined text-lg">close</span>
@@ -942,43 +1022,64 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                             />
                                         </div>
 
-                                        {/* File input + submit */}
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                ref={mediaFileInputRef}
-                                                type="file"
-                                                className="hidden"
-                                                accept=".pdf,.mp3,.wav,.ogg,.webm,.mp4,.jpg,.jpeg,.png,.webp,.gif"
-                                                onChange={(e) => {
-                                                    const file = e.target.files?.[0]
-                                                    if (file) {
-                                                        if (!mediaForm.name) {
-                                                            setMediaForm(prev => ({
-                                                                ...prev,
-                                                                name: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
-                                                            }))
+                                        {editingMediaId ? (
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <Button
+                                                    onClick={handleSaveMediaDetails}
+                                                    disabled={mediaUploading || !mediaForm.name.trim()}
+                                                >
+                                                    <span className="material-symbols-outlined mr-2 text-sm">
+                                                        {mediaUploading ? "sync" : "save"}
+                                                    </span>
+                                                    {mediaUploading ? "Guardando..." : "Guardar cambios"}
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={resetMediaForm}
+                                                    disabled={mediaUploading}
+                                                >
+                                                    Cancelar
+                                                </Button>
+                                                <p className="text-xs text-muted-foreground">Edita la instrucción, categoría o tags sin volver a subir el archivo.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    ref={mediaFileInputRef}
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept=".pdf,.mp3,.wav,.ogg,.webm,.mp4,.jpg,.jpeg,.png,.webp,.gif"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0]
+                                                        if (file) {
+                                                            if (!mediaForm.name) {
+                                                                setMediaForm(prev => ({
+                                                                    ...prev,
+                                                                    name: file.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " ")
+                                                                }))
+                                                            }
+                                                            handleUploadMedia(file)
                                                         }
-                                                        handleUploadMedia(file)
-                                                    }
-                                                }}
-                                            />
-                                            <Button
-                                                onClick={() => {
-                                                    if (!mediaForm.name.trim()) {
-                                                        alert("Escribe un nombre antes de seleccionar el archivo")
-                                                        return
-                                                    }
-                                                    mediaFileInputRef.current?.click()
-                                                }}
-                                                disabled={mediaUploading || !mediaForm.name.trim()}
-                                            >
-                                                <span className="material-symbols-outlined mr-2 text-sm">
-                                                    {mediaUploading ? "sync" : "upload_file"}
-                                                </span>
-                                                {mediaUploading ? "Subiendo..." : "Seleccionar y subir archivo"}
-                                            </Button>
-                                            <p className="text-xs text-muted-foreground">PDF, audio, imagen o video (máx 10MB)</p>
-                                        </div>
+                                                    }}
+                                                />
+                                                <Button
+                                                    onClick={() => {
+                                                        if (!mediaForm.name.trim()) {
+                                                            alert("Escribe un nombre antes de seleccionar el archivo")
+                                                            return
+                                                        }
+                                                        mediaFileInputRef.current?.click()
+                                                    }}
+                                                    disabled={mediaUploading || !mediaForm.name.trim()}
+                                                >
+                                                    <span className="material-symbols-outlined mr-2 text-sm">
+                                                        {mediaUploading ? "sync" : "upload_file"}
+                                                    </span>
+                                                    {mediaUploading ? "Subiendo..." : "Seleccionar y subir archivo"}
+                                                </Button>
+                                                <p className="text-xs text-muted-foreground">PDF, audio, imagen o video (máx 50MB)</p>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -990,7 +1091,11 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                 ) : mediaFiles.length === 0 && !showMediaForm ? (
                                     <div
                                         className="p-8 border-2 border-dashed border-border-light dark:border-border-dark rounded-xl flex flex-col items-center justify-center text-center text-muted-foreground bg-slate-50 dark:bg-slate-900/20 cursor-pointer hover:border-primary/50 transition-colors"
-                                        onClick={() => setShowMediaForm(true)}
+                                        onClick={() => {
+                                            setEditingMediaId(null)
+                                            setMediaForm({ name: "", description: "", category: "document", tags: "" })
+                                            setShowMediaForm(true)
+                                        }}
                                     >
                                         <span className="material-symbols-outlined text-4xl mb-2 opacity-50">attach_file</span>
                                         <p className="font-medium">No hay archivos configurados</p>
@@ -1046,6 +1151,13 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                                         >
                                                             <span className="material-symbols-outlined text-base">visibility</span>
                                                         </a>
+                                                        <button
+                                                            onClick={() => handleEditMedia(file)}
+                                                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-muted-foreground hover:text-primary transition-colors"
+                                                            title="Editar archivo"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">edit</span>
+                                                        </button>
                                                         <button
                                                             onClick={() => handleDeleteMedia(file.id, file.name)}
                                                             className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-500 transition-colors"
@@ -1259,7 +1371,7 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                 <p className="text-xs text-center text-muted-foreground">
                                     Sube una imagen para el avatar de tu agente.
                                     <br />
-                                    Recuerda guardar los cambios en la pestaña "General".
+                                    Recuerda guardar los cambios en la pestaña &quot;General&quot;.
                                 </p>
                             </div>
                         </CardContent>
