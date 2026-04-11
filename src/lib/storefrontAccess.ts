@@ -210,6 +210,24 @@ export async function getStorefrontCustomerSession(slug: string) {
     return verifyStorefrontCustomerSessionToken(token, { slug })
 }
 
+export async function getValidatedStorefrontCustomerSession(input: {
+    slug: string
+    organizationId: string
+    customerId?: string | null
+}) {
+    const session = await getStorefrontCustomerSession(input.slug)
+
+    if (!session || session.organizationId !== input.organizationId) {
+        return null
+    }
+
+    if (input.customerId && session.customerId !== input.customerId) {
+        return null
+    }
+
+    return session
+}
+
 export async function setStorefrontCustomerSession(input: {
     slug: string
     organizationId: string

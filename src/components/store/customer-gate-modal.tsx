@@ -18,7 +18,6 @@ interface CustomerGateModalProps {
     onClose: () => void
     onIdentified: (customer: Customer) => void
     slug: string
-    organizationName?: string
 }
 
 interface Customer {
@@ -44,14 +43,13 @@ export function CustomerGateModal({
     isOpen,
     onClose,
     onIdentified,
-    slug,
-    organizationName = "nuestra tienda"
+    slug
 }: CustomerGateModalProps) {
     const [state, setState] = useState<ModalState>("register")
     const [name, setName] = useState("")
     const [phone, setPhone] = useState("")
     const [countryCode, setCountryCode] = useState("+57")
-    const [errors, setErrors] = useState<{ name?: string; phone?: string; dataConsent?: string }>({})
+    const [errors, setErrors] = useState<{ name?: string; phone?: string; dataConsent?: string; form?: string }>({})
     const [returningCustomer, setReturningCustomer] = useState<Customer | null>(null)
     const [dataConsentAccepted, setDataConsentAccepted] = useState(false)
 
@@ -105,6 +103,7 @@ export function CustomerGateModal({
         if (!validateForm()) return
 
         setState("loading")
+        setReturningCustomer(null)
 
         try {
             const fullPhone = `${countryCode}${phone.replace(/\D/g, "")}`
@@ -121,12 +120,8 @@ export function CustomerGateModal({
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.error || "Error al identificar")
-            }
-
-            if (data.isReturning && data.customer.full_name.toLowerCase() !== name.trim().toLowerCase()) {
-                setReturningCustomer(data.customer)
-                setState("returning")
+                setErrors({ form: data.error || "Error al identificar" })
+                setState("register")
                 return
             }
 
@@ -135,9 +130,10 @@ export function CustomerGateModal({
                 onIdentified({ ...data.customer, isNew: data.isNew })
             }, 1000)
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error identifying customer:", error)
-            setErrors({ phone: error.message || "Error al procesar. Intenta de nuevo." })
+            const message = error instanceof Error ? error.message : "Error al procesar. Intenta de nuevo."
+            setErrors({ form: message })
             setState("register")
         }
     }
@@ -192,7 +188,7 @@ export function CustomerGateModal({
                                     value={name}
                                     onChange={(e) => {
                                         setName(e.target.value)
-                                        if (errors.name) setErrors({ ...errors, name: undefined })
+                                        if (errors.name || errors.form) setErrors({ ...errors, name: undefined, form: undefined })
                                     }}
                                     className={errors.name ? "border-red-500" : ""}
                                     disabled={state === "loading"}
@@ -231,7 +227,7 @@ export function CustomerGateModal({
                                         value={phone}
                                         onChange={(e) => {
                                             setPhone(e.target.value)
-                                            if (errors.phone) setErrors({ ...errors, phone: undefined })
+                                            if (errors.phone || errors.form) setErrors({ ...errors, phone: undefined, form: undefined })
                                         }}
                                         className={`flex-1 ${errors.phone ? "border-red-500" : ""}`}
                                         disabled={state === "loading"}
@@ -250,7 +246,7 @@ export function CustomerGateModal({
                                         checked={dataConsentAccepted}
                                         onChange={(e) => {
                                             setDataConsentAccepted(e.target.checked)
-                                            if (errors.dataConsent) setErrors({ ...errors, dataConsent: undefined })
+                                            if (errors.dataConsent || errors.form) setErrors({ ...errors, dataConsent: undefined, form: undefined })
                                         }}
                                         className="mt-1 w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                                         disabled={state === "loading"}
@@ -271,6 +267,10 @@ export function CustomerGateModal({
                                     <p className="text-sm text-red-500">{errors.dataConsent}</p>
                                 )}
                             </div>
+
+                            {errors.form && (
+                                <p className="text-sm text-red-500">{errors.form}</p>
+                            )}
 
                             <Button
                                 type="submit"

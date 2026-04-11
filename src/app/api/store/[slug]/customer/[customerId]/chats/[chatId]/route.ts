@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 
 /**
  * DELETE /api/store/[slug]/customer/[customerId]/chats/[chatId]
  * Deletes a specific chat for a customer
  */
 export async function DELETE(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ slug: string; customerId: string; chatId: string }> }
 ) {
     const { slug, customerId, chatId } = await params
 
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabase = createServiceClient()
 
     // Get organization by slug
     const { data: organization, error: orgError } = await supabase
@@ -30,12 +28,25 @@ export async function DELETE(
         )
     }
 
+    const storefrontSession = await getValidatedStorefrontCustomerSession({
+        slug,
+        organizationId: organization.id,
+        customerId,
+    })
+
+    if (!storefrontSession) {
+        return NextResponse.json(
+            { error: "Acceso no autorizado" },
+            { status: 403 }
+        )
+    }
+
     // Verify chat belongs to this customer and organization
     const { data: chat, error: chatError } = await supabase
         .from("chats")
         .select("id")
         .eq("id", chatId)
-        .eq("customer_id", customerId)
+        .eq("customer_id", storefrontSession.customerId)
         .eq("organization_id", organization.id)
         .single()
 

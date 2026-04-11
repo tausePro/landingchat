@@ -80,7 +80,7 @@ export async function POST(
         // Buscar cliente existente con cualquiera de las variantes de teléfono
         const { data: existingCustomers } = await supabase
             .from("customers")
-            .select("id, full_name, phone, email, total_orders, total_spent, created_at")
+            .select("id, full_name, phone, created_at")
             .eq("organization_id", organization.id)
             .in("phone", phoneVariants)
             .order("created_at", { ascending: true })
@@ -91,9 +91,9 @@ export async function POST(
         if (existingCustomer) {
             const nameMatches = normalizeName(existingCustomer.full_name) === normalizeName(name)
 
-            if (mode === "profile" && !nameMatches) {
+            if (!nameMatches) {
                 return NextResponse.json(
-                    { error: "Los datos no coinciden con una cuenta registrada" },
+                    { error: mode === "profile" ? "Los datos no coinciden con una cuenta registrada" : "No pudimos validar tus datos. Verifica tu nombre y WhatsApp." },
                     { status: 403, headers }
                 )
             }
@@ -116,25 +116,20 @@ export async function POST(
                     id: existingCustomer.id,
                     full_name: existingCustomer.full_name,
                     phone: updates.phone || existingCustomer.phone,
-                    email: existingCustomer.email,
-                    totalOrders: existingCustomer.total_orders || 0,
-                    totalSpent: existingCustomer.total_spent || 0
                 },
                 isNew: false,
                 isReturning: true
             }, { headers })
 
-            if (nameMatches) {
-                response.cookies.set(
-                    getStorefrontCustomerSessionCookieName(slug),
-                    createStorefrontCustomerSessionToken({
-                        slug,
-                        organizationId: organization.id,
-                        customerId: existingCustomer.id,
-                    }),
-                    getStorefrontCustomerSessionCookieOptions()
-                )
-            }
+            response.cookies.set(
+                getStorefrontCustomerSessionCookieName(slug),
+                createStorefrontCustomerSessionToken({
+                    slug,
+                    organizationId: organization.id,
+                    customerId: existingCustomer.id,
+                }),
+                getStorefrontCustomerSessionCookieOptions()
+            )
 
             return response
         }
@@ -158,7 +153,7 @@ export async function POST(
                     first_visit: new Date().toISOString()
                 }
             })
-            .select("id, full_name, phone, email")
+            .select("id, full_name, phone")
             .single()
 
         if (createError) {
@@ -171,9 +166,6 @@ export async function POST(
                 id: newCustomer.id,
                 full_name: newCustomer.full_name,
                 phone: newCustomer.phone,
-                email: newCustomer.email,
-                totalOrders: 0,
-                totalSpent: 0
             },
             isNew: true,
             isReturning: false

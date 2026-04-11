@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 
 export async function GET(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ slug: string; chatId: string }> }
 ) {
     const { slug, chatId } = await params
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Verify organization
     const { data: organization } = await supabase
@@ -19,15 +20,24 @@ export async function GET(
         return NextResponse.json({ error: "Organization not found" }, { status: 404 })
     }
 
-    // Security: Verify chat belongs to this organization
+    const storefrontSession = await getValidatedStorefrontCustomerSession({
+        slug,
+        organizationId: organization.id,
+    })
+
+    if (!storefrontSession) {
+        return NextResponse.json({ error: "Acceso no autorizado" }, { status: 403 })
+    }
+
+    // Security: Verify chat belongs to this organization and storefront customer
     const { data: chat } = await supabase
         .from("chats")
-        .select("id")
+        .select("id, customer_id")
         .eq("id", chatId)
         .eq("organization_id", organization.id)
         .single()
 
-    if (!chat) {
+    if (!chat || chat.customer_id !== storefrontSession.customerId) {
         return NextResponse.json({ error: "Chat not found" }, { status: 404 })
     }
 
@@ -44,7 +54,12 @@ export async function GET(
     }
 
     // Map to frontend format
-    const formattedMessages = messages.map((msg: any) => ({
+    const formattedMessages = (messages ?? []).map((msg: {
+        id: string
+        sender_type: string
+        content: string | null
+        created_at: string
+    }) => ({
         id: msg.id,
         role: msg.sender_type === "user" ? "user" : "assistant",
         content: msg.content,

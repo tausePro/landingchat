@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 
 /**
  * GET /api/store/[slug]/customer/[customerId]/chats
  * Returns list of chats for a specific customer in an organization
  */
 export async function GET(
-    request: NextRequest,
+    _request: NextRequest,
     { params }: { params: Promise<{ slug: string; customerId: string }> }
 ) {
     const { slug, customerId } = await params
-    const supabase = await createClient()
+    const supabase = createServiceClient()
 
     // Get organization by slug
     const { data: organization, error: orgError } = await supabase
@@ -26,6 +27,19 @@ export async function GET(
         )
     }
 
+    const storefrontSession = await getValidatedStorefrontCustomerSession({
+        slug,
+        organizationId: organization.id,
+        customerId,
+    })
+
+    if (!storefrontSession) {
+        return NextResponse.json(
+            { error: "Acceso no autorizado" },
+            { status: 403 }
+        )
+    }
+
     // Fetch customer's chats for this organization
     const { data: chats, error: chatsError } = await supabase
         .from("chats")
@@ -37,7 +51,7 @@ export async function GET(
             messages:messages(content, created_at)
         `)
         .eq("organization_id", organization.id)
-        .eq("customer_id", customerId)
+        .eq("customer_id", storefrontSession.customerId)
         .order("updated_at", { ascending: false })
         .limit(20)
 
@@ -50,15 +64,22 @@ export async function GET(
     }
 
     // Format chats with a title derived from first message or date
-    const formattedChats = (chats || []).map((chat: any) => {
+    const formattedChats = (chats || []).map((chat: {
+        id: string
+        created_at: string
+        updated_at: string
+        status: string
+        messages: Array<{ content: string | null; created_at: string }> | null
+    }) => {
         // Get first user message as title, or use date
-        const firstMessage = chat.messages?.find((m: any) => m.content)
+        const firstMessage = chat.messages?.find((message) => message.content)
         const title = firstMessage?.content?.slice(0, 40) ||
             `Conversación del ${new Date(chat.created_at).toLocaleDateString('es-CO')}`
+        const shouldTruncateTitle = (firstMessage?.content?.length ?? 0) > 40
 
         return {
             id: chat.id,
-            title: title + (firstMessage?.content?.length > 40 ? '...' : ''),
+            title: title + (shouldTruncateTitle ? '...' : ''),
             created_at: chat.created_at,
             updated_at: chat.updated_at,
             status: chat.status
