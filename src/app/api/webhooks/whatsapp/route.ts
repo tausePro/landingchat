@@ -18,6 +18,11 @@ import {
     updateWebhookLog,
     verifyEvolutionSignature,
 } from "@/lib/whatsapp/webhook-utils"
+import {
+    extractEvolutionPhone,
+    extractEvolutionState,
+    normalizeEvolutionStatus,
+} from "@/lib/whatsapp/evolutionStatus"
 import { logger } from "@/lib/logger"
 
 const log = logger("webhooks/whatsapp")
@@ -236,7 +241,7 @@ async function handleIncomingMessage(
     log.info("Message received", { from: phoneNumber, preview: messageText.substring(0, 50) })
 
     // Buscar o crear cliente por número de teléfono
-    let customer = await findOrCreateCustomer(supabase, instance.organization_id, phoneNumber, message.pushName)
+    const customer = await findOrCreateCustomer(supabase, instance.organization_id, phoneNumber, message.pushName)
 
     // Verificar límite de conversaciones del plan
     const canContinue = await checkConversationLimit(supabase, instance.organization_id)
@@ -292,18 +297,11 @@ async function handleConnectionUpdate(
 ) {
     log.debug("Connection update data", { data })
     
-    // Evolution API v2.x puede enviar el estado en diferentes formatos
-    let state: string | undefined
-    
-    // Intentar obtener el estado de diferentes ubicaciones
-    if (typeof data.state === "string") {
-        state = data.state
-    } else if (typeof data.status === "string") {
-        state = data.status
-    } else if (data.connection && typeof (data.connection as Record<string, unknown>).state === "string") {
-        state = (data.connection as Record<string, unknown>).state as string
-    }
-    
+    const parsedConnectionUpdate = ConnectionUpdateSchema.safeParse(data)
+    const state = parsedConnectionUpdate.success
+        ? parsedConnectionUpdate.data.state
+        : extractEvolutionState(data)
+     
     if (!state) {
         log.error("Could not extract state from connection update")
         return
@@ -311,46 +309,16 @@ async function handleConnectionUpdate(
 
     log.info("Connection state change", { instanceId: instance.id, state })
 
-    // Mapear estado de Evolution a nuestro estado
-    const statusMap: Record<string, string> = {
-        open: "connected",
-        close: "disconnected",
-        closed: "disconnected",
-        connecting: "connecting",
-    }
-
-    const newStatus = statusMap[state.toLowerCase()] || "disconnected"
+    const newStatus = normalizeEvolutionStatus(state)
     log.info("Updating instance status", { instanceId: instance.id, newStatus })
 
-    // Intentar extraer número de teléfono si está conectado
-    let phoneNumber: string | null = null
-    let phoneNumberDisplay: string | null = null
-    
-    if (newStatus === "connected") {
-        // Evolution API puede enviar el número en diferentes ubicaciones
-        const possiblePhoneFields = [
-            data.instance,
-            data.phoneNumber,
-            data.phone,
-            (data.connection as any)?.phoneNumber,
-            (data.connection as any)?.phone,
-        ]
-        
-        for (const field of possiblePhoneFields) {
-            if (typeof field === "string" && field.length > 0) {
-                // Limpiar el número (remover @s.whatsapp.net si existe)
-                phoneNumber = field.replace("@s.whatsapp.net", "").replace(/\D/g, "")
-                if (phoneNumber.length >= 4) {
-                    phoneNumberDisplay = phoneNumber.slice(-4)
-                    log.debug("Extracted phone number", { last4: phoneNumberDisplay })
-                    break
-                }
-            }
-        }
-    }
+    const { phoneNumber, phoneNumberDisplay } =
+        newStatus === "connected"
+            ? extractEvolutionPhone(data)
+            : { phoneNumber: null, phoneNumberDisplay: null }
 
     // Actualizar estado en la base de datos
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, string> = {
         status: newStatus,
         updated_at: new Date().toISOString(),
     }
@@ -359,7 +327,7 @@ async function handleConnectionUpdate(
         updateData.connected_at = new Date().toISOString()
         if (phoneNumber) {
             updateData.phone_number = phoneNumber
-            updateData.phone_number_display = phoneNumberDisplay
+            updateData.phone_number_display = phoneNumberDisplay || phoneNumber.slice(-4)
         }
     } else if (newStatus === "disconnected") {
         updateData.disconnected_at = new Date().toISOString()

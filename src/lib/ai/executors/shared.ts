@@ -1,5 +1,6 @@
 import { logger } from "@/lib/logger"
 import { createManagedAppointment, getAppointmentAvailability } from "@/lib/appointments/service"
+import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import {
     ConfirmShippingDetailsSchema,
     EscalateToHumanSchema,
@@ -12,6 +13,34 @@ import {
 import type { ToolHandler } from "./types"
 
 const log = logger("ai/tool-executor")
+
+type StoreInfoData = Record<string, unknown>
+
+interface OrderHistoryItem {
+    name?: string | null
+}
+
+interface OrderHistoryCustomerInfo {
+    name?: string | null
+    email?: string | null
+    phone?: string | null
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    document_type?: string | null
+    document_number?: string | null
+    person_type?: string | null
+    business_name?: string | null
+}
+
+interface OrderHistoryRow {
+    id: string
+    items?: OrderHistoryItem[] | null
+    total?: number | null
+    status?: string | null
+    created_at: string
+    customer_info?: OrderHistoryCustomerInfo | null
+}
 
 const identifyCustomer: ToolHandler = async (supabase, input, context) => {
     const { name, email, phone } = IdentifyCustomerSchema.parse(input)
@@ -217,7 +246,7 @@ const getStoreInfo: ToolHandler = async (supabase, input, context) => {
 
     const settings = org?.settings || {}
 
-    const info: any = {
+    const info: StoreInfoData = {
         storeName: org?.name,
         contactEmail: org?.contact_email
     }
@@ -326,10 +355,15 @@ const getCustomerHistory: ToolHandler = async (supabase, _input, context) => {
         .order("created_at", { ascending: false })
         .limit(5)
 
-    const purchasedProducts = orders?.flatMap((o: any) => o.items?.map((i: any) => i.name)) || []
+    const orderRows = (orders || []) as OrderHistoryRow[]
+    const purchasedProducts = orderRows.flatMap((order) =>
+        (order.items || [])
+            .map((item) => item.name)
+            .filter((name): name is string => Boolean(name))
+    )
     const categories = [...new Set(purchasedProducts)]
 
-    const lastOrder = orders?.[0]
+    const lastOrder = orderRows[0]
     const lastShippingInfo = lastOrder?.customer_info ? {
         name: lastOrder.customer_info.name,
         email: lastOrder.customer_info.email,
@@ -366,13 +400,13 @@ const getCustomerHistory: ToolHandler = async (supabase, _input, context) => {
             },
             lastShippingInfo: lastShippingInfo,
             savedAddress: customerAddress,
-            recentOrders: orders?.map((o: any) => ({
-                id: o.id,
-                date: o.created_at,
-                total: o.total,
-                status: o.status,
-                itemCount: o.items?.length || 0
-            })) || [],
+            recentOrders: orderRows.map((order) => ({
+                id: order.id,
+                date: order.created_at,
+                total: order.total,
+                status: order.status,
+                itemCount: order.items?.length || 0
+            })),
             preferences: customer?.metadata || {},
             purchasedCategories: categories.slice(0, 5)
         }
@@ -505,8 +539,8 @@ const checkAvailability: ToolHandler = async (supabase, input, context) => {
         date: day.date,
         dayName: day.dayName,
         availableSlots: day.slots.map((slot) => ({
-            start: new Date(slot.isoDate).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
-            end: new Date(slot.endIsoDate).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+            start: formatAppointmentDateTime(slot.isoDate, { hour: "2-digit", minute: "2-digit" }),
+            end: formatAppointmentDateTime(slot.endIsoDate, { hour: "2-digit", minute: "2-digit" }),
         })),
         busyCount: day.busyCount,
     }))
@@ -566,7 +600,7 @@ const scheduleAppointment: ToolHandler = async (supabase, input, context) => {
         if (result.code === "conflict") {
             const conflictInfo = result.conflicts.map((conflict) => {
                 const conflictDate = new Date(conflict.proposed_date)
-                return `"${conflict.title}" el ${conflictDate.toLocaleDateString("es-CO")} a las ${conflictDate.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}`
+                return `"${conflict.title}" el ${formatAppointmentDateTime(conflictDate, { day: "numeric", month: "numeric", year: "numeric" })} a las ${formatAppointmentDateTime(conflictDate, { hour: "2-digit", minute: "2-digit" })}`
             }).join(", ")
 
             return {
@@ -586,13 +620,13 @@ const scheduleAppointment: ToolHandler = async (supabase, input, context) => {
     const appointment = result.appointment
     const assignedAdvisor = result.assignedAdvisor
 
-    const dateFormatted = proposedDate.toLocaleDateString('es-CO', {
+    const dateFormatted = formatAppointmentDateTime(proposedDate, {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     })
-    const timeFormatted = proposedDate.toLocaleTimeString('es-CO', {
+    const timeFormatted = formatAppointmentDateTime(proposedDate, {
         hour: '2-digit',
         minute: '2-digit'
     })
@@ -651,7 +685,7 @@ const sendMedia: ToolHandler = async (supabase, input, context) => {
         .eq("id", media_id)
         .then(
             () => log.debug("sendMedia: usage count updated"),
-            (e: any) => log.warn("sendMedia: failed to update usage count", { error: e?.message })
+            (e: unknown) => log.warn("sendMedia: failed to update usage count", { error: e instanceof Error ? e.message : String(e) })
         )
 
     log.info("sendMedia: sending", { name: media.name, type: media.file_type })

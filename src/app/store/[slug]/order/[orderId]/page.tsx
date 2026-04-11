@@ -16,11 +16,21 @@ import { CartCleaner } from "./components/cart-cleaner"
 
 interface OrderPageProps {
     params: Promise<{ slug: string; orderId: string }>
+    searchParams: Promise<{ access?: string }>
 }
 
-export default async function OrderTrackingPage({ params }: OrderPageProps) {
+interface OrderItem {
+    quantity: number
+    product_name?: string
+    name?: string
+    variant_info?: string | null
+    total_price: number
+}
+
+export default async function OrderTrackingPage({ params, searchParams }: OrderPageProps) {
     const { slug, orderId } = await params
-    const result = await getOrderDetails(slug, orderId)
+    const { access } = await searchParams
+    const result = await getOrderDetails(slug, orderId, access)
 
     if (!result) return notFound()
 
@@ -68,6 +78,7 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
 
     const currentStatus = getStatusConfig(order.status)
     const primaryColor = organization.settings?.branding?.primaryColor || "#3b82f6"
+    const orderItems = Array.isArray(order.items) ? order.items as OrderItem[] : []
 
     // Construct WhatsApp link for support (get phone from settings)
     const orgPhone = organization.settings?.whatsapp?.phone || organization.settings?.contact?.phone
@@ -172,11 +183,11 @@ export default async function OrderTrackingPage({ params }: OrderPageProps) {
                                     Productos
                                 </h3>
                                 <div className="space-y-4">
-                                    {order.items.map((item: any, i: number) => (
+                                    {orderItems.map((item, i: number) => (
                                         <div key={i} className="flex justify-between items-start py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
                                             <div>
                                                 <p className="font-medium text-slate-900 dark:text-slate-100">
-                                                    {item.quantity}x {item.product_name}
+                                                    {item.quantity}x {item.product_name || item.name || "Producto"}
                                                 </p>
                                                 {item.variant_info && (
                                                     <p className="text-sm text-slate-500">{item.variant_info}</p>

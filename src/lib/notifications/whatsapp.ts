@@ -5,6 +5,7 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
+import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
 
 interface NotificationContext {
@@ -205,12 +206,12 @@ export async function sendAppointmentNotification(
             meeting: "Reunión",
         }
 
-        const dateFormatted = appointment.proposedDate.toLocaleDateString("es-CO", {
+        const dateFormatted = formatAppointmentDateTime(appointment.proposedDate, {
             weekday: "long",
             day: "numeric",
             month: "long",
         })
-        const timeFormatted = appointment.proposedDate.toLocaleTimeString("es-CO", {
+        const timeFormatted = formatAppointmentDateTime(appointment.proposedDate, {
             hour: "2-digit",
             minute: "2-digit",
         })

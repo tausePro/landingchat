@@ -3,6 +3,7 @@ import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { canCreateResource } from "@/lib/utils/subscription"
+import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { message, chatId, slug, customerId: bodyCustomerId, currentProductId, cartItems } = validation.data
+        const { message, chatId, slug, currentProductId, cartItems } = validation.data
 
         const supabase = createServiceClient()
 
@@ -77,10 +78,29 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        const storefrontSession = await getValidatedStorefrontCustomerSession({
+            slug,
+            organizationId: organization.id,
+        })
+
+        if (!storefrontSession) {
+            return NextResponse.json(
+                { error: "Sesión inválida o expirada" },
+                { status: 401, headers }
+            )
+        }
+
+        if (validation.data.customerId && validation.data.customerId !== storefrontSession.customerId) {
+            return NextResponse.json(
+                { error: "Sesión inválida o expirada" },
+                { status: 403, headers }
+            )
+        }
+
         // Get or create chat
         let currentChatId = chatId
         let agentId: string
-        let customerId: string | undefined
+        const customerId = storefrontSession.customerId
 
         if (!currentChatId) {
             // Create new chat
@@ -112,6 +132,7 @@ export async function POST(request: NextRequest) {
                 .from("chats")
                 .insert({
                     organization_id: organization.id,
+                    customer_id: storefrontSession.customerId,
                     assigned_agent_id: agent.id,
                     status: "active"
                 })
@@ -128,7 +149,6 @@ export async function POST(request: NextRequest) {
 
             currentChatId = newChat.id
             agentId = agent.id
-            customerId = undefined
         } else {
             // Get agent ID from existing chat - SECURITY: validate ownership
             const { data: chat, error: chatQueryError } = await supabase
@@ -146,9 +166,14 @@ export async function POST(request: NextRequest) {
                 )
             }
 
+            if (chat.customer_id !== storefrontSession.customerId) {
+                return NextResponse.json(
+                    { error: "Chat not found" },
+                    { status: 404, headers }
+                )
+            }
+
             agentId = chat.assigned_agent_id
-            // Usar customerId del body si existe, sino del chat
-            customerId = bodyCustomerId || chat.customer_id
         }
 
         // Sync frontend cart with database (if cartItems provided)
@@ -221,10 +246,13 @@ export async function POST(request: NextRequest) {
             metadata: result.metadata
         }, { headers })
 
-    } catch (error: any) {
-        log.error("Error in chat API", { name: error.name, message: error.message })
+    } catch (error: unknown) {
+        const errorName = error instanceof Error ? error.name : "UnknownError"
+        const errorMessage = error instanceof Error ? error.message : "Unknown error"
+
+        log.error("Error in chat API", { name: errorName, message: errorMessage })
         return NextResponse.json(
-            { error: "Internal server error", details: error.message },
+            { error: "Internal server error", details: errorMessage },
             { status: 500, headers }
         )
     }

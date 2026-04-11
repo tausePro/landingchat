@@ -4,6 +4,7 @@ import { getFreeBusySlots, isCalendarConnected, createCalendarEvent, updateCalen
 import { assignAdvisor, getAdvisors, type Advisor, type WorkingHours } from "@/lib/advisors/assignment"
 import { createAppointment as createAppointmentRecord, getActiveAppointmentsInRange, getConflictingAppointments, updateAppointment as updateAppointmentRecord } from "@/lib/repositories/appointments"
 import { sendAppointmentNotification } from "@/lib/notifications/whatsapp"
+import { addDaysToAppointmentDateKey, createAppointmentDate, formatAppointmentDateTime, getAppointmentDateKey, getAppointmentWeekday } from "@/lib/appointments/appointmentDateTime"
 
 const log = logger("appointments/service")
 
@@ -191,9 +192,10 @@ export async function getAppointmentAvailability(
     const includeEmptyDays = input.includeEmptyDays ?? false
     const skipSundays = input.skipSundays ?? true
 
-    const startDate = new Date(input.date)
-    startDate.setHours(0, 0, 0, 0)
-    const endDate = new Date(startDate.getTime() + daysToCheck * 24 * 60 * 60 * 1000)
+    const startDateKey = getAppointmentDateKey(input.date)
+    const todayDateKey = getAppointmentDateKey(new Date())
+    const startDate = createAppointmentDate(startDateKey, 0, 0)
+    const endDate = createAppointmentDate(addDaysToAppointmentDateKey(startDateKey, daysToCheck), 0, 0)
 
     let advisors: Advisor[] = []
     try {
@@ -244,32 +246,31 @@ export async function getAppointmentAvailability(
     const availability: AppointmentAvailabilityDay[] = []
 
     for (let offset = 0; offset < daysToCheck; offset++) {
-        const dayDate = new Date(startDate.getTime() + offset * 24 * 60 * 60 * 1000)
-        const dayStr = dayDate.toISOString().split("T")[0]
-        const dayName = dayDate.toLocaleDateString("es-CO", {
+        const dayDateKey = addDaysToAppointmentDateKey(startDateKey, offset)
+        const dayLabelDate = createAppointmentDate(dayDateKey, 12, 0)
+        const dayName = formatAppointmentDateTime(dayLabelDate, {
             weekday: includeEmptyDays ? "long" : "short",
             day: "numeric",
             month: includeEmptyDays ? "long" : "short",
         })
 
-        if (skipSundays && dayDate.getDay() === 0) {
+        if (skipSundays && getAppointmentWeekday(dayDateKey) === 0) {
             if (includeEmptyDays) {
-                availability.push({ date: dayStr, dayName, slots: [], busyCount: 0 })
+                availability.push({ date: dayDateKey, dayName, slots: [], busyCount: 0 })
             }
             continue
         }
 
-        if (dayDate < new Date(new Date().setHours(0, 0, 0, 0))) {
+        if (dayDateKey < todayDateKey) {
             continue
         }
 
-        const dayBusy = busySlots.filter((busy) => busy.start.toISOString().split("T")[0] === dayStr)
-        const workMinutes = buildWorkingMinutes(dayDate, relevantAdvisors, slotStepMinutes)
+        const dayBusy = busySlots.filter((busy) => getAppointmentDateKey(busy.start) === dayDateKey)
+        const workMinutes = buildWorkingMinutes(dayDateKey, relevantAdvisors, slotStepMinutes)
         const slots: AppointmentAvailabilitySlot[] = []
 
         for (const minutes of workMinutes) {
-            const slotStart = new Date(dayDate)
-            slotStart.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0)
+            const slotStart = createAppointmentDate(dayDateKey, Math.floor(minutes / 60), minutes % 60)
             const slotEnd = new Date(slotStart.getTime() + slotDurationMinutes * 60 * 1000)
 
             if (slotStart < new Date()) {
@@ -279,7 +280,7 @@ export async function getAppointmentAvailability(
             const isOccupied = dayBusy.some((busy) => slotStart < busy.end && slotEnd > busy.start)
             if (!isOccupied) {
                 slots.push({
-                    time: slotStart.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: true }),
+                    time: formatAppointmentDateTime(slotStart, { hour: "2-digit", minute: "2-digit", hour12: true }),
                     isoDate: slotStart.toISOString(),
                     endIsoDate: slotEnd.toISOString(),
                 })
@@ -288,7 +289,7 @@ export async function getAppointmentAvailability(
 
         if (slots.length > 0 || includeEmptyDays) {
             availability.push({
-                date: dayStr,
+                date: dayDateKey,
                 dayName,
                 slots,
                 busyCount: dayBusy.length,
@@ -521,9 +522,9 @@ export async function getCalendarEventsForRange(
     organizationId: string,
     weekStart: Date,
 ): Promise<GetCalendarEventsResult> {
-    const startDate = new Date(weekStart)
-    startDate.setHours(0, 0, 0, 0)
-    const endDate = new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const startDateKey = getAppointmentDateKey(weekStart)
+    const startDate = createAppointmentDate(startDateKey, 0, 0)
+    const endDate = createAppointmentDate(addDaysToAppointmentDateKey(startDateKey, 7), 0, 0)
 
     const { data } = await supabase
         .from("appointments")
@@ -676,7 +677,7 @@ function getRelevantAdvisors(advisors: Advisor[], propertyType?: string): Adviso
     })
 }
 
-function buildWorkingMinutes(dayDate: Date, advisors: Advisor[], slotStepMinutes: number): number[] {
+function buildWorkingMinutes(dayDateKey: string, advisors: Advisor[], slotStepMinutes: number): number[] {
     if (advisors.length === 0) {
         const minutes: number[] = []
         for (let minute = DEFAULT_DAY_START_HOUR * 60; minute < DEFAULT_DAY_END_HOUR * 60; minute += slotStepMinutes) {
@@ -685,7 +686,7 @@ function buildWorkingMinutes(dayDate: Date, advisors: Advisor[], slotStepMinutes
         return minutes
     }
 
-    const dayKey = DAY_KEYS[dayDate.getDay()]
+    const dayKey = DAY_KEYS[getAppointmentWeekday(dayDateKey)]
     const slotMinutes = new Set<number>()
 
     for (const advisor of advisors) {

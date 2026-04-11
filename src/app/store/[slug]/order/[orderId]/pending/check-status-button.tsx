@@ -4,12 +4,7 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { RefreshCw } from "lucide-react"
 
-interface CheckStatusButtonProps {
-    orderId: string
-    slug: string
-}
-
-export function CheckStatusButton({ orderId, slug }: CheckStatusButtonProps) {
+export function CheckStatusButton() {
     const router = useRouter()
     const [isChecking, setIsChecking] = useState(false)
 

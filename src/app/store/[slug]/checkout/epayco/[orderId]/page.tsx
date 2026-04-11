@@ -5,93 +5,102 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
+import {
+    appendStorefrontAccessParam,
+    createStorefrontOrderAccessToken,
+} from "@/lib/storefrontAccess"
 import { notFound, redirect } from "next/navigation"
 import { EpaycoCheckoutClient } from "./components/epayco-checkout-client"
+import { getOrderDetails } from "../../../actions"
 
 interface PageProps {
     params: Promise<{
         slug: string
         orderId: string
     }>
+    searchParams: Promise<{
+        access?: string
+    }>
 }
 
-export default async function EpaycoCheckoutPage({ params }: PageProps) {
+export default async function EpaycoCheckoutPage({ params, searchParams }: PageProps) {
     const { slug, orderId } = await params
+    const { access } = await searchParams
+
+    const result = await getOrderDetails(slug, orderId, access)
+
+    if (!result) {
+        notFound()
+    }
+
+    const { order, organization } = result
     const supabase = createServiceClient()
+    const customDomain = organization.custom_domain
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
 
-    // 1. Obtener la orden con datos de la organización incluyendo custom_domain
-    const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .select("*, organization:organizations(id, name, slug, settings, custom_domain)")
-        .eq("id", orderId)
-        .single()
-
-    if (orderError || !order) {
-        notFound()
+    let baseUrl: string
+    if (customDomain) {
+        baseUrl = `https://${customDomain}`
+    } else if (appUrl.includes("localhost") || appUrl.includes("127.0.0.1")) {
+        baseUrl = `${appUrl}/store/${slug}`
+    } else {
+        baseUrl = `https://${slug}.landingchat.co`
     }
 
-    // 2. Verificar que la orden pertenece a la tienda correcta
-    if (order.organization?.slug !== slug) {
-        notFound()
-    }
+    const orderAccessToken = access || createStorefrontOrderAccessToken({
+        slug,
+        organizationId: organization.id,
+        orderId: order.id,
+        customerId: order.customer_id ?? null,
+    })
+    const orderUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}`, orderAccessToken)
+    const gatewayErrorUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}/error?reason=gateway_not_configured`, orderAccessToken)
 
     // 3. Verificar que la orden está pendiente de pago
     if (order.payment_status !== "pending") {
-        redirect(`/store/${slug}/order/${orderId}`)
+        redirect(orderUrl)
     }
 
     // 4. Obtener configuración de ePayco
     const { data: gatewayConfig, error: gatewayError } = await supabase
         .from("payment_gateway_configs")
         .select("public_key, is_test_mode")
-        .eq("organization_id", order.organization_id)
+        .eq("organization_id", organization.id)
         .eq("provider", "epayco")
         .eq("is_active", true)
         .single()
 
     if (gatewayError || !gatewayConfig) {
-        redirect(`/store/${slug}/order/${orderId}/error?reason=gateway_not_configured`)
+        redirect(gatewayErrorUrl)
     }
 
     // 5. Construir la URL base correcta
     // Para subdominios de landingchat.co, usar el subdominio
     // Para dominios personalizados, usar el dominio personalizado
-    const customDomain = (order.organization as { custom_domain?: string })?.custom_domain
-    
-    let baseUrl: string
-    if (customDomain) {
-        // Dominio personalizado: https://tez.com.co
-        baseUrl = `https://${customDomain}`
-    } else {
-        // Subdominio de landingchat.co: https://tez.landingchat.co
-        baseUrl = `https://${slug}.landingchat.co`
-    }
 
     // 6. Preparar datos para el checkout de ePayco
     const checkoutData = {
         // Llaves de ePayco (solo la pública, nunca la privada)
         publicKey: gatewayConfig.public_key,
         isTestMode: gatewayConfig.is_test_mode,
-        
+
         // Datos de la transacción
         orderId: order.id,
         orderNumber: order.order_number,
         amount: Math.round(order.total), // ePayco usa pesos, no centavos
         currency: "COP",
         description: `Orden ${order.order_number}`,
-        
+
         // Datos del cliente (solo los necesarios para ePayco)
         customerName: order.customer_info?.name || "",
         customerEmail: order.customer_info?.email || "",
-        
+
         // URLs de respuesta - usar el dominio correcto de la tienda
-        responseUrl: customDomain 
-            ? `${baseUrl}/order/${orderId}` 
-            : `${baseUrl}/order/${orderId}`,
+        responseUrl: orderUrl,
         confirmationUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payments/epayco?org=${slug}`,
-        
+
         // Información de la tienda
-        storeName: order.organization?.name || "Tienda",
+        storeName: organization.name || "Tienda",
         storeSlug: slug,
     }
 

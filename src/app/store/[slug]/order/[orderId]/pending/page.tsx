@@ -1,35 +1,22 @@
-import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Clock } from "lucide-react"
+import { getOrderDetails } from "../../../actions"
 import { CheckStatusButton } from "./check-status-button"
 
 interface PendingPageProps {
     params: Promise<{ slug: string; orderId: string }>
+    searchParams: Promise<{ access?: string }>
 }
 
-export default async function OrderPendingPage({ params }: PendingPageProps) {
+export default async function OrderPendingPage({ params, searchParams }: PendingPageProps) {
     const { slug, orderId } = await params
-    const supabase = createServiceClient()
+    const { access } = await searchParams
+    const result = await getOrderDetails(slug, orderId, access)
 
-    // Get organization
-    const { data: org } = await supabase
-        .from("organizations")
-        .select("id, name")
-        .eq("slug", slug)
-        .single()
+    if (!result) notFound()
 
-    if (!org) notFound()
-
-    // Get order
-    const { data: order } = await supabase
-        .from("orders")
-        .select("id, order_number, total, items, customer_info, status, payment_status, payment_method")
-        .eq("id", orderId)
-        .eq("organization_id", org.id)
-        .single()
-
-    if (!order) notFound()
+    const { order } = result
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -120,7 +107,7 @@ export default async function OrderPendingPage({ params }: PendingPageProps) {
 
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <CheckStatusButton orderId={orderId} slug={slug} />
+                        <CheckStatusButton />
                         <Link
                             href={`/store/${slug}`}
                             className="px-6 py-3 rounded-lg border border-border-light dark:border-border-dark text-text-light-primary dark:text-text-dark-primary font-medium hover:bg-background-light dark:hover:bg-background-dark transition-colors"

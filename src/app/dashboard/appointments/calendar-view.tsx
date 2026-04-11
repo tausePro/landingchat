@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { addDaysToAppointmentDateKey, createAppointmentDate, formatAppointmentDateTime, getAppointmentDateKey, getAppointmentMinutesOfDay, getAppointmentWeekday } from "@/lib/appointments/appointmentDateTime"
 import { getCalendarEvents, confirmAppointment, cancelAppointment, completeAppointment } from "./actions"
 import type { CalendarEvent } from "./actions"
 import { toast } from "sonner"
 
 const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 8am - 6pm
-const DAY_NAMES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 
 const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 border-yellow-300 text-yellow-900 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-200",
@@ -33,18 +33,16 @@ const typeIcons: Record<string, string> = {
 }
 
 function getMonday(d: Date): Date {
-    const date = new Date(d)
-    const day = date.getDay()
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1)
-    date.setDate(diff)
-    date.setHours(0, 0, 0, 0)
-    return date
+    const dateKey = getAppointmentDateKey(d)
+    const weekday = getAppointmentWeekday(dateKey)
+    const diff = weekday === 0 ? -6 : 1 - weekday
+    return createAppointmentDate(addDaysToAppointmentDateKey(dateKey, diff), 0, 0)
 }
 
 function formatWeekRange(monday: Date): string {
-    const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000)
-    const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" }
-    return `${monday.toLocaleDateString("es-CO", opts)} — ${sunday.toLocaleDateString("es-CO", { ...opts, year: "numeric" })}`
+    const mondayKey = getAppointmentDateKey(monday)
+    const sunday = createAppointmentDate(addDaysToAppointmentDateKey(mondayKey, 6), 12, 0)
+    return `${formatAppointmentDateTime(monday, { day: "numeric", month: "short" })} — ${formatAppointmentDateTime(sunday, { day: "numeric", month: "short", year: "numeric" })}`
 }
 
 export function CalendarView() {
@@ -75,10 +73,10 @@ export function CalendarView() {
     }, [currentMonday])
 
     const goToPrev = () => {
-        setCurrentMonday(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))
+        setCurrentMonday(prev => createAppointmentDate(addDaysToAppointmentDateKey(getAppointmentDateKey(prev), -7), 0, 0))
     }
     const goToNext = () => {
-        setCurrentMonday(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000))
+        setCurrentMonday(prev => createAppointmentDate(addDaysToAppointmentDateKey(getAppointmentDateKey(prev), 7), 0, 0))
     }
     const goToToday = () => {
         setCurrentMonday(getMonday(new Date()))
@@ -108,23 +106,27 @@ export function CalendarView() {
     }
 
     // Generar días de la semana (Lun-Sáb)
+    const todayDateKey = getAppointmentDateKey(new Date())
+    const currentMondayDateKey = getAppointmentDateKey(currentMonday)
     const weekDays = Array.from({ length: 6 }, (_, i) => {
-        const d = new Date(currentMonday.getTime() + i * 24 * 60 * 60 * 1000)
+        const dateStr = addDaysToAppointmentDateKey(currentMondayDateKey, i)
+        const d = createAppointmentDate(dateStr, 12, 0)
+        const dayName = formatAppointmentDateTime(d, { weekday: "short" }).replace(".", "")
         return {
             date: d,
-            dayName: DAY_NAMES[i],
-            dayNum: d.getDate(),
-            isToday: d.toDateString() === new Date().toDateString(),
-            dateStr: d.toISOString().split("T")[0],
+            dayName: dayName.charAt(0).toUpperCase() + dayName.slice(1),
+            dayNum: Number(dateStr.slice(-2)),
+            isToday: dateStr === todayDateKey,
+            dateStr,
         }
     })
 
     // Posicionar eventos en el grid
     const getEventPosition = (event: CalendarEvent) => {
-        const start = new Date(event.start)
-        const end = new Date(event.end)
-        const startHour = start.getHours() + start.getMinutes() / 60
-        const endHour = end.getHours() + end.getMinutes() / 60
+        const startMinutes = getAppointmentMinutesOfDay(event.start)
+        const endMinutes = getAppointmentMinutesOfDay(event.end)
+        const startHour = startMinutes / 60
+        const endHour = endMinutes / 60
         const top = Math.max(0, (startHour - 8) * 64) // 64px por hora
         const height = Math.max(32, (endHour - startHour) * 64)
         return { top, height }
@@ -132,7 +134,7 @@ export function CalendarView() {
 
     const getEventsForDay = (dateStr: string) => {
         return events.filter(e => {
-            const eDate = new Date(e.start).toISOString().split("T")[0]
+            const eDate = getAppointmentDateKey(e.start)
             return eDate === dateStr
         })
     }
@@ -255,7 +257,7 @@ export function CalendarView() {
                                     const colorClass = isGoogle
                                         ? "bg-gray-100 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300"
                                         : hasAdvisorColor ? "" : statusColors[event.status || "pending"]
-                                    const startTime = new Date(event.start).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+                                    const startTime = formatAppointmentDateTime(event.start, { hour: "2-digit", minute: "2-digit" })
 
                                     return (
                                         <button
@@ -323,11 +325,11 @@ export function CalendarView() {
                                 <div className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                                     <span className="material-symbols-outlined text-base">schedule</span>
                                     <span>
-                                        {new Date(selectedEvent.start).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}
+                                        {formatAppointmentDateTime(selectedEvent.start, { weekday: "long", day: "numeric", month: "long" })}
                                         {" · "}
-                                        {new Date(selectedEvent.start).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                                        {formatAppointmentDateTime(selectedEvent.start, { hour: "2-digit", minute: "2-digit" })}
                                         {" — "}
-                                        {new Date(selectedEvent.end).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                                        {formatAppointmentDateTime(selectedEvent.end, { hour: "2-digit", minute: "2-digit" })}
                                     </span>
                                 </div>
 

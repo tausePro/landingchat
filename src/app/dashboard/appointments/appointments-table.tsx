@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
+import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import { confirmAppointment, cancelAppointment, completeAppointment } from "./actions"
 import { toast } from "sonner"
 
@@ -94,8 +95,7 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
     : appointments.filter(a => a.status === filter)
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString("es-CO", {
+    return formatAppointmentDateTime(dateStr, {
       weekday: "short",
       day: "numeric",
       month: "short",
@@ -104,8 +104,7 @@ export function AppointmentsTable({ appointments }: AppointmentsTableProps) {
   }
 
   const formatTime = (dateStr: string) => {
-    const d = new Date(dateStr)
-    return d.toLocaleTimeString("es-CO", {
+    return formatAppointmentDateTime(dateStr, {
       hour: "2-digit",
       minute: "2-digit",
     })

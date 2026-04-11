@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { EvolutionClient } from "@/lib/evolution"
+import { resolveEvolutionInstanceStatus } from "@/lib/whatsapp/evolutionStatus"
 
 export async function POST(request: NextRequest) {
     try {
@@ -56,9 +57,12 @@ export async function POST(request: NextRequest) {
         })
 
         // 2. Obtener estado desde Evolution API
-        let evolutionState: any
+        let evolutionState: Awaited<ReturnType<typeof resolveEvolutionInstanceStatus>>
         try {
-            evolutionState = await evolutionClient.getConnectionStatus(instanceName)
+            evolutionState = await resolveEvolutionInstanceStatus(
+                evolutionClient,
+                instanceName
+            )
         } catch (error) {
             return NextResponse.json(
                 {
@@ -88,23 +92,16 @@ export async function POST(request: NextRequest) {
         }
 
         // 4. Mapear estado de Evolution a nuestro estado
-        const statusMap: Record<string, string> = {
-            open: "connected",
-            close: "disconnected",
-            closed: "disconnected",
-            connecting: "connecting",
-        }
-
-        const evolutionStatus = statusMap[evolutionState.state] || "disconnected"
+        const evolutionStatus = evolutionState.status
         const dbStatus = dbInstance.status
 
         // 5. Verificar si hay desincronización
         const isSynced = evolutionStatus === dbStatus
 
-        const response: any = {
+        const response: Record<string, unknown> = {
             instanceName,
             evolution: {
-                state: evolutionState.state,
+                state: evolutionState.rawState,
                 mappedStatus: evolutionStatus,
             },
             database: {
@@ -118,24 +115,18 @@ export async function POST(request: NextRequest) {
 
         // 6. Si no está sincronizado, actualizar DB
         if (!isSynced) {
-            const updateData: Record<string, any> = {
+            const updateData: Record<string, string> = {
                 status: evolutionStatus,
                 updated_at: new Date().toISOString(),
             }
 
             if (evolutionStatus === "connected") {
                 updateData.connected_at = new Date().toISOString()
-                
-                // Intentar obtener información de la instancia
-                try {
-                    const instanceInfo = await evolutionClient.getInstance(instanceName)
-                    if (instanceInfo.phoneNumber) {
-                        const phoneNumber = instanceInfo.phoneNumber.replace(/\D/g, "")
-                        updateData.phone_number = phoneNumber
-                        updateData.phone_number_display = phoneNumber.slice(-4)
-                    }
-                } catch (error) {
-                    console.error("Could not get instance info:", error)
+                if (evolutionState.phoneNumber) {
+                    updateData.phone_number = evolutionState.phoneNumber
+                    updateData.phone_number_display =
+                        evolutionState.phoneNumberDisplay ||
+                        evolutionState.phoneNumber.slice(-4)
                 }
             } else if (evolutionStatus === "disconnected") {
                 updateData.disconnected_at = new Date().toISOString()
