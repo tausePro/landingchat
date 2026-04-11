@@ -1,34 +1,30 @@
 "use server"
 
-import { createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
+import { getOrderDetails } from "../../../actions"
+import {
+    appendStorefrontAccessParam,
+    createStorefrontOrderAccessToken,
+    setStorefrontCustomerSession,
+} from "@/lib/storefrontAccess"
 
-export async function retryPayment(orderId: string, slug: string) {
-    const supabase = createServiceClient()
+interface OrderCustomerInfo {
+    email?: string
+    name?: string
+    document_number?: string
+    document_type?: string
+    phone?: string
+}
 
+export async function retryPayment(orderId: string, slug: string, accessToken?: string): Promise<{ success: boolean, error?: string, paymentUrl?: string }> {
     try {
-        // Get organization
-        const { data: org, error: orgError } = await supabase
-            .from("organizations")
-            .select("id")
-            .eq("slug", slug)
-            .single()
+        const result = await getOrderDetails(slug, orderId, accessToken)
 
-        if (orgError || !org) {
-            return { success: false, error: "Organización no encontrada" }
+        if (!result) {
+            return { success: false, error: "No autorizado para reintentar este pago" }
         }
 
-        // Get order
-        const { data: order, error: orderError } = await supabase
-            .from("orders")
-            .select("*")
-            .eq("id", orderId)
-            .eq("organization_id", org.id)
-            .single()
-
-        if (orderError || !order) {
-            return { success: false, error: "Pedido no encontrado" }
-        }
+        const { order, organization } = result
 
         // Check if order can be retried
         if (order.payment_status === 'paid') {
@@ -39,13 +35,26 @@ export async function retryPayment(orderId: string, slug: string) {
             return { success: false, error: "Este pedido usa pago manual" }
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const customerInfo = order.customer_info as any
+        if (order.customer_id) {
+            await setStorefrontCustomerSession({
+                slug,
+                organizationId: organization.id,
+                customerId: order.customer_id,
+            })
+        }
+
+        const customerInfo = (order.customer_info || {}) as OrderCustomerInfo
+        const orderAccessToken = createStorefrontOrderAccessToken({
+            slug,
+            organizationId: organization.id,
+            orderId: order.id,
+            customerId: order.customer_id ?? null,
+        })
 
         // Initiate payment again
         const paymentResult = await paymentService.initiatePayment({
             orderId: order.id,
-            organizationId: org.id,
+            organizationId: organization.id,
             amount: Math.round(order.total * 100), // Convert to cents
             currency: 'COP',
             customerEmail: customerInfo?.email || '',
@@ -56,9 +65,9 @@ export async function retryPayment(orderId: string, slug: string) {
             returnUrl: (() => {
                 const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'
                 if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
-                    return `${appUrl}/store/${slug}/order/${order.id}`
+                    return appendStorefrontAccessParam(`${appUrl}/store/${slug}/order/${order.id}`, orderAccessToken)
                 }
-                return `https://${slug}.landingchat.co/order/${order.id}`
+                return appendStorefrontAccessParam(`https://${slug}.landingchat.co/order/${order.id}`, orderAccessToken)
             })(),
             paymentMethod: order.payment_method as "wompi" | "epayco"
         })

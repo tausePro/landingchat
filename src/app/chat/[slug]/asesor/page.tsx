@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, use, useRef, useCallback } from "react"
+import { useState, useEffect, use, useRef, type CSSProperties } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getAdvisorData } from "./actions"
 import { getStoredUUID, getStoredString, setStoredUUID } from "@/lib/utils/storage"
@@ -58,6 +58,84 @@ interface MediaAttachment {
     file_type: string
     file_name: string
     category: string
+}
+
+interface Agent {
+    name?: string
+    avatar_url?: string | null
+    [key: string]: unknown
+}
+
+interface AdvisorOrganizationSettings {
+    branding?: {
+        primaryColor?: string
+        [key: string]: unknown
+    }
+    agent?: {
+        name?: string
+        avatar?: string
+        [key: string]: unknown
+    }
+    [key: string]: unknown
+}
+
+interface AdvisorOrganization {
+    name: string
+    settings?: AdvisorOrganizationSettings | null
+    [key: string]: unknown
+}
+
+interface ShowPropertyActionData {
+    id: string
+    title: string
+    type?: string
+    class?: string
+    location?: {
+        neighborhood?: string
+        city?: string
+        address?: string
+        stratum?: string
+    }
+    specs?: {
+        bedrooms?: number
+        bathrooms?: number
+        area?: string
+    }
+    prices?: {
+        rent?: string
+        sale?: string
+        admin?: string
+    }
+    images?: string[]
+    url?: string
+}
+
+interface AdvisorAction {
+    type: string
+    data?: {
+        properties?: PropertyCard[]
+        property?: ShowPropertyActionData
+        appointment?: AppointmentCard
+        media?: MediaAttachment
+    }
+}
+
+interface AdvisorAIResponse {
+    message: string
+    actions?: AdvisorAction[]
+}
+
+interface ChatInitResponse {
+    chatId?: string
+    agent?: Agent
+}
+
+interface StoredMessage extends Omit<Message, "timestamp"> {
+    timestamp: string
+}
+
+type CssWithVariables = CSSProperties & {
+    "--tw-ring-color"?: string
 }
 
 function PropertyCardComponent({ prop, primaryColor }: { prop: PropertyCard; primaryColor: string }) {
@@ -209,8 +287,8 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
     const [isInitializing, setIsInitializing] = useState(true)
 
     const [input, setInput] = useState("")
-    const [agent, setAgent] = useState<any>(null)
-    const [organization, setOrganization] = useState<any>(null)
+    const [agent, setAgent] = useState<Agent | null>(null)
+    const [organization, setOrganization] = useState<AdvisorOrganization | null>(null)
     const [propertyCount, setPropertyCount] = useState(0)
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -218,6 +296,29 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
+    const initializeChatRef = useRef(initializeChat)
+    const handleSendRef = useRef(handleSend)
+
+    const resetStorefrontState = () => {
+        try {
+            localStorage.removeItem(`customer_${slug}`)
+            localStorage.removeItem(`customer_name_${slug}`)
+            localStorage.removeItem(`chatId_asesor_${slug}`)
+        } catch (error) {
+            console.error("Error clearing advisor storefront state:", error)
+        }
+
+        setCustomerId(null)
+        setCustomerName(null)
+        setChatId(null)
+        setMessages([])
+    }
+
+    const redirectToChatGate = () => {
+        resetStorefrontState()
+        const storeUrl = getStoreLink("/?action=chat", isSubdomain, slug)
+        router.push(storeUrl)
+    }
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -247,7 +348,7 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                 setOrganization(data.organization)
                 setPropertyCount(data.propertyCount)
                 if (data.agent) setAgent(data.agent)
-                await initializeChat(storedCustomerId, storedChatId)
+                await initializeChatRef.current(storedCustomerId, storedChatId)
 
                 // Si viene contexto del BookingPanel o código de propiedad en el URL
                 if (!contextSentRef.current) {
@@ -267,23 +368,25 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
             setError("Error de conexión.")
             setIsInitializing(false)
         })
-    }, [slug, router])
+    }, [contextParam, isSubdomain, propertyCodeParam, router, slug])
 
     // Auto-enviar contexto del BookingPanel cuando el chat esté listo
     useEffect(() => {
         if (pendingContext && chatId && customerId && !isLoading && !isInitializing) {
             setPendingContext(null)
-            handleSend(pendingContext)
+            handleSendRef.current(pendingContext)
         }
-    }, [pendingContext, chatId, customerId, isLoading, isInitializing])
+    }, [chatId, customerId, isInitializing, isLoading, pendingContext])
 
-    const initializeChat = async (custId: string, existingChatId: string | null) => {
-        let currentChatId: string | null = null
-
+    async function initializeChat(custId: string, existingChatId: string | null) {
         if (existingChatId) {
-            const historyLoaded = await fetchHistory(existingChatId)
-            if (historyLoaded) {
+            const historyState = await fetchHistory(existingChatId)
+            if (historyState === "loaded") {
                 setChatId(existingChatId)
+                setIsInitializing(false)
+                return
+            }
+            if (historyState === "invalid-session") {
                 setIsInitializing(false)
                 return
             }
@@ -297,24 +400,18 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                 body: JSON.stringify({ customerId: custId })
             })
 
-            if (!response.ok) {
-                if (response.status === 404) {
-                    localStorage.removeItem(`customer_${slug}`)
-                    localStorage.removeItem(`customer_name_${slug}`)
-                    localStorage.removeItem(`chatId_asesor_${slug}`)
-                    const storeUrl = getStoreLink("/?action=chat", isSubdomain, slug)
-                    router.push(storeUrl)
-                    return
-                }
-                throw new Error("Failed to init chat")
+            if (response.status === 401 || response.status === 403 || response.status === 404) {
+                redirectToChatGate()
+                return
             }
 
-            const data = await response.json()
+            if (!response.ok) throw new Error("Failed to init chat")
+
+            const data = await response.json() as ChatInitResponse
             if (data.chatId) {
-                currentChatId = data.chatId
                 setChatId(data.chatId)
                 setStoredUUID(`chatId_asesor_${slug}`, data.chatId)
-                if (data.agent) setAgent((prev: any) => ({ ...prev, ...data.agent }))
+                if (data.agent) setAgent((prev) => ({ ...(prev ?? {}), ...data.agent }))
                 await fetchHistory(data.chatId)
             }
 
@@ -326,23 +423,29 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
         }
     }
 
-    const fetchHistory = async (id: string): Promise<boolean> => {
+    async function fetchHistory(id: string): Promise<"loaded" | "missing" | "invalid-session"> {
         try {
             const res = await fetch(`/api/store/${slug}/chat/${id}/messages`)
-            if (!res.ok) return false
+            if (res.status === 401 || res.status === 403) {
+                redirectToChatGate()
+                return "invalid-session"
+            }
+            if (!res.ok) return "missing"
             const historyData = await res.json()
             if (historyData.messages) {
-                setMessages(historyData.messages.map((m: any) => ({
+                setMessages((historyData.messages as StoredMessage[]).map((m) => ({
                     ...m,
                     timestamp: new Date(m.timestamp)
                 })))
-                return true
+                return "loaded"
             }
-            return false
-        } catch { return false }
+            return "missing"
+        } catch {
+            return "missing"
+        }
     }
 
-    const handleSend = async (textOverride?: string) => {
+    async function handleSend(textOverride?: string) {
         const textToSend = typeof textOverride === "string" ? textOverride : input
         if (!textToSend.trim() || isLoading || !chatId || !customerId) return
 
@@ -369,14 +472,24 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                 })
             })
 
+            if (response.status === 401 || response.status === 403) {
+                redirectToChatGate()
+                return
+            }
+
+            if (response.status === 404) {
+                localStorage.removeItem(`chatId_asesor_${slug}`)
+                setChatId(null)
+            }
+
             if (!response.ok) throw new Error("Failed to get response")
 
-            const data = await response.json()
+            const data = await response.json() as AdvisorAIResponse
 
             // Procesar acciones del AI
             let collectedProperties: PropertyCard[] = []
             let appointmentData: AppointmentCard | undefined
-            let collectedMedia: MediaAttachment[] = []
+            const collectedMedia: MediaAttachment[] = []
 
             if (data.actions && data.actions.length > 0) {
                 for (const action of data.actions) {
@@ -443,6 +556,9 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
             handleSend()
         }
     }
+
+    initializeChatRef.current = initializeChat
+    handleSendRef.current = handleSend
 
     const primaryColor = organization?.settings?.branding?.primaryColor || "#2b7cee"
     const agentName = organization?.settings?.agent?.name || agent?.name || "Asesor"
@@ -555,11 +671,11 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                                             style={msg.role === "user" ? { backgroundColor: primaryColor } : {}}>
                                             {msg.role === "user" ? msg.content : (
                                                 <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
-                                                    p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                                    a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: primaryColor }} {...props} />,
-                                                    ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-                                                    ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-                                                    strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
+                                                    p: (props) => <p className="mb-2 last:mb-0" {...props} />,
+                                                    a: (props) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium" style={{ color: primaryColor }} {...props} />,
+                                                    ul: (props) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                                                    ol: (props) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                                                    strong: (props) => <strong className="font-bold" {...props} />,
                                                 }}>
                                                     {msg.content}
                                                 </ReactMarkdown>
@@ -719,7 +835,7 @@ export default function AdvisorChatPage({ params }: { params: Promise<{ slug: st
                     </div>
 
                     <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-2 flex items-center gap-2 focus-within:ring-2 transition-all"
-                        style={{ "--tw-ring-color": `${primaryColor}30` } as any}>
+                        style={{ "--tw-ring-color": `${primaryColor}30` } as CssWithVariables}>
                         <textarea
                             className="flex-1 border-0 bg-transparent px-2 py-1 text-sm focus:ring-0 placeholder:text-gray-400 text-gray-800 dark:text-gray-200 resize-none max-h-32 scrollbar-thin"
                             placeholder="Escribe tu mensaje aquí..."

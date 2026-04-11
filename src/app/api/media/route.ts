@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
+ const MAX_FILE_SIZE = 50 * 1024 * 1024
+
+ function parseTags(tags: string[] | string | null | undefined): string[] {
+     if (Array.isArray(tags)) {
+         return tags.map(tag => tag.trim()).filter(Boolean)
+     }
+
+     if (typeof tags === "string") {
+         return tags.split(",").map(tag => tag.trim()).filter(Boolean)
+     }
+
+     return []
+ }
+
 // GET /api/media — Lista archivos media de la organización del usuario
 export async function GET() {
     const supabase = await createClient()
@@ -68,10 +82,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 })
     }
 
-    // Validar tamaño (máx 10MB)
-    const MAX_SIZE = 10 * 1024 * 1024
-    if (file.size > MAX_SIZE) {
-        return NextResponse.json({ error: "El archivo no puede superar 10MB" }, { status: 400 })
+    if (file.size > MAX_FILE_SIZE) {
+        return NextResponse.json({ error: "El archivo no puede superar 50MB" }, { status: 400 })
     }
 
     // Validar tipo de archivo
@@ -111,8 +123,7 @@ export async function POST(request: NextRequest) {
 
     const fileUrl = urlData.publicUrl
 
-    // Parsear tags
-    const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : []
+    const tags = parseTags(tagsRaw)
 
     // Insertar registro en la tabla
     const { data: mediaRecord, error: insertError } = await serviceClient
@@ -141,6 +152,61 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, media: mediaRecord })
 }
+
+export async function PATCH(request: NextRequest) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return NextResponse.json({ error: "No autenticado" }, { status: 401 })
+    }
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.organization_id) {
+        return NextResponse.json({ error: "Sin organización" }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const id = typeof body.id === "string" ? body.id : ""
+    const name = typeof body.name === "string" ? body.name : ""
+    const description = typeof body.description === "string" ? body.description : ""
+    const mediaCategory = typeof body.media_category === "string" ? body.media_category : "document"
+    const tags = parseTags(body.tags as string[] | string | null | undefined)
+
+    if (!id) {
+        return NextResponse.json({ error: "ID requerido" }, { status: 400 })
+    }
+
+    if (!name.trim()) {
+        return NextResponse.json({ error: "El nombre es requerido" }, { status: 400 })
+    }
+
+    const serviceClient = createServiceClient()
+    const { data: mediaRecord, error } = await serviceClient
+        .from("organization_media")
+        .update({
+            name: name.trim(),
+            description: description.trim() || null,
+            media_category: mediaCategory,
+            tags,
+        })
+        .eq("id", id)
+        .eq("organization_id", profile.organization_id)
+        .select("id, name, description, file_name, file_url, file_type, file_size, media_category, tags, is_active, usage_count, created_at")
+        .single()
+
+    if (error || !mediaRecord) {
+        console.error("[api/media] Update error:", error)
+        return NextResponse.json({ error: error?.message || "Error al actualizar archivo" }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, media: mediaRecord })
+ }
 
 // DELETE /api/media?id=xxx — Eliminar un archivo media
 export async function DELETE(request: NextRequest) {

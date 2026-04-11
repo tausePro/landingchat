@@ -5,7 +5,7 @@ import { getStoreLink } from "@/lib/utils/store-urls"
 import { getStoredUUID, getStoredString, setStoredUUID } from "@/lib/utils/storage"
 import { ChatLayout } from "@/components/layout/chat-layout"
 
-import { useState, useEffect, use, useRef } from "react"
+import { useState, useEffect, use, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cart-store"
 import { getStoreProducts } from "./actions"
@@ -17,6 +17,7 @@ import { CheckoutModal } from "../components/checkout-modal"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
+import type { CSSProperties } from "react"
 
 interface Product {
     id: string
@@ -48,6 +49,83 @@ interface Message {
     timestamp: Date
 }
 
+interface Agent {
+    id?: string
+    name?: string
+    avatar_url?: string | null
+    [key: string]: unknown
+}
+
+interface ChatOrganizationSettings {
+    branding?: {
+        primaryColor?: string
+        logoUrl?: string
+        [key: string]: unknown
+    }
+    storefront?: {
+        header?: {
+            showStoreName?: boolean
+            [key: string]: unknown
+        }
+        [key: string]: unknown
+    }
+    agent?: {
+        name?: string
+        avatar?: string
+        [key: string]: unknown
+    }
+    [key: string]: unknown
+}
+
+interface ChatOrganization {
+    name: string
+    slug?: string
+    settings?: ChatOrganizationSettings | null
+    [key: string]: unknown
+}
+
+interface ShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
+    default_shipping_rate: number
+}
+
+interface AddedToCartActionData {
+    product_id?: string
+    name: string
+    price: number
+    quantity?: number
+}
+
+interface ChatAction {
+    type: string
+    data?: {
+        product?: Product
+        added?: AddedToCartActionData
+        media?: MediaAttachment
+    } & Record<string, unknown>
+}
+
+interface ChatInitResponse {
+    chatId?: string
+    agent?: Agent
+}
+
+interface AIChatResponse {
+    message: string
+    actions?: ChatAction[]
+}
+
+interface StoredMessage extends Omit<Message, "timestamp"> {
+    timestamp: string
+}
+
+type CssWithVariables = CSSProperties & {
+    "--tw-ring-color"?: string
+    "--hover-color"?: string
+}
+
 export default function ChatPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = use(params)
     const isSubdomain = useIsSubdomain()
@@ -59,21 +137,42 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [isInitializing, setIsInitializing] = useState(true)
 
     const [input, setInput] = useState("")
-    const [products, setProducts] = useState<any[]>([])
-    const [agent, setAgent] = useState<any>(null)
-    const [organization, setOrganization] = useState<any>(null)
-    const [badges, setBadges] = useState<any[]>([])
-    const [promotions, setPromotions] = useState<any[]>([])
+    const [products, setProducts] = useState<Product[]>([])
+    const [agent, setAgent] = useState<Agent | null>(null)
+    const [organization, setOrganization] = useState<ChatOrganization | null>(null)
     const [messages, setMessages] = useState<Message[]>([])
     const [customerChats, setCustomerChats] = useState<Array<{ id: string; title: string; created_at: string; updated_at?: string }>>([])
-    const [shippingConfig, setShippingConfig] = useState<any>(null)
+    const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { addItem, items, removeItem, updateQuantity, clearCart, toggleCart, setIsOpen: setCartOpen, total: cartTotal } = useCartStore()
+    const { addItem, items, toggleCart, setIsOpen: setCartOpen } = useCartStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
     const processedProductIdRef = useRef<string | null>(null)
+
+    const resetStorefrontState = useCallback(() => {
+        try {
+            localStorage.removeItem(`customer_${slug}`)
+            localStorage.removeItem(`customer_name_${slug}`)
+            localStorage.removeItem(`chatId_${slug}`)
+        } catch (error) {
+            console.error("Error clearing storefront state:", error)
+        }
+
+        processedProductIdRef.current = null
+        setCustomerId(null)
+        setCustomerName(null)
+        setChatId(null)
+        setCustomerChats([])
+        setMessages([])
+    }, [slug])
+
+    const redirectToChatGate = useCallback(() => {
+        resetStorefrontState()
+        const storeUrl = getStoreLink('/?action=chat', isSubdomain, slug)
+        router.push(storeUrl)
+    }, [isSubdomain, resetStorefrontState, router, slug])
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -83,87 +182,39 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         scrollToBottom()
     }, [messages])
 
-    useEffect(() => {
-        // Evitar doble ejecución (especialmente en desarrollo con StrictMode)
-        if (initializationRef.current) return
-        initializationRef.current = true
-
-        // Verificar que el usuario esté identificado (con validación de UUID)
-        const storedCustomerId = getStoredUUID(`customer_${slug}`)
-        const storedCustomerName = getStoredString(`customer_name_${slug}`)
-        // Si no hay chatId en localStorage, será null, lo que forzará crear uno nuevo
-        const storedChatId = getStoredUUID(`chatId_${slug}`)
-
-        if (!storedCustomerId) {
-            // No identificado, redirigir al store
-            const storeUrl = getStoreLink('/?action=chat', isSubdomain, slug)
-            router.push(storeUrl)
-            return
-        }
-
-        setCustomerId(storedCustomerId)
-        setCustomerName(storedCustomerName)
-
-        // Cargar productos, agente y organización
-        getStoreProducts(slug).then(async (data) => {
-            if (data && data.organization) {
-                setProducts(data.products)
-                setOrganization(data.organization)
-                setBadges(data.badges)
-                setPromotions(data.promotions)
-                if (!agent) setAgent(data.agent)
-
-                // Cargar configuración de envío
-                try {
-                    const shippingRes = await fetch(`/api/store/${slug}/shipping-config`)
-                    if (shippingRes.ok) {
-                        const config = await shippingRes.json()
-                        setShippingConfig(config)
-                    }
-                } catch (e) {
-                    console.error("Error loading shipping config:", e)
-                }
-
-                // Inicializar chat con los productos cargados
-                initializeChat(storedCustomerId, storedChatId, data.products)
-            } else {
-                // Fallback si falla la carga de productos o no hay organización
-                console.error("No se encontró la organización o hubo un error al cargar datos.")
-                setError("No se pudo cargar la información de la tienda. Verifica que el enlace sea correcto.")
-                setIsInitializing(false)
+    const fetchHistory = useCallback(async (id: string): Promise<"loaded" | "missing" | "invalid-session"> => {
+        try {
+            const res = await fetch(`/api/store/${slug}/chat/${id}/messages`)
+            if (res.status === 401 || res.status === 403) {
+                redirectToChatGate()
+                return "invalid-session"
             }
-        }).catch(err => {
-            console.error("Error loading store data:", err)
-            setError("Ocurrió un error de conexión. Por favor intenta de nuevo.")
-            setIsInitializing(false)
-        })
-    }, [slug, router]) // Mantenemos dependencias mínimas
+            if (!res.ok) return "missing"
 
-    // Fetch customer's chat history
-    useEffect(() => {
-        if (!customerId) return
-        const fetchCustomerChats = async () => {
-            try {
-                const res = await fetch(`/api/store/${slug}/customer/${customerId}/chats`)
-                const data = await res.json()
-                if (data.chats) {
-                    setCustomerChats(data.chats)
-                }
-            } catch (e) {
-                console.error("Error fetching customer chats:", e)
+            const historyData = await res.json()
+            if (historyData.messages) {
+                const parsedMessages = (historyData.messages as StoredMessage[]).map((m) => ({
+                    ...m,
+                    timestamp: new Date(m.timestamp)
+                }))
+                setMessages(parsedMessages)
+                return "loaded"
             }
+            return "missing"
+        } catch (e) {
+            console.error("Error fetching history:", e)
+            return "missing"
         }
-        fetchCustomerChats()
-    }, [customerId, slug])
+    }, [redirectToChatGate, slug])
 
-    const initializeChat = async (custId: string, existingChatId: string | null, loadedProducts: any[]) => {
-        let currentChatId: string | null = null;
+    const initializeChat = useCallback(async (custId: string, existingChatId: string | null, loadedProducts: Product[]) => {
+        let currentChatId: string | null = null
 
         // Si hay un ID de chat existente, intentar retomarlo
         if (existingChatId) {
             const historyLoaded = await fetchHistory(existingChatId)
 
-            if (historyLoaded) {
+            if (historyLoaded === "loaded") {
                 // Chat retomado exitosamente
                 setChatId(existingChatId)
                 currentChatId = existingChatId
@@ -177,6 +228,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     return
                 }
                 // Si hay producto, continuamos para procesarlo abajo...
+            } else if (historyLoaded === "invalid-session") {
+                setIsInitializing(false)
+                return
             } else {
                 // Si falló cargar el historial (ej: chat eliminado), continuar para crear uno nuevo
                 console.log("Chat existente no válido, creando uno nuevo...")
@@ -193,21 +247,15 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     body: JSON.stringify({ customerId: custId })
                 })
 
+                if (response.status === 401 || response.status === 403 || response.status === 404) {
+                    redirectToChatGate()
+                    return
+                }
                 if (!response.ok) {
-                    // Si el cliente no existe (fue eliminado), limpiar localStorage y redirigir
-                    if (response.status === 404) {
-                        console.warn("Cliente no encontrado, limpiando sesión...")
-                        localStorage.removeItem(`customer_${slug}`)
-                        localStorage.removeItem(`customer_name_${slug}`)
-                        localStorage.removeItem(`chatId_${slug}`)
-                        const storeUrl = getStoreLink('/?action=chat', isSubdomain, slug)
-                        router.push(storeUrl)
-                        return
-                    }
                     throw new Error("Failed to init chat")
                 }
 
-                const data = await response.json()
+                const data = await response.json() as ChatInitResponse
 
                 if (data.chatId) {
                     currentChatId = data.chatId
@@ -215,7 +263,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     setStoredUUID(`chatId_${slug}`, data.chatId)
 
                     if (data.agent) {
-                        setAgent((prev: any) => ({ ...prev, ...data.agent }))
+                        setAgent((prev) => ({ ...(prev ?? {}), ...data.agent }))
                     }
 
                     // Cargar historial de mensajes (incluyendo el saludo inicial)
@@ -260,39 +308,52 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             context: context ? decodeURIComponent(context) : undefined
                         })
                     }).then(async (aiResponse) => {
-                        if (aiResponse.ok) {
-                            const aiData = await aiResponse.json()
+                        if (aiResponse.status === 401 || aiResponse.status === 403) {
+                            redirectToChatGate()
+                            return
+                        }
 
-                            // Procesar acciones (show_product)
-                            let collectedProducts: any[] = []
-                            if (aiData.actions && aiData.actions.length > 0) {
-                                for (const action of aiData.actions) {
-                                    if (action.type === 'show_product' && action.data.product) {
-                                        collectedProducts.push(action.data.product)
-                                    }
+                        if (aiResponse.status === 404) {
+                            localStorage.removeItem(`chatId_${slug}`)
+                            setChatId(null)
+                            return
+                        }
+
+                        if (!aiResponse.ok) {
+                            return
+                        }
+
+                        const aiData = await aiResponse.json() as AIChatResponse
+
+                        // Procesar acciones (show_product)
+                        const collectedProducts: Product[] = []
+                        if (aiData.actions && aiData.actions.length > 0) {
+                            for (const action of aiData.actions) {
+                                if (action.type === 'show_product' && action.data?.product) {
+                                    collectedProducts.push(action.data.product)
                                 }
                             }
+                        }
 
-                            if (collectedProducts.length > 0) {
-                                const productMsg: Message = {
-                                    id: "product-" + Date.now(),
-                                    role: 'assistant',
-                                    content: aiData.message,
-                                    products: collectedProducts.length > 1 ? collectedProducts : undefined,
-                                    product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
-                                    timestamp: new Date()
-                                }
-                                setMessages(prev => [...prev, productMsg])
-                            } else {
-                                // Si no hay productos, solo mostrar el mensaje
-                                const aiMsg: Message = {
-                                    id: "ai-init-" + Date.now(),
-                                    role: 'assistant',
-                                    content: aiData.message,
-                                    timestamp: new Date()
-                                }
-                                setMessages(prev => [...prev, aiMsg])
+                        if (collectedProducts.length > 0) {
+                            const productMsg: Message = {
+                                id: "product-" + Date.now(),
+                                role: 'assistant',
+                                content: aiData.message,
+                                products: collectedProducts.length > 1 ? collectedProducts : undefined,
+                                product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
+                                timestamp: new Date()
                             }
+                            setMessages(prev => [...prev, productMsg])
+                        } else {
+                            // Si no hay productos, solo mostrar el mensaje
+                            const aiMsg: Message = {
+                                id: "ai-init-" + Date.now(),
+                                role: 'assistant',
+                                content: aiData.message,
+                                timestamp: new Date()
+                            }
+                            setMessages(prev => [...prev, aiMsg])
                         }
                     }).catch(err => {
                         console.error("Error calling AI with product context:", err)
@@ -309,28 +370,76 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             setError("Error al conectar con el chat.")
             setIsInitializing(false)
         }
-    }
+    }, [fetchHistory, redirectToChatGate, slug])
 
-    const fetchHistory = async (id: string): Promise<boolean> => {
-        try {
-            const res = await fetch(`/api/store/${slug}/chat/${id}/messages`)
-            if (!res.ok) return false
+    useEffect(() => {
+        if (initializationRef.current) return
+        initializationRef.current = true
 
-            const historyData = await res.json()
-            if (historyData.messages) {
-                const parsedMessages = historyData.messages.map((m: any) => ({
-                    ...m,
-                    timestamp: new Date(m.timestamp)
-                }))
-                setMessages(parsedMessages)
-                return true
-            }
-            return false
-        } catch (e) {
-            console.error("Error fetching history:", e)
-            return false
+        const storedCustomerId = getStoredUUID(`customer_${slug}`)
+        const storedCustomerName = getStoredString(`customer_name_${slug}`)
+        const storedChatId = getStoredUUID(`chatId_${slug}`)
+
+        if (!storedCustomerId) {
+            const storeUrl = getStoreLink('/?action=chat', isSubdomain, slug)
+            router.push(storeUrl)
+            return
         }
-    }
+
+        setCustomerId(storedCustomerId)
+        setCustomerName(storedCustomerName)
+
+        getStoreProducts(slug).then(async (data) => {
+            if (data && data.organization) {
+                setProducts(data.products)
+                setOrganization(data.organization)
+                if (data.agent) setAgent(data.agent)
+
+                try {
+                    const shippingRes = await fetch(`/api/store/${slug}/shipping-config`)
+                    if (shippingRes.ok) {
+                        const config = await shippingRes.json() as ShippingConfig
+                        setShippingConfig(config)
+                    }
+                } catch (e) {
+                    console.error("Error loading shipping config:", e)
+                }
+
+                initializeChat(storedCustomerId, storedChatId, data.products)
+            } else {
+                console.error("No se encontró la organización o hubo un error al cargar datos.")
+                setError("No se pudo cargar la información de la tienda. Verifica que el enlace sea correcto.")
+                setIsInitializing(false)
+            }
+        }).catch(err => {
+            console.error("Error loading store data:", err)
+            setError("Ocurrió un error de conexión. Por favor intenta de nuevo.")
+            setIsInitializing(false)
+        })
+    }, [initializeChat, isSubdomain, router, slug])
+
+    useEffect(() => {
+        if (!customerId) return
+        const fetchCustomerChats = async () => {
+            try {
+                const res = await fetch(`/api/store/${slug}/customer/${customerId}/chats`)
+                if (res.status === 401 || res.status === 403) {
+                    redirectToChatGate()
+                    return
+                }
+                if (!res.ok) {
+                    return
+                }
+                const data = await res.json()
+                if (data.chats) {
+                    setCustomerChats(data.chats)
+                }
+            } catch (e) {
+                console.error("Error fetching customer chats:", e)
+            }
+        }
+        fetchCustomerChats()
+    }, [customerId, redirectToChatGate, slug])
 
     const handleSend = async (textOverride?: string) => {
         const textToSend = typeof textOverride === 'string' ? textOverride : input
@@ -371,30 +480,43 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 })
             })
 
+            if (response.status === 401 || response.status === 403) {
+                redirectToChatGate()
+                return
+            }
+            if (response.status === 404) {
+                localStorage.removeItem(`chatId_${slug}`)
+                setChatId(null)
+            }
             if (!response.ok) {
                 throw new Error('Failed to get response from AI')
             }
 
-            const data = await response.json()
+            const data = await response.json() as AIChatResponse
 
             // Process actions from AI
-            let collectedProducts: Product[] = []
-            let hasProductAction = false
-            let collectedMedia: MediaAttachment[] = []
+            const collectedProducts: Product[] = []
+            const collectedMedia: MediaAttachment[] = []
 
             if (data.actions && data.actions.length > 0) {
                 for (const action of data.actions) {
-                    if (action.type === 'show_product' && action.data.product) {
-                        hasProductAction = true
+                    if (action.type === 'show_product' && action.data?.product) {
                         collectedProducts.push(action.data.product)
-                    } else if (action.type === 'add_to_cart' && action.data.added) {
+                    } else if (action.type === 'add_to_cart' && action.data?.added) {
                         // Producto agregado al carrito
                         const addedProduct = action.data.added
+                        const matchedProduct = products.find((p) => p.name === addedProduct.name)
+                        const productId = addedProduct.product_id ?? matchedProduct?.id
+
+                        if (!productId) {
+                            continue
+                        }
+
                         addItem({
-                            id: action.data.added.product_id || products.find(p => p.name === addedProduct.name)?.id,
+                            id: productId,
                             name: addedProduct.name,
                             price: addedProduct.price,
-                            image_url: products.find(p => p.name === addedProduct.name)?.image_url
+                            image_url: matchedProduct?.image_url
                         }, addedProduct.quantity || 1)
                     } else if (action.type === 'send_media' && action.data?.media) {
                         collectedMedia.push(action.data.media as MediaAttachment)
@@ -428,7 +550,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 setMessages(prev => [...prev, aiMsg])
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error calling AI agent:', error)
             const errorMsg: Message = {
                 id: (Date.now() + 1).toString(),
@@ -461,7 +583,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const activeProducts = messages
         .filter(m => m.product || (m.products && m.products.length > 0))
         .flatMap(m => m.products || (m.product ? [m.product] : []))
-        .reduce((unique: any[], item) => {
+        .reduce<Product[]>((unique, item) => {
             return unique.some(u => u.id === item.id) ? unique : [...unique, item]
         }, [])
 
@@ -475,7 +597,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         // 2. Filter products by matching category, excluding current active products
         recommendedProducts = products.filter(p =>
             p.id !== lastActiveProduct.id && // Not the same product
-            !activeProducts.find((ap: any) => ap.id === p.id) && // Not already in conversation
+            !activeProducts.find((ap) => ap.id === p.id) && // Not already in conversation
             p.categories?.some((c: string) => lastActiveProduct.categories?.includes(c)) // Matches any category
         ).slice(0, 5)
     }
@@ -483,7 +605,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     // 3. Fallback: If not enough recommendations, fill with other available products
     if (recommendedProducts.length < 5) {
         const fallback = products.filter(p =>
-            !activeProducts.find((ap: any) => ap.id === p.id) &&
+            !activeProducts.find((ap) => ap.id === p.id) &&
             !recommendedProducts.find(rp => rp.id === p.id)
         ).slice(0, 5 - recommendedProducts.length)
 
@@ -537,7 +659,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             const res = await fetch(`/api/store/${slug}/customer/${customerId}/chats/${deleteChatId}`, {
                 method: 'DELETE'
             })
-            if (res.ok) {
+            if (res.status === 401 || res.status === 403) {
+                redirectToChatGate()
+                return
+            }
+            if (res.ok || res.status === 404) {
                 // Remove from local state
                 setCustomerChats(prev => prev.filter(c => c.id !== deleteChatId))
                 // If we deleted the current chat, start a new one
@@ -689,14 +815,14 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                     <ReactMarkdown
                                                         remarkPlugins={[remarkGfm]}
                                                         components={{
-                                                            p: ({ node, ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                                            a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium hover:opacity-80" style={{ color: primaryColor }} {...props} />,
-                                                            ul: ({ node, ...props }) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
-                                                            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
-                                                            li: ({ node, ...props }) => <li className="" {...props} />,
-                                                            strong: ({ node, ...props }) => <strong className="font-bold" {...props} />,
-                                                            em: ({ node, ...props }) => <em className="italic" {...props} />,
-                                                            blockquote: ({ node, ...props }) => <blockquote className="border-l-2 pl-3 italic text-gray-500 dark:text-gray-400 my-2" style={{ borderColor: `${primaryColor}50` }} {...props} />,
+                                                            p: (props) => <p className="mb-2 last:mb-0" {...props} />,
+                                                            a: (props) => <a target="_blank" rel="noopener noreferrer" className="underline font-medium hover:opacity-80" style={{ color: primaryColor }} {...props} />,
+                                                            ul: (props) => <ul className="list-disc pl-4 mb-2 space-y-1" {...props} />,
+                                                            ol: (props) => <ol className="list-decimal pl-4 mb-2 space-y-1" {...props} />,
+                                                            li: (props) => <li className="" {...props} />,
+                                                            strong: (props) => <strong className="font-bold" {...props} />,
+                                                            em: (props) => <em className="italic" {...props} />,
+                                                            blockquote: (props) => <blockquote className="border-l-2 pl-3 italic text-gray-500 dark:text-gray-400 my-2" style={{ borderColor: `${primaryColor}50` }} {...props} />,
                                                         }}
                                                     >
                                                         {msg.content}
@@ -869,7 +995,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-100 via-purple-50 to-indigo-100 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 rounded-2xl opacity-50 blur-sm pointer-events-none"></div>
 
                         <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-2 flex items-center gap-2 focus-within:ring-2 transition-all"
-                            style={{ '--tw-ring-color': `${primaryColor}30` } as any}
+                            style={{ '--tw-ring-color': `${primaryColor}30` } as CssWithVariables}
                         >
                             <div className="flex-1 px-2 py-1">
                                 <textarea
@@ -886,7 +1012,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                             <div className="flex items-center gap-1 border-l border-gray-100 dark:border-gray-700 pl-2">
                                 <button className="p-2 text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl transition-colors" title="Adjuntar imagen (Próximamente)"
-                                    style={{ '--hover-color': primaryColor } as any}
+                                    style={{ '--hover-color': primaryColor } as CssWithVariables}
                                     onMouseEnter={(e) => e.currentTarget.style.color = primaryColor}
                                     onMouseLeave={(e) => e.currentTarget.style.color = ''}
                                 >

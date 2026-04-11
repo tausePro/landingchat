@@ -9,6 +9,15 @@ import { EpaycoGateway } from "./epayco-gateway"
 import { decrypt } from "@/lib/utils/encryption"
 import type { GatewayConfig } from "./types"
 
+function buildPaymentStatusUrl(returnUrl: string, status: "success" | "error" | "pending") {
+  const url = new URL(returnUrl)
+  const pathname = url.pathname.replace(/\/$/, "")
+
+  url.pathname = `${pathname}/${status}`
+
+  return url.toString()
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -55,16 +64,13 @@ export class PaymentService {
       }
 
       // 2. Generate return URLs for success/error/pending
-      const baseReturnUrl = params.returnUrl.replace(/\/$/, "") // Remove trailing slash
-      const successUrl = `${baseReturnUrl}/success`
-      const errorUrl = `${baseReturnUrl}/error`
-      const pendingUrl = `${baseReturnUrl}/pending`
+      const successUrl = buildPaymentStatusUrl(params.returnUrl, "success")
 
       // 3. Initiate payment based on provider
       if (config.provider === "wompi") {
-        return await this.initiateWompiPayment(config, params, successUrl, errorUrl, pendingUrl)
+        return await this.initiateWompiPayment(config, params, successUrl)
       } else if (config.provider === "epayco") {
-        return await this.initiateEpaycoPayment(config, params, successUrl, errorUrl, pendingUrl)
+        return await this.initiateEpaycoPayment(config, params, successUrl)
       }
 
       return {
@@ -143,9 +149,7 @@ export class PaymentService {
   private async initiateWompiPayment(
     config: GatewayConfig,
     params: InitiatePaymentParams,
-    successUrl: string,
-    errorUrl: string,
-    _pendingUrl: string
+    successUrl: string
   ): Promise<PaymentResponse> {
     try {
       const gateway = new WompiGateway(config)
@@ -191,9 +195,7 @@ export class PaymentService {
   private async initiateEpaycoPayment(
     config: GatewayConfig,
     params: InitiatePaymentParams,
-    successUrl: string,
-    errorUrl: string,
-    _pendingUrl: string
+    successUrl: string
   ): Promise<PaymentResponse> {
     try {
       const gateway = new EpaycoGateway(config)

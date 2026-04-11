@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { CustomerGateModal } from "@/components/store/customer-gate-modal"
 import { TemplateRenderer } from "@/components/store/templates/template-renderer"
-import { StoreHeader } from "@/components/store/store-header"
 import { EnhancedStoreHeader } from "@/components/store/enhanced-store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl } from "@/lib/utils/store-urls"
@@ -19,18 +17,84 @@ import { useTrackingParams } from "@/hooks/use-tracking-params"
 import { ConversationalLayout } from "@/components/store/layouts/conversational-layout"
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
-import { getSafeStorefrontTemplate, isRealEstateIndustry } from "@/lib/storefront-templates"
+import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
 
 // ... (in render)
 
+interface StoreMenuItem {
+    id: string
+    label: string
+    url: string
+}
 
+interface OrganizationSettings {
+    industry?: string | null
+    branding?: {
+        primaryColor?: string
+        [key: string]: unknown
+    }
+    storefront?: {
+        hero?: Record<string, unknown>
+        typography?: {
+            fontFamily?: string
+            [key: string]: unknown
+        }
+        header?: {
+            showStoreName?: boolean
+            menuItems?: StoreMenuItem[]
+            [key: string]: unknown
+        }
+        template?: string
+        [key: string]: unknown
+    }
+    whatsapp?: {
+        phone?: string
+        [key: string]: unknown
+    }
+    [key: string]: unknown
+}
+
+interface StoreOrganization extends StorefrontTemplateContext {
+    slug: string
+    name: string
+    logo_url?: string | null
+    settings?: OrganizationSettings | null
+}
+
+interface StoreProduct extends Record<string, unknown> {
+    id: string
+    name: string
+    price: number
+    image_url: string
+    slug: string
+}
+
+interface ShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
+    default_shipping_rate: number
+}
+
+interface HeaderShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount?: number
+    default_shipping_rate?: number
+}
+
+interface IdentifiedCustomer {
+    id: string
+    full_name: string
+    phone: string
+    email?: string
+}
 
 interface StoreLayoutClientProps {
     slug: string
-    organization: any
-    products: any[]
-    properties?: any[]
-    badges?: any[]
+    organization: StoreOrganization
+    products: StoreProduct[]
+    properties?: Array<Record<string, unknown>>
+    badges?: Array<Record<string, unknown>>
     pages?: Array<{ id: string; slug: string; title: string }>
     children?: React.ReactNode
     hideNavigation?: boolean
@@ -53,7 +117,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
-    const [shippingConfig, setShippingConfig] = useState<any>(null)
+    const [shippingConfig, setShippingConfig] = useState<ShippingConfig | undefined>(undefined)
     const { setIsOpen: setCartOpen, setOrganizationSlug } = useCartStore()
 
     // Clear cart if switching organizations
@@ -79,6 +143,13 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const headerSettings = storefrontSettings.header || {}
     const selectedTemplate = getSafeStorefrontTemplate(storefrontSettings.template, organization)
     const showStoreName = headerSettings.showStoreName ?? true
+    const headerShippingConfig: HeaderShippingConfig | undefined = shippingConfig
+        ? {
+            free_shipping_enabled: shippingConfig.free_shipping_enabled,
+            free_shipping_min_amount: shippingConfig.free_shipping_min_amount ?? undefined,
+            default_shipping_rate: shippingConfig.default_shipping_rate ?? undefined,
+        }
+        : undefined
 
     // Defaults de menú según vertical (el admin puede personalizar)
     const defaultMenuItems = isRealEstate
@@ -101,7 +172,15 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
             try {
                 const response = await fetch(`/api/store/${slug}/shipping-config`)
                 if (response.ok) {
-                    const config = await response.json()
+                    const rawConfig = await response.json() as Omit<ShippingConfig, "default_shipping_rate"> & {
+                        default_shipping_rate: number | null
+                    }
+
+                    const config: ShippingConfig = {
+                        ...rawConfig,
+                        default_shipping_rate: rawConfig.default_shipping_rate ?? 0,
+                    }
+
                     setShippingConfig(config)
                 }
             } catch (error) {
@@ -132,12 +211,16 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                 router.push(chatUrl)
             } else {
                 // No identificado, guardar contexto y mostrar modal
-                if (productId) setPendingProductId(productId)
-                if (context) setPendingContext(context)
-                setShowGateModal(true)
+                const frameId = window.requestAnimationFrame(() => {
+                    if (productId) setPendingProductId(productId)
+                    if (context) setPendingContext(context)
+                    setShowGateModal(true)
+                })
+
+                return () => window.cancelAnimationFrame(frameId)
             }
         }
-    }, [searchParams, organization.slug, router, isSubdomain])
+    }, [searchParams, organization.slug, router, isSubdomain, isRealEstate])
 
     const handleStartChat = (productId?: string, query?: string) => {
         // Verificar si ya está identificado (con validación de UUID)
@@ -164,7 +247,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
         }
     }
 
-    const handleCustomerIdentified = (customer: any) => {
+    const handleCustomerIdentified = (customer: IdentifiedCustomer) => {
         // Guardar en localStorage (con validación)
         setStoredUUID(`customer_${organization.slug}`, customer.id)
         setStoredString(`customer_name_${organization.slug}`, customer.full_name)
@@ -172,10 +255,17 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
         // Identificar en PostHog
         const posthog = ensurePosthog()
         if (posthog) {
-            posthog.identify(customer.id, {
-                email: customer.email,
+            const posthogPersonProperties: Record<string, string> = {
                 name: customer.full_name,
                 phone: customer.phone
+            }
+
+            if (typeof customer.email === "string" && customer.email.length > 0) {
+                posthogPersonProperties.email = customer.email
+            }
+
+            posthog.identify(customer.id, {
+                ...posthogPersonProperties
             })
         }
 
@@ -210,7 +300,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     showStoreName={showStoreName}
                     menuItems={menuItems}
                     hideOnMobile={hideHeaderOnMobile}
-                    shippingConfig={shippingConfig}
+                    shippingConfig={headerShippingConfig}
                     isRealEstate={isRealEstate}
                 />
             )}
@@ -237,7 +327,6 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                 isOpen={showGateModal}
                 onClose={() => setShowGateModal(false)}
                 slug={slug}
-                organizationName={organization.name}
                 onIdentified={handleCustomerIdentified}
             />
 

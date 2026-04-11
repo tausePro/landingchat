@@ -3,9 +3,10 @@ import { z } from "zod"
 import { chatInitRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { createServiceClient } from "@/lib/supabase/server"
 import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
+import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 
 const chatInitSchema = z.object({
-    customerId: z.string().uuid("Customer ID inválido")
+    customerId: z.string().uuid("Customer ID inválido").optional()
 })
 
 export async function POST(
@@ -38,7 +39,7 @@ export async function POST(
             )
         }
 
-        const { customerId } = validation.data
+        const { customerId: requestedCustomerId } = validation.data
 
         const supabase = createServiceClient()
 
@@ -48,10 +49,23 @@ export async function POST(
             return NextResponse.json({ error: "Tienda no encontrada" }, { status: 404 })
         }
 
+        const storefrontSession = await getValidatedStorefrontCustomerSession({
+            slug,
+            organizationId: organization.id,
+        })
+
+        if (!storefrontSession) {
+            return NextResponse.json({ error: "Sesión inválida o expirada" }, { status: 401, headers })
+        }
+
+        if (requestedCustomerId && requestedCustomerId !== storefrontSession.customerId) {
+            return NextResponse.json({ error: "Sesión inválida o expirada" }, { status: 403, headers })
+        }
+
         const { data: customer } = await supabase
             .from("customers")
             .select("id, full_name, total_orders")
-            .eq("id", customerId)
+            .eq("id", storefrontSession.customerId)
             .eq("organization_id", organization.id)
             .single()
 
@@ -90,7 +104,7 @@ export async function POST(
         const firstName = customer.full_name.split(" ")[0]
         const isReturning = (customer.total_orders || 0) > 0
 
-        let greeting = isReturning
+        const greeting = isReturning
             ? `¡Hola ${firstName}! Qué gusto verte de nuevo. ¿En qué puedo ayudarte hoy?`
             : `¡Hola ${firstName}! Bienvenido/a a ${organization.name}. Soy ${agent.name}, ¿qué estás buscando hoy?`
 
@@ -112,7 +126,7 @@ export async function POST(
             }
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Error initializing chat:", error)
         return NextResponse.json({ error: "Error interno" }, { status: 500 })
     }

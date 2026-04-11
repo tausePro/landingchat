@@ -1,10 +1,17 @@
 "use server"
 
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
 import { calculateTaxForItems, buildProductTaxMap, type OrgTaxSettings } from "@/lib/utils/tax"
+import { getPhoneVariants, normalizePhone } from "@/lib/utils/phone"
+import {
+    appendStorefrontAccessParam,
+    createStorefrontOrderAccessToken,
+    getStorefrontCustomerSession,
+    setStorefrontCustomerSession,
+} from "@/lib/storefrontAccess"
 
 interface CreateOrderParams {
     slug: string
@@ -47,7 +54,6 @@ interface CreateOrderParams {
         referrer?: string
     }
 }
-
 
 /**
  * Calculate order totals including tax and fees
@@ -209,8 +215,6 @@ export async function getShippingConfig(slug: string) {
     }
 }
 
-
-
 /**
  * Get available payment gateways for organization
  */
@@ -290,7 +294,6 @@ export async function getManualPaymentInfo(slug: string) {
         return { success: false, error: "Error inesperado", data: null }
     }
 }
-
 
 /**
  * Validate a coupon code for a given organization and subtotal
@@ -402,32 +405,147 @@ export async function createOrder(params: CreateOrderParams) {
             return { success: false, error: "Organización no encontrada" }
         }
 
-        // 2. Create/Update Customer (Upsert by email)
-        const { data: customer, error: customerError } = await supabase
-            .from("customers")
-            .upsert({
-                organization_id: org.id,
-                email: params.customerInfo.email,
-                phone: params.customerInfo.phone,
-                full_name: params.customerInfo.name,
-                // Tax/Invoicing fields
-                document_type: params.customerInfo.document_type,
-                document_number: params.customerInfo.document_number,
-                person_type: params.customerInfo.person_type,
-                business_name: params.customerInfo.business_name,
-                metadata: {
-                    address: params.customerInfo.address,
-                    city: params.customerInfo.city,
-                    state: params.customerInfo.state
-                }
-            }, { onConflict: 'organization_id, email' })
-            .select()
-            .single()
-
-        if (customerError) {
-            console.error("[createOrder] Error creating customer:", customerError)
-            // Continue with order creation even if customer upsert fails
+        const normalizedEmail = params.customerInfo.email.trim().toLowerCase()
+        const canonicalPhone = normalizePhone(params.customerInfo.phone)
+        const phoneVariants = getPhoneVariants(params.customerInfo.phone)
+        const storefrontSession = await getStorefrontCustomerSession(params.slug)
+        let storefrontCustomerId: string | null = null
+        type ExistingCustomer = {
+            id: string
+            metadata: Record<string, unknown> | null
+            email: string | null
+            phone: string | null
         }
+
+        if (storefrontSession && storefrontSession.organizationId === org.id) {
+            storefrontCustomerId = storefrontSession.customerId
+        }
+
+        let sessionCustomer: ExistingCustomer | null = null
+        let phoneCustomer: ExistingCustomer | null = null
+        let emailCustomer: ExistingCustomer | null = null
+
+        if (storefrontCustomerId) {
+            const { data: sessionCustomerData } = await supabase
+                .from("customers")
+                .select("id, metadata, email, phone")
+                .eq("id", storefrontCustomerId)
+                .eq("organization_id", org.id)
+                .maybeSingle()
+
+            if (sessionCustomerData) {
+                sessionCustomer = sessionCustomerData
+            }
+        }
+
+        if (normalizedEmail) {
+            const { data: emailCustomerData } = await supabase
+                .from("customers")
+                .select("id, metadata, email, phone")
+                .eq("organization_id", org.id)
+                .eq("email", normalizedEmail)
+                .order("created_at", { ascending: true })
+                .limit(1)
+                .maybeSingle()
+
+            if (emailCustomerData) {
+                emailCustomer = emailCustomerData
+            }
+        }
+
+        const { data: phoneCustomers } = await supabase
+            .from("customers")
+            .select("id, metadata, email, phone")
+            .eq("organization_id", org.id)
+            .in("phone", phoneVariants)
+            .order("created_at", { ascending: true })
+            .limit(1)
+
+        if (phoneCustomers?.[0]) {
+            phoneCustomer = phoneCustomers[0]
+        }
+
+        const matchedCustomer = phoneCustomer ?? sessionCustomer ?? emailCustomer
+        const conflictingEmailCustomer = emailCustomer && matchedCustomer && emailCustomer.id !== matchedCustomer.id
+            ? emailCustomer
+            : null
+
+        const customerPayload: Record<string, unknown> = {
+            organization_id: org.id,
+            phone: canonicalPhone,
+            full_name: params.customerInfo.name.trim(),
+            document_type: params.customerInfo.document_type,
+            document_number: params.customerInfo.document_number,
+            person_type: params.customerInfo.person_type,
+            business_name: params.customerInfo.business_name,
+            metadata: {
+                ...(matchedCustomer?.metadata || {}),
+                address: params.customerInfo.address,
+                city: params.customerInfo.city,
+                state: params.customerInfo.state,
+            }
+        }
+
+        if (normalizedEmail && !conflictingEmailCustomer) {
+            customerPayload.email = normalizedEmail
+        }
+
+        let customer: { id: string } | null = matchedCustomer ? { id: matchedCustomer.id } : null
+
+        if (matchedCustomer) {
+            const { data: updatedCustomer, error: customerUpdateError } = await supabase
+                .from("customers")
+                .update(customerPayload)
+                .eq("id", matchedCustomer.id)
+                .eq("organization_id", org.id)
+                .select("id")
+                .single()
+
+            if (customerUpdateError) {
+                console.error("[createOrder] Error updating customer:", customerUpdateError)
+            } else {
+                customer = updatedCustomer
+            }
+        } else {
+            const { data: createdCustomer, error: customerCreateError } = await supabase
+                .from("customers")
+                .insert(customerPayload)
+                .select("id")
+                .single()
+
+            if (customerCreateError) {
+                console.error("[createOrder] Error creating customer:", customerCreateError)
+
+                const { data: recoveredPhoneCustomers } = await supabase
+                    .from("customers")
+                    .select("id")
+                    .eq("organization_id", org.id)
+                    .in("phone", phoneVariants)
+                    .order("created_at", { ascending: true })
+                    .limit(1)
+
+                if (recoveredPhoneCustomers?.[0]) {
+                    customer = recoveredPhoneCustomers[0]
+                } else if (normalizedEmail) {
+                    const { data: recoveredEmailCustomer } = await supabase
+                        .from("customers")
+                        .select("id")
+                        .eq("organization_id", org.id)
+                        .eq("email", normalizedEmail)
+                        .order("created_at", { ascending: true })
+                        .limit(1)
+                        .maybeSingle()
+
+                    if (recoveredEmailCustomer) {
+                        customer = recoveredEmailCustomer
+                    }
+                }
+            } else {
+                customer = createdCustomer
+            }
+        }
+
+        const resolvedCustomerId = customer?.id ?? null
 
         // 3. Generate unique order number
         const orderNumber = generateOrderNumber()
@@ -495,10 +613,13 @@ export async function createOrder(params: CreateOrderParams) {
             .from("orders")
             .insert({
                 organization_id: org.id,
-                customer_id: customer?.id,
+                customer_id: resolvedCustomerId,
                 order_number: orderNumber,
                 customer_info: {
                     ...params.customerInfo,
+                    name: params.customerInfo.name.trim(),
+                    email: normalizedEmail || null,
+                    phone: canonicalPhone,
                     payment_method_fee: paymentMethodFee > 0 ? paymentMethodFee : undefined,
                     coupon_code: params.couponCode || undefined,
                     discount_amount: discountAmount > 0 ? discountAmount : undefined
@@ -523,6 +644,21 @@ export async function createOrder(params: CreateOrderParams) {
             console.error("[createOrder] Error creating order:", orderError)
             return { success: false, error: "Error al crear la orden" }
         }
+
+        if (resolvedCustomerId) {
+            await setStorefrontCustomerSession({
+                slug: params.slug,
+                organizationId: org.id,
+                customerId: resolvedCustomerId,
+            })
+        }
+
+        const orderAccessToken = createStorefrontOrderAccessToken({
+            slug: params.slug,
+            organizationId: org.id,
+            orderId: order.id,
+            customerId: order.customer_id || resolvedCustomerId,
+        })
 
         // Increment coupon usage if coupon was applied
         if (params.couponCode) {
@@ -581,7 +717,7 @@ export async function createOrder(params: CreateOrderParams) {
                 customerDocument: params.customerInfo.document_number,
                 customerDocumentType: params.customerInfo.document_type,
                 customerPhone: params.customerInfo.phone,
-                returnUrl: `${baseUrl}/order/${order.id}`,
+                returnUrl: appendStorefrontAccessParam(`${baseUrl}/order/${order.id}`, orderAccessToken),
                 paymentMethod: params.paymentMethod as "wompi" | "epayco"
             })
 
@@ -607,12 +743,24 @@ export async function createOrder(params: CreateOrderParams) {
             // Get organization details for notifications
             const { data: orgDetails } = await supabase
                 .from("organizations")
-                .select("name, contact_email")
+                .select("name, contact_email, custom_domain")
                 .eq("id", org.id)
                 .single()
 
             const organizationName = orgDetails?.name || "Tu Tienda"
             const ownerEmail = orgDetails?.contact_email
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'
+
+            let storeUrl: string
+            if (orgDetails?.custom_domain) {
+                storeUrl = `https://${orgDetails.custom_domain}`
+            } else if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
+                storeUrl = `${appUrl}/store/${params.slug}`
+            } else {
+                storeUrl = `https://${params.slug}.landingchat.co`
+            }
+
+            const orderUrl = appendStorefrontAccessParam(`${storeUrl}/order/${order.id}`, orderAccessToken)
 
             // Send WhatsApp notification to store owner
             console.log("[createOrder] Sending WhatsApp notification for order:", orderNumber)
@@ -636,7 +784,8 @@ export async function createOrder(params: CreateOrderParams) {
                 items: params.items,
                 paymentMethod: params.paymentMethod,
                 organizationName: organizationName,
-                storeUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'}/store/${params.slug}`
+                storeUrl,
+                orderUrl,
             })
 
             // Send email notification to store owner
