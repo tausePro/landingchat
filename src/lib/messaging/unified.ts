@@ -109,8 +109,8 @@ export async function processIncomingMessage(
 
                 if (channelSchedule) {
                     const isOutsideHours = isOutsideSchedule(channelSchedule, schedule.timezone || "America/Bogota")
-                    if (!isOutsideHours) {
-                        log.info("AI paused by schedule", { chatId: message.chatId, channel: message.channel, agentId })
+                    if (isOutsideHours) {
+                        log.info("AI paused by schedule (outside working hours)", { chatId: message.chatId, channel: message.channel, agentId })
                         return {
                             success: true,
                             response: undefined,

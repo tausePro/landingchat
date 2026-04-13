@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger"
 import { createManagedAppointment, getAppointmentAvailability } from "@/lib/appointments/service"
-import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
+import { createAppointmentDate, formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import {
     ConfirmShippingDetailsSchema,
     EscalateToHumanSchema,
@@ -573,9 +573,24 @@ const scheduleAppointment: ToolHandler = async (supabase, input, context) => {
 
     apptLog.debug("Validated input", { title: validated.title, date: validated.proposed_date })
 
-    const proposedDate = new Date(validated.proposed_date)
+    // Interpretar la fecha como hora Colombia (America/Bogota), no como UTC
+    // El AI genera "2026-04-14T10:00:00" queriendo decir 10am Colombia,
+    // pero new Date() lo interpreta como UTC (5am Colombia)
+    let proposedDate: Date
+    const rawDate = validated.proposed_date
+    const dateMatch = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(rawDate)
+    if (dateMatch) {
+        const dateKey = `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+        const hour = parseInt(dateMatch[4], 10)
+        const minute = parseInt(dateMatch[5], 10)
+        proposedDate = createAppointmentDate(dateKey, hour, minute)
+        apptLog.debug("Date interpreted as Colombia time", { raw: rawDate, interpreted: proposedDate.toISOString() })
+    } else {
+        proposedDate = new Date(rawDate)
+    }
+
     if (isNaN(proposedDate.getTime())) {
-        apptLog.warn("Invalid date", { date: validated.proposed_date })
+        apptLog.warn("Invalid date", { date: rawDate })
         return { success: false, error: "Fecha inválida. Usa formato ISO 8601 (ej: 2025-02-20T10:00:00)" }
     }
 
