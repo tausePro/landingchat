@@ -12,6 +12,7 @@ interface WompiConfigInput {
     public_key: string
     private_key: string
     integrity_secret: string
+    events_secret?: string
 }
 
 /**
@@ -85,6 +86,9 @@ export async function saveWompiConfig(input: WompiConfigInput): Promise<ActionRe
         const encryptedIntegritySecret = input.integrity_secret
             ? encrypt(input.integrity_secret)
             : null
+        const encryptedEventsSecret = input.events_secret
+            ? encrypt(input.events_secret)
+            : null
 
         // Generar URL de webhook
         const { data: org } = await supabase
@@ -105,6 +109,7 @@ export async function saveWompiConfig(input: WompiConfigInput): Promise<ActionRe
             public_key: input.public_key,
             private_key_encrypted: encryptedPrivateKey,
             integrity_secret_encrypted: encryptedIntegritySecret,
+            events_secret_encrypted: encryptedEventsSecret,
             webhook_url: webhookUrl,
             updated_at: new Date().toISOString(),
         }

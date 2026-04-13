@@ -18,6 +18,7 @@ interface WompiConfig {
     publicKey: string
     privateKey: string
     integritySecret: string
+    eventsSecret: string
 }
 
 export function WompiSettings() {
@@ -36,6 +37,7 @@ export function WompiSettings() {
         publicKey: "",
         privateKey: "",
         integritySecret: "",
+        eventsSecret: "",
     })
 
     useEffect(() => {
@@ -53,6 +55,7 @@ export function WompiSettings() {
                     publicKey: (data.public_key as string) || "",
                     privateKey: "",
                     integritySecret: "",
+                    eventsSecret: "",
                 })
                 setHasExistingCredentials(!!(data.private_key_encrypted))
                 setWebhookUrl((data.webhook_url as string) || null)
@@ -87,6 +90,7 @@ export function WompiSettings() {
                 public_key: config.publicKey,
                 private_key: config.privateKey,
                 integrity_secret: config.integritySecret,
+                events_secret: config.eventsSecret,
             })
 
             if (result.success) {
@@ -291,7 +295,7 @@ export function WompiSettings() {
                     {/* Integrity Secret */}
                     <div className="space-y-2">
                         <Label htmlFor="integritySecret">
-                            Secreto de Integridad (Events)
+                            Secreto de Integridad
                             {hasExistingCredentials && (
                                 <span className="ml-2 text-xs text-slate-400">(opcional — deja vacío para mantener)</span>
                             )}
@@ -302,7 +306,7 @@ export function WompiSettings() {
                                 type={showIntegritySecret ? "text" : "password"}
                                 value={config.integritySecret}
                                 onChange={(e) => setConfig((prev) => ({ ...prev, integritySecret: e.target.value }))}
-                                placeholder={hasExistingCredentials ? "••••••••••••••••" : "Secreto para validar webhooks"}
+                                placeholder={hasExistingCredentials ? "••••••••••••••••" : config.isTestMode ? "test_integrity_xxxxx" : "prod_integrity_xxxxx"}
                             />
                             <Button
                                 type="button"
@@ -315,7 +319,38 @@ export function WompiSettings() {
                             </Button>
                         </div>
                         <p className="text-xs text-slate-500">
-                            Necesario para validar webhooks. Encuéntralo en Wompi → Configuración → Events
+                            Necesario para el checkout. Encuéntralo en Wompi → Desarrolladores → Secretos → Integridad
+                        </p>
+                    </div>
+
+                    {/* Events Secret */}
+                    <div className="space-y-2">
+                        <Label htmlFor="eventsSecret">
+                            Secreto de Eventos
+                            {hasExistingCredentials && (
+                                <span className="ml-2 text-xs text-slate-400">(opcional — deja vacío para mantener)</span>
+                            )}
+                        </Label>
+                        <div className="relative">
+                            <Input
+                                id="eventsSecret"
+                                type={showIntegritySecret ? "text" : "password"}
+                                value={config.eventsSecret}
+                                onChange={(e) => setConfig((prev) => ({ ...prev, eventsSecret: e.target.value }))}
+                                placeholder={hasExistingCredentials ? "••••••••••••••••" : config.isTestMode ? "test_events_xxxxx" : "prod_events_xxxxx"}
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3"
+                                onClick={() => setShowIntegritySecret(!showIntegritySecret)}
+                            >
+                                {showIntegritySecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <p className="text-xs text-slate-500">
+                            Necesario para validar webhooks. Encuéntralo en Wompi → Desarrolladores → Secretos → Eventos
                         </p>
                     </div>
 

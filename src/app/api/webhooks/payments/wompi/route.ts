@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         const orgSlug = url.searchParams.get("org")
 
         if (!orgSlug) {
-            await logWebhook(supabase, null, "wompi", "error", null, { error: "Missing org parameter" })
+            await logWebhook(supabase, "wompi", "error", null, { error: "Missing org parameter" })
             return NextResponse.json(
                 { error: "Missing org parameter" },
                 { status: 400 }
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
             .single()
 
         if (!org) {
-            await logWebhook(supabase, null, "wompi", "error", payload, { error: "Organization not found" })
+            await logWebhook(supabase, "wompi", "error", payload, { error: "Organization not found" })
             return NextResponse.json(
                 { error: "Organization not found" },
                 { status: 404 }
@@ -71,32 +71,33 @@ export async function POST(request: Request) {
             .single()
 
         if (!config) {
-            await logWebhook(supabase, org.id, "wompi", "error", payload, { error: "Payment gateway not configured" })
+            await logWebhook(supabase, "wompi", "error", payload, { error: "Payment gateway not configured" })
             return NextResponse.json(
                 { error: "Payment gateway not configured" },
                 { status: 400 }
             )
         }
 
-        // Validar firma del webhook
-        if (config.integrity_secret_encrypted) {
-            const integritySecret = decrypt(config.integrity_secret_encrypted)
-            const privateKey = config.private_key_encrypted
-                ? decrypt(config.private_key_encrypted)
-                : ""
+        // Validar firma del webhook usando el secreto de eventos (prod_events_...)
+        // Según docs Wompi: https://docs.wompi.co/docs/colombia/eventos/
+        // El secreto de eventos es diferente al de integridad del widget
+        const eventsSecret = config.events_secret_encrypted
+            ? decrypt(config.events_secret_encrypted)
+            : null
 
+        if (eventsSecret) {
             const gateway = new WompiGateway({
                 provider: "wompi",
                 publicKey: config.public_key || "",
-                privateKey,
-                integritySecret,
+                privateKey: "",
+                integritySecret: eventsSecret,
                 isTestMode: config.is_test_mode,
             })
 
             const isValid = gateway.validateWebhookSignature(payload, "", "")
             if (!isValid) {
                 console.error("[Wompi Webhook] Invalid signature")
-                await logWebhook(supabase, org.id, "wompi", "error", payload, { error: "Invalid signature" })
+                await logWebhook(supabase, "wompi", "error", payload, { error: "Invalid signature" })
                 return NextResponse.json(
                     { error: "Invalid signature" },
                     { status: 401 }
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
             // Idempotencia: si el estado ya es el mismo, no hacer nada
             if (existingTx.status === status) {
                 console.log(`[Wompi Webhook] Duplicate webhook for transaction ${transaction.id}, status already ${status}`)
-                await logWebhook(supabase, org.id, "wompi", "duplicate", payload, { 
+                await logWebhook(supabase, "wompi", "duplicate", payload, { 
                     message: "Duplicate webhook, no action taken",
                     transactionId: existingTx.id 
                 })
@@ -142,7 +143,7 @@ export async function POST(request: Request) {
                 await processOrderUpdate(supabase, existingTx.order_id, status, org.id)
             }
 
-            await logWebhook(supabase, org.id, "wompi", "success", payload, { 
+            await logWebhook(supabase, "wompi", "success", payload, { 
                 transactionId: existingTx.id,
                 orderId: existingTx.order_id,
                 status,
@@ -174,18 +175,28 @@ export async function POST(request: Request) {
                     await processOrderUpdate(supabase, txByRef.order_id, status, org.id)
                 }
 
-                await logWebhook(supabase, org.id, "wompi", "success", payload, { 
+                await logWebhook(supabase, "wompi", "success", payload, { 
                     transactionId: txByRef.id,
                     orderId: txByRef.order_id,
                     status,
                     processingTime: Date.now() - startTime
                 })
             } else {
-                // Crear nueva transacción (caso raro, pero posible)
+                // No hay transacción previa - buscar la orden directamente por reference (orderId)
+                // El reference es el UUID de la orden que pasamos al widget de Wompi
+                const { data: order } = await supabase
+                    .from("orders")
+                    .select("id, organization_id")
+                    .eq("id", transaction.reference)
+                    .eq("organization_id", org.id)
+                    .single()
+
+                // Crear nueva transacción con el order_id si encontramos la orden
                 const { data: newTx } = await supabase
                     .from("store_transactions")
                     .insert({
                         organization_id: org.id,
+                        order_id: order?.id || null,
                         amount: transaction.amount_in_cents,
                         currency: transaction.currency,
                         status,
@@ -199,10 +210,16 @@ export async function POST(request: Request) {
                     .select("id")
                     .single()
 
-                await logWebhook(supabase, org.id, "wompi", "success", payload, { 
+                // Si encontramos la orden, actualizarla
+                if (order) {
+                    await processOrderUpdate(supabase, order.id, status, org.id)
+                }
+
+                await logWebhook(supabase, "wompi", "success", payload, { 
                     transactionId: newTx?.id,
+                    orderId: order?.id,
                     status,
-                    note: "New transaction created from webhook",
+                    note: order ? "New transaction created and order updated" : "New transaction created (order not found)",
                     processingTime: Date.now() - startTime
                 })
             }
@@ -211,7 +228,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ received: true })
     } catch (error) {
         console.error("[Wompi Webhook] Error:", error)
-        await logWebhook(supabase, null, "wompi", "error", null, { 
+        await logWebhook(supabase, "wompi", "error", null, { 
             error: error instanceof Error ? error.message : "Unknown error",
             processingTime: Date.now() - startTime
         })
@@ -363,28 +380,25 @@ async function processOrderUpdate(
 
 /**
  * Registra el evento del webhook en la tabla webhook_logs
+ * Columnas reales: webhook_type, event_type, instance_name, payload, headers, processing_result, error_message
  */
 async function logWebhook(
     supabase: ReturnType<typeof createServiceClient>,
-    organizationId: string | null,
-    provider: string,
-    status: "success" | "error" | "duplicate",
+    webhookType: string,
+    processingResult: string,
     payload: unknown,
     response: unknown
 ) {
     try {
         await supabase.from("webhook_logs").insert({
-            organization_id: organizationId,
-            provider,
-            event_type: "payment.updated",
-            status,
-            payload,
-            response,
-            created_at: new Date().toISOString(),
+            webhook_type: webhookType,
+            event_type: "transaction.updated",
+            processing_result: processingResult,
+            payload: payload || {},
+            headers: response || {},
         })
     } catch (error) {
         console.error("[Wompi Webhook] Error logging webhook:", error)
-        // No fallar el webhook si el logging falla
     }
 }
 
