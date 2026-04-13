@@ -24,15 +24,22 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/utils/encryption", () => ({
     decrypt: vi.fn((encrypted: string) => {
         if (encrypted === "encrypted_integrity_secret") return "test_integrity_secret"
+        if (encrypted === "encrypted_events_secret") return "test_events_secret"
         if (encrypted === "encrypted_private_key") return "test_private_key"
         return encrypted
     }),
 }))
 
 vi.mock("@/lib/payments/wompi-gateway", () => ({
-    WompiGateway: vi.fn().mockImplementation(() => ({
-        validateWebhookSignature: vi.fn().mockReturnValue(true),
-    })),
+    WompiGateway: class {
+        validateWebhookSignature() {
+            return true
+        }
+    },
+}))
+
+vi.mock("@/lib/notifications/whatsapp", () => ({
+    sendSaleNotification: vi.fn().mockResolvedValue(undefined),
 }))
 
 let mockSupabase: ReturnType<typeof createMockSupabase>

@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { middleware } from '../middleware'
+import { proxy as middleware } from '../proxy'
 
 // Mock Supabase
 vi.mock('@supabase/ssr', () => ({

@@ -24,6 +24,8 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/utils/encryption", () => ({
     decrypt: vi.fn((encrypted: string) => {
+        if (encrypted === "encrypted_integrity_secret") return "test_integrity_secret"
+        if (encrypted === "encrypted_encryption_key") return "test_private_key"
         if (encrypted === "encrypted_private_key") return "test_private_key"
         return encrypted
     }),
@@ -62,6 +64,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         .mockResolvedValueOnce({ data: TEST_EPAYCO_CONFIG, error: null }) // config lookup
                         .mockResolvedValueOnce({ data: null, error: null }) // existing transaction lookup
                         .mockResolvedValueOnce({ data: null, error: null }) // transaction by reference lookup
+                        .mockResolvedValueOnce({ data: null, error: null }) // order lookup by reference
                         .mockResolvedValueOnce({ data: { id: "new-tx-id" }, error: null }) // insert new transaction
 
                     // Generar payload con firma válida
@@ -71,7 +74,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         codResponse,
-                        TEST_EPAYCO_CONFIG.public_key,
+                        "test_integrity_secret",
                         "test_private_key"
                     )
 
@@ -118,7 +121,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         codResponse,
-                        TEST_EPAYCO_CONFIG.public_key,
+                        "test_integrity_secret",
                         "test_private_key"
                     )
                     // Corromper la firma
@@ -175,7 +178,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         codResponse,
-                        TEST_EPAYCO_CONFIG.public_key,
+                        "test_integrity_secret",
                         "test_private_key"
                     )
 
@@ -252,7 +255,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         "1", // Código 1 = APPROVED
-                        TEST_EPAYCO_CONFIG.public_key,
+                        "test_integrity_secret",
                         "test_private_key"
                     )
 
@@ -282,7 +285,9 @@ describe("ePayco Webhook - Property Tests", () => {
                         call[0].payment_status === "paid"
                     )
                     expect(orderUpdateCall).toBeDefined()
-                    expect(orderUpdateCall[0]).toMatchObject({
+                    const orderUpdate = orderUpdateCall?.[0]
+                    if (!orderUpdate) throw new Error("Expected order update call for paid status")
+                    expect(orderUpdate).toMatchObject({
                         payment_status: "paid",
                         status: "confirmed",
                         confirmed_at: expect.any(String),
@@ -334,7 +339,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         "2", // Código 2 = DECLINED
-                        TEST_EPAYCO_CONFIG.public_key,
+                        "test_integrity_secret",
                         "test_private_key"
                     )
 
@@ -364,13 +369,14 @@ describe("ePayco Webhook - Property Tests", () => {
                         call[0].payment_status === "failed"
                     )
                     expect(orderUpdateCall).toBeDefined()
-                    expect(orderUpdateCall[0]).toMatchObject({
+                    const orderUpdate = orderUpdateCall?.[0]
+                    if (!orderUpdate) throw new Error("Expected order update call for failed status")
+                    expect(orderUpdate).toMatchObject({
                         payment_status: "failed",
                         status: "cancelled",
                         updated_at: expect.any(String),
                     })
-                    // No debe tener confirmed_at para DECLINED
-                    expect(orderUpdateCall[0].confirmed_at).toBeUndefined()
+                    expect(orderUpdate.confirmed_at).toBeUndefined()
                 }
             ),
             { numRuns: 30 }
@@ -396,6 +402,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         .mockResolvedValueOnce({ data: TEST_EPAYCO_CONFIG, error: null }) // config lookup
                         .mockResolvedValueOnce({ data: null, error: null }) // existing transaction lookup
                         .mockResolvedValueOnce({ data: null, error: null }) // transaction by reference lookup
+                        .mockResolvedValueOnce({ data: null, error: null }) // order lookup by reference
                         .mockResolvedValueOnce({ data: { id: "new-tx-id" }, error: null }) // insert new transaction
 
                     const payload = generateEpaycoWebhookPayload(
@@ -404,7 +411,7 @@ describe("ePayco Webhook - Property Tests", () => {
                         invoice,
                         amountStr,
                         "1",
-                        TEST_EPAYCO_CONFIG.public_key,
+                        "test_integrity_secret",
                         "test_private_key"
                     )
 

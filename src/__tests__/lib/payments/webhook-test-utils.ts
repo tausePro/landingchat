@@ -123,8 +123,8 @@ export function generateEpaycoWebhookPayload(
     invoice: string,
     amount: string,
     codResponse: "1" | "2" | "3" | "4" | "6", // 1=approved, 2=declined, 3=pending, 4=error, 6=voided
-    publicKey?: string,
-    privateKey?: string
+    customerId?: string,
+    pKey?: string
 ): EpaycoWebhookPayload {
     const payload: EpaycoWebhookPayload = {
         x_ref_payco: refPayco,
@@ -166,16 +166,17 @@ export function generateEpaycoWebhookPayload(
         x_extra1: invoice,
     }
 
-    // Generar firma si se proporcionan las claves
-    if (publicKey && privateKey) {
+    // Generar firma según docs oficiales de ePayco:
+    // hash('sha256', p_cust_id_cliente ^ p_key ^ x_ref_payco ^ x_transaction_id ^ x_amount ^ x_currency_code)
+    if (customerId && pKey) {
         const stringToSign = [
-            publicKey,
-            privateKey,
+            customerId,
+            pKey,
             payload.x_ref_payco,
             payload.x_transaction_id,
             payload.x_amount,
             payload.x_currency_code,
-        ].join("")
+        ].join("^")
 
         payload.x_signature = crypto
             .createHash("sha256")
@@ -204,27 +205,19 @@ export function createMockSupabase() {
     const mockInsert = vi.fn()
     const mockUpdate = vi.fn()
 
-    // Configurar cadena de métodos para queries
-    const createQueryChain = () => ({
+    const queryChain = {
         select: mockSelect,
         eq: mockEq,
         single: mockSingle,
-    })
+        insert: mockInsert,
+        update: mockUpdate,
+    }
 
-    const createInsertChain = () => ({
-        select: mockSelect,
-        single: mockSingle,
-    })
-
-    const createUpdateChain = () => ({
-        eq: mockEq,
-    })
-
-    mockFrom.mockReturnValue(createQueryChain())
-    mockSelect.mockReturnValue(createQueryChain())
-    mockEq.mockReturnValue(createQueryChain())
-    mockInsert.mockReturnValue(createInsertChain())
-    mockUpdate.mockReturnValue(createUpdateChain())
+    mockFrom.mockReturnValue(queryChain)
+    mockSelect.mockReturnValue(queryChain)
+    mockEq.mockReturnValue(queryChain)
+    mockInsert.mockReturnValue(queryChain)
+    mockUpdate.mockReturnValue(queryChain)
     mockSingle.mockResolvedValue({ data: null, error: null })
 
     return {
@@ -255,6 +248,7 @@ export const TEST_WOMPI_CONFIG = {
     public_key: "pub_test_key",
     private_key_encrypted: "encrypted_private_key",
     integrity_secret_encrypted: "encrypted_integrity_secret",
+    events_secret_encrypted: "encrypted_events_secret",
     is_test_mode: true,
 }
 
@@ -264,6 +258,8 @@ export const TEST_EPAYCO_CONFIG = {
     provider: "epayco",
     public_key: "test_public_key",
     private_key_encrypted: "encrypted_private_key",
+    integrity_secret_encrypted: "encrypted_integrity_secret",
+    encryption_key_encrypted: "encrypted_encryption_key",
     is_test_mode: true,
 }
 
@@ -290,9 +286,16 @@ export function createWebhookRequest(
     payload: WompiWebhookPayload | EpaycoWebhookPayload,
     contentType: "application/json" | "application/x-www-form-urlencoded" = "application/json"
 ): Request {
+    const formPayloadEntries: [string, string][] = Object.entries(payload).reduce<[string, string][]>((entries, [key, value]) => {
+        if (value !== undefined) {
+            entries.push([key, String(value)])
+        }
+        return entries
+    }, [])
+
     const body = contentType === "application/json" 
         ? JSON.stringify(payload)
-        : new URLSearchParams(payload as Record<string, string>).toString()
+        : new URLSearchParams(formPayloadEntries).toString()
 
     return new Request(url, {
         method: "POST",

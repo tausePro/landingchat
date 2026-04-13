@@ -31,9 +31,11 @@ vi.mock("@/lib/utils/encryption", () => ({
 }))
 
 vi.mock("@/lib/payments/wompi-gateway", () => ({
-    WompiGateway: vi.fn().mockImplementation(() => ({
-        validateWebhookSignature: vi.fn().mockReturnValue(true),
-    })),
+    WompiGateway: class {
+        validateWebhookSignature() {
+            return true
+        }
+    },
 }))
 
 // Mock de notificaciones WhatsApp
@@ -127,7 +129,9 @@ describe("Transaction Status Handling - Property Tests", () => {
                         call[0].payment_status === "paid"
                     )
                     expect(orderUpdateCall).toBeDefined()
-                    expect(orderUpdateCall[0]).toMatchObject({
+                    const orderUpdate = orderUpdateCall?.[0]
+                    if (!orderUpdate) throw new Error("Expected order update call for paid status")
+                    expect(orderUpdate).toMatchObject({
                         payment_status: "paid",
                         status: "confirmed",
                         confirmed_at: expect.any(String),
@@ -205,13 +209,14 @@ describe("Transaction Status Handling - Property Tests", () => {
                         call[0].payment_status === "failed"
                     )
                     expect(orderUpdateCall).toBeDefined()
-                    expect(orderUpdateCall[0]).toMatchObject({
+                    const orderUpdate = orderUpdateCall?.[0]
+                    if (!orderUpdate) throw new Error("Expected order update call for failed status")
+                    expect(orderUpdate).toMatchObject({
                         payment_status: "failed",
                         status: "cancelled",
                         updated_at: expect.any(String),
                     })
-                    // No debe tener confirmed_at para DECLINED
-                    expect(orderUpdateCall[0].confirmed_at).toBeUndefined()
+                    expect(orderUpdate.confirmed_at).toBeUndefined()
                 }
             ),
             { numRuns: 50 }
@@ -343,12 +348,13 @@ describe("Transaction Status Handling - Property Tests", () => {
                         call[0].payment_status === "refunded"
                     )
                     expect(orderUpdateCall).toBeDefined()
-                    expect(orderUpdateCall[0]).toMatchObject({
+                    const orderUpdate = orderUpdateCall?.[0]
+                    if (!orderUpdate) throw new Error("Expected order update call for refunded status")
+                    expect(orderUpdate).toMatchObject({
                         payment_status: "refunded",
                         updated_at: expect.any(String),
                     })
-                    // VOIDED no debe cambiar el status de la orden (solo payment_status)
-                    expect(orderUpdateCall[0].status).toBeUndefined()
+                    expect(orderUpdate.status).toBeUndefined()
                 }
             ),
             { numRuns: 30 }
