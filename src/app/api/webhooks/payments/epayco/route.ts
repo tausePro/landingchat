@@ -89,7 +89,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
     
     try {
         if (!orgSlug) {
-            await logWebhook(supabase, null, "epayco", "error", null, { error: "Missing org parameter" })
+            await logWebhook(supabase, "epayco", "error", null, { error: "Missing org parameter" })
             return NextResponse.json(
                 { error: "Missing org parameter" },
                 { status: 400 }
@@ -104,7 +104,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
             .single()
 
         if (!org) {
-            await logWebhook(supabase, null, "epayco", "error", payload, { error: "Organization not found" })
+            await logWebhook(supabase, "epayco", "error", payload, { error: "Organization not found" })
             return NextResponse.json(
                 { error: "Organization not found" },
                 { status: 404 }
@@ -119,7 +119,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
             .single()
 
         if (!config) {
-            await logWebhook(supabase, org.id, "epayco", "error", payload, { error: "Payment gateway not configured" })
+            await logWebhook(supabase, "epayco", "error", payload, { error: "Payment gateway not configured" })
             return NextResponse.json(
                 { error: "Payment gateway not configured" },
                 { status: 400 }
@@ -127,17 +127,19 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
         }
 
         // Validar firma del webhook
+        // Según docs ePayco: hash('sha256', p_cust_id_cliente ^ p_key ^ x_ref_payco ^ x_transaction_id ^ x_amount ^ x_currency_code)
+        // p_cust_id_cliente = integrity_secret_encrypted, p_key = private_key_encrypted
         const customerId = config.integrity_secret_encrypted
             ? decrypt(config.integrity_secret_encrypted)
             : ""
-        const encryptionKey = config.encryption_key_encrypted
-            ? decrypt(config.encryption_key_encrypted)
+        const privateKey = config.private_key_encrypted
+            ? decrypt(config.private_key_encrypted)
             : ""
 
-        const isValid = validateEpaycoSignature(payload, customerId, encryptionKey)
+        const isValid = validateEpaycoSignature(payload, customerId, privateKey)
         if (!isValid) {
             log.error("Invalid signature")
-            await logWebhook(supabase, org.id, "epayco", "error", payload, { error: "Invalid signature" })
+            await logWebhook(supabase, "epayco", "error", payload, { error: "Invalid signature" })
             return NextResponse.json(
                 { error: "Invalid signature" },
                 { status: 401 }
@@ -160,7 +162,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
             // Idempotencia: si el estado ya es el mismo, no hacer nada
             if (existingTx.status === status) {
                 log.info("Duplicate webhook, no action taken", { transactionId: payload.x_ref_payco, status })
-                await logWebhook(supabase, org.id, "epayco", "duplicate", payload, { 
+                await logWebhook(supabase, "epayco", "duplicate", payload, { 
                     message: "Duplicate webhook, no action taken",
                     transactionId: existingTx.id 
                 })
@@ -183,7 +185,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
                 await processOrderUpdate(supabase, existingTx.order_id, status, org.id)
             }
 
-            await logWebhook(supabase, org.id, "epayco", "success", payload, { 
+            await logWebhook(supabase, "epayco", "success", payload, { 
                 transactionId: existingTx.id,
                 orderId: existingTx.order_id,
                 status,
@@ -215,7 +217,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
                     await processOrderUpdate(supabase, txByRef.order_id, status, org.id)
                 }
 
-                await logWebhook(supabase, org.id, "epayco", "success", payload, { 
+                await logWebhook(supabase, "epayco", "success", payload, { 
                     transactionId: txByRef.id,
                     orderId: txByRef.order_id,
                     status,
@@ -255,7 +257,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
                     await processOrderUpdate(supabase, order.id, status, org.id)
                 }
 
-                await logWebhook(supabase, org.id, "epayco", "success", payload, { 
+                await logWebhook(supabase, "epayco", "success", payload, { 
                     transactionId: newTx?.id,
                     orderId: order?.id,
                     status,
@@ -268,7 +270,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
         return NextResponse.json({ received: true })
     } catch (error) {
         log.error("Unhandled error", { error: error instanceof Error ? error.message : String(error) })
-        await logWebhook(supabase, null, "epayco", "error", null, { 
+        await logWebhook(supabase, "epayco", "error", null, { 
             error: error instanceof Error ? error.message : "Unknown error",
             processingTime: Date.now() - startTime
         })
@@ -420,50 +422,49 @@ async function processOrderUpdate(
 
 /**
  * Registra el evento del webhook en la tabla webhook_logs
+ * Columnas reales: webhook_type, event_type, instance_name, payload, headers, processing_result, error_message
  */
 async function logWebhook(
     supabase: ReturnType<typeof createServiceClient>,
-    organizationId: string | null,
-    provider: string,
-    status: "success" | "error" | "duplicate",
+    webhookType: string,
+    processingResult: string,
     payload: unknown,
     response: unknown
 ) {
     try {
         await supabase.from("webhook_logs").insert({
-            organization_id: organizationId,
-            provider,
+            webhook_type: webhookType,
             event_type: "payment.updated",
-            status,
-            payload,
-            response,
-            created_at: new Date().toISOString(),
+            processing_result: processingResult,
+            payload: payload || {},
+            headers: response || {},
         })
     } catch (error) {
         log.error("Error logging webhook", { error: error instanceof Error ? error.message : String(error) })
-        // No fallar el webhook si el logging falla
     }
 }
 
 function validateEpaycoSignature(
     payload: EpaycoWebhookPayload,
     customerId: string,
-    encryptionKey: string
+    pKey: string
 ): boolean {
-    if (!customerId || !encryptionKey) {
-        log.error("Missing P_CUST_ID_CLIENTE or P_ENCRYPTION_KEY")
+    if (!customerId || !pKey) {
+        log.error("Missing P_CUST_ID_CLIENTE or P_KEY for signature validation")
         return false
     }
 
-    // ePayco signature: SHA256(p_cust_id_cliente + p_encryption_key + x_ref_payco + x_transaction_id + x_amount + x_currency_code)
+    // Según docs oficiales de ePayco (https://docs.epayco.com/docs/url-de-confirmacion):
+    // hash('sha256', p_cust_id_cliente ^ p_key ^ x_ref_payco ^ x_transaction_id ^ x_amount ^ x_currency_code)
+    // Los valores van separados por '^'
     const stringToSign = [
         customerId,
-        encryptionKey,
+        pKey,
         payload.x_ref_payco,
         payload.x_transaction_id,
         payload.x_amount,
         payload.x_currency_code,
-    ].join("")
+    ].join("^")
 
     const calculatedSignature = crypto
         .createHash("sha256")
@@ -472,7 +473,7 @@ function validateEpaycoSignature(
 
     log.debug("Signature validation", {
         customerId: customerId.substring(0, 4) + "***",
-        encryptionKey: encryptionKey.substring(0, 4) + "***",
+        pKey: pKey.substring(0, 4) + "***",
         stringToSign: stringToSign.substring(0, 20) + "...",
         calculatedSignature,
         receivedSignature: payload.x_signature,
