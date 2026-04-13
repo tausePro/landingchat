@@ -89,13 +89,15 @@ export async function POST(
         const existingCustomer = existingCustomers?.[0]
 
         if (existingCustomer) {
-            const nameMatches = normalizeName(existingCustomer.full_name) === normalizeName(name)
-
-            if (!nameMatches) {
-                return NextResponse.json(
-                    { error: mode === "profile" ? "Los datos no coinciden con una cuenta registrada" : "No pudimos validar tus datos. Verifica tu nombre y WhatsApp." },
-                    { status: 403, headers }
-                )
+            // En modo profile, validar nombre como capa de seguridad adicional
+            if (mode === "profile") {
+                const nameMatches = normalizeName(existingCustomer.full_name) === normalizeName(name)
+                if (!nameMatches) {
+                    return NextResponse.json(
+                        { error: "Los datos no coinciden con una cuenta registrada" },
+                        { status: 403, headers }
+                    )
+                }
             }
 
             // Normalizar teléfono almacenado al formato canónico
