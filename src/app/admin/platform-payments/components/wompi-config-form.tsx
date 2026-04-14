@@ -12,6 +12,7 @@ interface WompiConfigFormProps {
         webhook_url: string
         has_private_key: boolean
         has_integrity_secret: boolean
+        has_events_secret: boolean
     }
 }
 
@@ -24,6 +25,7 @@ export function WompiConfigForm({ initialConfig }: WompiConfigFormProps) {
     const [publicKey, setPublicKey] = useState(initialConfig.public_key)
     const [privateKey, setPrivateKey] = useState("")
     const [integritySecret, setIntegritySecret] = useState("")
+    const [eventsSecret, setEventsSecret] = useState("")
 
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
     const [testResult, setTestResult] = useState<{
@@ -37,8 +39,8 @@ export function WompiConfigForm({ initialConfig }: WompiConfigFormProps) {
     } | null>(null)
 
     const webhookUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/api/webhooks/subscriptions/wompi`
-        : initialConfig.webhook_url || "https://landingchat.co/api/webhooks/subscriptions/wompi"
+        ? `${window.location.origin}/api/webhooks/wompi`
+        : initialConfig.webhook_url || "https://landingchat.co/api/webhooks/wompi"
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -52,12 +54,14 @@ export function WompiConfigForm({ initialConfig }: WompiConfigFormProps) {
                 public_key: publicKey,
                 private_key: privateKey || undefined,
                 integrity_secret: integritySecret || undefined,
+                events_secret: eventsSecret || undefined,
             })
 
             if (result.success) {
                 setMessage({ type: "success", text: "Configuración guardada correctamente" })
                 setPrivateKey("")
                 setIntegritySecret("")
+                setEventsSecret("")
             } else {
                 setMessage({ type: "error", text: result.error || "Error al guardar" })
             }
@@ -191,7 +195,7 @@ export function WompiConfigForm({ initialConfig }: WompiConfigFormProps) {
                     {/* Integrity Secret */}
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                            Integrity Secret (Events)
+                            Secreto de Integridad
                             {initialConfig.has_integrity_secret && (
                                 <span className="ml-2 text-xs text-green-600 dark:text-green-400">
                                     (ya configurado - dejar vacío para mantener)
@@ -202,11 +206,33 @@ export function WompiConfigForm({ initialConfig }: WompiConfigFormProps) {
                             type="password"
                             value={integritySecret}
                             onChange={(e) => setIntegritySecret(e.target.value)}
-                            placeholder={initialConfig.has_integrity_secret ? "••••••••••••••••" : "test_integrity_xxxxx"}
+                            placeholder={initialConfig.has_integrity_secret ? "••••••••••••••••" : (isTestMode ? "test_integrity_xxxxx" : "prod_integrity_xxxxx")}
                             className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white font-mono"
                         />
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Para validar webhooks. Encuéntralo en Wompi → Configuración → Events
+                            Para el checkout/widget. Encuéntralo en Wompi → Desarrolladores → Secretos → Integridad
+                        </p>
+                    </div>
+
+                    {/* Events Secret */}
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                            Secreto de Eventos
+                            {initialConfig.has_events_secret && (
+                                <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                                    (ya configurado - dejar vacío para mantener)
+                                </span>
+                            )}
+                        </label>
+                        <input
+                            type="password"
+                            value={eventsSecret}
+                            onChange={(e) => setEventsSecret(e.target.value)}
+                            placeholder={initialConfig.has_events_secret ? "••••••••••••••••" : (isTestMode ? "test_events_xxxxx" : "prod_events_xxxxx")}
+                            className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800 dark:text-white font-mono"
+                        />
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Para validar webhooks. Encuéntralo en Wompi → Desarrolladores → Secretos → Eventos
                         </p>
                     </div>
 
