@@ -20,6 +20,82 @@ export type {
   ProductData,
 } from "@/types/product"
 
+// ============================================================================
+// Sync de variante default con product_variants (Commerce Reset Fase 2)
+// ============================================================================
+
+/**
+ * Sincroniza la variante default en product_variants cuando se crea o actualiza un producto.
+ * Mantiene product_variants como fuente de verdad para pricing/stock,
+ * mientras products conserva los campos legacy como fallback.
+ * 
+ * Ref: docs-private/ANALISIS_COMMERCE_RESET.md §3 Grupo B
+ */
+async function syncDefaultVariant(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  productId: string,
+  organizationId: string,
+  data: {
+    price?: number
+    sale_price?: number | null
+    stock?: number
+    sku?: string | null
+    image_url?: string | null
+    is_active?: boolean
+    name?: string
+  }
+) {
+  try {
+    const variantData: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (data.price !== undefined) variantData.price = data.price
+    if (data.sale_price !== undefined) variantData.compare_at_price = data.sale_price || null
+    if (data.stock !== undefined) variantData.stock_quantity = data.stock
+    if (data.sku !== undefined) variantData.sku = data.sku || null
+    if (data.image_url !== undefined) variantData.image_url = data.image_url || null
+    if (data.is_active !== undefined) variantData.is_active = data.is_active
+    if (data.name !== undefined) variantData.title = `${data.name} — Default`
+
+    // Intentar actualizar variante default existente
+    const { data: existing } = await supabase
+      .from("product_variants")
+      .select("id")
+      .eq("product_id", productId)
+      .eq("is_default", true)
+      .single()
+
+    if (existing) {
+      await supabase
+        .from("product_variants")
+        .update(variantData)
+        .eq("id", existing.id)
+    } else {
+      // Crear variante default si no existe (producto nuevo o backfill faltante)
+      await supabase
+        .from("product_variants")
+        .insert({
+          product_id: productId,
+          organization_id: organizationId,
+          title: data.name ? `${data.name} — Default` : "Default",
+          sku: data.sku || null,
+          position: 0,
+          is_default: true,
+          is_active: data.is_active ?? true,
+          price: data.price ?? 0,
+          compare_at_price: data.sale_price || null,
+          stock_quantity: data.stock ?? 0,
+          image_url: data.image_url || null,
+          option_values: [],
+        })
+    }
+  } catch (error) {
+    // No fallar la operación principal si la sync falla
+    console.error("[syncDefaultVariant] Error syncing variant:", error)
+  }
+}
+
 /**
  * Fetches all products for the current user's organization
  * @returns Array of products or empty array on error
@@ -156,6 +232,17 @@ export async function createProduct(
       return failure(error.message)
     }
 
+    // Sincronizar variante default en product_variants (Commerce Reset Fase 2)
+    await syncDefaultVariant(supabase, data.id, profile.organization_id, {
+      price: parsed.data.price,
+      sale_price: parsed.data.sale_price,
+      stock: parsed.data.stock,
+      sku: parsed.data.sku,
+      image_url: parsed.data.image_url,
+      is_active: parsed.data.is_active,
+      name: parsed.data.name,
+    })
+
     revalidatePath("/dashboard/products")
     return success({ id: data.id, product: data as ProductData })
   } catch (err) {
@@ -201,6 +288,26 @@ export async function updateProduct(
 
     if (error) {
       return failure(error.message)
+    }
+
+    // 4. Sincronizar variante default (Commerce Reset Fase 2)
+    // Necesitamos el organization_id para la sync
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+
+    if (profile?.organization_id) {
+      await syncDefaultVariant(supabase, id, profile.organization_id, {
+        price: parsed.data.price,
+        sale_price: parsed.data.sale_price,
+        stock: parsed.data.stock,
+        sku: parsed.data.sku,
+        image_url: parsed.data.image_url,
+        is_active: parsed.data.is_active,
+        name: parsed.data.name,
+      })
     }
 
     revalidatePath("/dashboard/products")
@@ -302,6 +409,13 @@ export async function quickUpdateProduct(
 
     if (error) return failure(error.message)
 
+    // Sincronizar variante default (Commerce Reset Fase 2)
+    const syncData: Record<string, unknown> = {}
+    if (field === "price") syncData.price = value
+    if (field === "sale_price") syncData.sale_price = value === 0 ? null : value
+    if (field === "stock") syncData.stock = value
+    await syncDefaultVariant(supabase, id, profile.organization_id, syncData)
+
     revalidatePath("/dashboard/products")
     return success(undefined)
   } catch (err) {
@@ -340,6 +454,9 @@ export async function toggleProductStatus(
       .eq("organization_id", profile.organization_id)
 
     if (error) return failure(error.message)
+
+    // Sincronizar variante default (Commerce Reset Fase 2)
+    await syncDefaultVariant(supabase, id, profile.organization_id, { is_active: isActive })
 
     revalidatePath("/dashboard/products")
     return success(undefined)
@@ -785,6 +902,15 @@ export async function importProductsCsv(csvContent: string): Promise<ActionResul
         result.errors.push(`Fila ${i + 1} (${id}): ${error.message}`)
       } else {
         result.updated++
+        // Sincronizar variante default (Commerce Reset Fase 2)
+        await syncDefaultVariant(supabase, id, profile.organization_id, {
+          price: updateData.price as number | undefined,
+          sale_price: updateData.sale_price as number | null | undefined,
+          stock: updateData.stock as number | undefined,
+          sku: updateData.sku as string | null | undefined,
+          is_active: updateData.is_active as boolean | undefined,
+          name: updateData.name as string | undefined,
+        })
       }
     }
 
