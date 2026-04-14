@@ -262,17 +262,46 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                             </div>
                         </div>
 
-                        {/* Shipping Address */}
-                        {order.shipping_address && (
+                        {/* Facturación */}
+                        {order.customer_info?.document_number && (
+                            <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                                <h2 className="text-lg font-bold text-text-light-primary dark:text-text-dark-primary mb-4">
+                                    Facturación
+                                </h2>
+                                <div className="space-y-3">
+                                    <div>
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Documento</p>
+                                        <p className="font-medium text-text-light-primary dark:text-text-dark-primary">
+                                            {order.customer_info.document_type || 'CC'} {order.customer_info.document_number}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Tipo de Persona</p>
+                                        <p className="font-medium text-text-light-primary dark:text-text-dark-primary">
+                                            {order.customer_info.person_type === 'Jurídica' ? 'Persona Jurídica' : 'Persona Natural'}
+                                        </p>
+                                    </div>
+                                    {order.customer_info.business_name && (
+                                        <div>
+                                            <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Razón Social</p>
+                                            <p className="font-medium text-text-light-primary dark:text-text-dark-primary">
+                                                {order.customer_info.business_name}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Dirección de Envío */}
+                        {order.customer_info?.address && (
                             <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                                 <h2 className="text-lg font-bold text-text-light-primary dark:text-text-dark-primary mb-4">
                                     Dirección de Envío
                                 </h2>
                                 <div className="text-sm text-text-light-secondary dark:text-text-dark-secondary space-y-1">
-                                    <p>{order.shipping_address.street}</p>
-                                    <p>{order.shipping_address.city}, {order.shipping_address.state}</p>
-                                    <p>{order.shipping_address.postal_code}</p>
-                                    <p>{order.shipping_address.country}</p>
+                                    <p>{order.customer_info.address}</p>
+                                    <p>{[order.customer_info.city, order.customer_info.state].filter(Boolean).join(', ')}</p>
                                 </div>
                             </div>
                         )}
