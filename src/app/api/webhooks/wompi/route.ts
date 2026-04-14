@@ -1,32 +1,67 @@
 /**
- * Webhook handler para eventos de Wompi
- * Recibe notificaciones de transacciones y actualiza el estado de suscripciones
+ * Webhook handler para eventos de Wompi (billing de LandingChat)
+ * Recibe notificaciones de transacciones de suscripciones y actualiza el estado
+ * 
+ * IMPORTANTE: Este webhook es para cobros de LandingChat a merchants (suscripciones/planes).
+ * NO confundir con /api/webhooks/payments/wompi que es para pagos de clientes en tiendas.
+ * 
+ * Config se lee de platform_config (key: payment_gateway_wompi), no de system_settings.
+ * Validación de firma usa events_secret según docs oficiales de Wompi.
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { WompiClient } from "@/lib/wompi/client"
-import { type WompiWebhookPayload, type WompiConfig, WOMPI_STATUS_MAP } from "@/lib/wompi/types"
+import { type WompiWebhookPayload, WOMPI_STATUS_MAP } from "@/lib/wompi/types"
+import { decrypt } from "@/lib/utils/encryption"
 
-const WOMPI_CONFIG_KEY = "wompi_config"
+interface PlatformConfigRow {
+    value: {
+        is_active: boolean
+        is_test_mode: boolean
+        public_key: string
+    }
+    encrypted_values: {
+        private_key_encrypted?: string
+        integrity_secret_encrypted?: string
+        events_secret_encrypted?: string
+    }
+}
 
 /**
- * Obtiene la configuración de Wompi desde la base de datos
+ * Obtiene la configuración de Wompi de la plataforma desde platform_config
  */
-async function getWompiConfig(): Promise<WompiConfig | null> {
-    const supabase = await createServiceClient()
-
+async function getPlatformWompiConfig(supabase: ReturnType<typeof createServiceClient>): Promise<{
+    publicKey: string
+    privateKey: string
+    eventsSecret: string
+    integritySecret: string
+    isTestMode: boolean
+} | null> {
     const { data, error } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", WOMPI_CONFIG_KEY)
+        .from("platform_config")
+        .select("value, encrypted_values")
+        .eq("key", "payment_gateway_wompi")
         .single()
 
     if (error || !data) {
         return null
     }
 
-    return data.value as WompiConfig
+    const config = data as PlatformConfigRow
+    const encrypted = config.encrypted_values || {}
+
+    if (!encrypted.private_key_encrypted) {
+        return null
+    }
+
+    return {
+        publicKey: config.value.public_key,
+        privateKey: decrypt(encrypted.private_key_encrypted),
+        eventsSecret: encrypted.events_secret_encrypted ? decrypt(encrypted.events_secret_encrypted) : "",
+        integritySecret: encrypted.integrity_secret_encrypted ? decrypt(encrypted.integrity_secret_encrypted) : "",
+        isTestMode: config.value.is_test_mode,
+    }
 }
 
 /**
@@ -41,38 +76,47 @@ function extractSubscriptionIdFromReference(reference: string): string | null {
 export async function POST(request: NextRequest) {
     try {
         const payload: WompiWebhookPayload = await request.json()
+        const supabase = createServiceClient()
 
-        console.log("Wompi webhook received:", payload.event)
+        console.log("[Wompi Billing] Webhook received:", payload.event)
 
         // Solo procesar eventos de transacción
         if (payload.event !== "transaction.updated") {
             return NextResponse.json({ received: true })
         }
 
-        // Obtener configuración de Wompi
-        const config = await getWompiConfig()
+        // Obtener configuración de Wompi de la plataforma
+        const config = await getPlatformWompiConfig(supabase)
         if (!config) {
-            console.error("Wompi config not found")
+            console.error("[Wompi Billing] Platform config not found in platform_config")
             return NextResponse.json(
                 { error: "Wompi not configured" },
                 { status: 500 }
             )
         }
 
-        // Validar firma del webhook
-        const client = new WompiClient(config)
-        const isValid = client.validateWebhookSignature(payload)
+        // Validar firma del webhook usando events_secret
+        // Según docs Wompi: https://docs.wompi.co/docs/colombia/eventos/
+        const signatureSecret = config.eventsSecret || config.integritySecret
+        if (signatureSecret) {
+            const client = new WompiClient({
+                publicKey: config.publicKey,
+                privateKey: config.privateKey,
+                integritySecret: signatureSecret,
+                environment: config.isTestMode ? "sandbox" : "production",
+            })
+            const isValid = client.validateWebhookSignature(payload)
 
-        if (!isValid) {
-            console.error("Invalid webhook signature")
-            return NextResponse.json(
-                { error: "Invalid signature" },
-                { status: 401 }
-            )
+            if (!isValid) {
+                console.error("[Wompi Billing] Invalid webhook signature")
+                return NextResponse.json(
+                    { error: "Invalid signature" },
+                    { status: 401 }
+                )
+            }
         }
 
         const transaction = payload.data.transaction
-        const supabase = await createServiceClient()
 
         // Registrar la transacción en payment_transactions
         const { error: txError } = await supabase

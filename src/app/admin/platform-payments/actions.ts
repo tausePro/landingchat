@@ -16,6 +16,7 @@ export interface PlatformWompiConfig {
 export interface PlatformWompiConfigWithSecrets extends PlatformWompiConfig {
     private_key: string
     integrity_secret: string
+    events_secret: string
 }
 
 interface ConfigRow {
@@ -25,6 +26,7 @@ interface ConfigRow {
     encrypted_values: {
         private_key_encrypted?: string
         integrity_secret_encrypted?: string
+        events_secret_encrypted?: string
     }
 }
 
@@ -51,7 +53,7 @@ async function verifySuperadmin(): Promise<boolean> {
  */
 export async function getPlatformWompiConfig(): Promise<{
     success: boolean
-    data?: PlatformWompiConfig & { has_private_key: boolean; has_integrity_secret: boolean }
+    data?: PlatformWompiConfig & { has_private_key: boolean; has_integrity_secret: boolean; has_events_secret: boolean }
     error?: string
 }> {
     try {
@@ -80,6 +82,7 @@ export async function getPlatformWompiConfig(): Promise<{
                         webhook_url: "",
                         has_private_key: false,
                         has_integrity_secret: false,
+                        has_events_secret: false,
                     }
                 }
             }
@@ -95,6 +98,7 @@ export async function getPlatformWompiConfig(): Promise<{
                 ...config.value,
                 has_private_key: !!encryptedValues.private_key_encrypted,
                 has_integrity_secret: !!encryptedValues.integrity_secret_encrypted,
+                has_events_secret: !!encryptedValues.events_secret_encrypted,
             }
         }
     } catch (error) {
@@ -115,6 +119,7 @@ export async function savePlatformWompiConfig(input: {
     public_key: string
     private_key?: string  // Solo si se quiere actualizar
     integrity_secret?: string  // Solo si se quiere actualizar
+    events_secret?: string  // Solo si se quiere actualizar
 }): Promise<{ success: boolean; error?: string }> {
     try {
         if (!await verifySuperadmin()) {
@@ -136,6 +141,7 @@ export async function savePlatformWompiConfig(input: {
         const encryptedValues: ConfigRow["encrypted_values"] = {
             private_key_encrypted: existingEncrypted.private_key_encrypted,
             integrity_secret_encrypted: existingEncrypted.integrity_secret_encrypted,
+            events_secret_encrypted: existingEncrypted.events_secret_encrypted,
         }
 
         // Encriptar nuevos valores si se proporcionan
@@ -145,10 +151,13 @@ export async function savePlatformWompiConfig(input: {
         if (input.integrity_secret && input.integrity_secret.trim()) {
             encryptedValues.integrity_secret_encrypted = encrypt(input.integrity_secret.trim())
         }
+        if (input.events_secret && input.events_secret.trim()) {
+            encryptedValues.events_secret_encrypted = encrypt(input.events_secret.trim())
+        }
 
         // Generar webhook URL
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
-        const webhookUrl = `${baseUrl}/api/webhooks/subscriptions/wompi`
+        const webhookUrl = `${baseUrl}/api/webhooks/wompi`
 
         const value: PlatformWompiConfig = {
             provider: "wompi",
@@ -281,6 +290,7 @@ export async function getPlatformWompiCredentials(): Promise<{
         publicKey: string
         privateKey: string
         integritySecret: string
+        eventsSecret: string
         isTestMode: boolean
         isActive: boolean
     }
@@ -315,12 +325,17 @@ export async function getPlatformWompiCredentials(): Promise<{
             ? decrypt(encryptedValues.integrity_secret_encrypted)
             : ""
 
+        const eventsSecret = encryptedValues.events_secret_encrypted
+            ? decrypt(encryptedValues.events_secret_encrypted)
+            : ""
+
         return {
             success: true,
             data: {
                 publicKey: config.value.public_key,
                 privateKey,
                 integritySecret,
+                eventsSecret,
                 isTestMode: config.value.is_test_mode,
                 isActive: config.value.is_active,
             }
