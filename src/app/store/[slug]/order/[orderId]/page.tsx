@@ -214,10 +214,36 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
                                         {order.customer_info.name}
                                     </p>
                                     <p>{order.customer_info.address}</p>
-                                    <p>{order.customer_info.city}</p>
+                                    <p>{[order.customer_info.city, order.customer_info.state].filter(Boolean).join(', ')}</p>
                                     <p>{order.customer_info.phone}</p>
+                                    {order.customer_info.email && (
+                                        <p>{order.customer_info.email}</p>
+                                    )}
                                 </div>
                             </div>
+
+                            {order.customer_info.document_number && (
+                                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl">
+                                    <h3 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100 mb-3">
+                                        <CreditCard className="w-5 h-5 text-slate-400" />
+                                        Facturación
+                                    </h3>
+                                    <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                                        <p>
+                                            <span className="font-medium text-slate-900 dark:text-slate-100">
+                                                {order.customer_info.document_type || 'CC'}
+                                            </span>{' '}
+                                            {order.customer_info.document_number}
+                                        </p>
+                                        <p>{order.customer_info.person_type === 'Jurídica' ? 'Persona Jurídica' : 'Persona Natural'}</p>
+                                        {order.customer_info.business_name && (
+                                            <p className="font-medium text-slate-900 dark:text-slate-100">
+                                                {order.customer_info.business_name}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl">
                                 <h3 className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100 mb-3">
@@ -229,10 +255,22 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
                                         <span>Subtotal</span>
                                         <span>{formatCurrency(order.subtotal)}</span>
                                     </div>
+                                    {order.tax > 0 && (
+                                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                            <span>IVA</span>
+                                            <span>{formatCurrency(order.tax)}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
                                         <span>Envío</span>
                                         <span>{order.shipping_cost === 0 ? 'Gratis' : formatCurrency(order.shipping_cost)}</span>
                                     </div>
+                                    {order.customer_info?.payment_method_fee > 0 && (
+                                        <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                            <span>Recargo contraentrega</span>
+                                            <span>{formatCurrency(order.customer_info.payment_method_fee)}</span>
+                                        </div>
+                                    )}
                                     {order.customer_info?.discount_amount > 0 && (
                                         <div className="flex justify-between text-green-600">
                                             <span>Descuento {order.customer_info?.coupon_code && <span className="font-mono text-xs">({order.customer_info.coupon_code})</span>}</span>
