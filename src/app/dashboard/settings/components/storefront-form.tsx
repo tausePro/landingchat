@@ -13,6 +13,7 @@ import { CompleteTemplateEditor } from "./complete-template-editor"
 import { ServicesTemplateEditor } from "./services-template-editor"
 import { SingleProductTemplateEditor } from "./single-product-template-editor"
 import { TestimonialsEditor } from "./testimonials-editor"
+import { VideoSectionEditor } from "./video-section-editor"
 import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 
 interface StorefrontFormProps {
@@ -42,6 +43,7 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
                 {selectedTemplate === "complete" && (
                     <>
                         <CompleteTemplateEditor organization={organization} />
+                        <VideoSectionEditor organization={organization} />
                         <ProductFeaturesEditor organization={organization} />
                         <TestimonialsEditor organization={organization} />
                         <ProductSectionEditor organization={organization} />
