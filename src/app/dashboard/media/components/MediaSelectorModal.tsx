@@ -67,10 +67,23 @@ export function MediaSelectorModal({
 
     const uploadedUrls: string[] = []
     for (const file of Array.from(e.target.files)) {
-      const result = await uploadMediaFile(file)
-      if (result.success) {
-        setFiles((prev) => [result.data, ...prev])
-        uploadedUrls.push(result.data.publicUrl)
+      // Usar API route para archivos grandes (server actions truncan FormData > ~4MB)
+      const formData = new FormData()
+      formData.append("file", file)
+
+      try {
+        const response = await fetch("/api/media/upload", {
+          method: "POST",
+          body: formData,
+        })
+        const result = await response.json()
+
+        if (result.success && result.data) {
+          setFiles((prev) => [result.data as MediaFile, ...prev])
+          uploadedUrls.push(result.data.publicUrl)
+        }
+      } catch (err) {
+        console.error("Error uploading file:", err)
       }
     }
 

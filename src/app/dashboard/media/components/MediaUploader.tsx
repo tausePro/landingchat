@@ -38,22 +38,40 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
         )
       )
 
-      const result = await uploadMediaFile(item.file)
+      // Usar API route para soportar archivos grandes (server actions truncan > ~4MB)
+      try {
+        const formData = new FormData()
+        formData.append("file", item.file)
 
-      if (result.success) {
-        setUploads((prev) =>
-          prev.map((u) =>
-            u.file === item.file
-              ? { ...u, status: "success", result: result.data }
-              : u
+        const response = await fetch("/api/media/upload", {
+          method: "POST",
+          body: formData,
+        })
+        const result = await response.json()
+
+        if (result.success && result.data) {
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.file === item.file
+                ? { ...u, status: "success", result: result.data }
+                : u
+            )
           )
-        )
-        onUploadComplete(result.data)
-      } else {
+          onUploadComplete(result.data)
+        } else {
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.file === item.file
+                ? { ...u, status: "error", error: result.error || "Error al subir" }
+                : u
+            )
+          )
+        }
+      } catch (err) {
         setUploads((prev) =>
           prev.map((u) =>
             u.file === item.file
-              ? { ...u, status: "error", error: result.error }
+              ? { ...u, status: "error", error: err instanceof Error ? err.message : "Error al subir" }
               : u
           )
         )
