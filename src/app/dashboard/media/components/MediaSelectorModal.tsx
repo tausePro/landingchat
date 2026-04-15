@@ -43,7 +43,8 @@ export function MediaSelectorModal({
       loadFiles()
       setSelectedUrls(initialSelectedUrls)
     }
-  }, [open, loadFiles, initialSelectedUrls])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   const handleSelect = (url: string) => {
     if (multiple) {
