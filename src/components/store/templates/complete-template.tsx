@@ -444,6 +444,94 @@ export function CompleteTemplate({
                 </section>
             )}
 
+            {/* Video Section */}
+            {organization.settings?.storefront?.videoSection?.enabled && organization.settings?.storefront?.videoSection?.videoUrl && (() => {
+                const vs = organization.settings.storefront.videoSection
+                const videoUrl = vs.videoUrl as string
+                const videoStyle = (vs.style as string) || "clip"
+                const videoTitle = (vs.title as string) || ""
+                const videoSubtitle = (vs.subtitle as string) || ""
+                const videoOverlayText = (vs.overlayText as string) || ""
+                const isClip = videoStyle === "clip"
+                const isHero = videoStyle === "hero"
+
+                // Detectar YouTube
+                const isYouTube = videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")
+                const getYouTubeEmbedUrl = (url: string) => {
+                    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/)
+                    return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&mute=1&loop=1&playlist=${match[1]}&controls=0` : url
+                }
+
+                if (isHero) {
+                    return (
+                        <section key="video-hero" className="relative overflow-hidden" style={{ height: "500px" }}>
+                            {isYouTube ? (
+                                <iframe
+                                    src={getYouTubeEmbedUrl(videoUrl)}
+                                    className="absolute inset-0 w-full h-full"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                                    style={{ border: 0, pointerEvents: "none" }}
+                                />
+                            ) : (
+                                <video
+                                    src={videoUrl}
+                                    autoPlay loop muted playsInline
+                                    className="absolute inset-0 w-full h-full object-cover"
+                                />
+                            )}
+                            {videoOverlayText && (
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+                                    <h2 className="text-4xl md:text-6xl font-bold text-white text-center px-6" style={{ fontFamily: typographyConfig.fontFamily }}>
+                                        {videoOverlayText}
+                                    </h2>
+                                </div>
+                            )}
+                        </section>
+                    )
+                }
+
+                return (
+                    <section key="video-section" className="py-16 bg-white">
+                        <div className="container mx-auto px-4">
+                            {videoTitle && (
+                                <div className="text-center mb-8">
+                                    <h2 className="text-3xl font-bold mb-2" style={{ fontFamily: typographyConfig.fontFamily, color: getTextColor(typographyConfig.textColor) }}>
+                                        {videoTitle}
+                                    </h2>
+                                    {videoSubtitle && (
+                                        <p className="text-gray-600 text-lg" style={{ fontFamily: typographyConfig.fontFamily }}>
+                                            {videoSubtitle}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                            <div className="max-w-4xl mx-auto">
+                                <div className="relative aspect-video rounded-2xl overflow-hidden shadow-lg">
+                                    {isYouTube ? (
+                                        <iframe
+                                            src={getYouTubeEmbedUrl(videoUrl).replace("autoplay=1&mute=1&loop=1", "").replace("&controls=0", "")}
+                                            className="absolute inset-0 w-full h-full"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <video
+                                            src={videoUrl}
+                                            autoPlay={isClip}
+                                            loop={isClip}
+                                            muted={isClip}
+                                            playsInline
+                                            controls={!isClip}
+                                            className="w-full h-full object-cover"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                )
+            })()}
+
             {/* Featured Products */}
             {productConfig.showSection && (
                 <section id="products" className="py-20 bg-gray-50">
