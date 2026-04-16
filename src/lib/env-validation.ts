@@ -15,21 +15,28 @@ interface EnvVar {
     name: string
     required: "production" | "always" | "optional"
     description: string
+    blockInProductionRuntime?: boolean
+}
+
+export interface EnvValidationResult {
+    valid: boolean
+    missing: string[]
+    warnings: string[]
 }
 
 const CRITICAL_ENV_VARS: EnvVar[] = [
     // Supabase
-    { name: "NEXT_PUBLIC_SUPABASE_URL", required: "always", description: "Supabase project URL" },
-    { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", required: "always", description: "Supabase anonymous key" },
-    { name: "SUPABASE_SERVICE_ROLE_KEY", required: "always", description: "Supabase service role key (server-side)" },
+    { name: "NEXT_PUBLIC_SUPABASE_URL", required: "always", description: "Supabase project URL", blockInProductionRuntime: true },
+    { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", required: "always", description: "Supabase anonymous key", blockInProductionRuntime: true },
+    { name: "SUPABASE_SERVICE_ROLE_KEY", required: "always", description: "Supabase service role key (server-side)", blockInProductionRuntime: true },
 
     // Seguridad
-    { name: "ENCRYPTION_KEY", required: "production", description: "Key para cifrado de datos sensibles" },
+    { name: "ENCRYPTION_KEY", required: "production", description: "Key para cifrado de datos sensibles", blockInProductionRuntime: true },
     { name: "ENCRYPTION_SALT", required: "production", description: "Salt para cifrado (no usar legacy)" },
     { name: "CRON_SECRET", required: "production", description: "Secreto para proteger cron jobs" },
 
     // AI
-    { name: "ANTHROPIC_API_KEY", required: "always", description: "API key de Claude/Anthropic" },
+    { name: "ANTHROPIC_API_KEY", required: "always", description: "API key de Claude/Anthropic", blockInProductionRuntime: true },
 
     // Pagos (solo en producción con pagos activos)
     { name: "WOMPI_EVENTS_SECRET", required: "optional", description: "Secreto para validar webhooks de Wompi" },
@@ -38,13 +45,18 @@ const CRITICAL_ENV_VARS: EnvVar[] = [
     { name: "META_APP_SECRET", required: "optional", description: "App secret de Meta para validar webhooks" },
 ]
 
-let validated = false
+let cachedValidationResult: EnvValidationResult | null = null
 
-export function validateEnv(): { valid: boolean; missing: string[]; warnings: string[] } {
-    if (validated) return { valid: true, missing: [], warnings: [] }
+function formatEnvVar(envVar: EnvVar): string {
+    return `${envVar.name} — ${envVar.description}`
+}
+
+export function validateEnv(): EnvValidationResult {
+    if (cachedValidationResult) return cachedValidationResult
 
     const isProduction = process.env.NODE_ENV === "production"
-    const missing: string[] = []
+    const isBuild = process.env.NEXT_PHASE === "phase-production-build"
+    const missingVars: EnvVar[] = []
     const warnings: string[] = []
 
     for (const envVar of CRITICAL_ENV_VARS) {
@@ -53,21 +65,40 @@ export function validateEnv(): { valid: boolean; missing: string[]; warnings: st
 
         if (!exists) {
             if (envVar.required === "always") {
-                missing.push(`${envVar.name} — ${envVar.description}`)
+                missingVars.push(envVar)
             } else if (envVar.required === "production" && isProduction) {
-                missing.push(`${envVar.name} — ${envVar.description}`)
+                missingVars.push(envVar)
             } else if (envVar.required === "production" && !isProduction) {
-                warnings.push(`${envVar.name} — ${envVar.description} (requerido en producción)`)
+                warnings.push(`${formatEnvVar(envVar)} (requerido en producción)`)
             }
         }
     }
 
+    const missing = missingVars.map(formatEnvVar)
+    const result: EnvValidationResult = {
+        valid: missing.length === 0,
+        missing,
+        warnings,
+    }
+
     if (missing.length > 0) {
-        const msg = `Variables de entorno faltantes:\n${missing.map(m => `  ✗ ${m}`).join("\n")}`
-        const isBuild = process.env.NEXT_PHASE === "phase-production-build"
+        const blockingMissing = isProduction && !isBuild
+            ? missingVars.filter((envVar) => envVar.blockInProductionRuntime).map(formatEnvVar)
+            : []
+
+        if (blockingMissing.length > 0) {
+            log.error("CRITICAL: Missing blocking env vars in production runtime", {
+                missing,
+                blockingMissing,
+            })
+
+            throw new Error(
+                `Variables de entorno críticas faltantes:\n${blockingMissing.map((item) => `  ✗ ${item}`).join("\n")}`
+            )
+        }
 
         if (isProduction && !isBuild) {
-            log.error("CRITICAL: Missing required env vars in production — app will continue but may have degraded functionality", { missing })
+            log.error("Missing required env vars in production runtime (continuing with degraded functionality)", { missing })
         } else {
             log.warn("Missing required env vars (continuing)", { missing, isBuild })
         }
@@ -77,7 +108,7 @@ export function validateEnv(): { valid: boolean; missing: string[]; warnings: st
         log.info("Env var warnings (optional in dev)", { warnings })
     }
 
-    validated = true
+    cachedValidationResult = result
     log.info("Environment validation passed", {
         env: isProduction ? "production" : "development",
         varsChecked: CRITICAL_ENV_VARS.length,
@@ -85,5 +116,5 @@ export function validateEnv(): { valid: boolean; missing: string[]; warnings: st
         warnings: warnings.length,
     })
 
-    return { valid: missing.length === 0, missing, warnings }
+    return result
 }

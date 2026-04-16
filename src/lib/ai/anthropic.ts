@@ -1,4 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { logger } from "@/lib/logger"
+
+const log = logger("ai/anthropic")
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -11,23 +14,31 @@ export async function createMessage(params: Anthropic.MessageCreateParams, retri
 
     // Check if API key is present
     if (!process.env.ANTHROPIC_API_KEY) {
-        console.error("ANTHROPIC_API_KEY is missing in environment variables")
+        log.error("ANTHROPIC_API_KEY is missing in environment variables")
         throw new Error("ANTHROPIC_API_KEY is missing")
     }
 
     for (let i = 0; i < retries; i++) {
         try {
-            console.log(`Calling Anthropic API (attempt ${i + 1})...`)
+            log.debug("Calling Anthropic API", { attempt: i + 1, retries })
             const message = await anthropic.messages.create(params) as Anthropic.Message
-            console.log("Anthropic API response received")
+            log.debug("Anthropic API response received", { attempt: i + 1 })
             return message
-        } catch (error: any) {
-            lastError = error
-            console.error(`Anthropic API error (attempt ${i + 1}/${retries}):`, error.message)
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error"
+            const errorStatus = typeof error === "object"
+                && error !== null
+                && "status" in error
+                && typeof (error as { status?: unknown }).status === "number"
+                ? (error as { status: number }).status
+                : undefined
+
+            lastError = error instanceof Error ? error : new Error(errorMessage)
+            log.error("Anthropic API error", { attempt: i + 1, retries, message: errorMessage, status: errorStatus })
 
             // Don't retry on certain errors
-            if (error.status === 401 || error.status === 403) {
-                throw new Error(`Authentication error: ${error.message}`)
+            if (errorStatus === 401 || errorStatus === 403) {
+                throw new Error(`Authentication error: ${errorMessage}`)
             }
 
             // Wait before retrying (exponential backoff)
