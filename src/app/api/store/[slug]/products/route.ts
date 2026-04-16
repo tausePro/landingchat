@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { listProductsWithVariants } from "@/lib/commerce/listProductsWithVariants"
+import { mapProductListItemToStorefrontProduct } from "@/lib/commerce/storefrontProduct"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
@@ -36,20 +37,18 @@ export async function GET(
         })
 
         return NextResponse.json({
-            products: products.map((product) => ({
-                id: product.id,
-                name: product.name,
-                price: product.default_variant?.price
-                    ?? product.legacy_sale_price
-                    ?? product.legacy_price
-                    ?? product.price_range.min_price,
-                image_url: product.default_variant?.image_url
-                    ?? product.image_url
-                    ?? product.images[0]
-                    ?? null,
-                slug: product.slug,
-                description: product.description,
-            })),
+            products: products.map((product) => {
+                const storefrontProduct = mapProductListItemToStorefrontProduct(product)
+
+                return {
+                    id: storefrontProduct.id,
+                    name: storefrontProduct.name,
+                    price: storefrontProduct.sale_price ?? storefrontProduct.price,
+                    image_url: storefrontProduct.image_url || null,
+                    slug: storefrontProduct.slug,
+                    description: storefrontProduct.description,
+                }
+            }),
             total: products.length
         })
     } catch (error) {

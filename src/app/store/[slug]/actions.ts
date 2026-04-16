@@ -1,12 +1,62 @@
 "use server"
 
 import { getProductWithVariants } from "@/lib/commerce/getProductWithVariants"
+import { listProductsWithVariants, type ProductListOrderBy } from "@/lib/commerce/listProductsWithVariants"
+import {
+    mapLegacyProductRowToStorefrontProduct,
+    mapProductListItemToStorefrontProduct,
+    type StorefrontProduct,
+} from "@/lib/commerce/storefrontProduct"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
 import {
     getStorefrontCustomerSession,
     verifyStorefrontOrderAccessToken,
 } from "@/lib/storefrontAccess"
+
+type StorefrontSupabaseClient = Awaited<ReturnType<typeof createClient>>
+
+function resolveStorefrontProductOrder(value: unknown): ProductListOrderBy {
+    return value === "custom" || value === "price_asc" || value === "price_desc"
+        ? value
+        : "recent"
+}
+
+async function getLegacyStorefrontProducts(params: {
+    supabase: StorefrontSupabaseClient
+    organizationId: string
+    itemsToShow: number
+    orderBy: ProductListOrderBy
+}): Promise<StorefrontProduct[]> {
+    const { supabase, organizationId, itemsToShow, orderBy } = params
+
+    let query = supabase
+        .from("products")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .neq("is_active", false)
+
+    if (orderBy === "custom") {
+        query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false })
+    } else if (orderBy === "price_asc") {
+        query = query.order("price", { ascending: true })
+    } else if (orderBy === "price_desc") {
+        query = query.order("price", { ascending: false })
+    } else {
+        query = query.order("created_at", { ascending: false })
+    }
+
+    const { data: products, error: productsError } = await query.limit(itemsToShow)
+
+    if (productsError) {
+        console.error("Error fetching products:", productsError)
+        return []
+    }
+
+    return (products || [])
+        .map((product) => mapLegacyProductRowToStorefrontProduct(product))
+        .filter((product): product is StorefrontProduct => product != null)
+}
 
 export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
@@ -26,33 +76,26 @@ export async function getStoreData(slug: string, limit?: number) {
     // 2. Get product configuration from organization settings
     const productConfig = org.settings?.storefront?.products
     const itemsToShow = limit || productConfig?.itemsToShow || 20 // Default to 20 if no config
-    const orderBy = productConfig?.orderBy || "recent"
+    const orderBy = resolveStorefrontProductOrder(productConfig?.orderBy)
+    let products: StorefrontProduct[] = []
 
-    // 3. Fetch Active Products with proper ordering
-    let query = supabase
-        .from("products")
-        .select("*")
-        .eq("organization_id", org.id)
-        .neq("is_active", false)
+    try {
+        const productList = await listProductsWithVariants({
+            organizationId: org.id,
+            client: supabase,
+            limit: itemsToShow,
+            orderBy,
+        })
 
-    // Apply ordering based on configuration
-    if (orderBy === "custom") {
-        query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false })
-    } else if (orderBy === "price_asc") {
-        query = query.order("price", { ascending: true })
-    } else if (orderBy === "price_desc") {
-        query = query.order("price", { ascending: false })
-    } else {
-        query = query.order("created_at", { ascending: false })
-    }
-
-    // Apply limit
-    query = query.limit(itemsToShow)
-
-    const { data: products, error: productsError } = await query
-
-    if (productsError) {
-        console.error("Error fetching products:", productsError)
+        products = productList.map((product) => mapProductListItemToStorefrontProduct(product))
+    } catch (error) {
+        console.error("[getStoreData] Error fetching variant-centric products:", error)
+        products = await getLegacyStorefrontProducts({
+            supabase,
+            organizationId: org.id,
+            itemsToShow,
+            orderBy,
+        })
     }
 
     // 4. Fetch Published Pages for footer/navigation

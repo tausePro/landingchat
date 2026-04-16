@@ -328,4 +328,6 @@ export interface ProductWithVariantsReadModel {
 export interface ProductWithVariantsListItem extends ProductWithVariantsReadModel {
   legacy_price: number | null
   legacy_sale_price: number | null
+  legacy_stock: number | null
+  badge_id: string | null
 }

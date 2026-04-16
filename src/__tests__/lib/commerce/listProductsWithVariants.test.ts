@@ -21,10 +21,10 @@ interface QueryCall {
   inFilters: Record<string, unknown[]>
   selection: string
   limit?: number
-  order?: {
+  orders: Array<{
     column: string
     ascending: boolean
-  }
+  }>
   orExpression: string | null
 }
 
@@ -41,7 +41,7 @@ function createMockClient(params: {
       const inFilters: Record<string, unknown[]> = {}
       let selection = ""
       let limit: number | undefined
-      let order: QueryCall["order"]
+      const orders: QueryCall["orders"] = []
       let orExpression: string | null = null
 
       const builder = {
@@ -66,10 +66,10 @@ function createMockClient(params: {
           return builder
         },
         order(column: string, options?: { ascending?: boolean }) {
-          order = {
+          orders.push({
             column,
             ascending: options?.ascending ?? true,
-          }
+          })
           return builder
         },
         limit(value: number) {
@@ -84,7 +84,7 @@ function createMockClient(params: {
             inFilters: { ...inFilters },
             selection,
             limit,
-            order,
+            orders: [...orders],
             orExpression,
           })
 
@@ -129,6 +129,8 @@ describe("listProductsWithVariants", () => {
             price_tiers: null,
             price: 80000,
             sale_price: 70000,
+            stock: 9,
+            badge_id: "badge-1",
             created_at: "2026-01-01T00:00:00Z",
           },
           {
@@ -145,6 +147,8 @@ describe("listProductsWithVariants", () => {
             price_tiers: null,
             price: "45000",
             sale_price: null,
+            stock: "2",
+            badge_id: null,
             created_at: "2026-01-02T00:00:00Z",
           },
         ],
@@ -187,6 +191,8 @@ describe("listProductsWithVariants", () => {
       slug: "camiseta-premium",
       legacy_price: 80000,
       legacy_sale_price: 70000,
+      legacy_stock: 9,
+      badge_id: "badge-1",
     })
     expect(result[0].default_variant?.price).toBe(65000)
     expect(result[1]).toMatchObject({
@@ -194,6 +200,8 @@ describe("listProductsWithVariants", () => {
       slug: null,
       legacy_price: 45000,
       legacy_sale_price: null,
+      legacy_stock: 2,
+      badge_id: null,
     })
 
     expect(calls).toHaveLength(2)
@@ -206,10 +214,10 @@ describe("listProductsWithVariants", () => {
         is_active: false,
       },
       limit: 10,
-      order: {
+      orders: [{
         column: "created_at",
         ascending: false,
-      },
+      }],
       orExpression: "name.ilike.%camiseta%,description.ilike.%camiseta%",
     })
     expect(calls[1]).toMatchObject({
@@ -283,7 +291,37 @@ describe("listProductsWithVariants", () => {
     expect(calls[0]).toMatchObject({
       limit: 20,
       excludedFilters: {},
+      orders: [{
+        column: "created_at",
+        ascending: false,
+      }],
       orExpression: null,
+    })
+  })
+
+  it("respeta el orden configurable del storefront", async () => {
+    const { client, calls } = createMockClient({
+      productsResult: { data: [], error: null },
+      variantsResult: { data: [], error: null },
+    })
+
+    await listProductsWithVariants({
+      organizationId: "org-1",
+      client,
+      orderBy: "custom",
+    })
+
+    expect(calls[0]).toMatchObject({
+      orders: [
+        {
+          column: "display_order",
+          ascending: true,
+        },
+        {
+          column: "created_at",
+          ascending: false,
+        },
+      ],
     })
   })
 })

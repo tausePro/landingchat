@@ -15,8 +15,13 @@ export const LIST_PRODUCTS_WITH_VARIANTS_PRODUCT_SELECT = [
   PRODUCT_WITH_VARIANTS_PRODUCT_SELECT,
   "price",
   "sale_price",
+  "stock",
+  "badge_id",
+  "display_order",
   "created_at",
 ].join(", ")
+
+export type ProductListOrderBy = "recent" | "custom" | "price_asc" | "price_desc"
 
 export interface ListProductsWithVariantsParams {
   organizationId: string
@@ -24,6 +29,7 @@ export interface ListProductsWithVariantsParams {
   search?: string | null
   limit?: number
   activeOnly?: boolean
+  orderBy?: ProductListOrderBy
 }
 
 function parseLegacyNumber(value: unknown): number | null {
@@ -85,12 +91,33 @@ function getLegacySalePrice(product: unknown): number | null {
   return parseLegacyNumber(record.sale_price)
 }
 
+function getLegacyStock(product: unknown): number | null {
+  const record = asRecord(product)
+
+  if (!record) {
+    return null
+  }
+
+  return parseLegacyNumber(record.stock)
+}
+
+function getBadgeId(product: unknown): string | null {
+  const record = asRecord(product)
+
+  if (!record) {
+    return null
+  }
+
+  return typeof record.badge_id === "string" ? record.badge_id : null
+}
+
 export async function listProductsWithVariants({
   organizationId,
   client,
   search,
   limit,
   activeOnly = true,
+  orderBy = "recent",
 }: ListProductsWithVariantsParams): Promise<ProductWithVariantsListItem[]> {
   const supabase = client ?? await createClient()
   const sanitizedLimit = sanitizeLimit(limit)
@@ -109,8 +136,17 @@ export async function listProductsWithVariants({
     query = query.or(`name.ilike.%${trimmedSearch}%,description.ilike.%${trimmedSearch}%`)
   }
 
+  if (orderBy === "custom") {
+    query = query.order("display_order", { ascending: true }).order("created_at", { ascending: false })
+  } else if (orderBy === "price_asc") {
+    query = query.order("price", { ascending: true })
+  } else if (orderBy === "price_desc") {
+    query = query.order("price", { ascending: false })
+  } else {
+    query = query.order("created_at", { ascending: false })
+  }
+
   const { data: products, error: productsError } = await query
-    .order("created_at", { ascending: false })
     .limit(sanitizedLimit)
 
   if (productsError) {
@@ -163,6 +199,8 @@ export async function listProductsWithVariants({
       ...productWithVariants,
       legacy_price: getLegacyPrice(product),
       legacy_sale_price: getLegacySalePrice(product),
+      legacy_stock: getLegacyStock(product),
+      badge_id: getBadgeId(product),
     }
   })
 }
