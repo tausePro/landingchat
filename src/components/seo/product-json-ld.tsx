@@ -1,3 +1,5 @@
+import type { ProductWithVariantsReadModel } from "@/types/product"
+
 /**
  * JSON-LD Schema.org para productos
  * Mejora SEO y permite que motores de búsqueda e IA entiendan el catálogo
@@ -28,14 +30,64 @@ interface ProductJsonLdProps {
         custom_domain?: string | null
     }
     url: string
+    productWithVariants?: ProductWithVariantsReadModel | null
 }
 
-export function ProductJsonLd({ product, organization, url }: ProductJsonLdProps) {
-    const images = product.images?.length 
-        ? product.images 
-        : product.image_url 
-            ? [product.image_url] 
-            : []
+function buildOffersSchema({
+    product,
+    organization,
+    url,
+    productWithVariants,
+}: ProductJsonLdProps) {
+    const seller = {
+        "@type": "Organization",
+        name: organization.name
+    }
+
+    if (productWithVariants?.price_range.has_range) {
+        const activeVariants = productWithVariants.variants.filter(variant => variant.is_active)
+        const hasAvailableStock = activeVariants.some(variant => variant.stock_quantity > 0)
+
+        return {
+            "@type": "AggregateOffer",
+            url,
+            priceCurrency: "COP",
+            lowPrice: productWithVariants.price_range.min_price,
+            highPrice: productWithVariants.price_range.max_price,
+            offerCount: activeVariants.length || productWithVariants.variants.length,
+            availability: hasAvailableStock
+                ? "https://schema.org/InStock"
+                : "https://schema.org/OutOfStock",
+            seller
+        }
+    }
+
+    const defaultVariant = productWithVariants?.default_variant
+    const resolvedPrice = defaultVariant?.price ?? (product.sale_price || product.price)
+    const resolvedStock = defaultVariant?.stock_quantity ?? product.stock
+
+    return {
+        "@type": "Offer",
+        url,
+        priceCurrency: "COP",
+        price: resolvedPrice,
+        priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        availability: resolvedStock > 0
+            ? "https://schema.org/InStock"
+            : "https://schema.org/OutOfStock",
+        seller
+    }
+}
+
+export function buildProductJsonLdData({ product, organization, url, productWithVariants }: ProductJsonLdProps) {
+    const defaultVariant = productWithVariants?.default_variant
+    const images = product.images?.length
+        ? product.images
+        : defaultVariant?.image_url
+            ? [defaultVariant.image_url]
+            : product.image_url
+                ? [product.image_url]
+                : []
 
     const productSchema = {
         "@context": "https://schema.org",
@@ -43,7 +95,7 @@ export function ProductJsonLd({ product, organization, url }: ProductJsonLdProps
         name: product.name,
         description: product.meta_description || product.description || `${product.name} - Disponible en ${organization.name}`,
         image: images,
-        sku: product.sku || product.id,
+        sku: defaultVariant?.sku || product.sku || product.id,
         brand: product.brand ? {
             "@type": "Brand",
             name: product.brand
@@ -51,20 +103,7 @@ export function ProductJsonLd({ product, organization, url }: ProductJsonLdProps
             "@type": "Brand",
             name: organization.name
         },
-        offers: {
-            "@type": "Offer",
-            url: url,
-            priceCurrency: "COP",
-            price: product.sale_price || product.price,
-            priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            availability: product.stock > 0 
-                ? "https://schema.org/InStock" 
-                : "https://schema.org/OutOfStock",
-            seller: {
-                "@type": "Organization",
-                name: organization.name
-            }
-        },
+        offers: buildOffersSchema({ product, organization, url, productWithVariants }),
         ...(product.categories?.length && {
             category: product.categories.join(" > ")
         }),
@@ -116,6 +155,21 @@ export function ProductJsonLd({ product, organization, url }: ProductJsonLdProps
             }
         ]
     }
+
+    return {
+        productSchema,
+        faqSchema,
+        breadcrumbSchema,
+    }
+}
+
+export function ProductJsonLd({ product, organization, url, productWithVariants }: ProductJsonLdProps) {
+    const { productSchema, faqSchema, breadcrumbSchema } = buildProductJsonLdData({
+        product,
+        organization,
+        url,
+        productWithVariants,
+    })
 
     return (
         <>
