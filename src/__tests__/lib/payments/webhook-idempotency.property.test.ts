@@ -220,6 +220,14 @@ describe("Webhook Idempotency - Property Tests", () => {
 
                     // Debe actualizar con el provider_transaction_id incluso si el estado es igual
                     expect(mockSupabase.mocks.update).toHaveBeenCalled()
+
+                    const updateCalls = mockSupabase.mocks.update.mock.calls
+                    const replayedOrderSideEffects = updateCalls.some((call) => {
+                        const updatePayload = call[0] as Record<string, unknown>
+                        return "payment_status" in updatePayload
+                    })
+
+                    expect(replayedOrderSideEffects).toBe(false)
                 }
             ),
             { numRuns: 50 }
