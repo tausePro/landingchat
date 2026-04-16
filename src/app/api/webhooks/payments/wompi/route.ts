@@ -7,6 +7,9 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import { WompiGateway } from "@/lib/payments/wompi-gateway"
+import { logger } from "@/lib/logger"
+
+const log = logger("webhooks/payments/wompi")
 
 interface WompiWebhookPayload {
     event: string
@@ -96,7 +99,7 @@ export async function POST(request: Request) {
 
             const isValid = gateway.validateWebhookSignature(payload, "", "")
             if (!isValid) {
-                console.error("[Wompi Webhook] Invalid signature")
+                log.error("Invalid signature", { orgSlug, transactionId: transaction.id })
                 await logWebhook(supabase, "wompi", "error", payload, { error: "Invalid signature" })
                 return NextResponse.json(
                     { error: "Invalid signature" },
@@ -119,7 +122,11 @@ export async function POST(request: Request) {
         if (existingTx) {
             // Idempotencia: si el estado ya es el mismo, no hacer nada
             if (existingTx.status === status) {
-                console.log(`[Wompi Webhook] Duplicate webhook for transaction ${transaction.id}, status already ${status}`)
+                log.info("Duplicate webhook ignored", {
+                    transactionId: transaction.id,
+                    status,
+                    storeTransactionId: existingTx.id,
+                })
                 await logWebhook(supabase, "wompi", "duplicate", payload, { 
                     message: "Duplicate webhook, no action taken",
                     transactionId: existingTx.id 
@@ -227,7 +234,9 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ received: true })
     } catch (error) {
-        console.error("[Wompi Webhook] Error:", error)
+        log.error("Unhandled webhook error", {
+            message: error instanceof Error ? error.message : "Unknown error",
+        })
         await logWebhook(supabase, "wompi", "error", null, { 
             error: error instanceof Error ? error.message : "Unknown error",
             processingTime: Date.now() - startTime
@@ -320,7 +329,13 @@ async function processOrderUpdate(
                                     .from("products")
                                     .update({ stock: newStock, updated_at: new Date().toISOString() })
                                     .eq("id", item.product_id)
-                                console.log(`[Wompi Webhook] Stock decremented: ${item.product_id} ${product.stock} → ${newStock} (qty: ${item.quantity})`)
+                                log.info("Stock decremented", {
+                                    productId: item.product_id,
+                                    previousStock: product.stock,
+                                    newStock,
+                                    quantity: item.quantity,
+                                    orderId,
+                                })
                             }
                         }
                     }
@@ -341,9 +356,15 @@ async function processOrderUpdate(
                             })) || [],
                         }
                     )
-                    console.log(`[Wompi Webhook] Sale notification sent for order ${order.order_number}`)
+                    log.info("Sale notification sent", {
+                        orderId,
+                        orderNumber: order.order_number,
+                    })
                 } catch (notifError) {
-                    console.error("[Wompi Webhook] Error sending sale notification:", notifError)
+                    log.error("Error sending sale notification", {
+                        orderId,
+                        message: notifError instanceof Error ? notifError.message : "Unknown error",
+                    })
                 }
 
                 // 2. Enviar evento Purchase a Meta Conversions API (server-side tracking)
@@ -367,13 +388,22 @@ async function processOrderUpdate(
                         },
                         supabase
                     )
-                    console.log(`[Wompi Webhook] Meta CAPI Purchase event sent for order ${order.order_number}`)
+                    log.info("Meta CAPI Purchase event sent", {
+                        orderId,
+                        orderNumber: order.order_number,
+                    })
                 } catch (capiError) {
-                    console.error("[Wompi Webhook] Error sending Meta CAPI event:", capiError)
+                    log.error("Error sending Meta CAPI event", {
+                        orderId,
+                        message: capiError instanceof Error ? capiError.message : "Unknown error",
+                    })
                 }
             }
         } catch (err) {
-            console.error("[Wompi Webhook] Error in post-payment processing:", err)
+            log.error("Error in post-payment processing", {
+                orderId,
+                message: err instanceof Error ? err.message : "Unknown error",
+            })
         }
     }
 }
@@ -398,7 +428,10 @@ async function logWebhook(
             headers: response || {},
         })
     } catch (error) {
-        console.error("[Wompi Webhook] Error logging webhook:", error)
+        log.error("Error logging webhook", {
+            webhookType,
+            message: error instanceof Error ? error.message : "Unknown error",
+        })
     }
 }
 

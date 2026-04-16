@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: test-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: test-service-role-key
+          ANTHROPIC_API_KEY: test-anthropic-key
+          ENCRYPTION_KEY: test-encryption-key
+          ENCRYPTION_SALT: test-encryption-salt
+          CRON_SECRET: test-cron-secret
+
+      - name: Run focused tests
+        run: npx vitest run src/__tests__/lib/env-validation.test.ts src/__tests__/lib/payments/checkout-access-token.test.ts src/__tests__/security/ai-chat-route.test.ts
