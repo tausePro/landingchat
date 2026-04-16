@@ -25,6 +25,23 @@ const EPAYCO_SECURE_URL = {
     production: "https://secure.epayco.co",
 }
 
+function appendAccessToCheckoutUrl(checkoutUrl: string, redirectUrl: string) {
+    try {
+        const sourceUrl = new URL(redirectUrl)
+        const access = sourceUrl.searchParams.get("access")
+
+        if (!access) {
+            return checkoutUrl
+        }
+
+        const targetUrl = new URL(checkoutUrl)
+        targetUrl.searchParams.set("access", access)
+        return targetUrl.toString()
+    } catch {
+        return checkoutUrl
+    }
+}
+
 export class EpaycoGateway implements PaymentGateway {
     readonly provider = "epayco" as const
     private config: GatewayConfig
@@ -105,6 +122,8 @@ export class EpaycoGateway implements PaymentGateway {
                 const baseUrl = urlParts?.[1] || ""
                 checkoutUrl = `${baseUrl}/checkout/epayco/${input.reference}`
             }
+
+            checkoutUrl = appendAccessToCheckoutUrl(checkoutUrl, redirectUrl)
 
             return {
                 success: true,

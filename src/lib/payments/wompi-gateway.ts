@@ -20,6 +20,23 @@ const WOMPI_API_URL = {
     production: "https://production.wompi.co/v1",
 }
 
+function appendAccessToCheckoutUrl(checkoutUrl: string, redirectUrl: string) {
+    try {
+        const sourceUrl = new URL(redirectUrl)
+        const access = sourceUrl.searchParams.get("access")
+
+        if (!access) {
+            return checkoutUrl
+        }
+
+        const targetUrl = new URL(checkoutUrl)
+        targetUrl.searchParams.set("access", access)
+        return targetUrl.toString()
+    } catch {
+        return checkoutUrl
+    }
+}
+
 export class WompiGateway implements PaymentGateway {
     readonly provider = "wompi" as const
     private config: GatewayConfig
@@ -59,6 +76,8 @@ export class WompiGateway implements PaymentGateway {
                 const baseUrl = urlParts?.[1] || ""
                 checkoutUrl = `${baseUrl}/checkout/wompi/${input.reference}`
             }
+
+            checkoutUrl = appendAccessToCheckoutUrl(checkoutUrl, redirectUrl)
 
             return {
                 success: true,
@@ -227,6 +246,9 @@ export class WompiGateway implements PaymentGateway {
         _signature: string,
         _timestamp?: string
     ): boolean {
+        void _signature
+        void _timestamp
+
         if (!this.config.integritySecret) return false
         if (!payload.signature?.properties || !payload.data) return false
 
