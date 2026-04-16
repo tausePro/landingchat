@@ -3,6 +3,7 @@ import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
 import { canCreateResource } from "@/lib/utils/subscription"
+import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
@@ -60,18 +61,13 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { message, chatId, slug, currentProductId, cartItems } = validation.data
+        const { message, chatId, slug, customerId: requestedCustomerId, currentProductId, cartItems } = validation.data
 
         const supabase = createServiceClient()
 
-        // Get organization from slug
-        const { data: organization, error: orgError } = await supabase
-            .from("organizations")
-            .select("id")
-            .eq("slug", slug)
-            .single()
+        const organization = await resolvePublicOrganization(supabase, { slug })
 
-        if (orgError || !organization) {
+        if (!organization) {
             return NextResponse.json(
                 { error: "Organization not found" },
                 { status: 404, headers }
@@ -90,7 +86,7 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        if (validation.data.customerId && validation.data.customerId !== storefrontSession.customerId) {
+        if (requestedCustomerId && requestedCustomerId !== storefrontSession.customerId) {
             return NextResponse.json(
                 { error: "Sesión inválida o expirada" },
                 { status: 403, headers }
@@ -103,52 +99,67 @@ export async function POST(request: NextRequest) {
         const customerId = storefrontSession.customerId
 
         if (!currentChatId) {
-            // Create new chat
-            const { data: agent } = await supabase
-                .from("agents")
-                .select("id")
-                .eq("organization_id", organization.id)
-                .eq("status", "available")
-                .eq("type", "bot")
-                .single()
-
-            if (!agent) {
-                return NextResponse.json(
-                    { error: "No active agent found for this organization" },
-                    { status: 404, headers }
-                )
-            }
-
-            // Verificar límite de conversaciones mensuales del plan
-            const resourceCheck = await canCreateResource(organization.id, "conversation", supabase)
-            if (!resourceCheck.allowed) {
-                return NextResponse.json(
-                    { error: resourceCheck.message || "Esta tienda ha alcanzado el límite de conversaciones de su plan." },
-                    { status: 429, headers }
-                )
-            }
-
-            const { data: newChat, error: chatError } = await supabase
+            const { data: existingActiveChat } = await supabase
                 .from("chats")
-                .insert({
-                    organization_id: organization.id,
-                    customer_id: storefrontSession.customerId,
-                    assigned_agent_id: agent.id,
-                    status: "active"
-                })
-                .select()
-                .single()
+                .select("id, assigned_agent_id")
+                .eq("organization_id", organization.id)
+                .eq("customer_id", customerId)
+                .eq("status", "active")
+                .is("channel", null)
+                .order("updated_at", { ascending: false })
+                .limit(1)
+                .maybeSingle()
 
-            if (chatError || !newChat) {
-                log.error("Chat creation error", { error: chatError?.message })
-                return NextResponse.json(
-                    { error: "Failed to create chat", details: chatError?.message },
-                    { status: 500, headers }
-                )
+            if (existingActiveChat?.assigned_agent_id) {
+                currentChatId = existingActiveChat.id
+                agentId = existingActiveChat.assigned_agent_id
+            } else {
+                const { data: agent } = await supabase
+                    .from("agents")
+                    .select("id")
+                    .eq("organization_id", organization.id)
+                    .eq("status", "available")
+                    .eq("type", "bot")
+                    .single()
+
+                if (!agent) {
+                    return NextResponse.json(
+                        { error: "No active agent found for this organization" },
+                        { status: 404, headers }
+                    )
+                }
+
+                // Verificar límite de conversaciones mensuales del plan solo al crear una nueva
+                const resourceCheck = await canCreateResource(organization.id, "conversation", supabase)
+                if (!resourceCheck.allowed) {
+                    return NextResponse.json(
+                        { error: resourceCheck.message || "Esta tienda ha alcanzado el límite de conversaciones de su plan." },
+                        { status: 429, headers }
+                    )
+                }
+
+                const { data: newChat, error: chatError } = await supabase
+                    .from("chats")
+                    .insert({
+                        organization_id: organization.id,
+                        customer_id: storefrontSession.customerId,
+                        assigned_agent_id: agent.id,
+                        status: "active"
+                    })
+                    .select()
+                    .single()
+
+                if (chatError || !newChat) {
+                    log.error("Chat creation error", { error: chatError?.message })
+                    return NextResponse.json(
+                        { error: "Failed to create chat", details: chatError?.message },
+                        { status: 500, headers }
+                    )
+                }
+
+                currentChatId = newChat.id
+                agentId = agent.id
             }
-
-            currentChatId = newChat.id
-            agentId = agent.id
         } else {
             // Get agent ID from existing chat - SECURITY: validate ownership
             const { data: chat, error: chatQueryError } = await supabase

@@ -6,6 +6,8 @@
 import { notFound } from "next/navigation"
 import { headers } from "next/headers"
 import { createServiceClient } from "@/lib/supabase/server"
+import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
+import { getOrderDetails } from "../../store/[slug]/actions"
 import Link from "next/link"
 import {
     Package,
@@ -22,70 +24,35 @@ import { CartCleaner } from "./components/cart-cleaner"
 
 interface OrderPageProps {
     params: Promise<{ orderId: string }>
+    searchParams: Promise<{ access?: string }>
 }
 
-async function getOrderDetailsByDomain(host: string, orderId: string) {
+export default async function OrderTrackingPage({ params, searchParams }: OrderPageProps) {
+    const { orderId } = await params
+    const { access } = await searchParams
+    const headersList = await headers()
+    const host = headersList.get("host") || ""
     const supabase = createServiceClient()
 
-    // Limpiar el host (quitar puerto si existe, quitar www)
-    let cleanHost = host.split(':')[0] // Quitar puerto
-    if (cleanHost.startsWith('www.')) {
-        cleanHost = cleanHost.substring(4)
-    }
+    const publicOrganization = await resolvePublicOrganization(supabase, { host })
 
-    console.log(`[OrderPage] Looking for org with custom_domain: ${cleanHost} (original host: ${host})`)
+    if (!publicOrganization) return notFound()
 
-    // 1. Buscar organización por dominio personalizado
-    const { data: org, error: orgError } = await supabase
-        .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain")
-        .eq("custom_domain", cleanHost)
-        .single()
+    const result = await getOrderDetails(publicOrganization.slug, orderId, access)
 
-    console.log(`[OrderPage] Org query result:`, { found: !!org, error: orgError?.message, orgSlug: org?.slug })
+    if (!result) return notFound()
 
-    if (orgError || !org) return null
+    const { order, organization } = result
 
-    // 2. Buscar la orden
-    console.log(`[OrderPage] Looking for order: ${orderId} in org: ${org.id}`)
-    
-    const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", orderId)
-        .eq("organization_id", org.id)
-        .single()
-
-    console.log(`[OrderPage] Order query result:`, { found: !!order, error: orderError?.message })
-
-    if (orderError || !order) return null
-
-    // 3. Buscar el número de WhatsApp de la tienda (instancia corporativa conectada)
     const { data: whatsappInstance } = await supabase
         .from("whatsapp_instances")
         .select("phone_number_display")
-        .eq("organization_id", org.id)
+        .eq("organization_id", organization.id)
         .eq("instance_type", "corporate")
         .eq("status", "connected")
         .single()
 
-    return { 
-        organization: org, 
-        order,
-        storeWhatsapp: whatsappInstance?.phone_number_display || null
-    }
-}
-
-export default async function OrderTrackingPage({ params }: OrderPageProps) {
-    const { orderId } = await params
-    const headersList = await headers()
-    const host = headersList.get("host") || ""
-    
-    const result = await getOrderDetailsByDomain(host, orderId)
-
-    if (!result) return notFound()
-
-    const { order, organization, storeWhatsapp } = result
+    const storeWhatsapp = whatsappInstance?.phone_number_display || null
 
     // Format currency
     const formatCurrency = (amount: number) => {

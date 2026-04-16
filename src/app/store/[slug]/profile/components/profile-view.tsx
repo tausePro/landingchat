@@ -9,16 +9,6 @@ interface Customer {
     full_name: string
     email?: string
     phone?: string
-    document_type?: string
-    document_number?: string
-    person_type?: string
-    business_name?: string
-    created_at: string
-    address?: {
-        city?: string
-        neighborhood?: string
-        address?: string
-    }
 }
 
 interface Order {
@@ -28,7 +18,7 @@ interface Order {
     status: string
     payment_status: string
     created_at: string
-    items: any[]
+    items: unknown[]
 }
 
 interface Organization {
