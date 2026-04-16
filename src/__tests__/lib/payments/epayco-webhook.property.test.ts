@@ -203,6 +203,66 @@ describe("ePayco Webhook - Property Tests", () => {
         )
     })
 
+    it("reconciles reference-matched ePayco webhooks without replaying side effects when status is unchanged", async () => {
+        await fc.assert(
+            fc.asyncProperty(
+                fc.string({ minLength: 10, maxLength: 50 }), // refPayco
+                fc.string({ minLength: 10, maxLength: 50 }), // transactionId
+                fc.string({ minLength: 5, maxLength: 20 }), // invoice
+                fc.float({ min: 10, max: 10000 }), // amount
+                fc.constantFrom("1", "2", "3", "4", "6"), // codResponse
+                async (refPayco, transactionId, invoice, amount, codResponse) => {
+                    const amountStr = amount.toFixed(2)
+                    const mappedStatus = mapEpaycoStatus(codResponse)
+
+                    mockSupabase.mocks.single
+                        .mockResolvedValueOnce({ data: TEST_ORG, error: null })
+                        .mockResolvedValueOnce({ data: TEST_EPAYCO_CONFIG, error: null })
+                        .mockResolvedValueOnce({ data: null, error: null })
+                        .mockResolvedValueOnce({
+                            data: {
+                                ...TEST_TRANSACTION,
+                                provider_reference: invoice,
+                                status: mappedStatus,
+                            },
+                            error: null,
+                        })
+
+                    const payload = generateEpaycoWebhookPayload(
+                        refPayco,
+                        transactionId,
+                        invoice,
+                        amountStr,
+                        codResponse,
+                        "test_integrity_secret",
+                        "test_private_key"
+                    )
+
+                    const request = createWebhookRequest(
+                        `http://localhost:3000/api/webhooks/payments/epayco?org=${TEST_ORG.slug}`,
+                        payload
+                    )
+
+                    const response = await POST(request)
+                    const result = await response.json()
+
+                    expect(response.status).toBe(200)
+                    expect(result.received).toBe(true)
+                    expect(mockSupabase.mocks.update).toHaveBeenCalled()
+
+                    const updateCalls = mockSupabase.mocks.update.mock.calls
+                    const replayedOrderSideEffects = updateCalls.some((call) => {
+                        const updatePayload = call[0] as Record<string, unknown>
+                        return "payment_status" in updatePayload
+                    })
+
+                    expect(replayedOrderSideEffects).toBe(false)
+                }
+            ),
+            { numRuns: 50 }
+        )
+    })
+
     /**
      * Test de manejo de estados APPROVED para ePayco
      */
