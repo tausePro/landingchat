@@ -10,6 +10,7 @@ import type {
 export const PRODUCT_WITH_VARIANTS_PRODUCT_SELECT = [
   "id",
   "organization_id",
+  "slug",
   "name",
   "description",
   "image_url",
@@ -147,7 +148,7 @@ function normalizePriceTiers(value: unknown): PriceTier[] | undefined {
   })
 }
 
-function normalizeProductSource(
+export function normalizeProductSource(
   product: unknown,
 ): Parameters<typeof buildProductWithVariants>[0] {
   const record = asRecord(product, "product")
@@ -155,6 +156,7 @@ function normalizeProductSource(
   return {
     id: readRequiredString(record, "id", "product"),
     organization_id: readRequiredString(record, "organization_id", "product"),
+    slug: typeof record.slug === "string" ? record.slug : undefined,
     name: readRequiredString(record, "name", "product"),
     description: typeof record.description === "string" ? record.description : undefined,
     image_url: typeof record.image_url === "string" ? record.image_url : undefined,
@@ -169,7 +171,7 @@ function normalizeProductSource(
   }
 }
 
-function normalizeVariantRow(variant: unknown): ProductVariantRow {
+export function normalizeVariantRow(variant: unknown): ProductVariantRow {
   const record = asRecord(variant, "product_variant")
 
   return {

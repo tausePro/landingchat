@@ -9,6 +9,7 @@ type ProductWithVariantsSource = Pick<
   ProductData,
   | "id"
   | "organization_id"
+  | "slug"
   | "name"
   | "description"
   | "image_url"
@@ -46,6 +47,7 @@ export function buildProductWithVariants(
   return {
     id: product.id,
     organization_id: product.organization_id,
+    slug: product.slug ?? null,
     name: product.name,
     description: product.description ?? null,
     image_url: product.image_url ?? null,

@@ -311,6 +311,7 @@ export interface CartLineItem {
 export interface ProductWithVariantsReadModel {
   id: string
   organization_id: string
+  slug: string | null
   name: string
   description: string | null
   image_url: string | null
@@ -322,4 +323,9 @@ export interface ProductWithVariantsReadModel {
   default_variant: ProductVariantRow | null
   variants: ProductVariantRow[]
   price_range: VariantPriceRange
+}
+
+export interface ProductWithVariantsListItem extends ProductWithVariantsReadModel {
+  legacy_price: number | null
+  legacy_sale_price: number | null
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { listProductsWithVariants } from "@/lib/commerce/listProductsWithVariants"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET(
@@ -27,36 +28,29 @@ export async function GET(
             )
         }
 
-        // 2. Build products query
-        let query = supabase
-            .from("products")
-            .select("id, name, price, image_url, slug, description")
-            .eq("organization_id", org.id)
-
-        // 3. Apply search filter if provided
-        if (search && search.trim()) {
-            // Search in name and description using ilike (case insensitive)
-            query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
-        }
-
-        // 4. Apply limit and ordering
-        query = query
-            .order("created_at", { ascending: false })
-            .limit(limit)
-
-        const { data: products, error: productsError } = await query
-
-        if (productsError) {
-            console.error("Error fetching products:", productsError)
-            return NextResponse.json(
-                { error: "Error fetching products" },
-                { status: 500 }
-            )
-        }
+        const products = await listProductsWithVariants({
+            organizationId: org.id,
+            client: supabase,
+            search,
+            limit,
+        })
 
         return NextResponse.json({
-            products: products || [],
-            total: products?.length || 0
+            products: products.map((product) => ({
+                id: product.id,
+                name: product.name,
+                price: product.default_variant?.price
+                    ?? product.legacy_sale_price
+                    ?? product.legacy_price
+                    ?? product.price_range.min_price,
+                image_url: product.default_variant?.image_url
+                    ?? product.image_url
+                    ?? product.images[0]
+                    ?? null,
+                slug: product.slug,
+                description: product.description,
+            })),
+            total: products.length
         })
     } catch (error) {
         console.error("Error in products API:", error)

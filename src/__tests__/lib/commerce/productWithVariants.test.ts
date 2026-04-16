@@ -11,6 +11,7 @@ function makeProduct(
   return {
     id: overrides.id ?? "product-1",
     organization_id: overrides.organization_id ?? "org-1",
+    slug: overrides.slug,
     name: overrides.name ?? "Producto test",
     description: overrides.description,
     image_url: overrides.image_url,
@@ -71,6 +72,7 @@ describe("selectDefaultVariant", () => {
 describe("buildProductWithVariants", () => {
   it("construye el read model con variantes ordenadas y variante default", () => {
     const product = makeProduct({
+      slug: "camiseta-test",
       images: ["https://example.com/a.jpg"],
       categories: ["camisetas"],
     })
@@ -100,6 +102,7 @@ describe("buildProductWithVariants", () => {
 
     expect(result.variants.map((variant) => variant.id)).toEqual(["v-1", "v-2"])
     expect(result.default_variant?.id).toBe("v-1")
+    expect(result.slug).toBe("camiseta-test")
     expect(result.images).toEqual(["https://example.com/a.jpg"])
     expect(result.categories).toEqual(["camisetas"])
     expect(result.price_range).toMatchObject({
@@ -124,6 +127,7 @@ describe("buildProductWithVariants", () => {
 
     const result = buildProductWithVariants(product, [])
 
+    expect(result.slug).toBeNull()
     expect(result.description).toBeNull()
     expect(result.image_url).toBeNull()
     expect(result.images).toEqual([])

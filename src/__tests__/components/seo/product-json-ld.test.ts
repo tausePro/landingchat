@@ -26,6 +26,7 @@ function makeProductWithVariants(
   return {
     id: overrides.id ?? "product-1",
     organization_id: overrides.organization_id ?? "org-1",
+    slug: overrides.slug ?? "camiseta-premium",
     name: overrides.name ?? "Camiseta Premium",
     description: overrides.description ?? "Algodón pesado",
     image_url: overrides.image_url ?? "https://example.com/main.jpg",
