@@ -307,3 +307,19 @@ export interface CartLineItem {
   quantity: number
   image_url: string | null
 }
+
+export interface ProductWithVariantsReadModel {
+  id: string
+  organization_id: string
+  name: string
+  description: string | null
+  image_url: string | null
+  images: string[]
+  categories: string[]
+  is_active: boolean
+  has_quantity_pricing: boolean
+  price_tiers: PriceTier[] | null
+  default_variant: ProductVariantRow | null
+  variants: ProductVariantRow[]
+  price_range: VariantPriceRange
+}
