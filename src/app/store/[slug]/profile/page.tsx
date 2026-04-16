@@ -1,9 +1,11 @@
 import { createServiceClient } from "@/lib/supabase/server"
-import { getStorefrontCustomerSession } from "@/lib/storefrontAccess"
+import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
 import { getPhoneVariants } from "@/lib/utils/phone"
 import { notFound } from "next/navigation"
 import { ProfileView } from "./components/profile-view"
 import { ProfileAccessForm } from "./components/profile-access-form"
+
+const PROFILE_CUSTOMER_SELECT = "id, full_name, email, phone"
 
 interface ProfilePageProps {
     params: Promise<{ slug: string }>
@@ -37,15 +39,18 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
     const orgPhone = whatsappInstance?.phone_number || org.settings?.contact?.phone || null
 
-    const customerSession = await getStorefrontCustomerSession(slug)
+    const customerSession = await getValidatedStorefrontCustomerSession({
+        slug,
+        organizationId: org.id,
+    })
 
-    if (!customerSession || customerSession.organizationId !== org.id) {
+    if (!customerSession) {
         return <ProfileAccessForm slug={slug} organizationName={org.name} />
     }
 
     const { data: customer } = await supabase
         .from("customers")
-        .select("*")
+        .select(PROFILE_CUSTOMER_SELECT)
         .eq("organization_id", org.id)
         .eq("id", customerSession.customerId)
         .single()
