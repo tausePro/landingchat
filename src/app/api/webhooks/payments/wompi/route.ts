@@ -166,6 +166,8 @@ export async function POST(request: Request) {
                 .single()
 
             if (txByRef) {
+                const shouldReplayOrderSideEffects = txByRef.status !== status
+
                 // Actualizar con el ID de transacción del proveedor
                 await supabase
                     .from("store_transactions")
@@ -178,8 +180,17 @@ export async function POST(request: Request) {
                     })
                     .eq("id", txByRef.id)
 
-                if (txByRef.order_id) {
+                if (txByRef.order_id && shouldReplayOrderSideEffects) {
                     await processOrderUpdate(supabase, txByRef.order_id, status, org.id)
+                }
+
+                if (!shouldReplayOrderSideEffects) {
+                    log.info("Reference-matched webhook reconciled without replaying side effects", {
+                        transactionId: transaction.id,
+                        storeTransactionId: txByRef.id,
+                        orderId: txByRef.order_id,
+                        status,
+                    })
                 }
 
                 await logWebhook(supabase, "wompi", "success", payload, { 
