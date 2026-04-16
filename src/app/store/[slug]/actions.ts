@@ -1,5 +1,6 @@
 "use server"
 
+import { getProductWithVariants } from "@/lib/commerce/getProductWithVariants"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
 import {
@@ -157,6 +158,18 @@ export async function getProductDetails(slug: string, slugOrId: string) {
 
     if (productError || !product) return null
 
+    let productWithVariants = null
+
+    try {
+        productWithVariants = await getProductWithVariants({
+            productId: product.id,
+            organizationId: org.id,
+            client: supabase,
+        })
+    } catch (error) {
+        console.error("[getProductDetails] Error fetching productWithVariants:", error)
+    }
+
     // 3. Fetch Active Badges
     const { data: badges } = await supabase
         .from("badges")
@@ -192,6 +205,7 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     return {
         organization: org,
         product,
+        productWithVariants,
         badges: badges || [],
         promotions: promotions || [],
         relatedProducts: relatedProducts || []

@@ -75,7 +75,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     if (!data) notFound()
 
-    const { organization, product, badges, promotions, relatedProducts } = data
+    const { organization, product, productWithVariants, badges, promotions, relatedProducts } = data
 
     // Construir URL canónica del producto
     const productUrl = organization.custom_domain
@@ -88,6 +88,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 product={product}
                 organization={organization}
                 url={productUrl}
+                productWithVariants={productWithVariants}
             />
             <StoreLayoutClient
                 slug={organization.slug}
