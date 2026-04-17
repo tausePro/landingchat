@@ -36,6 +36,41 @@ export function selectDefaultVariant(
   return variants.find((variant) => variant.is_default) ?? variants[0] ?? null
 }
 
+export function findVariantBySelectedOptions(
+  variants: ProductVariantRow[],
+  selectedOptions: Record<string, string>,
+): ProductVariantRow | null {
+  const entries = Object.entries(selectedOptions).filter(
+    ([optionName, value]) => optionName.length > 0 && value.length > 0,
+  )
+
+  if (entries.length === 0) {
+    return selectDefaultVariant(variants)
+  }
+
+  const activeVariants = sortVariants(
+    variants.filter((variant) => variant.is_active),
+  )
+
+  for (const variant of activeVariants) {
+    if (variant.option_values.length !== entries.length) {
+      continue
+    }
+
+    const matchesAllOptions = entries.every(([optionName, value]) => {
+      return variant.option_values.some((optionValue) => {
+        return optionValue.option_name === optionName && optionValue.value === value
+      })
+    })
+
+    if (matchesAllOptions) {
+      return variant
+    }
+  }
+
+  return null
+ }
+
 export function buildProductWithVariants(
   product: ProductWithVariantsSource,
   variants: ProductVariantRow[],
