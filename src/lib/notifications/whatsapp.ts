@@ -7,6 +7,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
+import { appendVariantToItemName } from "@/lib/utils/variantInfo"
 
 interface NotificationContext {
     organizationId: string
@@ -21,7 +22,7 @@ export async function sendSaleNotification(
         id: string
         total: number
         customerName: string
-        items: Array<{ name: string; quantity: number }>
+        items: Array<{ name: string; quantity: number; variant_title?: string | null }>
     }
 ): Promise<boolean> {
     try {
@@ -48,7 +49,7 @@ export async function sendSaleNotification(
 
         // Construir mensaje
         const itemsList = order.items
-            .map((item) => `• ${item.quantity}x ${item.name}`)
+            .map((item) => `• ${item.quantity}x ${appendVariantToItemName(item.name, item.variant_title)}`)
             .join("\n")
 
         const message = `🎉 *Nueva Venta!*

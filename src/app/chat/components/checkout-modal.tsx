@@ -1,18 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useCartStore } from "@/store/cart-store"
+import { getCartItemProductId, toCouponCartItem, toOrderSummaryItem, useCartStore } from "@/store/cart-store"
 import { useTracking } from "@/components/analytics/tracking-provider"
-import { createOrder } from "../actions"
+import { calculateOrderSummary, createOrder, getAvailablePaymentGateways, getManualPaymentInfo, getShippingConfig, validateCoupon } from "../actions"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getTrackingParams } from "@/hooks/use-tracking-params"
-
 import { COLOMBIA_DEPARTMENTS } from "@/lib/constants/colombia-departments"
+import { calculateCouponDiscount } from "@/lib/utils/coupon"
+import { getShippingAvailability } from "@/lib/utils/shipping"
+import { formatVariantInfo } from "@/lib/utils/variantInfo"
 
 interface CheckoutModalProps {
     isOpen: boolean
@@ -21,12 +23,6 @@ interface CheckoutModalProps {
     sourceChannel?: "web" | "chat" | "whatsapp"
     chatId?: string
 }
-
-
-import { getAvailablePaymentGateways, getShippingConfig, getManualPaymentInfo, calculateOrderSummary, validateCoupon } from "../actions"
-import { calculateCouponDiscount } from "@/lib/utils/coupon"
-import { calculateShippingCost, getShippingAvailability } from "@/lib/utils/shipping"
-import { useEffect } from "react"
 
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
@@ -56,7 +52,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     useEffect(() => {
         if (isOpen) {
             // Track InitiateCheckout event when modal opens
-            const contentIds = items.map(item => item.id)
+            const contentIds = items.map(item => getCartItemProductId(item))
             trackInitiateCheckout(total(), "COP", contentIds)
 
             // Load shipping configuration
@@ -135,7 +131,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         const fetchSummary = async () => {
             const result = await calculateOrderSummary({
                 slug,
-                items: items.map(i => ({ id: i.id, price: i.price, quantity: i.quantity })),
+                items: items.map(i => toOrderSummaryItem(i)),
                 paymentMethod,
                 shippingCost
             })
@@ -171,7 +167,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const displayFee = orderSummary?.paymentMethodFee ?? localFee
 
     // Coupon discount - reactivo, aplica solo a items que correspondan
-    const couponDiscount = calculateCouponDiscount(appliedCoupon, subtotal, items)
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, subtotal, items.map(item => toCouponCartItem(item)))
     const couponFreeShipping = appliedCoupon?.freeShipping || false
 
     // Final total for display and submission
@@ -554,11 +550,18 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                             <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-2 text-sm">
                                 <div className="space-y-2 pb-2 border-b border-slate-200 dark:border-slate-700 mb-2">
                                     {items.map((item) => (
-                                        <div key={item.id} className="flex justify-between items-center">
-                                            <span className="text-slate-700 dark:text-slate-300 truncate mr-2 flex-1">
-                                                {item.name} <span className="text-slate-400">×{item.quantity}</span>
-                                            </span>
-                                            <span className="text-slate-700 dark:text-slate-300 shrink-0">{formatPrice(item.price * item.quantity)}</span>
+                                        <div key={item.id} className="flex justify-between items-start gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-slate-700 dark:text-slate-300 truncate mr-2">
+                                                    {item.name} <span className="text-slate-400">×{item.quantity}</span>
+                                                </p>
+                                                {formatVariantInfo(item.variant_title) && (
+                                                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 truncate">
+                                                        {formatVariantInfo(item.variant_title)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span className="text-slate-700 dark:text-slate-300 shrink-0">{formatPrice(item.unit_price * item.quantity)}</span>
                                         </div>
                                     ))}
                                 </div>

@@ -1,7 +1,8 @@
 "use client"
 
-import { useCartStore } from "@/store/cart-store"
+import { getCartItemLineId, getCartItemProductId, toCouponCartItem, toOrderSummaryItem, useCartStore } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
+import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { useState, useEffect } from "react"
 import { validateCoupon, calculateOrderSummary } from "@/app/chat/actions"
 import { calculateCouponDiscount } from "@/lib/utils/coupon"
@@ -13,11 +14,20 @@ interface ShippingConfig {
     default_shipping_rate: number
 }
 
+interface RecommendationItem {
+    id: string
+    name: string
+    price: number
+    sale_price?: number | null
+    image_url?: string | null
+    categories?: string[]
+}
+
 interface CartSidebarProps {
     slug: string
     shippingConfig?: ShippingConfig | null
     primaryColor?: string
-    recommendations?: any[]
+    recommendations?: RecommendationItem[]
     onClose?: () => void
     onCheckout?: () => void
 }
@@ -34,8 +44,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
 
     // Descuento reactivo: recalcular cada vez que cambia el carrito
     // Pasar items para que cupones targeted solo apliquen a productos/categorías correspondientes
-    const couponDiscount = calculateCouponDiscount(appliedCoupon, currentTotal, items)
-    const couponFreeShipping = appliedCoupon?.freeShipping || false
+    const couponDiscount = calculateCouponDiscount(appliedCoupon, currentTotal, items.map(item => toCouponCartItem(item)))
 
     // Calcular impuestos cuando cambian los items
     useEffect(() => {
@@ -47,7 +56,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
         const fetchTax = async () => {
             const result = await calculateOrderSummary({
                 slug,
-                items: items.map(i => ({ id: i.id, price: i.price, quantity: i.quantity })),
+                items: items.map(i => toOrderSummaryItem(i)),
             })
             if (result.success && result.tax !== undefined && result.tax > 0) {
                 setTaxInfo({
@@ -109,9 +118,14 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
         
         addItem({
             id: crossSellProduct.id,
+            product_id: crossSellProduct.id,
             name: crossSellProduct.name,
+            product_name: crossSellProduct.name,
             price: crossSellProduct.sale_price || crossSellProduct.price,
-            image_url: crossSellProduct.image_url
+            unit_price: crossSellProduct.sale_price || crossSellProduct.price,
+            compare_at_price: crossSellProduct.sale_price ? crossSellProduct.price : null,
+            image_url: crossSellProduct.image_url,
+            categories: crossSellProduct.categories,
         })
     }
 
@@ -137,7 +151,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                             <span className="material-symbols-outlined">close</span>
                         </button>
                     ) : (
-                        <button className="text-gray-400 hover:text-primary transition-colors" style={{ '--hover-color': primaryColor } as any}>
+                        <button className="text-gray-400 hover:text-primary transition-colors">
                             <span className="material-symbols-outlined">more_horiz</span>
                         </button>
                     )}
@@ -176,9 +190,9 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                     ) : (
                         <div className="space-y-3">
                             {items.map((item) => (
-                                <div key={item.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-sm relative group hover:border-primary/30 transition-colors">
+                                <div key={getCartItemLineId(item)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-sm relative group hover:border-primary/30 transition-colors">
                                     <button 
-                                        onClick={() => removeItem(item.id)}
+                                        onClick={() => removeItem(getCartItemLineId(item))}
                                         className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                                     >
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -190,16 +204,21 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                         ></div>
                                         <div className="flex-1 min-w-0">
                                             <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate pr-4">{item.name}</h4>
+                                            {formatVariantInfo(item.variant_title) && (
+                                                <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 truncate pr-4">
+                                                    {formatVariantInfo(item.variant_title)}
+                                                </p>
+                                            )}
                                             <div className="flex justify-between items-center mt-2">
-                                                <span className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(item.price)}</span>
+                                                <span className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(item.unit_price)}</span>
                                                 <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-1.5 py-0.5 border border-gray-100 dark:border-gray-600">
                                                     <button 
-                                                        onClick={() => updateQuantity(item.id, Math.max(0, item.quantity - 1))}
+                                                        onClick={() => updateQuantity(getCartItemLineId(item), Math.max(0, item.quantity - 1))}
                                                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[12px] font-bold px-1"
                                                     >-</button>
                                                     <span className="text-[10px] font-medium w-3 text-center text-gray-700 dark:text-gray-200">{item.quantity}</span>
                                                     <button 
-                                                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                        onClick={() => updateQuantity(getCartItemLineId(item), item.quantity + 1)}
                                                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[12px] font-bold px-1"
                                                     >+</button>
                                                 </div>
@@ -212,7 +231,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                     )}
 
                     {/* Cross-selling Section */}
-                    {items.length > 0 && crossSellProduct && !items.find(i => i.id === crossSellProduct.id) && (
+                    {items.length > 0 && crossSellProduct && !items.find(i => getCartItemProductId(i) === crossSellProduct.id) && (
                         <div className="mt-6">
                             <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Comprados juntos</h5>
                             <div 

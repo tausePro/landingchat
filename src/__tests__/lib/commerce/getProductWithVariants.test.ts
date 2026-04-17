@@ -198,6 +198,53 @@ describe("getProductWithVariants", () => {
     })
   })
 
+  it("reconstruye el título de la variante desde option_values cuando title viene vacío", async () => {
+    const { client } = createMockClient({
+      productResult: {
+        data: {
+          id: "product-1",
+          organization_id: "org-1",
+          name: "Arena",
+        },
+        error: null,
+      },
+      variantsResult: {
+        data: [
+          {
+            id: "variant-1",
+            product_id: "product-1",
+            organization_id: "org-1",
+            title: "",
+            sku: null,
+            position: 0,
+            is_default: true,
+            is_active: true,
+            price: 79900,
+            compare_at_price: null,
+            stock_quantity: 10,
+            image_url: null,
+            option_values: [
+              { option_name: "Fragancia", value: "Manzana" },
+              { option_name: "Presentación", value: "25 Kg" },
+            ],
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+        ],
+        error: null,
+      },
+    })
+
+    const result = await getProductWithVariants({
+      productId: "product-1",
+      organizationId: "org-1",
+      client,
+    })
+
+    expect(result?.default_variant?.title).toBe("Manzana / 25 Kg")
+    expect(result?.variants[0]?.title).toBe("Manzana / 25 Kg")
+  })
+
   it("lanza error si falla la lectura del producto", async () => {
     const { client } = createMockClient({
       productResult: { data: null, error: { message: "db exploded" } },

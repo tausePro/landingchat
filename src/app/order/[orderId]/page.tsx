@@ -20,6 +20,7 @@ import {
     ArrowLeft,
     MessageCircle
 } from "lucide-react"
+import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { CartCleaner } from "./components/cart-cleaner"
 
 interface OrderPageProps {
@@ -199,15 +200,23 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
                                     Productos
                                 </h3>
                                 <div className="space-y-4">
-                                    {order.items.map((item: { quantity: number; product_name: string; variant_info?: string; total_price: number }, i: number) => (
+                                    {order.items.map((item: { quantity: number; product_name: string; variant_info?: unknown; total_price: number }, i: number) => (
                                         <div key={i} className="flex justify-between items-start py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
                                             <div>
+                                                {(() => {
+                                                    const variantLabel = formatVariantInfo(item.variant_info ?? item)
+
+                                                    return (
+                                                        <>
                                                 <p className="font-medium text-slate-900 dark:text-slate-100">
                                                     {item.quantity}x {item.product_name}
                                                 </p>
-                                                {item.variant_info && (
-                                                    <p className="text-sm text-slate-500">{item.variant_info}</p>
+                                                {variantLabel && (
+                                                    <p className="text-sm text-slate-500">{variantLabel}</p>
                                                 )}
+                                                        </>
+                                                    )
+                                                })()}
                                             </div>
                                             <span className="font-medium text-slate-900 dark:text-slate-100">
                                                 {formatCurrency(item.total_price)}

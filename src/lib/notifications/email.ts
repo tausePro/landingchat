@@ -4,6 +4,7 @@
  */
 
 import { Resend } from 'resend'
+import { appendVariantToItemName } from '@/lib/utils/variantInfo'
 
 // Initialize Resend client
 // Use a fallback key to prevent crash during module evaluation if env var is missing
@@ -18,6 +19,7 @@ interface OrderEmailData {
         name: string
         quantity: number
         price: number
+        variant_title?: string | null
     }>
     paymentMethod: string
     organizationName: string
@@ -83,7 +85,7 @@ function generateOrderEmailHTML(data: OrderEmailData): string {
     const itemsHTML = data.items.map(item => `
         <tr>
             <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
-                ${item.name}
+                ${appendVariantToItemName(item.name, item.variant_title)}
             </td>
             <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: center;">
                 ${item.quantity}
@@ -212,7 +214,7 @@ export async function sendOrderNotificationToOwner(data: {
     customerName: string
     customerEmail: string
     total: number
-    items: Array<{ name: string; quantity: number; price: number }>
+    items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null }>
     ownerEmail: string
     organizationName: string
 }): Promise<boolean> {
@@ -259,7 +261,7 @@ function generateOwnerNotificationHTML(data: {
     customerName: string
     customerEmail: string
     total: number
-    items: Array<{ name: string; quantity: number; price: number }>
+    items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null }>
     organizationName: string
 }): string {
     const formatCurrency = (amount: number) => {
@@ -272,7 +274,7 @@ function generateOwnerNotificationHTML(data: {
     }
 
     const itemsHTML = data.items.map(item => `
-        <li>${item.quantity}x ${item.name} - ${formatCurrency(item.price * item.quantity)}</li>
+        <li>${item.quantity}x ${appendVariantToItemName(item.name, item.variant_title)} - ${formatCurrency(item.price * item.quantity)}</li>
     `).join('')
 
     return `
