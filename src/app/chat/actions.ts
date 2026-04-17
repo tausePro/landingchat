@@ -30,11 +30,17 @@ interface CreateOrderParams {
     }
     items: Array<{
         id: string
+        product_id?: string
+        variant_id?: string | null
+        variant_title?: string | null
         name: string
+        product_name?: string
         price: number
+        unit_price?: number
+        compare_at_price?: number | null
         quantity: number
-        image?: string
-        image_url?: string // Support both property names (cart store uses image_url)
+        image?: string | null
+        image_url?: string | null // Support both property names (cart store uses image_url)
     }>
     subtotal: number
     shippingCost: number
@@ -61,7 +67,7 @@ interface CreateOrderParams {
  */
 export async function calculateOrderSummary(params: {
     slug: string,
-    items: Array<{ id: string, price: number, quantity: number }>,
+    items: Array<{ id: string, product_id?: string, price: number, quantity: number }>,
     paymentMethod?: string,
     shippingCost?: number
 }) {
@@ -78,7 +84,7 @@ export async function calculateOrderSummary(params: {
         if (orgError || !org) return { success: false, error: "Organización no encontrada" }
 
         // 2. Get Product Tax Rates & Calculate Tax
-        const productIds = params.items.map(item => item.id)
+        const productIds = params.items.map(item => item.product_id || item.id)
         const { data: products } = await supabase
             .from("products")
             .select("id, tax_rate")
@@ -153,14 +159,33 @@ function generateOrderNumber(): string {
  */
 const FALLBACK_IMAGE = 'https://landingchat.co/images/placeholder.png' // Use a valid placeholder
 
-function transformCartItemsToOrderItems(cartItems: Array<{ id: string, name: string, price: number, quantity: number, image?: string, image_url?: string }>) {
+function transformCartItemsToOrderItems(cartItems: Array<{
+    id: string
+    product_id?: string
+    variant_id?: string | null
+    variant_title?: string | null
+    name: string
+    product_name?: string
+    price: number
+    unit_price?: number
+    compare_at_price?: number | null
+    quantity: number
+    image?: string | null
+    image_url?: string | null
+}>) {
     return cartItems.map(item => ({
-        product_id: item.id,
-        product_name: item.name,
+        product_id: item.product_id || item.id,
+        product_name: item.product_name || item.name,
         quantity: item.quantity,
-        unit_price: item.price,
-        total_price: item.price * item.quantity,
-        variant_info: null,
+        unit_price: item.unit_price || item.price,
+        total_price: (item.unit_price || item.price) * item.quantity,
+        variant_info: item.variant_title
+            ? {
+                variant_id: item.variant_id ?? null,
+                variant_title: item.variant_title,
+                compare_at_price: item.compare_at_price ?? null,
+            }
+            : null,
         // Support both 'image' and 'image_url' property names (cart store uses image_url)
         image_url: item.image_url || item.image || FALLBACK_IMAGE
     }))

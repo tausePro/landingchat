@@ -1,10 +1,12 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { getOrderDetail } from "./actions"
-import { notFound, redirect } from "next/navigation"
+import Image from "next/image"
 import Link from "next/link"
+import { notFound, redirect } from "next/navigation"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { getOrderDetail } from "./actions"
 import { OrderStatusBadge } from "./order-status-badge"
+import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { OrderActions } from "./order-actions"
 import { CustomerJourney } from "./customer-journey"
 
@@ -82,9 +84,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                     <div key={index} className="p-6 flex items-start gap-4">
                                         <div className="size-16 rounded-lg bg-background-light dark:bg-background-dark flex items-center justify-center shrink-0 overflow-hidden">
                                             {item.image_url ? (
-                                                <img
+                                                <Image
                                                     src={item.image_url}
                                                     alt={item.product_name}
+                                                    width={64}
+                                                    height={64}
                                                     className="size-16 object-cover"
                                                 />
                                             ) : (
@@ -94,16 +98,22 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                             )}
                                         </div>
                                         <div className="flex-1 min-w-0">
+                                            {(() => {
+                                                const variantLabel = formatVariantInfo(item.variant_info ?? item)
+
+                                                return (
+                                                    <>
                                             <h3 className="font-semibold text-text-light-primary dark:text-text-dark-primary">
                                                 {item.product_name}
                                             </h3>
-                                            {item.variant_info && Array.isArray(item.variant_info) && item.variant_info.length > 0 && (
+                                            {variantLabel && (
                                                 <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
-                                                    {item.variant_info.map((v: { type: string; values: string[] }) =>
-                                                        `${v.type}: ${v.values?.join(', ') || ''}`
-                                                    ).join(' | ')}
+                                                    {variantLabel}
                                                 </p>
                                             )}
+                                                    </>
+                                                )
+                                            })()}
                                             <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
                                                 Cantidad: {item.quantity}
                                             </p>

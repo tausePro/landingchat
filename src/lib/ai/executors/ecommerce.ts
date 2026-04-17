@@ -1,4 +1,12 @@
 import { logger } from "@/lib/logger"
+import {
+    PRODUCT_WITH_VARIANTS_VARIANT_SELECT,
+    normalizeVariantRow,
+} from "@/lib/commerce/getProductWithVariants"
+import {
+    findVariantBySelectedOptions,
+    selectDefaultVariant,
+} from "@/lib/commerce/productWithVariants"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import {
     ApplyDiscountSchema,
@@ -7,6 +15,7 @@ import {
     RenderCheckoutSummarySchema,
 } from "@/lib/ai/tools"
 import type { ToolHandler } from "./types"
+import type { ProductVariantRow } from "@/types/product"
 import {
     appendStorefrontAccessParam,
     createStorefrontOrderAccessToken,
@@ -16,6 +25,123 @@ const log = logger("ai/tool-executor")
 
 function removeAccents(str: string): string {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+}
+
+async function getSellableVariants(
+    supabase: Parameters<ToolHandler>[0],
+    organizationId: string,
+    productId: string,
+): Promise<ProductVariantRow[]> {
+    const { data, error } = await supabase
+        .from("product_variants")
+        .select(PRODUCT_WITH_VARIANTS_VARIANT_SELECT)
+        .eq("product_id", productId)
+        .eq("organization_id", organizationId)
+
+    if (error) {
+        log.warn("Error fetching product variants", { productId, organizationId, error: error.message })
+        return []
+    }
+
+    return (data || []).map((variant) => normalizeVariantRow(variant)).filter((variant) => variant.is_active)
+}
+
+function findVariantByHint(
+    variants: ProductVariantRow[],
+    variantHint?: string,
+): ProductVariantRow | null {
+    if (!variantHint) {
+        return selectDefaultVariant(variants)
+    }
+
+    const normalizedHint = removeAccents(variantHint).trim()
+
+    if (!normalizedHint) {
+        return selectDefaultVariant(variants)
+    }
+
+    const exactTitleMatch = variants.find((variant) => removeAccents(variant.title) === normalizedHint)
+
+    if (exactTitleMatch) {
+        return exactTitleMatch
+    }
+
+    const exactValueMatches = variants.filter((variant) => {
+        return variant.option_values.some((optionValue) => removeAccents(optionValue.value) === normalizedHint)
+    })
+
+    if (exactValueMatches.length === 1) {
+        return exactValueMatches[0]
+    }
+
+    const partialTitleMatch = variants.find((variant) => {
+        const normalizedTitle = removeAccents(variant.title)
+        return normalizedTitle.includes(normalizedHint) || normalizedHint.includes(normalizedTitle)
+    })
+
+    if (partialTitleMatch) {
+        return partialTitleMatch
+    }
+
+    return null
+}
+
+function resolveVariantFromInput(
+    variants: ProductVariantRow[],
+    variantInput: unknown,
+): ProductVariantRow | null {
+    if (typeof variantInput === "string") {
+        return findVariantByHint(variants, variantInput)
+    }
+
+    if (variantInput && typeof variantInput === "object" && !Array.isArray(variantInput)) {
+        const selectedOptions = Object.fromEntries(
+            Object.entries(variantInput).filter((entry): entry is [string, string] => {
+                return typeof entry[0] === "string" && typeof entry[1] === "string"
+            }),
+        )
+
+        return findVariantBySelectedOptions(variants, selectedOptions)
+    }
+
+    return selectDefaultVariant(variants)
+}
+
+function resolveCatalogPricing(input: {
+    price: number
+    sale_price: number | null
+    defaultVariant?: ProductVariantRow | null
+}): { price: number; sale_price: number | null } {
+    const { price, sale_price, defaultVariant } = input
+
+    if (
+        defaultVariant?.compare_at_price != null
+        && defaultVariant.compare_at_price > defaultVariant.price
+    ) {
+        return {
+            price: defaultVariant.compare_at_price,
+            sale_price: defaultVariant.price,
+        }
+    }
+
+    if (defaultVariant) {
+        return {
+            price: defaultVariant.price,
+            sale_price: null,
+        }
+    }
+
+    if (sale_price != null && sale_price < price) {
+        return {
+            price,
+            sale_price,
+        }
+    }
+
+    return {
+        price: sale_price ?? price,
+        sale_price: null,
+    }
 }
 
 const searchProducts: ToolHandler = async (supabase, input, context) => {
@@ -86,6 +212,14 @@ const showProduct: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "Producto no encontrado" }
     }
 
+    const variants = await getSellableVariants(supabase, context.organizationId, product.id)
+    const defaultVariant = selectDefaultVariant(variants)
+    const pricing = resolveCatalogPricing({
+        price: product.price,
+        sale_price: product.sale_price,
+        defaultVariant,
+    })
+
     return {
         success: true,
         data: {
@@ -93,16 +227,18 @@ const showProduct: ToolHandler = async (supabase, input, context) => {
                 id: product.id,
                 name: product.name,
                 description: product.description,
-                price: product.sale_price || product.price,
-                originalPrice: product.sale_price ? product.price : undefined,
-                onSale: !!product.sale_price,
-                image_url: product.image_url,
+                price: pricing.price,
+                sale_price: pricing.sale_price,
+                image_url: defaultVariant?.image_url || product.image_url || product.images?.[0] || "",
                 images: product.images || [],
                 stock: product.stock,
                 available: product.stock > 0,
-                sku: product.sku,
                 categories: product.categories || [],
-                variants: product.variants || []
+                variants: variants,
+                default_variant_id: defaultVariant?.id ?? null,
+                default_variant_title: defaultVariant?.title ?? null,
+                default_variant_compare_at_price: defaultVariant?.compare_at_price ?? null,
+                default_variant_stock: defaultVariant?.stock_quantity ?? null,
             }
         }
     }
@@ -165,7 +301,26 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "Producto no encontrado" }
     }
 
-    if (variant && product.variants && Array.isArray(product.variants)) {
+    const sellableVariants = await getSellableVariants(supabase, context.organizationId, product.id)
+    const selectedVariant = resolveVariantFromInput(sellableVariants, variant)
+
+    if (sellableVariants.length > 0 && variant && !selectedVariant) {
+        return {
+            success: false,
+            error: `No encontré una variante válida para ${product.name}.`
+        }
+    }
+
+    if (selectedVariant && selectedVariant.stock_quantity < quantity) {
+        return {
+            success: false,
+            error: selectedVariant.stock_quantity === 0
+                ? `${product.name} en la variante "${selectedVariant.title}" está agotado.`
+                : `Solo hay ${selectedVariant.stock_quantity} unidades de ${product.name} en la variante "${selectedVariant.title}".`
+        }
+    }
+
+    if (!selectedVariant && variant && product.variants && Array.isArray(product.variants)) {
         for (const v of product.variants) {
             if (v.hasStockByVariant && v.stockByVariant) {
                 const variantValue = typeof variant === "string" ? variant : variant[v.type]
@@ -217,18 +372,55 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         cart = newCart
     }
 
-    const items = cart.items || []
-    const existingIndex = items.findIndex((i: any) => i.product_id === product_id)
+    const items = Array.isArray(cart.items) ? [...cart.items] : []
+    const lineId = selectedVariant?.id ?? product.id
+    const unitPrice = selectedVariant?.price ?? (product.sale_price || product.price)
+    const compareAtPrice = selectedVariant?.compare_at_price ?? (product.sale_price ? product.price : null)
+    const imageUrl = selectedVariant?.image_url || product.image_url
+    const existingIndex = items.findIndex((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+            return false
+        }
+
+        const record = item as Record<string, unknown>
+        const recordLineId = typeof record.variant_id === "string"
+            ? record.variant_id
+            : typeof record.product_id === "string"
+                ? record.product_id
+                : null
+
+        return recordLineId === lineId
+    })
 
     if (existingIndex >= 0) {
-        items[existingIndex].quantity += quantity
+        const currentItem = items[existingIndex] as Record<string, unknown>
+        const currentQuantity = typeof currentItem.quantity === "number" ? currentItem.quantity : 0
+        items[existingIndex] = {
+            ...currentItem,
+            id: lineId,
+            product_id: product.id,
+            product_name: product.name,
+            variant_id: selectedVariant?.id ?? null,
+            variant_title: selectedVariant?.title ?? null,
+            price: unitPrice,
+            unit_price: unitPrice,
+            compare_at_price: compareAtPrice,
+            image_url: imageUrl,
+            quantity: currentQuantity + quantity,
+            variant: variant || null,
+        }
     } else {
         items.push({
+            id: lineId,
             product_id: product.id,
+            product_name: product.name,
+            variant_id: selectedVariant?.id ?? null,
+            variant_title: selectedVariant?.title ?? null,
             name: product.name,
-            price: product.sale_price || product.price,
-            original_price: product.sale_price ? product.price : undefined,
-            image_url: product.image_url,
+            price: unitPrice,
+            unit_price: unitPrice,
+            compare_at_price: compareAtPrice,
+            image_url: imageUrl,
             quantity,
             variant: variant || null
         })
@@ -252,10 +444,15 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         success: true,
         data: {
             added: {
+                product_id: product.id,
+                variant_id: selectedVariant?.id ?? null,
+                variant_title: selectedVariant?.title ?? null,
                 name: product.name,
                 quantity,
-                price: product.sale_price || product.price,
-                onSale: !!product.sale_price
+                price: unitPrice,
+                compare_at_price: compareAtPrice,
+                image_url: imageUrl,
+                onSale: compareAtPrice != null && compareAtPrice > unitPrice
             },
             cart: {
                 itemCount: items.length,
@@ -642,12 +839,16 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
             message: message || "¡Excelente elección! Aquí tienes el resumen de tu pedido:",
             cart: {
                 items: cart.items.map((item: any) => ({
-                    id: item.product_id,
+                    id: item.variant_id || item.product_id,
+                    product_id: item.product_id,
+                    variant_id: item.variant_id || null,
+                    variant_title: item.variant_title || null,
                     name: item.name,
-                    price: item.price,
+                    price: item.unit_price || item.price,
+                    compare_at_price: item.compare_at_price ?? null,
                     quantity: item.quantity,
                     image_url: item.image_url,
-                    subtotal: item.price * item.quantity
+                    subtotal: (item.unit_price || item.price) * item.quantity
                 })),
                 itemCount,
                 subtotal,
@@ -734,12 +935,19 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
             order_number: orderNumber,
             items: cart.items.map((item: any) => ({
                 product_id: item.product_id,
-                product_name: item.name,
+                product_name: item.product_name || item.name,
                 name: item.name,
-                unit_price: item.price,
-                total_price: item.price * item.quantity,
-                price: item.price,
+                unit_price: item.unit_price || item.price,
+                total_price: (item.unit_price || item.price) * item.quantity,
+                price: item.unit_price || item.price,
                 quantity: item.quantity,
+                variant_info: item.variant_title
+                    ? {
+                        variant_id: item.variant_id ?? null,
+                        variant_title: item.variant_title,
+                        compare_at_price: item.compare_at_price ?? null,
+                    }
+                    : null,
                 image_url: item.image_url
             })),
             source_channel: chat?.channel || "web",

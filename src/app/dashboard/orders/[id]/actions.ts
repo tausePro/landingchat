@@ -87,15 +87,14 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             .select("*")
             .eq("id", orderId)
             .eq("organization_id", profile.organization_id)
-            .single()
+            .maybeSingle()
 
         if (error) {
-            console.error("[getOrderDetail] Error fetching order:", error)
+            console.error("[getOrderDetail] Query error:", error.message)
             return null
         }
 
         if (!order) {
-            console.error("[getOrderDetail] Order not found:", orderId)
             return null
         }
 

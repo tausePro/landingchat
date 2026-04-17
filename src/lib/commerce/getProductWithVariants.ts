@@ -118,6 +118,24 @@ function normalizeOptionValues(value: unknown): VariantOptionValue[] {
   })
 }
 
+function buildVariantTitle(input: {
+  title: unknown
+  option_values: VariantOptionValue[]
+}): string {
+  const rawTitle = typeof input.title === "string" ? input.title.trim() : ""
+
+  if (rawTitle.length > 0) {
+    return rawTitle
+  }
+
+  const fallbackTitle = input.option_values
+    .map((optionValue) => optionValue.value.trim())
+    .filter((value) => value.length > 0)
+    .join(" / ")
+
+  return fallbackTitle
+}
+
 function normalizePriceTiers(value: unknown): PriceTier[] | undefined {
   if (!Array.isArray(value)) {
     return undefined
@@ -173,12 +191,16 @@ export function normalizeProductSource(
 
 export function normalizeVariantRow(variant: unknown): ProductVariantRow {
   const record = asRecord(variant, "product_variant")
+  const optionValues = normalizeOptionValues(record.option_values)
 
   return {
     id: readRequiredString(record, "id", "product_variant"),
     product_id: readRequiredString(record, "product_id", "product_variant"),
     organization_id: readRequiredString(record, "organization_id", "product_variant"),
-    title: readRequiredString(record, "title", "product_variant"),
+    title: buildVariantTitle({
+      title: record.title,
+      option_values: optionValues,
+    }),
     sku: typeof record.sku === "string" ? record.sku : null,
     position: Math.trunc(parseNumber(record.position) ?? 0),
     is_default: typeof record.is_default === "boolean" ? record.is_default : false,
@@ -187,7 +209,7 @@ export function normalizeVariantRow(variant: unknown): ProductVariantRow {
     compare_at_price: parseNumber(record.compare_at_price),
     stock_quantity: Math.trunc(parseNumber(record.stock_quantity) ?? 0),
     image_url: typeof record.image_url === "string" ? record.image_url : null,
-    option_values: normalizeOptionValues(record.option_values),
+    option_values: optionValues,
     created_at: readRequiredString(record, "created_at", "product_variant"),
     updated_at: readRequiredString(record, "updated_at", "product_variant"),
   }

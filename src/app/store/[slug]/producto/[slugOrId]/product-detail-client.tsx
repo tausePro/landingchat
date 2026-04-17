@@ -1,18 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { findVariantBySelectedOptions } from "@/lib/commerce/productWithVariants"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { getStoredUUID } from "@/lib/utils/storage"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { useCartStore } from "@/store/cart-store"
 import { getColorHex } from "@/lib/constants/colors"
+import type { ProductWithVariantsReadModel } from "@/types/product"
 
 interface ProductDetailClientProps {
     product: any
+    productWithVariants?: ProductWithVariantsReadModel | null
     organization: any
     badges: any[]
     promotions: any[]
@@ -21,7 +24,7 @@ interface ProductDetailClientProps {
     initialIsSubdomain?: boolean
 }
 
-export function ProductDetailClient({ product, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -135,6 +138,33 @@ export function ProductDetailClient({ product, organization, badges, promotions,
         setActivePromotion(bestPromo)
     }, [product, selectedVariants, promotions])
 
+    const selectedSellableVariant = useMemo(() => {
+        if (!productWithVariants) {
+            return null
+        }
+
+        const hasSelectedOptions = Object.values(selectedVariants).some((value) => value.length > 0)
+
+        if (!hasSelectedOptions) {
+            return productWithVariants.default_variant ?? null
+        }
+
+        return findVariantBySelectedOptions(productWithVariants.variants, selectedVariants)
+    }, [productWithVariants, selectedVariants])
+
+    const selectedVariantTitle = useMemo(() => {
+        if (selectedSellableVariant?.title?.trim()) {
+            return selectedSellableVariant.title.trim()
+        }
+
+        const optionLabel = Object.values(selectedVariants)
+            .map((value) => value.trim())
+            .filter((value) => value.length > 0)
+            .join(" / ")
+
+        return optionLabel.length > 0 ? optionLabel : null
+    }, [selectedSellableVariant, selectedVariants])
+
     const handleVariantChange = (type: string, value: string) => {
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
 
@@ -173,10 +203,17 @@ export function ProductDetailClient({ product, organization, badges, promotions,
     const handleBuyNow = () => {
         const priceToUse = product.has_quantity_pricing ? unitPrice : currentPrice
         const productToAdd = {
-            id: product.id,
+            id: selectedSellableVariant?.id || product.id,
+            product_id: product.id,
+            variant_id: selectedSellableVariant?.id || null,
+            variant_title: selectedVariantTitle,
             name: product.name,
+            product_name: product.name,
             price: priceToUse,
-            image_url: product.image_url || selectedImage
+            unit_price: priceToUse,
+            compare_at_price: selectedSellableVariant?.compare_at_price ?? (product.sale_price ? product.price : null),
+            image_url: selectedSellableVariant?.image_url || product.image_url || selectedImage,
+            categories: product.categories,
         }
 
         trackAddToCart(product.id, product.name, priceToUse * quantity, "COP")
