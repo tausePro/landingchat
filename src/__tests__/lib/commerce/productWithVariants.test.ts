@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   buildProductWithVariants,
+  findVariantBySelectedOptions,
   selectDefaultVariant,
 } from "@/lib/commerce/productWithVariants"
 import type { ProductData, ProductVariantRow } from "@/types/product"
@@ -66,6 +67,61 @@ describe("selectDefaultVariant", () => {
 
   it("devuelve null si no hay variantes", () => {
     expect(selectDefaultVariant([])).toBeNull()
+  })
+})
+
+describe("findVariantBySelectedOptions", () => {
+  it("resuelve la variante real cuando todas las opciones coinciden", () => {
+    const variants = [
+      makeVariant({
+        id: "variant-red-m",
+        title: "Rojo / M",
+        option_values: [
+          { option_name: "Color", value: "Rojo" },
+          { option_name: "Talla", value: "M" },
+        ],
+      }),
+      makeVariant({
+        id: "variant-blue-m",
+        title: "Azul / M",
+        option_values: [
+          { option_name: "Color", value: "Azul" },
+          { option_name: "Talla", value: "M" },
+        ],
+      }),
+    ]
+
+    expect(findVariantBySelectedOptions(variants, {
+      Color: "Rojo",
+      Talla: "M",
+    })?.id).toBe("variant-red-m")
+  })
+
+  it("usa la variante default cuando no hay opciones seleccionadas", () => {
+    const variants = [
+      makeVariant({ id: "variant-2", position: 1 }),
+      makeVariant({ id: "variant-1", position: 0, is_default: true }),
+    ]
+
+    expect(findVariantBySelectedOptions(variants, {})?.id).toBe("variant-1")
+  })
+
+  it("devuelve null cuando la selección no corresponde a una variante real", () => {
+    const variants = [
+      makeVariant({
+        id: "variant-red-s",
+        title: "Rojo / S",
+        option_values: [
+          { option_name: "Color", value: "Rojo" },
+          { option_name: "Talla", value: "S" },
+        ],
+      }),
+    ]
+
+    expect(findVariantBySelectedOptions(variants, {
+      Color: "Rojo",
+      Talla: "M",
+    })).toBeNull()
   })
 })
 
