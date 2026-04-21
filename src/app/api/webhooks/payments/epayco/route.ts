@@ -312,17 +312,29 @@ async function processOrderUpdate(
                     : "pending"
 
     const orderStatus = status === "approved" ? "confirmed" : status === "declined" ? "cancelled" : undefined
-    const confirmedAt = status === "approved" ? new Date().toISOString() : undefined
 
-    await supabase
+    // Fase 0.4 post-mortem (hotfix v1.10.58): removimos `confirmed_at` del
+    // UPDATE porque la columna NO existe en `public.orders` y el UPDATE entero
+    // fallaba silenciosamente (PostgREST retornaba error sin capturarse,
+    // dejando la orden en `payment_status: pending` indefinidamente). El
+    // timestamp de confirmación queda en `store_transactions` + `updated_at`.
+    const { error: updateError } = await supabase
         .from("orders")
         .update({
             payment_status: paymentStatus,
             ...(orderStatus && { status: orderStatus }),
-            ...(confirmedAt && { confirmed_at: confirmedAt }),
             updated_at: new Date().toISOString(),
         })
         .eq("id", orderId)
+
+    if (updateError) {
+        log.error("Failed to update order payment_status", {
+            orderId,
+            status,
+            paymentStatus,
+            error: updateError.message,
+        })
+    }
 
     // Post-payment side effects cuando el pago se aprueba.
     // Fase 0.4 (Bug H): antes este bloque hacía un SELECT con JOIN a la

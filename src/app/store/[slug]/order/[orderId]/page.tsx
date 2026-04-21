@@ -48,13 +48,18 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
     }
 
     // Format date
+    // Sin `timeZone` explícito el SSR de Vercel (UTC por default) produce
+    // horas corridas 5h. Forzamos America/Bogota para todas las órdenes de
+    // la plataforma (LATAM-first). Si más adelante hay tenants fuera de
+    // UTC-5, hacemos el timezone dependiente de la organización.
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleDateString('es-CO', {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             hour: '2-digit',
-            minute: '2-digit'
+            minute: '2-digit',
+            timeZone: 'America/Bogota',
         })
     }
 

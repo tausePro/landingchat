@@ -350,9 +350,11 @@ describe("ePayco Webhook - Property Tests", () => {
                     expect(orderUpdate).toMatchObject({
                         payment_status: "paid",
                         status: "confirmed",
-                        confirmed_at: expect.any(String),
                         updated_at: expect.any(String),
                     })
+                    // Fase 0.4 post-mortem: `confirmed_at` se removió del
+                    // UPDATE porque la columna no existe en `orders`.
+                    expect(orderUpdate.confirmed_at).toBeUndefined()
                 }
             ),
             { numRuns: 30 }
