@@ -6,6 +6,7 @@ import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
 import { calculateTaxForItems, buildProductTaxMap, type OrgTaxSettings } from "@/lib/utils/tax"
 import { getPhoneVariants, normalizePhone } from "@/lib/utils/phone"
+import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
 import {
     appendStorefrontAccessParam,
     createStorefrontOrderAccessToken,
@@ -763,6 +764,21 @@ export async function createOrder(params: CreateOrderParams) {
         }
 
         // 8. Manual Payment & Success Handler
+        // Fase 0.4 (Bug C): los pagos offline (manual, contraentrega, cash_on_delivery)
+        // nunca pasan por webhook que decremente stock. Opción A aprobada por el
+        // usuario: decrementar inmediatamente al crear la orden. Cancelaciones
+        // futuras tendrán que usar `restore_product_stock` (RPC ya creada).
+        // La util `decrementOrderStock` loguea internamente cada item procesado
+        // y el resumen de idempotencia — no duplicamos logs aquí.
+        try {
+            await decrementOrderStock(supabase, order.id, org.id)
+        } catch (stockErr) {
+            // No fallamos la orden si el decrement falla: la orden ya existe,
+            // hay que poder notificar al cliente. El warning queda en logs para
+            // reconciliar manualmente.
+            console.error("[createOrder] Failed to decrement stock for offline payment", stockErr)
+        }
+
         // Send notifications (Fire and Forget)
         try {
             // Get organization details for notifications

@@ -8,6 +8,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import { WompiGateway } from "@/lib/payments/wompi-gateway"
 import { logger } from "@/lib/logger"
+import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
 
 const log = logger("webhooks/payments/wompi")
 
@@ -290,7 +291,12 @@ async function processOrderUpdate(
         })
         .eq("id", orderId)
 
-    // Enviar notificación de venta si el pago fue aprobado
+    // Post-payment side effects cuando el pago se aprueba.
+    // Fase 0.4 (Bug H): antes este bloque hacía un SELECT con JOIN a la
+    // tabla `order_items` que NO existe en la base. PostgREST devolvía error
+    // silencioso, `order` quedaba null, el `if (order)` fallaba y nada de lo
+    // de abajo se ejecutaba: ni stock, ni notificación WA, ni Meta CAPI.
+    // Ahora leemos items desde `orders.items` (jsonb, source of truth real).
     if (status === "approved") {
         try {
             const { data: order } = await supabase
@@ -299,24 +305,16 @@ async function processOrderUpdate(
                     id,
                     order_number,
                     total,
+                    items,
                     customer_info,
-                    customers(name, email, phone),
-                    order_items(
-                        quantity,
-                        product_id,
-                        products(name)
-                    )
+                    customers(name, email, phone)
                 `)
                 .eq("id", orderId)
+                .eq("organization_id", organizationId)
                 .single()
 
             if (order) {
                 const customer = order.customers as { name?: string; email?: string; phone?: string } | null
-                const orderItems = order.order_items as Array<{
-                    quantity: number
-                    product_id: string
-                    products: { name?: string } | null
-                }>
                 const customerInfo = order.customer_info as {
                     name?: string
                     email?: string
@@ -324,33 +322,28 @@ async function processOrderUpdate(
                     city?: string
                 } | null
 
-                // 1. Decrementar stock de cada producto comprado
-                if (orderItems?.length) {
-                    for (const item of orderItems) {
-                        if (item.product_id) {
-                            const { data: product } = await supabase
-                                .from("products")
-                                .select("stock")
-                                .eq("id", item.product_id)
-                                .single()
+                // Items del jsonb (formato de transformCartItemsToOrderItems)
+                const itemsJsonb = Array.isArray(order.items)
+                    ? (order.items as Array<{
+                        product_id?: string | null
+                        product_name?: string | null
+                        quantity?: number | null
+                    }>)
+                    : []
 
-                            if (product) {
-                                const newStock = Math.max(0, product.stock - item.quantity)
-                                await supabase
-                                    .from("products")
-                                    .update({ stock: newStock, updated_at: new Date().toISOString() })
-                                    .eq("id", item.product_id)
-                                log.info("Stock decremented", {
-                                    productId: item.product_id,
-                                    previousStock: product.stock,
-                                    newStock,
-                                    quantity: item.quantity,
-                                    orderId,
-                                })
-                            }
-                        }
-                    }
-                }
+                // 1. Decrementar stock atómicamente con la RPC (Bugs A+B+H)
+                const decrementResult = await decrementOrderStock(
+                    supabase,
+                    orderId,
+                    organizationId,
+                )
+                log.info("Stock decrement result", {
+                    orderId,
+                    skipped: decrementResult.skipped,
+                    reason: decrementResult.reason,
+                    itemsProcessed: decrementResult.items.length,
+                    oversaleDetected: decrementResult.items.some((item) => !item.wasSufficient),
+                })
 
                 // 2. Enviar notificación de venta por WhatsApp
                 try {
@@ -361,10 +354,12 @@ async function processOrderUpdate(
                             id: order.order_number || order.id,
                             total: order.total,
                             customerName: customer?.name || customerInfo?.name || "Cliente",
-                            items: orderItems?.map((item) => ({
-                                name: item.products?.name || "Producto",
-                                quantity: item.quantity,
-                            })) || [],
+                            items: itemsJsonb
+                                .filter((item) => typeof item.quantity === "number" && item.quantity > 0)
+                                .map((item) => ({
+                                    name: item.product_name || "Producto",
+                                    quantity: item.quantity as number,
+                                })),
                         }
                     )
                     log.info("Sale notification sent", {
@@ -378,7 +373,7 @@ async function processOrderUpdate(
                     })
                 }
 
-                // 2. Enviar evento Purchase a Meta Conversions API (server-side tracking)
+                // 3. Enviar evento Purchase a Meta Conversions API (server-side tracking)
                 try {
                     const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
                     await trackServerPurchase(
@@ -388,10 +383,12 @@ async function processOrderUpdate(
                             orderNumber: order.order_number,
                             total: order.total,
                             currency: "COP",
-                            items: orderItems?.map((item) => ({
-                                productId: item.product_id,
-                                quantity: item.quantity,
-                            })),
+                            items: itemsJsonb
+                                .filter((item) => typeof item.product_id === "string" && typeof item.quantity === "number" && item.quantity > 0)
+                                .map((item) => ({
+                                    productId: item.product_id as string,
+                                    quantity: item.quantity as number,
+                                })),
                             customerEmail: customer?.email || customerInfo?.email,
                             customerPhone: customer?.phone || customerInfo?.phone,
                             customerName: customer?.name || customerInfo?.name,
@@ -409,6 +406,8 @@ async function processOrderUpdate(
                         message: capiError instanceof Error ? capiError.message : "Unknown error",
                     })
                 }
+            } else {
+                log.error("Order not found for post-payment processing", { orderId, organizationId })
             }
         } catch (err) {
             log.error("Error in post-payment processing", {
