@@ -49,17 +49,36 @@ export async function POST(
             return NextResponse.json({ error: "Tienda no encontrada" }, { status: 404 })
         }
 
-        const storefrontSession = await getValidatedStorefrontCustomerSession({
-            slug,
-            organizationId: organization.id,
-        })
-
-        if (!storefrontSession) {
-            return NextResponse.json({ error: "Sesión inválida o expirada" }, { status: 401, headers })
+        // Tenant isolation defensivo (Bug G):
+        // Cualquier fallo en la obtención/validación de la sesión del storefront
+        // se trata como "sin sesión". Incluye excepciones del subsistema de
+        // cookies (contexto sin request store válido, corrupciones raras, etc.)
+        // para no propagar un 500 distinguible de otros códigos.
+        let storefrontSession: Awaited<ReturnType<typeof getValidatedStorefrontCustomerSession>> = null
+        try {
+            storefrontSession = await getValidatedStorefrontCustomerSession({
+                slug,
+                organizationId: organization.id,
+            })
+        } catch {
+            storefrontSession = null
         }
 
-        if (requestedCustomerId && requestedCustomerId !== storefrontSession.customerId) {
-            return NextResponse.json({ error: "Sesión inválida o expirada" }, { status: 403, headers })
+        // Si el request trae customerId, toda inconsistencia (sin sesión, sesión
+        // de otro tenant, mismatch de customerId) responde 404 "Cliente no
+        // encontrado" uniforme. Impide que un atacante enumere customers de
+        // otros tenants distinguiendo 401/403/404/500.
+        if (requestedCustomerId) {
+            if (!storefrontSession || storefrontSession.customerId !== requestedCustomerId) {
+                return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404, headers })
+            }
+        }
+
+        // Sin customerId y sin sesión: cliente legítimo que aún no se ha
+        // identificado. Se mantiene 401 para que el flujo de identificación
+        // pueda actuar.
+        if (!storefrontSession) {
+            return NextResponse.json({ error: "Sesión inválida o expirada" }, { status: 401, headers })
         }
 
         const { data: customer } = await supabase
@@ -70,7 +89,7 @@ export async function POST(
             .single()
 
         if (!customer) {
-            return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 })
+            return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404, headers })
         }
 
         const { data: agent } = await supabase
