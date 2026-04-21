@@ -74,6 +74,24 @@ export function validateEnv(): EnvValidationResult {
         }
     }
 
+    // Check especial: Redis acepta como válida cualquiera de las dos parejas de
+    // credenciales (Upstash directo o Vercel KV integration). El rate limit
+    // necesita las dos piezas (URL + token) para funcionar. Si falta alguna en
+    // producción, se emite error en log (rate-limit entra en fail-closed y
+    // responde 429 en todos los endpoints rate-limitados). NO se bloquea el
+    // boot para evitar caer la plataforma completa por una credencial rotada.
+    const hasRedisUrl = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").trim() !== ""
+    const hasRedisToken = (process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "").trim() !== ""
+    if (isProduction && (!hasRedisUrl || !hasRedisToken)) {
+        missingVars.push({
+            name: "UPSTASH_REDIS_REST_URL/TOKEN (o KV_REST_API_URL/TOKEN)",
+            required: "production",
+            description: "Redis requerido en producción para rate limit (ausencia activa modo FAIL-CLOSED: todos los endpoints rate-limitados devuelven 429)",
+        })
+    } else if (!isProduction && (!hasRedisUrl || !hasRedisToken)) {
+        warnings.push("UPSTASH_REDIS_REST_URL/TOKEN (o KV_REST_API_URL/TOKEN) — requerido en producción para rate limit (en dev se usa fail-open)")
+    }
+
     const missing = missingVars.map(formatEnvVar)
     const result: EnvValidationResult = {
         valid: missing.length === 0,
