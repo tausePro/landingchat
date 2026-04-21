@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { getFreeBusySlots } from "@/lib/calendar/google-calendar"
+import { formatBogotaTime } from "@/lib/utils/date"
 
 export interface Advisor {
     id: string
@@ -193,7 +194,7 @@ export async function getAdvisorAvailableSlots(
         if (slotDate < new Date()) continue // Skip past slots
 
         slots.push({
-            time: slotDate.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit", hour12: true }),
+            time: formatBogotaTime(slotDate),
             isoDate: slotDate.toISOString(),
         })
     }

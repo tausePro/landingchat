@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { formatBogotaDayKey } from "@/lib/utils/date"
 
 export interface RealEstateStats {
     activeProperties: number
@@ -126,10 +127,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const pendingOrders = validOrders.filter(order => pendingStatuses.has(order.status || "")).length
 
     // Revenue History (Last 30 days)
+    // Agrupamos por día en hora Colombia (America/Bogota). Sin timezone explícita
+    // las ventas hechas entre 19:00 y 23:59 hora local aparecían corridas al día
+    // siguiente UTC, distorsionando la curva de ventas del dashboard. Ver Fase
+    // 0.4 post-mortem en docs-private/PUNCHLIST_HARDENING_PLATAFORMA_2026-04.md.
     const revenueByDay = new Map<string, number>()
     validOrders.forEach(order => {
         if (order.created_at >= thirtyDaysAgo) {
-            const date = new Date(order.created_at).toLocaleDateString("en-US", { month: 'short', day: 'numeric' })
+            const date = formatBogotaDayKey(order.created_at)
             revenueByDay.set(date, (revenueByDay.get(date) || 0) + (order.total || 0))
         }
     })

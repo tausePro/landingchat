@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { Search, Smartphone, Globe, Bot } from "lucide-react"
 import type { ConsoleChatItem } from "../../actions"
+import { formatBogotaDayKey } from "@/lib/utils/date"
 
 interface ChatListProps {
     chats: ConsoleChatItem[]
@@ -27,7 +28,7 @@ function formatRelativeTime(dateStr: string | null): string {
     if (diffMins < 60) return `${diffMins}m`
     if (diffHours < 24) return `${diffHours}h`
     if (diffDays < 7) return `${diffDays}d`
-    return date.toLocaleDateString("es", { day: "numeric", month: "short" })
+    return formatBogotaDayKey(date)
 }
 
 function getChannelIcon(channel: string) {

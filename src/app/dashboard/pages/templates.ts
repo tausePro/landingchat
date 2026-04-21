@@ -2,6 +2,7 @@
 // Ahora usando formato JSONB estructurado basado en prototipos Stitch
 
 import { FAQContent, LegalContent, AboutContent } from "@/types/page-content"
+import { formatBogotaDateLong } from "@/lib/utils/date"
 
 export type PageTemplate = {
     slug: string
@@ -76,7 +77,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
         content_jsonb: {
             type: 'legal',
             title: "Términos y Condiciones",
-            lastUpdated: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }),
+            lastUpdated: formatBogotaDateLong(new Date()),
             sections: [
                 {
                     id: "intro",
@@ -116,7 +117,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
         content_jsonb: {
             type: 'legal',
             title: "Política de Privacidad",
-            lastUpdated: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' }),
+            lastUpdated: formatBogotaDateLong(new Date()),
             sections: [
                 {
                     id: "recopilacion",

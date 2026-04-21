@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 /**
  * GET /api/store/[slug]/customer/[customerId]/chats
@@ -74,7 +75,7 @@ export async function GET(
         // Get first user message as title, or use date
         const firstMessage = chat.messages?.find((message) => message.content)
         const title = firstMessage?.content?.slice(0, 40) ||
-            `Conversación del ${new Date(chat.created_at).toLocaleDateString('es-CO')}`
+            `Conversación del ${formatBogotaDate(chat.created_at)}`
         const shouldTruncateTitle = (firstMessage?.content?.length ?? 0) > 40
 
         return {

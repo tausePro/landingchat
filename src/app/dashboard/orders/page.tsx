@@ -20,8 +20,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import Link from "next/link"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 export const dynamic = 'force-dynamic'
 
@@ -191,7 +190,7 @@ export default async function OrdersPage({
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-text-light-secondary dark:text-text-dark-secondary">
-                                                {format(new Date(order.created_at), "d MMM yyyy", { locale: es })}
+                                                {formatBogotaDate(order.created_at)}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>

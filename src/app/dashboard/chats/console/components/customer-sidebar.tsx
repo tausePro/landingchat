@@ -1,6 +1,7 @@
 "use client"
 
 import type { ChatDetailData } from "../../actions"
+import { formatBogotaDate } from "@/lib/utils/date"
 import {
     User,
     Mail,
@@ -29,11 +30,7 @@ function formatCurrency(amount: number): string {
 }
 
 function formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString("es", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-    })
+    return formatBogotaDate(dateStr)
 }
 
 function getStatusColor(status: string): string {

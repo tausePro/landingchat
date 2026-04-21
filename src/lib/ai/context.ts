@@ -1,3 +1,5 @@
+import { formatBogotaDate } from "@/lib/utils/date"
+
 interface Product {
     id: string
     name: string
@@ -296,7 +298,7 @@ export function buildCustomerContext(customer?: Customer, orders?: Order[]): str
     if (orders && orders.length > 0) {
         context += `\nHISTORIAL DE COMPRAS:\n`
         const lastOrder = orders[0]
-        context += `- Última compra: ${new Date(lastOrder.created_at).toLocaleDateString()}\n`
+        context += `- Última compra: ${formatBogotaDate(lastOrder.created_at)}\n`
         context += `- Total: ${lastOrder.total.toLocaleString()}\n`
         context += `- Estado: ${lastOrder.status}\n`
 

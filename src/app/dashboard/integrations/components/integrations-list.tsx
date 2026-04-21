@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { NubyConfigDialog } from "./nuby-config-dialog"
 import { syncProperties, disconnectIntegration } from "../actions"
 import type { IntegrationData } from "../actions"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 interface IntegrationsListProps {
   integrations: IntegrationData[]
@@ -188,7 +189,7 @@ export function IntegrationsList({ integrations }: IntegrationsListProps) {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Conectado desde</span>
                     <span className="text-sm" suppressHydrationWarning>
-                      {new Date(gcalIntegration.config.connected_at).toLocaleDateString('es-ES')}
+                      {formatBogotaDate(gcalIntegration.config.connected_at)}
                     </span>
                   </div>
                 )}

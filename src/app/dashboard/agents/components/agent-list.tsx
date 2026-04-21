@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { AgentData, AgentTemplateData, createAgentFromTemplate, deleteAgent } from "../actions"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 interface AgentListProps {
     agents: AgentData[]
@@ -170,7 +171,7 @@ export function AgentList({ agents, templates }: AgentListProps) {
                         <CardContent className="flex-1 pt-4">
                             <div className="text-sm text-muted-foreground">
                                 <p>Tipo: <span className="capitalize text-foreground">{agent.type}</span></p>
-                                <p suppressHydrationWarning>Creado: {new Date(agent.created_at).toLocaleDateString('es-ES')}</p>
+                                <p suppressHydrationWarning>Creado: {formatBogotaDate(agent.created_at)}</p>
                             </div>
                         </CardContent>
                         <CardFooter className="border-t pt-4 flex justify-end gap-2">

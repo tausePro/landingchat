@@ -5,6 +5,7 @@ import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHist
 import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 const AI_MODEL = "claude-haiku-4-5-20251001"
 
@@ -410,7 +411,7 @@ REGLAS CRÍTICAS DE LINKS Y PAGOS:
                         const summary = recentMsgs.reverse().map(m =>
                             `${m.sender_type === "user" ? "Cliente" : "Agente"}: ${m.content.substring(0, 100)}`
                         ).join("\n")
-                        recentChannelMessages.push(`[${channelLabel} - ${new Date(otherChat.updated_at).toLocaleDateString()}]\n${summary}`)
+                        recentChannelMessages.push(`[${channelLabel} - ${formatBogotaDate(otherChat.updated_at)}]\n${summary}`)
                     }
                 }
 

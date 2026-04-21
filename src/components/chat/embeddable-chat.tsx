@@ -7,6 +7,7 @@ import { useChat } from "@/hooks/use-chat"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { getStoredUUID, setStoredUUID } from "@/lib/utils/storage"
+import { formatBogotaTime } from "@/lib/utils/date"
 
 const ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001" // Default Seed Org
 
@@ -119,7 +120,7 @@ export function EmbeddableChat({
                             {/* Timestamp optional in compact modes */}
                             {mode === 'full' && (
                                 <p className="text-gray-400 text-[10px] px-1">
-                                    {msg.sender_type === "user" ? "Tú" : "Asistente"} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {msg.sender_type === "user" ? "Tú" : "Asistente"} • {formatBogotaTime(msg.created_at)}
                                 </p>
                             )}
                             <div

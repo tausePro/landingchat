@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { UserData, updateUserRole, toggleSuperadmin } from "../actions"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 // Simple debounce implementation
 function useDebounceValue<T>(value: T, delay: number): T {
@@ -146,7 +147,7 @@ export function UserList({ initialData }: UserListProps) {
                                         </Badge>
                                     )}
                                 </TableCell>
-                                <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                                <TableCell>{formatBogotaDate(user.created_at)}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>

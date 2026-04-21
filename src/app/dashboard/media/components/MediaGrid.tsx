@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { type MediaFile } from "../actions"
 import { Trash2, Play, Check, ExternalLink, Copy, Pencil, X, Loader2 } from "lucide-react"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 interface MediaGridProps {
   files: MediaFile[]
@@ -22,11 +23,7 @@ function formatFileSize(bytes: number | null): string {
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "—"
-  return new Date(dateStr).toLocaleDateString("es-CO", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  })
+  return formatBogotaDate(dateStr)
 }
 
 export function MediaGrid({

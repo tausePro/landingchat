@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { OrganizationData, updateOrganizationStatus, deleteOrganization } from "../actions"
 import { toast } from "sonner"
+import { formatBogotaDate } from "@/lib/utils/date"
 // import { useDebounce } from "@/hooks/use-debounce" // We might need to create this hook or implement debounce manually
 
 // Simple debounce implementation inside component if hook doesn't exist
@@ -144,7 +145,7 @@ export function OrgList({ initialData }: OrgListProps) {
                                 </TableCell>
                                 <TableCell>{org.users_count}</TableCell>
                                 <TableCell>{org.chats_count}</TableCell>
-                                <TableCell>{new Date(org.created_at).toLocaleDateString("es-CO")}</TableCell>
+                                <TableCell>{formatBogotaDate(org.created_at)}</TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>

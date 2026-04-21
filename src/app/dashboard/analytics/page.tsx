@@ -10,6 +10,7 @@ import { MetaAdsCard } from "./components/meta-ads-card"
 import { TopProductsCard } from "./components/top-products-card"
 import { RevenueByChannelCard } from "./components/revenue-by-channel-card"
 import { AiPerformanceCard } from "./components/ai-performance-card"
+import { formatBogotaDayKey } from "@/lib/utils/date"
 
 export const dynamic = 'force-dynamic'
 
@@ -84,15 +85,17 @@ async function getAnalyticsData() {
     // Conversión = órdenes / chats (no solo pagadas, igual que dashboard)
     const conversionRate = totalChats > 0 ? ((totalOrders / totalChats) * 100).toFixed(1) : "0"
 
-    // Group orders by day for chart
+    // Group orders by day for chart.
+    // Sin timezone explícita las ventas hechas entre 19:00 y 23:59 hora local
+    // aparecían corridas al día siguiente UTC, distorsionando la curva.
     const ordersByDay = orders?.reduce((acc, order) => {
-        const date = new Date(order.created_at).toLocaleDateString('es-CO', { month: 'short', day: 'numeric' })
+        const date = formatBogotaDayKey(order.created_at)
         acc[date] = (acc[date] || 0) + 1
         return acc
     }, {} as Record<string, number>) || {}
 
     const revenueByDay = orders?.reduce((acc, order) => {
-        const date = new Date(order.created_at).toLocaleDateString('es-CO', { month: 'short', day: 'numeric' })
+        const date = formatBogotaDayKey(order.created_at)
         acc[date] = (acc[date] || 0) + (order.total || 0)
         return acc
     }, {} as Record<string, number>) || {}

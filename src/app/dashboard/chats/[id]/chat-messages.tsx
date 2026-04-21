@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { formatBogotaTime } from "@/lib/utils/date"
 
 interface Message {
     id: string
@@ -119,7 +120,7 @@ export function ChatMessages({ chatId, initialMessages }: ChatMessagesProps) {
 
                                 <div className={`flex flex-col gap-1 max-w-[70%] ${sender.isAgent ? "items-end" : "items-start"}`}>
                                     <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
-                                        {sender.label} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {sender.label} • {formatBogotaTime(msg.created_at)}
                                     </p>
                                     <div
                                         className={`text-sm px-4 py-3 shadow-sm whitespace-pre-wrap ${

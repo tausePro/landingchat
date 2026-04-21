@@ -15,6 +15,7 @@ import {
 } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { formatBogotaDayKey, formatBogotaDateLong, formatBogotaTime } from "@/lib/utils/date"
 
 interface DailyInsight {
     date: string
@@ -243,10 +244,11 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
 
     const formatNumber = (n: number) => new Intl.NumberFormat("es-CO").format(n)
 
-    const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr + "T00:00:00")
-        return d.toLocaleDateString("es-CO", { month: "short", day: "numeric" })
-    }
+    // El endpoint Meta Ads devuelve fechas como "2026-04-21" (day only); al
+    // concatenar "T00:00:00" y pasar por new Date(), el server las interpreta
+    // como hora local del server (UTC en Vercel) y eso mueve 5h en el chart.
+    // formatBogotaDayKey ya formatea en hora Colombia.
+    const formatDate = (dateStr: string) => formatBogotaDayKey(dateStr + "T00:00:00")
 
     const totalConversions = data?.summary?.actions
         ?.filter((a) => ["purchase", "complete_registration", "lead"].includes(a.action_type))
@@ -335,7 +337,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                     </div>
                     {campaign?.created_time && (
                         <p className="text-sm text-muted-foreground mt-1">
-                            Creada {new Date(campaign.created_time).toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" })}
+                            Creada {formatBogotaDateLong(campaign.created_time)}
                         </p>
                     )}
                 </div>
@@ -433,7 +435,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                             <div className="flex items-center gap-3">
                                 {aiGeneratedAt && !aiLoading && (
                                     <span className="text-xs text-muted-foreground">
-                                        Generado {new Date(aiGeneratedAt).toLocaleDateString("es-CO", { day: "numeric", month: "short" })} · {new Date(aiGeneratedAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                                        Generado {formatBogotaDayKey(aiGeneratedAt)} · {formatBogotaTime(aiGeneratedAt)}
                                     </span>
                                 )}
                                 {aiDone && !aiLoading && (

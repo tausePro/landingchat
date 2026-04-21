@@ -3,6 +3,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { formatBogotaDate, formatBogotaTime } from "@/lib/utils/date"
 
 interface ChatHistoryItem {
     id: string
@@ -74,11 +75,11 @@ export function ChatLayout({
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
 
         if (diffDays === 0) {
-            return `Hoy, ${date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+            return `Hoy, ${formatBogotaTime(date)}`
         } else if (diffDays === 1) {
-            return `Ayer, ${date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}`
+            return `Ayer, ${formatBogotaTime(date)}`
         } else {
-            return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
+            return formatBogotaDate(date)
         }
     }
 

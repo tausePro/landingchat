@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getCoupons, deleteCoupon, toggleCouponStatus, Coupon } from "./actions"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 export default function CouponsPage() {
     const router = useRouter()
@@ -64,7 +65,7 @@ export default function CouponsPage() {
 
     function formatDate(dateString: string | null) {
         if (!dateString) return 'Sin límite'
-        return new Date(dateString).toLocaleDateString('es-CO')
+        return formatBogotaDate(dateString)
     }
 
     if (loading) {

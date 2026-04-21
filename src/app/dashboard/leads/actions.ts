@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { formatBogotaDayKey } from "@/lib/utils/date"
 
 export interface Lead {
     id: string
@@ -278,7 +279,7 @@ function getActivityLabel(dateStr: string): string {
     if (diffDays === 1) return "Ayer"
     if (diffDays < 7) return `Hace ${diffDays} días`
     if (diffDays < 30) return `Hace ${Math.floor(diffDays / 7)} semanas`
-    return date.toLocaleDateString("es-CO", { day: "numeric", month: "short" })
+    return formatBogotaDayKey(date)
 }
 
 function emptyStats(): LeadStats {

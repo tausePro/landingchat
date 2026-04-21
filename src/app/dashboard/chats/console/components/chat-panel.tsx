@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { formatBogotaTime, formatBogotaDateLong } from "@/lib/utils/date"
 import type { ChatDetailData } from "../../actions"
 import type { ActionResult } from "@/types/common"
 import {
@@ -35,10 +36,7 @@ interface Message {
 }
 
 function formatMessageTime(dateStr: string): string {
-    return new Date(dateStr).toLocaleTimeString("es", {
-        hour: "2-digit",
-        minute: "2-digit",
-    })
+    return formatBogotaTime(dateStr)
 }
 
 function formatMessageDate(dateStr: string): string {
@@ -49,7 +47,7 @@ function formatMessageDate(dateStr: string): string {
 
     if (date.toDateString() === today.toDateString()) return "Hoy"
     if (date.toDateString() === yesterday.toDateString()) return "Ayer"
-    return date.toLocaleDateString("es", { day: "numeric", month: "long", year: "numeric" })
+    return formatBogotaDateLong(dateStr)
 }
 
 export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange, onToggleAi }: ChatPanelProps) {

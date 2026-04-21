@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 interface Customer {
     id: string
@@ -69,14 +70,9 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
         return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     }
 
-    // Format date
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-        })
-    }
+    // Format date (siempre en hora Colombia para que coincida con lo que
+    // el cliente ve en su confirmación de orden).
+    const formatDate = (dateString: string) => formatBogotaDate(dateString)
 
     // Get status badge
     const getStatusBadge = (status: string, paymentStatus: string) => {

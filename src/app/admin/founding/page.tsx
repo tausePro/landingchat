@@ -58,6 +58,7 @@ import {
     formatFoundingPrice,
     calculateAnnualPrice,
 } from "@/types"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 export default function FoundingAdminPage() {
     const [loading, setLoading] = useState(true)
@@ -210,7 +211,7 @@ export default function FoundingAdminPage() {
                             </Badge>
                             <span className="text-sm">
                                 {program.is_active
-                                    ? `Programa activo desde ${new Date(program.starts_at || "").toLocaleDateString("es-CO")}`
+                                    ? `Programa activo desde ${formatBogotaDate(program.starts_at)}`
                                     : "El programa no está visible para usuarios"}
                             </span>
                         </div>
@@ -463,7 +464,7 @@ export default function FoundingAdminPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            {new Date(slot.reserved_at).toLocaleDateString("es-CO")}
+                                            {formatBogotaDate(slot.reserved_at)}
                                         </TableCell>
                                     </TableRow>
                                 ))}

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { syncNubyProperties } from "@/lib/nuby/sync"
+import { formatBogotaDateTime } from "@/lib/utils/date"
 
 interface Property {
   id: string
@@ -75,7 +76,7 @@ export function PropertiesGrid({ properties, organizationId, hasNuby, lastSyncAt
         <h1 className="text-2xl font-bold">Propiedades ({properties.length})</h1>
         {lastSyncAt && (
           <p className="text-sm text-muted-foreground mt-1">
-            Última sincronización: {new Date(lastSyncAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            Última sincronización: {formatBogotaDateTime(lastSyncAt)}
           </p>
         )}
       </div>

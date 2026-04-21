@@ -2,8 +2,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import Image from "next/image"
 import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
+import { formatBogotaDateTime } from "@/lib/utils/date"
 import { getOrderDetail } from "./actions"
 import { OrderStatusBadge } from "./order-status-badge"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
@@ -63,7 +62,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                             </h1>
                         </div>
                         <p className="text-text-light-secondary dark:text-text-dark-secondary text-base font-normal leading-normal">
-                            Creado el {format(new Date(order.created_at), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}
+                            Creado el {formatBogotaDateTime(order.created_at)}
                         </p>
                     </div>
                     <OrderActions orderId={order.id} orderNumber={order.order_number} currentStatus={order.status} />

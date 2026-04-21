@@ -10,6 +10,7 @@ import { EmbeddedSignup } from "./embedded-signup"
 import { connectWhatsApp, disconnectWhatsApp, getMetaSignupConfig } from "../actions"
 import { toast } from "sonner"
 import type { WhatsAppInstance } from "@/types"
+import { formatBogotaDate } from "@/lib/utils/date"
 
 interface CorporateCardProps {
     instance: WhatsAppInstance | null
@@ -233,9 +234,7 @@ export function CorporateCard({ instance, planLimit, onUpdate }: CorporateCardPr
                                     </p>
                                     <p className="text-sm font-medium">
                                         {instance.last_message_at
-                                            ? new Date(
-                                                  instance.last_message_at
-                                              ).toLocaleDateString()
+                                            ? formatBogotaDate(instance.last_message_at)
                                             : "N/A"}
                                     </p>
                                 </div>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge"
 import { Check, Loader2, AlertTriangle, CreditCard, Calendar, Zap } from "lucide-react"
 import { upgradeSubscription, type WompiWidgetData } from "../actions"
+import { formatBogotaDateLong } from "@/lib/utils/date"
 
 // Declarar tipos para el widget de Wompi
 declare global {
@@ -250,11 +251,7 @@ export function SubscriptionManager({
                                         {subscription.status === "trialing" ? "Fin de prueba" : "Próximo cobro"}
                                     </p>
                                     <p className="font-semibold text-slate-900 dark:text-white">
-                                        {new Date(subscription.current_period_end).toLocaleDateString("es-CO", {
-                                            year: "numeric",
-                                            month: "long",
-                                            day: "numeric"
-                                        })}
+                                        {formatBogotaDateLong(subscription.current_period_end)}
                                     </p>
                                     <p className="text-sm text-slate-600">
                                         {daysRemaining} días restantes

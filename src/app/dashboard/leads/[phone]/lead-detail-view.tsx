@@ -7,6 +7,12 @@ import type { LeadDetail, AdvisorOption } from "./actions"
 import { toast } from "sonner"
 import Link from "next/link"
 import Image from "next/image"
+import {
+    formatBogotaDateLong,
+    formatBogotaDayKey,
+    formatBogotaMonthShort,
+    formatBogotaTime,
+} from "@/lib/utils/date"
 
 const STATUS_OPTIONS: Array<{ value: string; label: string; color: string }> = [
     { value: "new", label: "Nuevo", color: "#f59e0b" },
@@ -170,14 +176,14 @@ export function LeadDetailView({ lead, advisors }: Props) {
                                     <div key={apt.id} className="flex gap-4 p-4 bg-white dark:bg-gray-900 border rounded-xl dark:border-gray-800">
                                         <div className="flex-shrink-0 text-center w-14">
                                             <p className="text-2xl font-bold text-gray-900 dark:text-white">{aptDate.getDate()}</p>
-                                            <p className="text-xs text-gray-500 uppercase">{aptDate.toLocaleDateString("es-CO", { month: "short" })}</p>
+                                            <p className="text-xs text-gray-500 uppercase">{formatBogotaMonthShort(aptDate)}</p>
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
                                                     <p className="font-semibold text-gray-900 dark:text-white">{apt.title}</p>
                                                     <p className="text-sm text-gray-500">
-                                                        {aptDate.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
+                                                        {formatBogotaTime(aptDate)}
                                                         {apt.location && ` · ${apt.location}`}
                                                     </p>
                                                 </div>
@@ -235,7 +241,7 @@ export function LeadDetailView({ lead, advisors }: Props) {
                                         </span>
                                     </div>
                                     <span className="text-xs text-gray-400" suppressHydrationWarning>
-                                        {new Date(chat.updatedAt).toLocaleDateString("es-CO", { day: "numeric", month: "short" })}
+                                        {formatBogotaDayKey(chat.updatedAt)}
                                     </span>
                                 </Link>
                             ))}
@@ -418,7 +424,7 @@ export function LeadDetailView({ lead, advisors }: Props) {
                 {/* Info adicional */}
                 <div className="bg-white dark:bg-gray-900 border rounded-xl dark:border-gray-800 p-5 text-xs text-gray-400 space-y-1">
                     {lead.createdAt && (
-                        <p suppressHydrationWarning>Primer contacto: {new Date(lead.createdAt).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}</p>
+                        <p suppressHydrationWarning>Primer contacto: {formatBogotaDateLong(lead.createdAt)}</p>
                     )}
                     <p>{lead.appointments.length} cita{lead.appointments.length !== 1 ? "s" : ""} · {lead.chats.length} conversaci{lead.chats.length !== 1 ? "ones" : "ón"}</p>
                 </div>
