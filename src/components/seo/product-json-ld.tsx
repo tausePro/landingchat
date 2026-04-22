@@ -1,8 +1,10 @@
-import type { ProductWithVariantsReadModel } from "@/types/product"
+import { stripHtml } from "@/lib/utils/stripHtml"
+import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel } from "@/types/product"
 
 /**
  * JSON-LD Schema.org para productos
  * Mejora SEO y permite que motores de búsqueda e IA entiendan el catálogo
+ * Incluye aggregateRating y review[] cuando hay reseñas publicadas para mostrar estrellas en Google
  */
 
 interface ProductJsonLdProps {
@@ -31,6 +33,8 @@ interface ProductJsonLdProps {
     }
     url: string
     productWithVariants?: ProductWithVariantsReadModel | null
+    reviews?: ProductReview[] | null
+    reviewSummary?: ProductReviewSummary | null
 }
 
 function buildOffersSchema({
@@ -79,7 +83,7 @@ function buildOffersSchema({
     }
 }
 
-export function buildProductJsonLdData({ product, organization, url, productWithVariants }: ProductJsonLdProps) {
+export function buildProductJsonLdData({ product, organization, url, productWithVariants, reviews, reviewSummary }: ProductJsonLdProps) {
     const defaultVariant = productWithVariants?.default_variant
     const images = product.images?.length
         ? product.images
@@ -89,11 +93,34 @@ export function buildProductJsonLdData({ product, organization, url, productWith
                 ? [product.image_url]
                 : []
 
+    const cleanDescription = stripHtml(product.meta_description || product.description)
+
+    // Estructurar reseñas para schema.org/Review (máximo 3 para no inflar el JSON)
+    const structuredReviews = reviews
+        ?.filter((review) => review.author_name?.trim() && review.content?.trim() && review.rating >= 1 && review.rating <= 5)
+        .slice(0, 3)
+        .map((review) => ({
+            "@type": "Review",
+            author: {
+                "@type": "Person",
+                name: review.author_name,
+            },
+            reviewRating: {
+                "@type": "Rating",
+                ratingValue: review.rating,
+                bestRating: 5,
+                worstRating: 1,
+            },
+            name: review.title || undefined,
+            reviewBody: review.content,
+            datePublished: (review.published_at || review.created_at)?.split("T")[0],
+        }))
+
     const productSchema = {
         "@context": "https://schema.org",
         "@type": "Product",
         name: product.name,
-        description: product.meta_description || product.description || `${product.name} - Disponible en ${organization.name}`,
+        description: cleanDescription || `${product.name} - Disponible en ${organization.name}`,
         image: images,
         sku: defaultVariant?.sku || product.sku || product.id,
         brand: product.brand ? {
@@ -106,6 +133,18 @@ export function buildProductJsonLdData({ product, organization, url, productWith
         offers: buildOffersSchema({ product, organization, url, productWithVariants }),
         ...(product.categories?.length && {
             category: product.categories.join(" > ")
+        }),
+        ...(reviewSummary && reviewSummary.reviewCount > 0 && {
+            aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: reviewSummary.averageRating,
+                reviewCount: reviewSummary.reviewCount,
+                bestRating: 5,
+                worstRating: 1,
+            }
+        }),
+        ...(structuredReviews && structuredReviews.length > 0 && {
+            review: structuredReviews,
         }),
         ...(product.specifications?.length && {
             additionalProperty: product.specifications.map(spec => ({
@@ -163,12 +202,14 @@ export function buildProductJsonLdData({ product, organization, url, productWith
     }
 }
 
-export function ProductJsonLd({ product, organization, url, productWithVariants }: ProductJsonLdProps) {
+export function ProductJsonLd({ product, organization, url, productWithVariants, reviews, reviewSummary }: ProductJsonLdProps) {
     const { productSchema, faqSchema, breadcrumbSchema } = buildProductJsonLdData({
         product,
         organization,
         url,
         productWithVariants,
+        reviews,
+        reviewSummary,
     })
 
     return (

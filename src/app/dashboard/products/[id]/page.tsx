@@ -1,10 +1,22 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProductForm } from "../components/product-form"
+import { ProductReviewsManager } from "../components/ProductReviewsManager"
 import { getProductById } from "../actions"
+import {
+    getProductEngagementSummaryForDashboard,
+    getProductReviewsForDashboard,
+} from "../review-actions"
 import { notFound } from "next/navigation"
+import type { ProductEngagementSummary } from "@/types/product"
 
 interface EditProductPageProps {
     params: Promise<{ id: string }>
+}
+
+const emptyEngagementSummary: ProductEngagementSummary = {
+    pageViews: 0,
+    addToCartCount: 0,
+    uniqueVisitors: 0,
 }
 
 export default async function EditProductPage({ params }: EditProductPageProps) {
@@ -18,12 +30,33 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
 
     const product = result.data
 
+    const [reviewsResult, engagementResult] = await Promise.all([
+        getProductReviewsForDashboard(id),
+        getProductEngagementSummaryForDashboard(id),
+    ])
+
+    const initialReviews = reviewsResult.success ? reviewsResult.data : []
+    const initialEngagementSummary = engagementResult.success
+        ? engagementResult.data
+        : emptyEngagementSummary
+    const initialError = !reviewsResult.success
+        ? reviewsResult.error
+        : !engagementResult.success
+            ? engagementResult.error
+            : undefined
+
     return (
         <DashboardLayout>
             <ProductForm
                 organizationId={product.organization_id}
                 initialData={product}
                 isEditing
+            />
+            <ProductReviewsManager
+                productId={id}
+                initialReviews={initialReviews}
+                initialEngagementSummary={initialEngagementSummary}
+                initialError={initialError}
             />
         </DashboardLayout>
     )

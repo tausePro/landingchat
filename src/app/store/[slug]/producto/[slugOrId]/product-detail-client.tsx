@@ -11,7 +11,7 @@ import { getStoredUUID } from "@/lib/utils/storage"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { useCartStore } from "@/store/cart-store"
 import { getColorHex } from "@/lib/constants/colors"
-import type { ProductWithVariantsReadModel } from "@/types/product"
+import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel } from "@/types/product"
 
 interface ProductDetailClientProps {
     product: any
@@ -22,9 +22,11 @@ interface ProductDetailClientProps {
     relatedProducts?: any[]
     slug: string
     initialIsSubdomain?: boolean
+    reviews?: ProductReview[]
+    reviewSummary?: ProductReviewSummary | null
 }
 
-export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -32,6 +34,25 @@ export function ProductDetailClient({ product, productWithVariants, organization
     const { addItem } = useCartStore()
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
+
+    // Reseñas reales del producto (filtrar válidas) + resolver summary
+    const productReviews = reviews.filter((item) =>
+        item.author_name?.trim() &&
+        item.content?.trim() &&
+        item.rating >= 1 &&
+        item.rating <= 5
+    )
+    const resolvedReviewSummary: ProductReviewSummary | null = reviewSummary?.reviewCount
+        ? reviewSummary
+        : productReviews.length > 0
+            ? {
+                averageRating: Number(
+                    (productReviews.reduce((sum, item) => sum + item.rating, 0) / productReviews.length).toFixed(1)
+                ),
+                reviewCount: productReviews.length,
+                verifiedReviewCount: productReviews.filter((item) => item.verified_purchase).length,
+            }
+            : null
 
 
 
@@ -401,6 +422,29 @@ export function ProductDetailClient({ product, productWithVariants, organization
                             {product.name}
                         </h1>
 
+                        {resolvedReviewSummary && (
+                            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                                <div className="flex items-center gap-0.5 text-amber-500">
+                                    {Array.from({ length: 5 }).map((_, index) => (
+                                        <span key={`rating-star-${index}`} className="material-symbols-outlined text-[18px]">
+                                            {index < Math.round(resolvedReviewSummary.averageRating) ? "star" : "star_outline"}
+                                        </span>
+                                    ))}
+                                </div>
+                                <span className="font-semibold text-slate-900 dark:text-white">
+                                    {resolvedReviewSummary.averageRating.toFixed(1)} / 5
+                                </span>
+                                <span className="text-slate-500 dark:text-slate-400">
+                                    {resolvedReviewSummary.reviewCount} reseña{resolvedReviewSummary.reviewCount === 1 ? "" : "s"} real{resolvedReviewSummary.reviewCount === 1 ? "" : "es"}
+                                </span>
+                                {resolvedReviewSummary.verifiedReviewCount > 0 && (
+                                    <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                                        {resolvedReviewSummary.verifiedReviewCount} verificada{resolvedReviewSummary.verifiedReviewCount === 1 ? "" : "s"}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         <div className="mt-4 flex flex-col gap-2">
                             <div className="flex items-baseline gap-3">
                                 <p className="text-slate-900 dark:text-slate-200 text-3xl font-bold">
@@ -520,26 +564,85 @@ export function ProductDetailClient({ product, productWithVariants, organization
                             </p>
                         )}
 
-                        {/* Testimonial - Datos reales de la organización */}
-                        {(() => {
+                        {/* Reseñas reales del producto (con fallback a testimonios de la organización) */}
+                        {productReviews.length > 0 ? (
+                            <div className="mt-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <div>
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">Reseñas de clientes</h3>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            Opiniones reales asociadas a este producto
+                                        </p>
+                                    </div>
+                                    {resolvedReviewSummary && (
+                                        <div className="text-right">
+                                            <p className="text-lg font-bold text-slate-900 dark:text-white">{resolvedReviewSummary.averageRating.toFixed(1)}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">{resolvedReviewSummary.reviewCount} reseña{resolvedReviewSummary.reviewCount === 1 ? "" : "s"}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="space-y-4">
+                                    {productReviews.slice(0, 3).map((review) => (
+                                        <article key={review.id} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-4">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <p className="font-semibold text-slate-900 dark:text-white">{review.author_name}</p>
+                                                    <div className="mt-1 flex items-center gap-2">
+                                                        <div className="flex items-center gap-0.5 text-amber-500">
+                                                            {Array.from({ length: 5 }).map((_, index) => (
+                                                                <span key={`${review.id}-star-${index}`} className="material-symbols-outlined text-[16px]">
+                                                                    {index < review.rating ? "star" : "star_outline"}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        {review.verified_purchase && (
+                                                            <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                                                Compra verificada
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {review.author_role && (
+                                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{review.author_role}</p>
+                                                    )}
+                                                </div>
+                                                <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                                                    {new Date(review.published_at || review.created_at).toLocaleDateString("es-CO")}
+                                                </span>
+                                            </div>
+                                            {review.title && (
+                                                <p className="mt-3 font-medium text-slate-800 dark:text-slate-200">{review.title}</p>
+                                            )}
+                                            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{review.content}</p>
+                                        </article>
+                                    ))}
+                                </div>
+                                {productReviews.length > 3 && (
+                                    <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                                        Mostrando 3 de {productReviews.length} reseñas. Las más recientes primero.
+                                    </p>
+                                )}
+                            </div>
+                        ) : (() => {
+                            // Fallback: testimonio de la organización si aún no hay reseñas reales
                             const testimonials = organization.settings?.storefront?.testimonials?.filter((t: any) => t.enabled) || []
-                            // Seleccionar testimonial basado en el ID del producto para que sea consistente
                             const testimonial = testimonials.length > 0
                                 ? testimonials[product.id.charCodeAt(0) % testimonials.length]
                                 : null
 
+                            if (!testimonial) return null
+
                             return (
                                 <div className="mt-8 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                                        {testimonial?.name?.charAt(0) || product.name.charAt(0)}
+                                        {testimonial.name?.charAt(0) || product.name.charAt(0)}
                                     </div>
                                     <div>
                                         <p className="font-semibold text-slate-700 dark:text-slate-200">
-                                            &ldquo;{testimonial?.text || 'Excelente calidad y servicio'}&rdquo;
+                                            &ldquo;{testimonial.text}&rdquo;
                                         </p>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            - {testimonial?.name || 'Cliente verificado'}
-                                            {testimonial?.role && <span className="ml-1 text-xs opacity-70">({testimonial.role})</span>}
+                                            - {testimonial.name}
+                                            {testimonial.role && <span className="ml-1 text-xs opacity-70">({testimonial.role})</span>}
                                         </p>
                                     </div>
                                 </div>
