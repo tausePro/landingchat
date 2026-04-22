@@ -331,3 +331,52 @@ export interface ProductWithVariantsListItem extends ProductWithVariantsReadMode
   legacy_stock: number | null
   badge_id: string | null
 }
+
+// ============================================================
+// Product Reviews — reseñas con verificación de compra
+// ============================================================
+
+export interface ProductReview {
+  id: string
+  product_id: string
+  organization_id: string
+  customer_id: string | null
+  order_id: string | null
+  author_name: string
+  author_role: string | null
+  title: string | null
+  content: string
+  rating: number
+  verified_purchase: boolean
+  is_published: boolean
+  published_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// ============================================================
+// Product Review Summary — agregado público para storefront
+// ============================================================
+
+export interface ProductReviewSummary {
+  averageRating: number
+  reviewCount: number
+  verifiedReviewCount: number
+}
+
+// ============================================================
+// Product Engagement — resumen de tracking para dashboard
+// ============================================================
+
+export interface ProductEngagementSummary {
+  pageViews: number
+  addToCartCount: number
+  uniqueVisitors: number
+}
+
+export type ProductEngagementEventType =
+  | "page_view"
+  | "view_content"
+  | "add_to_cart"
+  | "initiate_checkout"
+  | "purchase"

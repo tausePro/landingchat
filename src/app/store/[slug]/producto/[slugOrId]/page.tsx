@@ -6,6 +6,8 @@ import { ProductDetailClient } from "./product-detail-client"
 import { ProductJsonLd } from "@/components/seo/product-json-ld"
 import { headers } from "next/headers"
 import { isSubdomain } from "@/lib/utils/store-urls"
+import { createServiceClient } from "@/lib/supabase/server"
+import type { ProductReview, ProductReviewSummary } from "@/types/product"
 
 interface ProductDetailPageProps {
     params: Promise<{ slug: string; slugOrId: string }>
@@ -63,6 +65,42 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
     }
 }
 
+async function getPublishedProductReviews(productId: string): Promise<{
+    reviews: ProductReview[]
+    summary: ProductReviewSummary | null
+}> {
+    try {
+        const supabase = createServiceClient()
+        const { data, error } = await supabase
+            .from("product_reviews")
+            .select("id, product_id, organization_id, customer_id, order_id, author_name, author_role, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at")
+            .eq("product_id", productId)
+            .eq("is_published", true)
+            .order("created_at", { ascending: false })
+
+        if (error || !data) {
+            return { reviews: [], summary: null }
+        }
+
+        const reviews = data as ProductReview[]
+        if (reviews.length === 0) {
+            return { reviews, summary: null }
+        }
+
+        const summary: ProductReviewSummary = {
+            averageRating: Number(
+                (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+            ),
+            reviewCount: reviews.length,
+            verifiedReviewCount: reviews.filter((r) => r.verified_purchase).length,
+        }
+
+        return { reviews, summary }
+    } catch {
+        return { reviews: [], summary: null }
+    }
+}
+
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
     const { slug, slugOrId } = await params
 
@@ -77,6 +115,9 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     const { organization, product, productWithVariants, badges, promotions, relatedProducts } = data
 
+    // Cargar reseñas publicadas del producto en paralelo (no bloquea si falla)
+    const { reviews, summary: reviewSummary } = await getPublishedProductReviews(product.id)
+
     // Construir URL canónica del producto
     const productUrl = organization.custom_domain
         ? `https://${organization.custom_domain}/producto/${product.slug || product.id}`
@@ -89,6 +130,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 organization={organization}
                 url={productUrl}
                 productWithVariants={productWithVariants}
+                reviews={reviews}
+                reviewSummary={reviewSummary}
             />
             <StoreLayoutClient
                 slug={organization.slug}
@@ -106,6 +149,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                     relatedProducts={relatedProducts}
                     slug={organization.slug}
                     initialIsSubdomain={initialIsSubdomain}
+                    reviews={reviews}
+                    reviewSummary={reviewSummary}
                 />
             </StoreLayoutClient>
         </>
