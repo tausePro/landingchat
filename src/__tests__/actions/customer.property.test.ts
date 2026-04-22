@@ -21,8 +21,11 @@ const mockCustomerInsert = vi.fn(() => ({ select: mockCustomerSelect }))
 const mockUpdateEq = vi.fn()
 const mockUpdate = vi.fn(() => ({ eq: mockUpdateEq }))
 
-const mockDeleteEq = vi.fn()
-const mockDelete = vi.fn(() => ({ eq: mockDeleteEq }))
+// deleteCustomer hace .delete().eq(id).eq(organization_id) — doble eq encadenado.
+// Primer eq filtra por id, segundo eq filtra por organization_id y es el thenable final.
+const mockDeleteEqOrg = vi.fn()
+const mockDeleteEqId = vi.fn(() => ({ eq: mockDeleteEqOrg }))
+const mockDelete = vi.fn(() => ({ eq: mockDeleteEqId }))
 
 const mockGetUser = vi.fn()
 const mockFrom = vi.fn((table: string) => {
@@ -326,8 +329,16 @@ describe("customer actions", () => {
         data: { user: { id: "user-123" } },
         error: null,
       })
-      
-      mockDeleteEq.mockResolvedValue({ error: null })
+
+      // deleteCustomer consulta profiles.select().eq().single() para obtener
+      // organization_id antes del delete; sin este mock la consulta devuelve
+      // undefined y el action corta con "No organization found".
+      mockProfileSingle.mockResolvedValue({
+        data: { organization_id: "org-123" },
+        error: null,
+      })
+
+      mockDeleteEqOrg.mockResolvedValue({ error: null })
     })
 
     it("returns { success: true, data: undefined } on successful delete", async () => {
