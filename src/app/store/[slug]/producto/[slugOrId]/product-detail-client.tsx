@@ -4,7 +4,9 @@ import { useState, useEffect, useMemo } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { resolveProductDetailInventory, type ProductDetailViewModel } from "@/lib/commerce/productDetailViewModel"
 import { findVariantBySelectedOptions } from "@/lib/commerce/productWithVariants"
+import { resolveVariantPricing } from "@/lib/commerce/variantPricing"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { getStoredUUID } from "@/lib/utils/storage"
@@ -17,6 +19,7 @@ import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel 
 interface ProductDetailClientProps {
     product: ProductDetailProduct
     productWithVariants?: ProductWithVariantsReadModel | null
+    viewModel: ProductDetailViewModel
     organization: ProductDetailOrganization
     badges: ProductBadge[]
     promotions: ProductPromotion[]
@@ -52,6 +55,8 @@ interface ProductPromotion {
     type: "percentage" | "fixed" | string
     value: number
 }
+
+type ProductPromotionDisplay = Pick<ProductPromotion, "type" | "value">
 
 interface ProductSpecification {
     label: string
@@ -162,6 +167,40 @@ function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount)
 }
 
+function normalizeHexColor(color: string | undefined, fallback: string): string {
+    if (!color) {
+        return fallback
+    }
+
+    const trimmed = color.trim()
+    const shortHexMatch = /^#([0-9a-fA-F]{3})$/.exec(trimmed)
+
+    if (shortHexMatch) {
+        const [r, g, b] = shortHexMatch[1].split("")
+        return `#${r}${r}${g}${g}${b}${b}`
+    }
+
+    return /^#([0-9a-fA-F]{6})$/.test(trimmed) ? trimmed : fallback
+}
+
+function hexToRgba(color: string, alpha: number): string {
+    const normalized = normalizeHexColor(color, "#0bbfbf")
+    const value = normalized.slice(1)
+    const red = Number.parseInt(value.slice(0, 2), 16)
+    const green = Number.parseInt(value.slice(2, 4), 16)
+    const blue = Number.parseInt(value.slice(4, 6), 16)
+    const clampedAlpha = Math.min(1, Math.max(0, alpha))
+
+    return `rgba(${red}, ${green}, ${blue}, ${clampedAlpha})`
+}
+
+function getReviewInitials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean)
+    const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("")
+
+    return initials || "•"
+}
+
 function buildWhatsAppLink(phone: string | null | undefined, message: string): string | null {
     if (!phone) {
         return null
@@ -216,6 +255,7 @@ interface ProductShippingCardProps {
 function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping }: ProductShippingCardProps) {
     const progress = getFreeShippingProgress(shippingConfig, subtotal)
     const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
+    const shippingQualified = hasProductLevelFreeShipping || (progress.enabled && (!progress.hasMinimum || progress.qualified))
 
     if (!hasProductLevelFreeShipping && !progress.enabled) {
         return null
@@ -230,40 +270,27 @@ function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProduc
             : `Envío gratis disponible${progress.zonesText}.`
 
     return (
-        <div className="mt-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                        Envío gratis{progress.zonesText}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        {description}
-                    </p>
-                </div>
+        <div className="rounded-[10px] border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-slate-600 dark:text-slate-300">
+                <span className="material-symbols-outlined text-[16px]" style={{ color: primaryColor }}>local_shipping</span>
+                {shippingQualified ? (
+                    <>
+                        <strong className="text-slate-900 dark:text-white">Envío gratis activo</strong>
+                        <span>{description}</span>
+                    </>
+                ) : (
+                    <span>{description}</span>
+                )}
                 {estimatedDeliveryDays ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white dark:bg-slate-950 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
-                        <span className="material-symbols-outlined text-[16px]">local_shipping</span>
-                        {estimatedDeliveryDays} día{estimatedDeliveryDays === 1 ? "" : "s"}
-                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">· {estimatedDeliveryDays} día{estimatedDeliveryDays === 1 ? "" : "s"}</span>
                 ) : null}
+            </p>
+            <div className="mt-2 h-[5px] overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${shippingQualified ? 100 : progress.progress}%`, backgroundColor: primaryColor }}
+                />
             </div>
-
-            {!hasProductLevelFreeShipping && progress.enabled && progress.hasMinimum && (
-                <div className="mt-3">
-                    <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
-                        <span>Progreso hacia envío gratis</span>
-                        <span>
-                            {progress.qualified ? "¡Conseguido!" : `${formatCurrency(progress.remaining)} más`}
-                        </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                        <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{ width: `${progress.progress}%`, backgroundColor: primaryColor }}
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
@@ -273,87 +300,137 @@ interface ProductTrustRailProps {
     sectionLinks: ProductSectionLink[]
     shippingConfig?: StorefrontShippingConfig | null
     hasFreeShipping: boolean
+    inventoryLabel?: string
+    primaryColor?: string
     onStartChat: () => void
 }
 
-function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeShipping, onStartChat }: ProductTrustRailProps) {
-    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
-    const hasShippingInfo = hasFreeShipping || Boolean(estimatedDeliveryDays) || Boolean(shippingConfig)
+interface TrustBadgeItem {
+    id: string
+    icon: string
+    title: string
+    description: string
+    href?: string
+    onClick?: () => void
+}
 
-    if (!whatsappLink && sectionLinks.length === 0 && !hasShippingInfo) {
+function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeShipping, inventoryLabel = "Inventario confirmado", primaryColor = "#3B82F6", onStartChat }: ProductTrustRailProps) {
+    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
+    const trustBadges: TrustBadgeItem[] = []
+
+    if (estimatedDeliveryDays) {
+        trustBadges.push({
+            id: "shipping",
+            icon: "local_shipping",
+            title: "Envío rápido",
+            description: `${estimatedDeliveryDays} día${estimatedDeliveryDays === 1 ? "" : "s"}`,
+        })
+    } else if (hasFreeShipping) {
+        trustBadges.push({
+            id: "shipping",
+            icon: "local_shipping",
+            title: "Envío gratis",
+            description: "Activo para esta compra",
+        })
+    }
+
+    if (whatsappLink) {
+        trustBadges.push({
+            id: "chat",
+            icon: "chat_bubble",
+            title: "Compra asistida",
+            description: "WhatsApp disponible",
+            href: whatsappLink,
+        })
+    } else {
+        trustBadges.push({
+            id: "chat",
+            icon: "chat_bubble",
+            title: "Compra asistida",
+            description: "Te ayudamos por chat",
+            onClick: onStartChat,
+        })
+    }
+
+    trustBadges.push({
+        id: "inventory",
+        icon: "inventory_2",
+        title: "Inventario real",
+        description: inventoryLabel,
+    })
+
+    if (sectionLinks.length > 0) {
+        trustBadges.push({
+            id: "sections",
+            icon: "menu_book",
+            title: "Explora",
+            description: `${sectionLinks.length} secciones`,
+        })
+    }
+
+    if (trustBadges.length === 0 && sectionLinks.length === 0) {
         return null
     }
 
-    const shippingMessage = estimatedDeliveryDays
-        ? hasFreeShipping
-            ? `Despacho estimado en ${estimatedDeliveryDays} día${estimatedDeliveryDays === 1 ? "" : "s"} y opciones con envío gratis.`
-            : `Despacho estimado en ${estimatedDeliveryDays} día${estimatedDeliveryDays === 1 ? "" : "s"}.`
-        : hasFreeShipping
-            ? "Este producto ya participa en condiciones reales de envío gratis."
-            : "Calculamos el envío con configuración real de la tienda al momento de comprar."
-
     return (
-        <div className="mt-6 space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Acompañamiento</p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                        Te ayudamos a resolver dudas y cerrar la compra por chat.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={onStartChat}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500"
-                        >
-                            <span className="material-symbols-outlined text-[16px]">chat</span>
-                            Abrir chat
-                        </button>
-                        {whatsappLink && (
-                            <a
-                                href={whatsappLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600"
-                            >
-                                <span className="material-symbols-outlined text-[16px]">call</span>
-                                WhatsApp
-                            </a>
-                        )}
-                    </div>
-                </div>
+        <div className="mt-5 space-y-3">
+            <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/40">
+                <div className="grid grid-cols-2 md:grid-cols-4">
+                    {trustBadges.map((item) => {
+                        const content = (
+                            <>
+                                <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>{item.icon}</span>
+                                <span>
+                                    {item.title}<br />{item.description}
+                                </span>
+                            </>
+                        )
 
-                {hasShippingInfo && (
-                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Despacho y entrega</p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                            {shippingMessage}
-                        </p>
-                    </div>
-                )}
+                        const className = "flex flex-col items-center gap-1 border-r border-slate-200 px-3 py-3 text-center text-[11px] font-medium text-slate-600 last:border-r-0 dark:border-slate-800 dark:text-slate-300"
+
+                        if ("href" in item && item.href) {
+                            return (
+                                <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" className={className}>
+                                    {content}
+                                </a>
+                            )
+                        }
+
+                        if ("onClick" in item && item.onClick) {
+                            return (
+                                <button key={item.id} type="button" onClick={item.onClick} className={className}>
+                                    {content}
+                                </button>
+                            )
+                        }
+
+                        return (
+                            <div key={item.id} className={className}>
+                                {content}
+                            </div>
+                        )
+                    })}
+                </div>
             </div>
 
             {sectionLinks.length > 0 && (
-                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Explora esta ficha</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                        {sectionLinks.map((sectionLink) => (
-                            <a
-                                key={sectionLink.id}
-                                href={`#${sectionLink.id}`}
-                                className="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500"
-                            >
-                                {sectionLink.label}
-                            </a>
-                        ))}
-                    </div>
+                <div className="flex flex-wrap gap-2">
+                    {sectionLinks.map((sectionLink) => (
+                        <a
+                            key={sectionLink.id}
+                            href={`#${sectionLink.id}`}
+                            className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500"
+                        >
+                            {sectionLink.label}
+                        </a>
+                    ))}
                 </div>
             )}
         </div>
     )
 }
 
-export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -361,25 +438,46 @@ export function ProductDetailClient({ product, productWithVariants, organization
     const { addItem } = useCartStore()
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
+    const accentColor = normalizeHexColor(primaryColor, "#0bbfbf")
+    const accentSurface = hexToRgba(accentColor, 0.08)
+    const accentSurfaceStrong = hexToRgba(accentColor, 0.14)
+    const accentBorder = hexToRgba(accentColor, 0.24)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const accentShadow = `0 14px 34px ${hexToRgba(accentColor, 0.16)}`
+
+    // Additional requested fields (to be wired to DB later, currently omitted if undefined)
+    type ExtendedProduct = typeof product & { sold_count?: number; viewing_count?: number; ai_recommendation?: string };
+    const extProduct = product as ExtendedProduct;
+    
+    const soldCount = extProduct.sold_count
+    const viewingCount = extProduct.viewing_count
+    const aiRecommendation = extProduct.ai_recommendation
+    const showUrgencyTimer = false
 
     // Reseñas reales del producto (filtrar válidas) + resolver summary
-    const productReviews = reviews.filter((item) =>
-        item.author_name?.trim() &&
-        item.content?.trim() &&
-        item.rating >= 1 &&
-        item.rating <= 5
+    const productReviews = useMemo(
+        () => reviews.filter((item) =>
+            item.author_name?.trim() &&
+            item.content?.trim() &&
+            item.rating >= 1 &&
+            item.rating <= 5
+        ),
+        [reviews]
     )
-    const resolvedReviewSummary: ProductReviewSummary | null = reviewSummary?.reviewCount
-        ? reviewSummary
-        : productReviews.length > 0
-            ? {
-                averageRating: Number(
-                    (productReviews.reduce((sum, item) => sum + item.rating, 0) / productReviews.length).toFixed(1)
-                ),
-                reviewCount: productReviews.length,
-                verifiedReviewCount: productReviews.filter((item) => item.verified_purchase).length,
-            }
-            : null
+    const resolvedReviewSummary: ProductReviewSummary | null = useMemo(
+        () => reviewSummary?.reviewCount
+            ? reviewSummary
+            : productReviews.length > 0
+                ? {
+                    averageRating: Number(
+                        (productReviews.reduce((sum, item) => sum + item.rating, 0) / productReviews.length).toFixed(1)
+                    ),
+                    reviewCount: productReviews.length,
+                    verifiedReviewCount: productReviews.filter((item) => item.verified_purchase).length,
+                }
+                : null,
+        [productReviews, reviewSummary]
+    )
 
 
 
@@ -392,27 +490,25 @@ export function ProductDetailClient({ product, productWithVariants, organization
         [product.variants]
     )
     const typedPromotions = promotions
+    const minimumQuantity = viewModel.quantityPricing.minimumQuantity || product.minimum_quantity || 1
+    const hasQuantityPricing = viewModel.quantityPricing.enabled || Boolean(product.has_quantity_pricing)
 
     const [selectedImage, setSelectedImage] = useState(images[0])
 
     // State
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => getDefaultSelectedVariants(productVariants))
-    const [quantity, setQuantity] = useState(product.minimum_quantity || 1)
+    const [quantity, setQuantity] = useState(minimumQuantity)
 
     // Calcular precio unitario según tier de cantidad
     const getUnitPriceForQuantity = (qty: number): number => {
-        if (!product.has_quantity_pricing || !product.price_tiers?.length) return product.sale_price || product.price
-        // Buscar el tier que aplica para esta cantidad
-        const sorted = [...(product.price_tiers as ProductPriceTier[])].sort((a, b) => b.min_quantity - a.min_quantity)
+        if (!hasQuantityPricing || !viewModel.quantityPricing.priceTiers?.length) return product.sale_price || product.price
+        const sorted = [...(viewModel.quantityPricing.priceTiers as ProductPriceTier[])].sort((a, b) => b.min_quantity - a.min_quantity)
         for (const tier of sorted) {
             if (qty >= tier.min_quantity) return tier.unit_price
         }
         return product.sale_price || product.price
     }
-    const unitPrice = getUnitPriceForQuantity(quantity)
-    const totalPrice = unitPrice * quantity
 
-    // Track ViewContent event when product loads
     useEffect(() => {
         trackViewContent(
             product.id,
@@ -422,7 +518,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
         )
     }, [product.id, product.name, product.price, trackViewContent])
 
-    const { currentPrice, activePromotion } = useMemo<{ currentPrice: number; activePromotion: ProductPromotion | null }>(() => {
+    const legacyPricing = useMemo<{ currentPrice: number; activePromotion: ProductPromotion | null }>(() => {
         let price = product.sale_price || product.price
 
         // 1. Add Variant Adjustments
@@ -466,18 +562,44 @@ export function ProductDetailClient({ product, productWithVariants, organization
 
     const selectedSellableVariant = useMemo(() => {
         if (!productWithVariants) {
-            return null
+            return viewModel.variants.defaultVariant ?? null
         }
 
         const hasSelectedOptions = Object.values(selectedVariants).some((value) => value.length > 0)
 
         if (!hasSelectedOptions) {
-            return productWithVariants.default_variant ?? null
+            return productWithVariants.default_variant ?? viewModel.variants.defaultVariant ?? null
         }
 
         return findVariantBySelectedOptions(productWithVariants.variants, selectedVariants)
-    }, [productWithVariants, selectedVariants])
+    }, [productWithVariants, selectedVariants, viewModel.variants.defaultVariant])
 
+    const pricingVariant = selectedSellableVariant ?? viewModel.variants.defaultVariant
+
+    const resolvedHeadlinePricing = useMemo(() => {
+        if (!pricingVariant) {
+            return viewModel.pricing.defaultResolved
+        }
+
+        return resolveVariantPricing(pricingVariant, {
+            promotions: viewModel.promotions,
+            quantity: minimumQuantity,
+            category_ids: viewModel.categoryIds,
+            price_tiers: pricingVariant.is_default ? viewModel.quantityPricing.priceTiers : null,
+            has_quantity_pricing: pricingVariant.is_default && viewModel.quantityPricing.enabled,
+        })
+    }, [minimumQuantity, pricingVariant, viewModel.categoryIds, viewModel.pricing.defaultResolved, viewModel.promotions, viewModel.quantityPricing.enabled, viewModel.quantityPricing.priceTiers])
+    const activePromotion: ProductPromotionDisplay | null = resolvedHeadlinePricing?.active_promotion
+        ? {
+            type: resolvedHeadlinePricing.active_promotion.type,
+            value: resolvedHeadlinePricing.active_promotion.value,
+        }
+        : legacyPricing.activePromotion
+            ? {
+                type: legacyPricing.activePromotion.type,
+                value: legacyPricing.activePromotion.value,
+            }
+            : null
     const selectedVariantTitle = useMemo(() => {
         if (selectedSellableVariant?.title?.trim()) {
             return selectedSellableVariant.title.trim()
@@ -490,6 +612,99 @@ export function ProductDetailClient({ product, productWithVariants, organization
 
         return optionLabel.length > 0 ? optionLabel : null
     }, [selectedSellableVariant, selectedVariants])
+    const resolvedInventory = useMemo(
+        () => resolveProductDetailInventory(viewModel, selectedSellableVariant?.id),
+        [selectedSellableVariant?.id, viewModel]
+    )
+    const availableQuantity = resolvedInventory.availableQuantity
+    const hasKnownAvailableQuantity = typeof availableQuantity === "number"
+    const effectiveQuantity = hasKnownAvailableQuantity && availableQuantity >= minimumQuantity
+        ? Math.min(quantity, availableQuantity)
+        : quantity
+    const hasInsufficientStockForMinimum = hasKnownAvailableQuantity && availableQuantity > 0 && availableQuantity < minimumQuantity
+    const canPurchase = resolvedInventory.inStock
+        && !hasInsufficientStockForMinimum
+        && (!hasKnownAvailableQuantity || effectiveQuantity <= availableQuantity)
+
+    const resolvedQuantityPricing = useMemo(() => {
+        if (!pricingVariant) {
+            return null
+        }
+
+        return resolveVariantPricing(pricingVariant, {
+            promotions: viewModel.promotions,
+            quantity: effectiveQuantity,
+            category_ids: viewModel.categoryIds,
+            price_tiers: pricingVariant.is_default ? viewModel.quantityPricing.priceTiers : null,
+            has_quantity_pricing: pricingVariant.is_default && viewModel.quantityPricing.enabled,
+        })
+    }, [effectiveQuantity, pricingVariant, viewModel.categoryIds, viewModel.promotions, viewModel.quantityPricing.enabled, viewModel.quantityPricing.priceTiers])
+
+    const unitPrice = resolvedQuantityPricing?.final_price ?? (hasQuantityPricing ? getUnitPriceForQuantity(effectiveQuantity) : legacyPricing.currentPrice)
+    const totalPrice = unitPrice * effectiveQuantity
+    const currentPrice = resolvedHeadlinePricing?.final_price ?? legacyPricing.currentPrice
+
+    const inventoryMessage = useMemo(() => {
+        if (!resolvedInventory.inStock) {
+            return {
+                tone: "critical",
+                badge: "Agotado",
+                title: selectedVariantTitle
+                    ? `${selectedVariantTitle} no está disponible ahora`
+                    : "Producto agotado temporalmente",
+                description: resolvedInventory.source === "variant"
+                    ? "Cambia tu selección o escríbenos por chat para revisar reposición."
+                    : "Escríbenos por chat para confirmar reposición o alternativas disponibles.",
+            }
+        }
+
+        if (hasInsufficientStockForMinimum) {
+            return {
+                tone: "warning",
+                badge: `Solo ${availableQuantity}`,
+                title: "El inventario actual no alcanza el mínimo de compra",
+                description: `Hay ${availableQuantity} unidade${availableQuantity === 1 ? "d" : "s"} disponible${availableQuantity === 1 ? "" : "s"} y el mínimo actual es ${minimumQuantity}.`,
+            }
+        }
+
+        if (resolvedInventory.lowStockLabel) {
+            return {
+                tone: "warning",
+                badge: resolvedInventory.lowStockLabel,
+                title: resolvedInventory.source === "variant" && selectedVariantTitle
+                    ? `${selectedVariantTitle} tiene inventario limitado`
+                    : "Inventario limitado",
+                description: resolvedInventory.source === "variant"
+                    ? "La disponibilidad mostrada corresponde a la variante seleccionada."
+                    : "La disponibilidad mostrada corresponde al inventario real del producto.",
+            }
+        }
+
+        if (resolvedInventory.source === "variant" && resolvedInventory.totalStock !== null) {
+            return {
+                tone: "ok",
+                badge: "Inventario por variante",
+                title: selectedVariantTitle
+                    ? `${selectedVariantTitle} disponible para compra`
+                    : "Variante disponible para compra",
+                description: `${resolvedInventory.totalStock} unidade${resolvedInventory.totalStock === 1 ? "d" : "s"} activas sumadas entre variantes.`,
+            }
+        }
+
+        return {
+            tone: "ok",
+            badge: "En stock",
+            title: "Disponible para compra",
+            description: resolvedInventory.totalStock !== null
+                ? `${resolvedInventory.totalStock} unidade${resolvedInventory.totalStock === 1 ? "d" : "s"} disponibles actualmente.`
+                : "Disponibilidad confirmada para compra.",
+        }
+    }, [availableQuantity, hasInsufficientStockForMinimum, minimumQuantity, resolvedInventory, selectedVariantTitle])
+    const inventoryBadgeClass = inventoryMessage.tone === "critical"
+        ? "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400"
+        : inventoryMessage.tone === "warning"
+            ? "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400"
+            : "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
 
     const handleVariantChange = (type: string, value: string) => {
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
@@ -527,23 +742,28 @@ export function ProductDetailClient({ product, productWithVariants, organization
     }
 
     const handleBuyNow = () => {
-        const priceToUse = product.has_quantity_pricing ? unitPrice : currentPrice
+        if (!canPurchase) {
+            return
+        }
+
+        const cartVariant = selectedSellableVariant ?? viewModel.variants.defaultVariant
+        const priceToUse = unitPrice
         const productToAdd = {
-            id: selectedSellableVariant?.id || product.id,
+            id: cartVariant?.id || product.id,
             product_id: product.id,
-            variant_id: selectedSellableVariant?.id || null,
+            variant_id: cartVariant?.id || null,
             variant_title: selectedVariantTitle,
             name: product.name,
             product_name: product.name,
             price: priceToUse,
             unit_price: priceToUse,
-            compare_at_price: selectedSellableVariant?.compare_at_price ?? (product.sale_price ? product.price : null),
-            image_url: selectedSellableVariant?.image_url || product.image_url || selectedImage,
+            compare_at_price: resolvedQuantityPricing?.compare_at_to_show ?? cartVariant?.compare_at_price ?? (product.sale_price ? product.price : null),
+            image_url: cartVariant?.image_url || product.image_url || selectedImage,
             categories: product.categories ?? undefined,
         }
 
-        trackAddToCart(product.id, product.name, priceToUse * quantity, "COP")
-        addItem(productToAdd, quantity)
+        trackAddToCart(product.id, product.name, priceToUse * effectiveQuantity, "COP")
+        addItem(productToAdd, effectiveQuantity)
     }
 
     // Logic for Brand/Category Label
@@ -555,33 +775,81 @@ export function ProductDetailClient({ product, productWithVariants, organization
         [shippingConfig, totalPrice]
     )
     const hasFreeShipping = product.free_shipping_enabled || freeShippingProgress.qualified
-    const compareAtPrice = (activePromotion || product.sale_price) ? product.price : null
+    const compareAtPrice = resolvedHeadlinePricing ? resolvedHeadlinePricing.compare_at_to_show : (legacyPricing.activePromotion || product.sale_price) ? product.price : null
     const savingsAmount = compareAtPrice ? Math.max(compareAtPrice - currentPrice, 0) : 0
     const whatsappLink = useMemo(
         () => buildWhatsAppLink(organization.settings?.whatsapp?.phone, `Hola, quiero más información sobre ${product.name}`),
         [organization.settings?.whatsapp?.phone, product.name]
     )
-    const sectionLinks = useMemo<ProductSectionLink[]>(() => {
-        const links: ProductSectionLink[] = []
+    const sectionLinks: ProductSectionLink[] = []
 
-        if (product.benefits?.length) {
-            links.push({ id: "product-benefits", label: "Beneficios" })
-        }
+    if (product.benefits?.length) {
+        sectionLinks.push({ id: "product-benefits", label: "Beneficios" })
+    }
 
-        if (product.specifications?.length) {
-            links.push({ id: "product-specifications", label: "Especificaciones" })
-        }
+    if (product.specifications?.length) {
+        sectionLinks.push({ id: "product-specifications", label: "Especificaciones" })
+    }
 
-        if (product.faq?.length) {
-            links.push({ id: "product-faq", label: "Preguntas" })
-        }
+    if (product.faq?.length) {
+        sectionLinks.push({ id: "product-faq", label: "Preguntas" })
+    }
 
-        if (productReviews.length > 0) {
-            links.push({ id: "product-reviews", label: "Reseñas" })
-        }
+    if (productReviews.length > 0) {
+        sectionLinks.push({ id: "product-reviews", label: "Reseñas" })
+    }
 
-        return links
-    }, [product.benefits, product.faq, product.specifications, productReviews.length])
+    const featuredReview = productReviews[0] ?? null
+    const heroValueRows: Array<{ icon: string; label: string; value?: string | null }> = product.is_bundle && product.bundle_items?.length
+        ? product.bundle_items.slice(0, 4).map((item) => ({
+            icon: "inventory_2",
+            label: `${(item.quantity ?? 0) > 1 ? `${item.quantity}x ` : ""}${item.product_name || "Producto incluido"}`,
+            value: null,
+        }))
+        : (() => {
+            const rows: Array<{ icon: string; label: string; value?: string | null }> = []
+
+            if (selectedVariantTitle) {
+                rows.push({ icon: "tune", label: "Selección actual", value: selectedVariantTitle })
+            }
+
+            product.specifications?.slice(0, 2).forEach((spec) => {
+                rows.push({ icon: "check_circle", label: spec.label, value: spec.value })
+            })
+
+            if (minimumQuantity > 1) {
+                rows.push({ icon: "shopping_bag", label: "Compra mínima", value: `${minimumQuantity} unidades` })
+            }
+
+            if (hasQuantityPricing && viewModel.quantityPricing.priceTiers?.length) {
+                rows.push({ icon: "price_change", label: "Precios por cantidad", value: `${viewModel.quantityPricing.priceTiers.length} niveles` })
+            }
+
+            return rows.slice(0, 4)
+        })()
+    const heroValueStackTitle = product.is_bundle && product.bundle_items?.length ? "¿Qué incluye este kit?" : "Lo que debes saber"
+    const heroSignalItems: Array<{ id: string; icon: string; label: string; tone: "warning" | "brand" | "success" | "danger" }> = []
+
+    if (hasKnownAvailableQuantity && availableQuantity > 0 && availableQuantity <= 10) {
+        heroSignalItems.push({ id: "inventory", icon: "inventory_2", label: `Solo ${availableQuantity} unidades`, tone: "danger" })
+    } else if (!resolvedInventory.inStock) {
+        heroSignalItems.push({ id: "inventory", icon: "inventory_2", label: "Agotado", tone: "danger" })
+    }
+
+    if (viewingCount) {
+        heroSignalItems.push({ id: "views", icon: "visibility", label: `${viewingCount} personas viendo`, tone: "brand" })
+    }
+    if (soldCount) {
+        heroSignalItems.push({ id: "sold", icon: "trending_up", label: `${soldCount} vendidos`, tone: "success" })
+    }
+    const inventoryTrustLabel = resolvedInventory.source === "variant"
+        ? (selectedVariantTitle ?? "Disponibilidad por variante")
+        : inventoryMessage.badge
+    const priceSupportLabel = hasQuantityPricing
+        ? `Total actual ${formatCurrency(totalPrice)} · ${formatCurrency(unitPrice)} por unidad.`
+        : savingsAmount > 0
+            ? `Ahorro real de ${formatCurrency(savingsAmount)} frente al valor regular.`
+            : (selectedVariantTitle ? `Precio final para ${selectedVariantTitle}.` : "Precio final para la selección actual.")
 
     // Mapa de imágenes → variante (para sync thumbnail → color selector)
     // y set de imágenes agotadas (para overlay "Agotado")
@@ -607,11 +875,11 @@ export function ProductDetailClient({ product, productWithVariants, organization
     const isSelectedImageOOS = outOfStockImages.has(selectedImage)
 
     return (
-        <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-8">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-6">
+            <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
 
                 {/* Breadcrumbs */}
-                <nav className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-6">
+                <nav className="flex items-center gap-2 text-[13px] text-slate-500 dark:text-slate-400 mb-8">
                     <Link href={getStoreLink("/", isSubdomain, slug)} className="hover:text-primary transition-colors">
                         {organization.name}
                     </Link>
@@ -627,107 +895,63 @@ export function ProductDetailClient({ product, productWithVariants, organization
                     <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[200px]">{product.name}</span>
                 </nav>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
+                <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_minmax(0,0.95fr)] lg:items-start lg:gap-14">
 
                     {/* Left Column: Gallery */}
-                    <div className="flex flex-col items-center gap-4">
-
-
-                        <div className="w-full relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-800">
-                            <Image
-                                src={selectedImage}
-                                alt={`${product.name}${product.brand ? ` - ${product.brand}` : ''} | ${organization.name}`}
-                                fill
-                                className={`object-cover ${isSelectedImageOOS ? 'grayscale opacity-60' : ''}`}
-                                priority
-                            />
-                            {isSelectedImageOOS && (
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-                                    <span className="bg-red-500/90 text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-lg">
-                                        Color agotado
-                                    </span>
-                                </div>
-                            )}
-                            {/* Badges Overlay — only show badge assigned to this product or matching automatic rules */}
-                            <div className="absolute top-4 left-4 flex flex-col gap-2">
-                                {badges
-                                    .filter(badge => {
-                                        // Manual badge: must match product.badge_id
-                                        if (badge.type === 'manual' || !badge.type) {
-                                            return badge.id === product.badge_id
-                                        }
-                                        // Automatic badge: check rules
-                                        if (badge.type === 'automatic' && badge.rules) {
-                                            if (badge.rules.discount_greater_than && product.sale_price) {
-                                                const discount = ((product.price - product.sale_price) / product.price) * 100
-                                                if (discount >= badge.rules.discount_greater_than) return true
+                    <div className="self-start lg:sticky lg:top-[76px]">
+                        <div className="relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                                <Image
+                                    src={selectedImage}
+                                    alt={`${product.name}${product.brand ? ` - ${product.brand}` : ''} | ${organization.name}`}
+                                    fill
+                                    className={`object-cover transition-transform duration-500 hover:scale-[1.04] cursor-zoom-in ${isSelectedImageOOS ? 'grayscale opacity-60' : ''}`}
+                                    priority
+                                />
+                                {isSelectedImageOOS && (
+                                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+                                        <span className="rounded-full bg-red-500/90 px-4 py-1.5 text-sm font-bold text-white shadow-lg">
+                                            Color agotado
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="absolute left-4 top-4 flex flex-col gap-2">
+                                    {badges
+                                        .filter(badge => {
+                                            if (badge.type === 'manual' || !badge.type) {
+                                                return badge.id === product.badge_id
                                             }
-                                            if (badge.rules.category && product.categories?.includes(badge.rules.category)) return true
-                                            if (badge.rules.stock_status === 'low' && product.stock > 0 && product.stock <= 5) return true
-                                            if (badge.rules.stock_status === 'out' && product.stock === 0) return true
-                                        }
-                                        return false
-                                    })
-                                    .map(badge => (
-                                    <div
-                                        key={badge.id}
-                                        className="px-3 py-1 rounded-full text-xs font-bold shadow-sm flex items-center gap-1"
-                                        style={{ backgroundColor: badge.background_color, color: badge.text_color }}
-                                    >
-                                        {badge.icon && <span className="material-symbols-outlined text-[14px]">{badge.icon}</span>}
-                                        {badge.display_text}
-                                    </div>
-                                ))}
-                                {activePromotion && (
-                                    <div className="px-3 py-1 rounded-full text-xs font-bold shadow-sm bg-red-500 text-white animate-pulse">
-                                        {activePromotion.type === 'percentage' ? `-${activePromotion.value}%` : 'OFERTA'}
-                                    </div>
-                                )}
-                                {hasFreeShipping && (
-                                    <div className="px-3 py-1 rounded-full text-xs font-bold shadow-sm bg-green-500 text-white flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-[14px]">local_shipping</span>
-                                        ENVÍO GRATIS
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="hidden md:grid md:grid-cols-2 gap-3 mt-5">
-                                {resolvedReviewSummary && (
-                                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 px-4 py-3">
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Reseñas reales</p>
-                                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
-                                            {resolvedReviewSummary.averageRating.toFixed(1)} / 5 · {resolvedReviewSummary.reviewCount} reseña{resolvedReviewSummary.reviewCount === 1 ? "" : "s"}
-                                        </p>
-                                    </div>
-                                )}
-                                {(shippingConfig?.estimated_delivery_days || product.stock > 0) && (
-                                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 px-4 py-3">
-                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Despacho</p>
-                                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
-                                            {shippingConfig?.estimated_delivery_days
-                                                ? `Envío estimado en ${shippingConfig.estimated_delivery_days} día${shippingConfig.estimated_delivery_days === 1 ? "" : "s"}`
-                                                : "Producto disponible para despacho"}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                                            if (badge.type === 'automatic' && badge.rules) {
+                                                if (badge.rules.discount_greater_than && product.sale_price) {
+                                                    const discount = ((product.price - product.sale_price) / product.price) * 100
+                                                    if (discount >= badge.rules.discount_greater_than) return true
+                                                }
+                                                if (badge.rules.category && product.categories?.includes(badge.rules.category)) return true
+                                                if (badge.rules.stock_status === 'low' && resolvedInventory.status === 'low_stock') return true
+                                                if (badge.rules.stock_status === 'out' && resolvedInventory.status === 'out_of_stock') return true
+                                            }
+                                            return false
+                                        })
+                                        .map(badge => (
+                                        <div
+                                            key={badge.id}
+                                            className="rounded uppercase tracking-[0.1em] px-3 py-1 text-[11px] font-bold shadow-sm"
+                                            style={{ backgroundColor: badge.background_color, color: badge.text_color || '#fff' }}
+                                        >
+                                            {badge.display_text}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="absolute right-4 top-4 flex flex-col items-end gap-2">
+                                    {savingsAmount > 0 && (
+                                        <div className="rounded bg-rose-600 px-2.5 py-1 text-[12px] font-bold text-white shadow-sm">
+                                            Ahorras {formatCurrency(savingsAmount)}
+                                        </div>
+                                    )}
+                                </div>
                         </div>
 
                         {images.length > 1 && (
-                            <div className="relative w-full group/thumbs">
-                                {/* Flecha izquierda */}
-                                {images.length > 5 && (
-                                    <button
-                                        onClick={() => {
-                                            const el = document.getElementById('thumb-scroll')
-                                            if (el) el.scrollBy({ left: -200, behavior: 'smooth' })
-                                        }}
-                                        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 dark:bg-slate-800/90 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">chevron_left</span>
-                                    </button>
-                                )}
-                                <div id="thumb-scroll" className="flex gap-2 overflow-x-auto scrollbar-hide scroll-smooth py-1 px-1">
+                            <div className="mt-3 flex gap-2.5 overflow-x-auto pb-1">
                                     {images.map((img: string, idx: number) => {
                                         const isOOS = outOfStockImages.has(img)
                                         return (
@@ -740,7 +964,8 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                                         handleVariantChange(mapped.type, mapped.value)
                                                     }
                                                 }}
-                                                className={`flex-none w-16 h-16 relative rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 ${isOOS ? 'opacity-50' : ''} ${selectedImage === img ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900' : 'ring-1 ring-slate-200 dark:ring-slate-700'}`}
+                                                className={`relative aspect-square flex-1 min-w-[70px] max-w-[90px] overflow-hidden rounded-[10px] border-2 bg-white transition-colors dark:bg-slate-950 ${isOOS ? 'opacity-50' : ''} ${selectedImage === img ? '' : 'border-transparent'}`}
+                                                style={selectedImage === img ? { borderColor: accentColor } : undefined}
                                             >
                                                 <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
                                                 {isOOS && (
@@ -751,147 +976,201 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                             </button>
                                         )
                                     })}
-                                </div>
-                                {/* Flecha derecha */}
-                                {images.length > 5 && (
-                                    <button
-                                        onClick={() => {
-                                            const el = document.getElementById('thumb-scroll')
-                                            if (el) el.scrollBy({ left: 200, behavior: 'smooth' })
-                                        }}
-                                        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 dark:bg-slate-800/90 rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">chevron_right</span>
-                                    </button>
-                                )}
                             </div>
                         )}
                     </div>
 
                     {/* Right Column: Info */}
-                    <div className="flex flex-col">
-                        <span className="text-sm font-bold text-primary tracking-wide uppercase mb-2">
+                    <div className="flex flex-col lg:pt-1">
+                        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: accentColor }}>
+                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
                             {brandOrCategory}
-                        </span>
+                        </div>
 
-                        <h1 className="text-slate-900 dark:text-white text-3xl md:text-4xl font-bold leading-tight">
+                        <h1 className="mb-3 text-[28px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 dark:text-white sm:text-[32px]">
                             {product.name}
                         </h1>
 
                         {resolvedReviewSummary && (
-                            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                                <div className="flex items-center gap-0.5 text-amber-500">
+                            <div className="mb-4 flex flex-wrap items-center gap-2.5 text-[13px] text-slate-500 dark:text-slate-400">
+                                <div className="flex gap-[1px] text-amber-400">
                                     {Array.from({ length: 5 }).map((_, index) => (
-                                        <span key={`rating-star-${index}`} className="material-symbols-outlined text-[18px]">
+                                        <span key={`rating-star-${index}`} className="material-symbols-outlined text-[16px] [font-variation-settings:'FILL'_1,'wght'_400,'GRAD'_0,'opsz'_24]">
                                             {index < Math.round(resolvedReviewSummary.averageRating) ? "star" : "star_outline"}
                                         </span>
                                     ))}
                                 </div>
-                                <span className="font-semibold text-slate-900 dark:text-white">
-                                    {resolvedReviewSummary.averageRating.toFixed(1)} / 5
+                                <span className="cursor-pointer border-b border-slate-200 pb-[1px] hover:text-slate-900 dark:border-slate-700 dark:hover:text-white">
+                                    {resolvedReviewSummary.averageRating.toFixed(1)} · <strong>{resolvedReviewSummary.reviewCount} reseñas</strong>
                                 </span>
-                                <span className="text-slate-500 dark:text-slate-400">
-                                    {resolvedReviewSummary.reviewCount} reseña{resolvedReviewSummary.reviewCount === 1 ? "" : "s"} real{resolvedReviewSummary.reviewCount === 1 ? "" : "es"}
-                                </span>
-                                {resolvedReviewSummary.verifiedReviewCount > 0 && (
-                                    <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                                        {resolvedReviewSummary.verifiedReviewCount} verificada{resolvedReviewSummary.verifiedReviewCount === 1 ? "" : "s"}
+                                {soldCount && (
+                                    <span className="cursor-pointer border-b border-slate-200 pb-[1px] hover:text-slate-900 dark:border-slate-700 dark:hover:text-white">
+                                        | <strong>{soldCount}</strong> vendidos
                                     </span>
+                                )}
+                                {viewingCount && (
+                                    <div className="ml-auto flex items-center gap-1.5 text-[12.5px]">
+                                        <div className="h-[7px] w-[7px] animate-pulse rounded-full bg-emerald-500" />
+                                        <span><strong>{viewingCount}</strong> personas viendo</span>
+                                    </div>
                                 )}
                             </div>
                         )}
 
-                        <div className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                        Precio de hoy
-                                    </p>
-                                    <div className="mt-2 flex flex-wrap items-baseline gap-3">
-                                        <p className="text-slate-900 dark:text-slate-100 text-4xl font-bold tracking-tight">
-                                            {formatCurrency(currentPrice)}
-                                        </p>
-                                        {compareAtPrice && (
-                                            <span className="text-lg text-slate-400 line-through">
-                                                {formatCurrency(compareAtPrice)}
-                                            </span>
-                                        )}
-                                    </div>
+                        {aiRecommendation && (
+                            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#b2e8e8] bg-gradient-to-br from-[#f0fafa] to-[#e0f7f7] p-3.5 dark:border-teal-900/30 dark:from-teal-950/20 dark:to-teal-900/10">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: accentColor }}>
+                                    <span className="material-symbols-outlined text-[18px] text-white [font-variation-settings:'FILL'_1,'wght'_500]">auto_awesome</span>
                                 </div>
+                                <div className="text-[12.5px] leading-[1.5]" style={{ color: normalizeHexColor(primaryColor, "#0bbfbf") }}>
+                                    <strong className="mb-0.5 block text-[13px] text-slate-900 dark:text-white">Recomendado por tu agente IA ✦</strong>
+                                    &quot;{aiRecommendation}&quot;
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Price Block */}
+                        <div className="mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                            <div className="flex items-baseline gap-3">
+                                <span className="text-[36px] font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">
+                                    {formatCurrency(currentPrice)}
+                                </span>
+                                {compareAtPrice && (
+                                    <span className="text-[18px] text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums]">
+                                        {formatCurrency(compareAtPrice)}
+                                    </span>
+                                )}
                                 {savingsAmount > 0 && (
-                                    <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                                        Ahorras {formatCurrency(savingsAmount)}
-                                    </div>
+                                    <span className="rounded bg-rose-100 px-2 py-0.5 text-[12px] font-bold text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                                        −{formatCurrency(savingsAmount)}
+                                    </span>
                                 )}
                             </div>
+                            <div className="mt-1.5 text-[13px] text-slate-600 dark:text-slate-300">
+                                o <strong style={{ color: accentColor }}>3 cuotas de {formatCurrency(currentPrice / 3)}</strong> sin intereses con tu tarjeta
+                            </div>
+                        </div>
 
-                            {product.has_quantity_pricing && (
-                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                                    Total actual: <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(totalPrice)}</span>
-                                </p>
-                            )}
+                        {/* Value Stack */}
+                        {heroValueRows.length > 0 && (
+                            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                                <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
+                                    {heroValueStackTitle}
+                                </div>
+                                <div className="flex flex-col">
+                                    {heroValueRows.map((item) => (
+                                        <div key={`${item.icon}-${item.label}`} className="flex items-center justify-between border-b border-slate-100 py-1.5 text-[13px] last:border-0 dark:border-slate-800">
+                                            <span className="flex items-center gap-2 text-slate-900 dark:text-slate-200">
+                                                <span className="material-symbols-outlined text-[16px]" style={{ color: accentColor }}>{item.icon}</span>
+                                                {item.label}
+                                            </span>
+                                            {item.value && <span className="text-slate-500 dark:text-slate-400 [font-variant-numeric:tabular-nums]">{item.value}</span>}
+                                        </div>
+                                    ))}
+                                    {product.is_bundle && compareAtPrice && (
+                                        <>
+                                            <div className="mt-1 flex justify-between border-t-2 border-dashed border-slate-200 pt-2.5 text-[13.5px] font-bold text-slate-900 dark:border-slate-800 dark:text-white">
+                                                <span>Valor individual</span>
+                                                <span className="text-slate-400 line-through dark:text-slate-500">{formatCurrency(compareAtPrice)}</span>
+                                            </div>
+                                            <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-slate-900 dark:text-white">
+                                                <span>Precio del kit hoy</span>
+                                                <span style={{ color: accentColor }}>{formatCurrency(currentPrice)}</span>
+                                            </div>
+                                            {savingsAmount > 0 && (
+                                                <div className="mt-1 text-right text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                    🎉 Ahorras {formatCurrency(savingsAmount)} ({(savingsAmount / compareAtPrice * 100).toFixed(0)}% descuento)
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
+                        {/* Signals Row */}
+                        {heroSignalItems.length > 0 && (
+                            <div className="mb-4 flex gap-2.5">
+                                {heroSignalItems.map((item) => {
+                                    let bg = "bg-slate-100", border = "border-slate-200", text = "text-slate-700"
+                                    if (item.tone === 'danger' || item.id === 'inventory') {
+                                        bg = "bg-[#fff7ed] dark:bg-orange-950/20"
+                                        border = "border-[#fed7aa] dark:border-orange-900/40"
+                                        text = "text-[#c2410c] dark:text-orange-400"
+                                    } else if (item.tone === 'success' || item.id === 'sold') {
+                                        bg = "bg-emerald-50 dark:bg-emerald-950/20"
+                                        border = "border-emerald-200 dark:border-emerald-900/40"
+                                        text = "text-emerald-600 dark:text-emerald-400"
+                                    } else if (item.tone === 'brand' || item.id === 'views') {
+                                        bg = "bg-[#f0fafa] dark:bg-teal-950/20"
+                                        border = "border-[#b2e8e8] dark:border-teal-900/40"
+                                        text = "text-[#089898] dark:text-teal-400"
+                                    }
+
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[12.5px] font-semibold ${bg} ${border} ${text}`}
+                                        >
+                                            <span className="material-symbols-outlined text-[15px]">{item.icon}</span>
+                                            <span className="truncate">{item.label}</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        )}
+
+                        {/* Stock Bar */}
+                        <div className="mb-4">
+                            <div className="mb-1.5 flex justify-between text-[12px] text-slate-500 dark:text-slate-400">
+                                <span>Disponibilidad</span>
+                                <strong className="text-rose-600 dark:text-rose-400">
+                                    {resolvedInventory.inStock && hasKnownAvailableQuantity && availableQuantity <= 10
+                                        ? `¡Quedan solo ${availableQuantity}!`
+                                        : resolvedInventory.inStock ? "Disponible hoy" : "Agotado"}
+                                </strong>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                                <div
+                                    className="h-full rounded-full transition-all duration-500"
+                                    style={{
+                                        width: resolvedInventory.inStock ? (hasKnownAvailableQuantity && availableQuantity <= 10 ? '15%' : '72%') : '0%',
+                                        background: 'linear-gradient(90deg, #10b981, #fbbf24)'
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Urgency Timer */}
+                        {showUrgencyTimer && (
+                            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-[#fed7aa] bg-[#fff7ed] p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
+                                <span className="material-symbols-outlined text-[20px] text-[#c2410c] dark:text-orange-400">alarm</span>
+                                <div>
+                                    <div className="text-[13px] font-semibold text-[#c2410c] dark:text-orange-400">⚡ Precio de oferta termina en</div>
+                                    <div className="mt-0.5 flex items-center gap-1">
+                                        <span className="rounded-md bg-white px-2 py-0.5 text-[15px] font-extrabold tracking-[0.03em] text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400 [font-variant-numeric:tabular-nums]">02</span>
+                                        <span className="font-extrabold text-rose-600 dark:text-rose-400">:</span>
+                                        <span className="rounded-md bg-white px-2 py-0.5 text-[15px] font-extrabold tracking-[0.03em] text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400 [font-variant-numeric:tabular-nums]">47</span>
+                                        <span className="font-extrabold text-rose-600 dark:text-rose-400">:</span>
+                                        <span className="rounded-md bg-white px-2 py-0.5 text-[15px] font-extrabold tracking-[0.03em] text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400 [font-variant-numeric:tabular-nums]">13</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Shipping Progress */}
+                        <div className="mb-4">
                             <ProductShippingCard
                                 shippingConfig={shippingConfig}
                                 subtotal={totalPrice}
                                 primaryColor={primaryColor}
                                 hasProductLevelFreeShipping={Boolean(product.free_shipping_enabled)}
                             />
-
-                            {/* Info Badges (solo datos reales) */}
-                            <div className="flex flex-wrap gap-3 mt-3">
-                                {product.stock > 0 && (
-                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                                        En stock
-                                    </div>
-                                )}
-
-                                {hasFreeShipping && (
-                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">local_shipping</span>
-                                        Envío gratis
-                                    </div>
-                                )}
-
-                                {(product.stock > 0 && product.stock < 20) && (
-                                    <div className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">bolt</span>
-                                        Últimas {product.stock} unidades
-                                    </div>
-                                )}
-                            </div>
-
-                            <ProductTrustRail
-                                whatsappLink={whatsappLink}
-                                sectionLinks={sectionLinks}
-                                shippingConfig={shippingConfig}
-                                hasFreeShipping={hasFreeShipping}
-                                onStartChat={() => handleChat(product.id)}
-                            />
                         </div>
 
-                        <div className="mt-8 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-5">
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                        Configura tu compra
-                                    </p>
-                                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                                        {selectedVariantTitle
-                                            ? `Selección actual: ${selectedVariantTitle}`
-                                            : "Elige tus opciones y confirma la cantidad antes de comprar."}
-                                    </p>
-                                </div>
-                                {product.stock > 0 && (
-                                    <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                                        Disponible para compra
-                                    </div>
-                                )}
-                            </div>
-
-                            {productVariants.length > 0 && (
-                                <div className="mt-6 space-y-6">
+                        {/* Variant Selectors */}
+                        {productVariants.length > 0 && (
+                            <div className="mb-5 space-y-6">
                                     {productVariants.map((variant, idx: number) => {
                                         const isColorVariant = variant.type.toLowerCase().includes('color')
                                         const hasMany = variant.values.length > 8
@@ -955,11 +1234,11 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                                                     onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
                                                                     disabled={isOutOfStock}
                                                                     className={`
-                                                                        px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem] relative
+                                                                        relative min-w-[3rem] rounded-xl px-4 py-2 text-sm font-bold
                                                                         ${isOutOfStock
                                                                             ? 'border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-600 cursor-not-allowed line-through'
                                                                             : isSelected
-                                                                                ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary'
+                                                                                ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary shadow-sm'
                                                                                 : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400'
                                                                         }
                                                                         transition-all duration-200
@@ -983,27 +1262,27 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 </div>
                             )}
 
-                            {product.has_quantity_pricing && product.price_tiers && product.price_tiers.length > 0 && (
-                                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                            {hasQuantityPricing && viewModel.quantityPricing.priceTiers && viewModel.quantityPricing.priceTiers.length > 0 && (
+                                <div className="mt-6 rounded-[18px] border p-4" style={{ backgroundColor: accentSurface, borderColor: accentBorder }}>
                                     <div className="flex items-center gap-2 mb-3">
-                                        <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">price_change</span>
-                                        <h4 className="text-sm font-bold text-blue-800 dark:text-blue-200">Precios por Cantidad</h4>
-                                        {product.minimum_quantity && (
-                                            <span className="text-xs bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded-full ml-auto">
-                                                Mín. {product.minimum_quantity} unidades
+                                        <span className="material-symbols-outlined" style={{ color: accentColor }}>price_change</span>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">Precios por Cantidad</h4>
+                                        {minimumQuantity && (
+                                            <span className="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: accentSurfaceStrong, color: accentColor }}>
+                                                Mín. {minimumQuantity} unidades
                                             </span>
                                         )}
                                     </div>
                                     <div className="space-y-1.5">
-                                        {(product.price_tiers as ProductPriceTier[]).map((tier, idx: number) => {
-                                            const isActive = quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)
+                                        {(viewModel.quantityPricing.priceTiers as ProductPriceTier[]).map((tier, idx: number) => {
+                                            const isActive = effectiveQuantity >= tier.min_quantity && (!tier.max_quantity || effectiveQuantity <= tier.max_quantity)
                                             return (
-                                                <div key={idx} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 dark:bg-blue-800/40 ring-1 ring-blue-300 dark:ring-blue-600' : ''}`}>
-                                                    <span className={isActive ? 'font-medium text-blue-800 dark:text-blue-200' : 'text-slate-600 dark:text-slate-300'}>
+                                                <div key={idx} className={`flex items-center justify-between rounded-[12px] px-3 py-2 text-sm transition-colors ${isActive ? 'ring-1' : ''}`} style={isActive ? { backgroundColor: accentSurfaceStrong, borderColor: accentBorder } : undefined}>
+                                                    <span className={isActive ? 'font-medium text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}>
                                                         {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} unidades
-                                                        {tier.label && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">({tier.label})</span>}
+                                                        {tier.label && <span className="ml-1 text-xs" style={{ color: accentColor }}>({tier.label})</span>}
                                                     </span>
-                                                    <span className={`font-bold ${isActive ? 'text-blue-800 dark:text-blue-200' : 'text-slate-900 dark:text-white'}`}>
+                                                    <span className={`font-bold ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
                                                         {formatCurrency(tier.unit_price)}/u
                                                     </span>
                                                 </div>
@@ -1013,62 +1292,95 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 </div>
                             )}
 
-                            <div className="mt-6 flex flex-wrap items-center gap-4">
-                                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cantidad</span>
-                                <div className="flex items-center border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden">
+                            <div className="mb-5 flex items-center gap-3">
+                                <span className="text-[13px] font-semibold text-slate-900 dark:text-white">Cantidad</span>
+                                <div className="flex items-center overflow-hidden rounded-xl border-1.5 border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
                                     <button
-                                        onClick={() => setQuantity((currentQuantity: number) => Math.max(product.minimum_quantity || 1, currentQuantity - 1))}
-                                        className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                        onClick={() => setQuantity(Math.max(minimumQuantity, effectiveQuantity - 1))}
+                                        disabled={effectiveQuantity <= minimumQuantity}
+                                    className="flex h-[38px] w-[38px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                                     >
                                         <span className="material-symbols-outlined text-lg">remove</span>
                                     </button>
                                     <input
                                         type="number"
-                                        value={quantity}
+                                        value={effectiveQuantity}
                                         onChange={(e) => {
-                                            const value = parseInt(e.target.value, 10) || (product.minimum_quantity || 1)
-                                            setQuantity(Math.max(product.minimum_quantity || 1, value))
+                                            const val = parseInt(e.target.value) || minimumQuantity
+                                            const maxAllowed = hasKnownAvailableQuantity ? availableQuantity : 99
+                                            setQuantity(Math.max(minimumQuantity, Math.min(val, maxAllowed)))
                                         }}
-                                        className="w-16 h-10 text-center font-bold text-slate-900 dark:text-white bg-transparent border-x border-slate-300 dark:border-slate-600 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="h-[38px] w-[48px] bg-transparent text-center text-[15px] font-semibold text-slate-900 focus:outline-none dark:text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                     />
                                     <button
-                                        onClick={() => setQuantity((currentQuantity: number) => currentQuantity + 1)}
-                                        className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                        onClick={() => setQuantity(hasKnownAvailableQuantity ? Math.min(availableQuantity, effectiveQuantity + 1) : effectiveQuantity + 1)}
+                                        disabled={hasKnownAvailableQuantity && effectiveQuantity >= availableQuantity}
+                                    className="flex h-[38px] w-[38px] items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
                                     >
                                         <span className="material-symbols-outlined text-lg">add</span>
                                     </button>
                                 </div>
-                                {product.has_quantity_pricing && (
-                                    <div className="text-right">
-                                        <p className="text-lg font-bold text-slate-900 dark:text-white">
-                                            {formatCurrency(totalPrice)}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                            {formatCurrency(unitPrice)}/u
-                                        </p>
-                                    </div>
-                                )}
+                                <span className="ml-auto text-[13px] text-slate-500 dark:text-slate-400">
+                                    Total: <strong className="text-[14px] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">{formatCurrency(totalPrice)}</strong>
+                                </span>
                             </div>
 
-                            <div className="hidden md:flex flex-col gap-4 mt-6">
+                            <div className="mb-5 flex flex-col gap-2.5">
                                 <button
                                     onClick={handleBuyNow}
-                                    className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-14 rounded-lg transform transition-transform duration-200 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                                    disabled={!canPurchase}
+                                className={`flex h-[52px] w-full items-center justify-center gap-2.5 rounded-xl text-[16px] font-bold tracking-[-0.01em] text-white shadow-[0_4px_16px_rgba(11,191,191,0.35)] transition-all duration-150 ${canPurchase ? 'hover:-translate-y-[1px] hover:shadow-[0_6px_24px_rgba(11,191,191,0.4)]' : 'cursor-not-allowed opacity-60'}`}
                                     style={{ backgroundColor: primaryColor }}
                                 >
-                                    <span className="material-symbols-outlined">shopping_cart</span>
-                                    <span>Comprar Ya</span>
+                                <span className="material-symbols-outlined text-[22px] [font-variation-settings:'FILL'_1,'wght'_500,'GRAD'_0,'opsz'_24]">shopping_cart</span>
+                                <span>{canPurchase ? `Comprar Ya — ${formatCurrency(totalPrice)}` : "No disponible"}</span>
                                 </button>
                                 <button
                                     onClick={() => handleChat(product.id)}
-                                    className="flex w-full items-center justify-center gap-3 text-slate-700 dark:text-slate-300 text-base font-bold h-14 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 transform transition-transform duration-200 hover:scale-[1.02] hover:border-slate-400 dark:hover:border-slate-500"
+                                className="flex h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border-1.5 border-slate-200 bg-white text-[15px] font-semibold text-slate-900 transition-all duration-150 hover:bg-[#f0fafa] hover:text-[#0bbfbf] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                style={{ borderColor: accentBorder }}
                                 >
-                                    <span className="material-symbols-outlined">chat</span>
-                                    <span>{product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}</span>
+                                <span className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>chat_bubble</span>
+                                    {product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}
+                                </span>
                                 </button>
                             </div>
-                        </div>
 
+                            <div className="mb-5">
+                                <ProductTrustRail
+                                    whatsappLink={whatsappLink}
+                                    sectionLinks={sectionLinks}
+                                    shippingConfig={shippingConfig}
+                                    hasFreeShipping={hasFreeShipping}
+                                    inventoryLabel={inventoryTrustLabel}
+                                    primaryColor={primaryColor}
+                                    onStartChat={() => handleChat(product.id)}
+                                />
+                            </div>
+
+                            {featuredReview && (
+                                <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+                                    <div className="flex items-start gap-4">
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: accentColor }}>
+                                            {getReviewInitials(featuredReview.author_name)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-semibold text-slate-900 dark:text-white">{featuredReview.author_name}</p>
+                                                <div className="flex items-center gap-0.5 text-amber-500">
+                                                    {Array.from({ length: 5 }).map((_, index) => (
+                                                        <span key={`${featuredReview.id}-hero-star-${index}`} className="material-symbols-outlined text-[16px]">
+                                                            {index < featuredReview.rating ? "star" : "star_outline"}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">“{featuredReview.content}”</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         {/* Description */}
                         {product.description ? (
                             <ProductDescription
@@ -1265,11 +1577,12 @@ export function ProductDetailClient({ product, productWithVariants, organization
                 <div className="flex gap-3">
                     <button
                         onClick={handleBuyNow}
-                        className="flex flex-1 items-center justify-center gap-2 text-white text-sm font-bold h-12 rounded-lg"
+                        disabled={!canPurchase}
+                        className={`flex flex-1 items-center justify-center gap-2 text-white text-sm font-bold h-12 rounded-lg ${canPurchase ? '' : 'opacity-60 cursor-not-allowed'}`}
                         style={{ backgroundColor: primaryColor }}
                     >
                         <span className="material-symbols-outlined text-lg">shopping_cart</span>
-                        <span>Comprar Ya</span>
+                        <span>{canPurchase ? "Comprar Ya" : "No disponible"}</span>
                     </button>
                     <button
                         onClick={() => handleChat(product.id)}

@@ -2,6 +2,7 @@
 
 import { getProductWithVariants } from "@/lib/commerce/getProductWithVariants"
 import { listProductsWithVariants, type ProductListOrderBy } from "@/lib/commerce/listProductsWithVariants"
+import { buildProductDetailViewModel } from "@/lib/commerce/productDetailViewModel"
 import {
     mapLegacyProductRowToStorefrontProduct,
     mapProductListItemToStorefrontProduct,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/commerce/storefrontProduct"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
+import type { ProductData } from "@/types/product"
 import {
     getStorefrontCustomerSession,
     verifyStorefrontOrderAccessToken,
@@ -269,11 +271,17 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     }
 
     const { data: relatedProducts } = await relatedProductsQuery
+    const viewModel = buildProductDetailViewModel({
+        product: product as ProductData,
+        productWithVariants,
+        promotions: promotions || [],
+    })
 
     return {
         organization: enrichedOrg,
         product,
         productWithVariants,
+        viewModel,
         badges: badges || [],
         promotions: promotions || [],
         relatedProducts: relatedProducts || []

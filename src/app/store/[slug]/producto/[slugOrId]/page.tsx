@@ -113,7 +113,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     if (!data) notFound()
 
-    const { organization, product, productWithVariants, badges, promotions, relatedProducts } = data
+    const { organization, product, productWithVariants, viewModel, badges, promotions, relatedProducts } = data
 
     // Cargar reseñas publicadas del producto en paralelo (no bloquea si falla)
     const [{ reviews, summary: reviewSummary }, shippingConfig] = await Promise.all([
@@ -146,6 +146,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             >
                 <ProductDetailClient
                     product={product}
+                    productWithVariants={productWithVariants}
+                    viewModel={viewModel}
                     organization={organization}
                     badges={badges}
                     promotions={promotions}
