@@ -11,19 +11,157 @@ import { getStoredUUID } from "@/lib/utils/storage"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { useCartStore } from "@/store/cart-store"
 import { getColorHex } from "@/lib/constants/colors"
+import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/utils/shipping"
 import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel } from "@/types/product"
 
 interface ProductDetailClientProps {
-    product: any
+    product: ProductDetailProduct
     productWithVariants?: ProductWithVariantsReadModel | null
-    organization: any
-    badges: any[]
-    promotions: any[]
-    relatedProducts?: any[]
+    organization: ProductDetailOrganization
+    badges: ProductBadge[]
+    promotions: ProductPromotion[]
+    relatedProducts?: RelatedProductCard[]
     slug: string
     initialIsSubdomain?: boolean
     reviews?: ProductReview[]
     reviewSummary?: ProductReviewSummary | null
+    shippingConfig?: StorefrontShippingConfig | null
+}
+
+interface ProductPriceTier {
+    min_quantity: number
+    max_quantity?: number | null
+    unit_price: number
+    label?: string | null
+}
+
+interface ProductVariantOption {
+    type: string
+    values: string[]
+    hasStockByVariant?: boolean
+    stockByVariant?: Record<string, number>
+    hasPriceAdjustment?: boolean
+    priceAdjustments?: Record<string, number>
+    hasImageMapping?: boolean
+    images?: Record<string, string | string[]>
+}
+
+interface ProductPromotion {
+    applies_to: "all" | "products" | string
+    target_ids?: string[]
+    type: "percentage" | "fixed" | string
+    value: number
+}
+
+interface ProductSpecification {
+    label: string
+    value: string
+}
+
+interface ProductFaqItem {
+    question: string
+    answer: string
+}
+
+interface ProductBundleItem {
+    quantity?: number | null
+    product_name?: string | null
+}
+
+interface ProductBadgeRules {
+    discount_greater_than?: number
+    category?: string
+    stock_status?: "low" | "out" | string
+}
+
+interface ProductBadge {
+    id: string
+    type?: "manual" | "automatic" | string | null
+    rules?: ProductBadgeRules | null
+    background_color: string
+    text_color: string
+    icon?: string | null
+    display_text: string
+}
+
+interface ProductDetailOrganization {
+    slug: string
+    name: string
+    settings?: {
+        branding?: {
+            primaryColor?: string
+        }
+        storefront?: {
+            testimonials?: StorefrontTestimonial[]
+        }
+    }
+}
+
+interface RelatedProductCard {
+    id: string
+    slug?: string | null
+    name: string
+    price: number
+    image_url?: string | null
+    images?: string[] | null
+}
+
+interface ProductDetailProduct {
+    id: string
+    name: string
+    price: number
+    sale_price?: number | null
+    image_url?: string | null
+    images?: string[] | null
+    minimum_quantity?: number | null
+    has_quantity_pricing?: boolean
+    price_tiers?: ProductPriceTier[] | null
+    variants?: ProductVariantOption[] | null
+    categories?: string[] | null
+    brand?: string | null
+    free_shipping_enabled?: boolean | null
+    stock: number
+    badge_id?: string | null
+    description?: string | null
+    benefits?: string[] | null
+    specifications?: ProductSpecification[] | null
+    faq?: ProductFaqItem[] | null
+    is_bundle?: boolean
+    is_configurable?: boolean
+    bundle_items?: ProductBundleItem[] | null
+    bundle_discount_type?: "percentage" | string | null
+    bundle_discount_value?: number | null
+}
+
+interface StorefrontTestimonial {
+    enabled?: boolean
+    name?: string
+    text?: string
+    role?: string
+}
+
+function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<string, string> {
+    const defaults: Record<string, string> = {}
+
+    variants.forEach((variant) => {
+        if (variant.values.length === 0) {
+            return
+        }
+
+        if (variant.hasStockByVariant && variant.stockByVariant) {
+            const availableValue = variant.values.find((value) => (variant.stockByVariant?.[value] ?? 0) > 0)
+            defaults[variant.type] = availableValue || variant.values[0]
+            return
+        }
+
+        defaults[variant.type] = variant.values[0]
+    })
+
+    return defaults
+}
+
+function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount)
 }
 
 interface ProductDescriptionProps {
@@ -57,7 +195,69 @@ function ProductDescription({ description }: ProductDescriptionProps) {
     )
 }
 
-export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null }: ProductDetailClientProps) {
+interface ProductShippingCardProps {
+    shippingConfig?: StorefrontShippingConfig | null
+    subtotal: number
+    primaryColor: string
+    hasProductLevelFreeShipping: boolean
+}
+
+function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping }: ProductShippingCardProps) {
+    const progress = getFreeShippingProgress(shippingConfig, subtotal)
+    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
+
+    if (!hasProductLevelFreeShipping && !progress.enabled) {
+        return null
+    }
+
+    const description = hasProductLevelFreeShipping
+        ? "Este producto ya cuenta con envío gratis."
+        : progress.hasMinimum
+            ? progress.qualified
+                ? `Tu selección actual ya califica para envío gratis${progress.zonesText}.`
+                : `Agrega ${formatCurrency(progress.remaining)} más y activa el envío gratis${progress.zonesText}.`
+            : `Envío gratis disponible${progress.zonesText}.`
+
+    return (
+        <div className="mt-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Envío gratis{progress.zonesText}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        {description}
+                    </p>
+                </div>
+                {estimatedDeliveryDays ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white dark:bg-slate-950 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800">
+                        <span className="material-symbols-outlined text-[16px]">local_shipping</span>
+                        {estimatedDeliveryDays} día{estimatedDeliveryDays === 1 ? "" : "s"}
+                    </span>
+                ) : null}
+            </div>
+
+            {!hasProductLevelFreeShipping && progress.enabled && progress.hasMinimum && (
+                <div className="mt-3">
+                    <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
+                        <span>Progreso hacia envío gratis</span>
+                        <span>
+                            {progress.qualified ? "¡Conseguido!" : `${formatCurrency(progress.remaining)} más`}
+                        </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{ width: `${progress.progress}%`, backgroundColor: primaryColor }}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -91,20 +291,23 @@ export function ProductDetailClient({ product, productWithVariants, organization
     const images = product.images && product.images.length > 0
         ? product.images
         : [product.image_url || "/placeholder-product.png"]
+    const productVariants = useMemo(
+        () => (Array.isArray(product.variants) ? product.variants as ProductVariantOption[] : []),
+        [product.variants]
+    )
+    const typedPromotions = promotions
 
     const [selectedImage, setSelectedImage] = useState(images[0])
 
     // State
-    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({})
-    const [currentPrice, setCurrentPrice] = useState(product.price)
-    const [activePromotion, setActivePromotion] = useState<any>(null)
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => getDefaultSelectedVariants(productVariants))
     const [quantity, setQuantity] = useState(product.minimum_quantity || 1)
 
     // Calcular precio unitario según tier de cantidad
     const getUnitPriceForQuantity = (qty: number): number => {
         if (!product.has_quantity_pricing || !product.price_tiers?.length) return product.sale_price || product.price
         // Buscar el tier que aplica para esta cantidad
-        const sorted = [...product.price_tiers].sort((a: any, b: any) => b.min_quantity - a.min_quantity)
+        const sorted = [...(product.price_tiers as ProductPriceTier[])].sort((a, b) => b.min_quantity - a.min_quantity)
         for (const tier of sorted) {
             if (qty >= tier.min_quantity) return tier.unit_price
         }
@@ -121,52 +324,25 @@ export function ProductDetailClient({ product, productWithVariants, organization
             product.price,
             "COP"
         )
-    }, [product.id, trackViewContent])
+    }, [product.id, product.name, product.price, trackViewContent])
 
-    // Initial Image Update (if changed)
-    useEffect(() => {
-        if (images.length > 0) setSelectedImage(images[0])
-    }, [product])
-
-    // Initialize default variants (skip out-of-stock values)
-    useEffect(() => {
-        if (product.variants) {
-            const defaults: Record<string, string> = {}
-            product.variants.forEach((v: any) => {
-                if (v.values && v.values.length > 0) {
-                    // Si tiene stock por variante, elegir el primer valor con stock > 0
-                    if (v.hasStockByVariant && v.stockByVariant) {
-                        const available = v.values.find((val: string) => (v.stockByVariant[val] ?? 0) > 0)
-                        defaults[v.type] = available || v.values[0]
-                    } else {
-                        defaults[v.type] = v.values[0]
-                    }
-                }
-            })
-            setSelectedVariants(defaults)
-        }
-    }, [product])
-
-    // Calculate Price & Promotion
-    useEffect(() => {
+    const { currentPrice, activePromotion } = useMemo<{ currentPrice: number; activePromotion: ProductPromotion | null }>(() => {
         let price = product.sale_price || product.price
 
         // 1. Add Variant Adjustments
-        if (product.variants) {
-            product.variants.forEach((v: any) => {
-                const selectedValue = selectedVariants[v.type]
-                if (selectedValue && v.hasPriceAdjustment && v.priceAdjustments) {
-                    const adjustment = v.priceAdjustments[selectedValue] || 0
-                    price += adjustment
-                }
-            })
-        }
+        productVariants.forEach((variant) => {
+            const selectedValue = selectedVariants[variant.type]
+            if (selectedValue && variant.hasPriceAdjustment && variant.priceAdjustments) {
+                const adjustment = variant.priceAdjustments[selectedValue] || 0
+                price += adjustment
+            }
+        })
 
         // 2. Apply Promotions
-        let bestPromo = null
+        let bestPromo: ProductPromotion | null = null
         let bestPrice = price
 
-        promotions.forEach(promo => {
+        typedPromotions.forEach((promo) => {
             let applies = false
             if (promo.applies_to === 'all') applies = true
             if (promo.applies_to === 'products' && promo.target_ids?.includes(product.id)) applies = true
@@ -186,9 +362,11 @@ export function ProductDetailClient({ product, productWithVariants, organization
             }
         })
 
-        setCurrentPrice(bestPrice)
-        setActivePromotion(bestPromo)
-    }, [product, selectedVariants, promotions])
+        return {
+            currentPrice: bestPrice,
+            activePromotion: bestPromo,
+        }
+    }, [product.id, product.price, product.sale_price, productVariants, selectedVariants, typedPromotions])
 
     const selectedSellableVariant = useMemo(() => {
         if (!productWithVariants) {
@@ -221,7 +399,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
 
         // Update image if this variant has a mapping for the selected value
-        const variant = product.variants?.find((v: any) => v.type === type)
+        const variant = productVariants.find((candidate) => candidate.type === type)
         if (variant?.hasImageMapping && variant?.images?.[value]) {
             const imgData = variant.images[value]
             // Soportar string legacy o array de imágenes
@@ -265,7 +443,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
             unit_price: priceToUse,
             compare_at_price: selectedSellableVariant?.compare_at_price ?? (product.sale_price ? product.price : null),
             image_url: selectedSellableVariant?.image_url || product.image_url || selectedImage,
-            categories: product.categories,
+            categories: product.categories ?? undefined,
         }
 
         trackAddToCart(product.id, product.name, priceToUse * quantity, "COP")
@@ -276,23 +454,28 @@ export function ProductDetailClient({ product, productWithVariants, organization
     const brandOrCategory = product.categories?.[0] || product.brand || organization.name
 
     // Logic for Free Shipping
-    const freeShippingThreshold = organization.settings?.shipping?.free_shipping_threshold || 100000 // Default to 100k if not set
-    const hasFreeShipping = product.free_shipping_enabled || (currentPrice >= freeShippingThreshold)
+    const freeShippingProgress = useMemo(
+        () => getFreeShippingProgress(shippingConfig, totalPrice),
+        [shippingConfig, totalPrice]
+    )
+    const hasFreeShipping = product.free_shipping_enabled || freeShippingProgress.qualified
+    const compareAtPrice = (activePromotion || product.sale_price) ? product.price : null
+    const savingsAmount = compareAtPrice ? Math.max(compareAtPrice - currentPrice, 0) : 0
 
     // Mapa de imágenes → variante (para sync thumbnail → color selector)
     // y set de imágenes agotadas (para overlay "Agotado")
     const outOfStockImages = new Set<string>()
     const imageToVariant = new Map<string, { type: string; value: string }>()
-    if (product.variants) {
-        product.variants.forEach((v: any) => {
-            if (v.hasImageMapping && v.images) {
-                Object.entries(v.images).forEach(([valueName, imgData]) => {
+    if (productVariants.length > 0) {
+        productVariants.forEach((variant) => {
+            if (variant.hasImageMapping && variant.images) {
+                Object.entries(variant.images).forEach(([valueName, imgData]) => {
                     // Soportar string o array de strings
                     const urls = Array.isArray(imgData) ? imgData : [imgData]
                     urls.forEach((url: string) => {
-                        imageToVariant.set(url, { type: v.type, value: valueName })
-                        if (v.hasStockByVariant && v.stockByVariant) {
-                            const stock = v.stockByVariant[valueName] ?? 0
+                        imageToVariant.set(url, { type: variant.type, value: valueName })
+                        if (variant.hasStockByVariant && variant.stockByVariant) {
+                            const stock = variant.stockByVariant[valueName] ?? 0
                             if (stock === 0) outOfStockImages.add(url)
                         }
                     })
@@ -386,6 +569,27 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                     </div>
                                 )}
                             </div>
+
+                            <div className="hidden md:grid md:grid-cols-2 gap-3 mt-5">
+                                {resolvedReviewSummary && (
+                                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 px-4 py-3">
+                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Reseñas reales</p>
+                                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                                            {resolvedReviewSummary.averageRating.toFixed(1)} / 5 · {resolvedReviewSummary.reviewCount} reseña{resolvedReviewSummary.reviewCount === 1 ? "" : "s"}
+                                        </p>
+                                    </div>
+                                )}
+                                {(shippingConfig?.estimated_delivery_days || product.stock > 0) && (
+                                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 px-4 py-3">
+                                        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Despacho</p>
+                                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                                            {shippingConfig?.estimated_delivery_days
+                                                ? `Envío estimado en ${shippingConfig.estimated_delivery_days} día${shippingConfig.estimated_delivery_days === 1 ? "" : "s"}`
+                                                : "Producto disponible para despacho"}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {images.length > 1 && (
@@ -476,17 +680,42 @@ export function ProductDetailClient({ product, productWithVariants, organization
                             </div>
                         )}
 
-                        <div className="mt-4 flex flex-col gap-2">
-                            <div className="flex items-baseline gap-3">
-                                <p className="text-slate-900 dark:text-slate-200 text-3xl font-bold">
-                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(currentPrice)}
-                                </p>
-                                {(activePromotion || product.sale_price) && (
-                                    <span className="text-lg text-slate-400 line-through">
-                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
-                                    </span>
+                        <div className="mt-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                        Precio de hoy
+                                    </p>
+                                    <div className="mt-2 flex flex-wrap items-baseline gap-3">
+                                        <p className="text-slate-900 dark:text-slate-100 text-4xl font-bold tracking-tight">
+                                            {formatCurrency(currentPrice)}
+                                        </p>
+                                        {compareAtPrice && (
+                                            <span className="text-lg text-slate-400 line-through">
+                                                {formatCurrency(compareAtPrice)}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {savingsAmount > 0 && (
+                                    <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                        Ahorras {formatCurrency(savingsAmount)}
+                                    </div>
                                 )}
                             </div>
+
+                            {product.has_quantity_pricing && (
+                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                                    Total actual: <span className="font-semibold text-slate-900 dark:text-white">{formatCurrency(totalPrice)}</span>
+                                </p>
+                            )}
+
+                            <ProductShippingCard
+                                shippingConfig={shippingConfig}
+                                subtotal={totalPrice}
+                                primaryColor={primaryColor}
+                                hasProductLevelFreeShipping={Boolean(product.free_shipping_enabled)}
+                            />
 
                             {/* Selector de cantidad + Precios por tier */}
                             {product.has_quantity_pricing && product.price_tiers && product.price_tiers.length > 0 && (
@@ -501,7 +730,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                         )}
                                     </div>
                                     <div className="space-y-1.5">
-                                        {product.price_tiers.map((tier: any, idx: number) => {
+                                        {(product.price_tiers as ProductPriceTier[]).map((tier, idx: number) => {
                                             const isActive = quantity >= tier.min_quantity && (!tier.max_quantity || quantity <= tier.max_quantity)
                                             return (
                                                 <div key={idx} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg transition-colors ${isActive ? 'bg-blue-100 dark:bg-blue-800/40 ring-1 ring-blue-300 dark:ring-blue-600' : ''}`}>
@@ -510,7 +739,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                                         {tier.label && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">({tier.label})</span>}
                                                     </span>
                                                     <span className={`font-bold ${isActive ? 'text-blue-800 dark:text-blue-200' : 'text-slate-900 dark:text-white'}`}>
-                                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(tier.unit_price)}/u
+                                                        {formatCurrency(tier.unit_price)}/u
                                                     </span>
                                                 </div>
                                             )
@@ -519,12 +748,11 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 </div>
                             )}
 
-                            {/* Selector de cantidad */}
-                            <div className="mt-4 flex items-center gap-4">
+                            <div className="mt-4 flex flex-wrap items-center gap-4">
                                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cantidad</span>
                                 <div className="flex items-center border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden">
                                     <button
-                                        onClick={() => setQuantity((q: number) => Math.max(product.minimum_quantity || 1, q - 1))}
+                                        onClick={() => setQuantity((currentQuantity: number) => Math.max(product.minimum_quantity || 1, currentQuantity - 1))}
                                         className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                     >
                                         <span className="material-symbols-outlined text-lg">remove</span>
@@ -533,14 +761,13 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                         type="number"
                                         value={quantity}
                                         onChange={(e) => {
-                                            const val = parseInt(e.target.value) || (product.minimum_quantity || 1)
-                                            setQuantity(Math.max(product.minimum_quantity || 1, val))
+                                            const value = parseInt(e.target.value, 10) || (product.minimum_quantity || 1)
+                                            setQuantity(Math.max(product.minimum_quantity || 1, value))
                                         }}
                                         className="w-16 h-10 text-center font-bold text-slate-900 dark:text-white bg-transparent border-x border-slate-300 dark:border-slate-600 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        min={product.minimum_quantity || 1}
                                     />
                                     <button
-                                        onClick={() => setQuantity((q: number) => q + 1)}
+                                        onClick={() => setQuantity((currentQuantity: number) => currentQuantity + 1)}
                                         className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                     >
                                         <span className="material-symbols-outlined text-lg">add</span>
@@ -549,10 +776,10 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 {product.has_quantity_pricing && (
                                     <div className="text-right">
                                         <p className="text-lg font-bold text-slate-900 dark:text-white">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(totalPrice)}
+                                            {formatCurrency(totalPrice)}
                                         </p>
                                         <p className="text-xs text-slate-500">
-                                            {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(unitPrice)}/u
+                                            {formatCurrency(unitPrice)}/u
                                         </p>
                                     </div>
                                 )}
@@ -655,7 +882,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                             </div>
                         ) : (() => {
                             // Fallback: testimonio de la organización si aún no hay reseñas reales
-                            const testimonials = organization.settings?.storefront?.testimonials?.filter((t: any) => t.enabled) || []
+                            const testimonials = ((organization.settings?.storefront?.testimonials as StorefrontTestimonial[] | undefined) || []).filter((testimonial) => testimonial.enabled)
                             const testimonial = testimonials.length > 0
                                 ? testimonials[product.id.charCodeAt(0) % testimonials.length]
                                 : null
@@ -682,10 +909,11 @@ export function ProductDetailClient({ product, productWithVariants, organization
 
                         {/* Variants */}
                         <div className="mt-8 space-y-6">
-                            {product.variants?.map((variant: any, idx: number) => {
+                            {productVariants.map((variant, idx: number) => {
                                 const isColorVariant = variant.type.toLowerCase().includes('color')
                                 const hasMany = variant.values.length > 8
                                 const hasVariantStock = variant.hasStockByVariant && variant.stockByVariant
+                                const stockByVariant = variant.stockByVariant
                                 return (
                                     <div key={idx}>
                                         <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-3">
@@ -700,7 +928,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                             <div className={`flex gap-2 flex-wrap ${hasMany ? '' : 'gap-3'}`}>
                                                 {variant.values.map((value: string, vIdx: number) => {
                                                     const isSelected = selectedVariants[variant.type] === value
-                                                    const isOutOfStock = hasVariantStock && (variant.stockByVariant[value] ?? 0) === 0
+                                                    const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
                                                     return (
                                                         <button
                                                             key={vIdx}
@@ -737,7 +965,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                             <div className="flex gap-3 flex-wrap">
                                                 {variant.values.map((value: string, vIdx: number) => {
                                                     const isSelected = selectedVariants[variant.type] === value
-                                                    const isOutOfStock = hasVariantStock && (variant.stockByVariant[value] ?? 0) === 0
+                                                    const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
                                                     return (
                                                         <button
                                                             key={vIdx}
@@ -811,7 +1039,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                         {product.specifications && product.specifications.length > 0 && (
                             <div className="mt-8">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    {product.specifications.map((spec: any, idx: number) => (
+                                    {product.specifications.map((spec, idx: number) => (
                                         <div key={idx} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                                             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{spec.label}</p>
                                             <p className="text-sm font-bold text-slate-900 dark:text-white mt-1">{spec.value}</p>
@@ -830,7 +1058,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                         <span className="material-symbols-outlined transform group-open:rotate-180 transition-transform">expand_more</span>
                                     </summary>
                                     <div className="mt-4 space-y-4">
-                                        {product.faq.map((item: any, idx: number) => (
+                                        {product.faq.map((item, idx: number) => (
                                             <div key={idx}>
                                                 <p className="font-medium text-slate-900 dark:text-white">{item.question}</p>
                                                 <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm">{item.answer}</p>
@@ -850,19 +1078,19 @@ export function ProductDetailClient({ product, productWithVariants, organization
                             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Qué incluye</h2>
                             <span className="text-sm text-slate-500 dark:text-slate-400">
                                 {product.bundle_items.length} productos
-                                {product.bundle_discount_type && product.bundle_discount_value > 0 && (
+                                {(product.bundle_discount_type && (product.bundle_discount_value ?? 0) > 0) && (
                                     <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
-                                        {product.bundle_discount_type === 'percentage' ? `-${product.bundle_discount_value}%` : `Ahorra ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.bundle_discount_value)}`}
+                                        {product.bundle_discount_type === 'percentage' ? `-${product.bundle_discount_value ?? 0}%` : `Ahorra ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.bundle_discount_value ?? 0)}`}
                                     </span>
                                 )}
                             </span>
                         </div>
                         <div className="flex flex-wrap gap-3">
-                            {product.bundle_items.map((item: any, idx: number) => (
+                            {product.bundle_items.map((item, idx: number) => (
                                 <div key={idx} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                                     <span className="material-symbols-outlined text-primary text-lg">inventory_2</span>
                                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                        {item.quantity > 1 && `${item.quantity}x `}{item.product_name || `Producto`}
+                                        {(item.quantity ?? 0) > 1 && `${item.quantity}x `}{item.product_name || `Producto`}
                                     </span>
                                 </div>
                             ))}

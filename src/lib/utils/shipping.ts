@@ -2,6 +2,25 @@
  * Shipping utilities
  */
 
+export interface StorefrontShippingConfig {
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
+    default_shipping_rate: number | null
+    estimated_delivery_days?: number | null
+    express_delivery_days?: number | null
+}
+
+export interface FreeShippingProgress {
+    enabled: boolean
+    qualified: boolean
+    hasMinimum: boolean
+    threshold: number
+    remaining: number
+    progress: number
+    zonesText: string
+}
+
 // Normalize string: remove accents and lowercase for comparison
 function normalize(str: string): string {
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -21,7 +40,7 @@ export interface ShippingResult {
  * - If no zones configured → ships everywhere
  */
 export function getShippingAvailability(
-    shippingConfig: any,
+    shippingConfig: StorefrontShippingConfig | null | undefined,
     subtotal: number,
     customerCity?: string
 ): ShippingResult {
@@ -65,12 +84,45 @@ export function getShippingAvailability(
     return { available: true, cost: defaultRate }
 }
 
+export function getFreeShippingProgress(
+    shippingConfig: StorefrontShippingConfig | null | undefined,
+    subtotal: number
+): FreeShippingProgress {
+    if (!shippingConfig?.free_shipping_enabled) {
+        return {
+            enabled: false,
+            qualified: false,
+            hasMinimum: false,
+            threshold: 0,
+            remaining: 0,
+            progress: 0,
+            zonesText: "",
+        }
+    }
+
+    const threshold = Number(shippingConfig.free_shipping_min_amount) || 0
+    const hasMinimum = threshold > 0
+    const remaining = hasMinimum ? Math.max(threshold - subtotal, 0) : 0
+    const zones = shippingConfig.free_shipping_zones
+    const zonesText = zones && zones.length > 0 ? ` a ${zones.join(", ")}` : ""
+
+    return {
+        enabled: true,
+        qualified: !hasMinimum || remaining === 0,
+        hasMinimum,
+        threshold,
+        remaining,
+        progress: hasMinimum ? Math.min((subtotal / threshold) * 100, 100) : 100,
+        zonesText,
+    }
+}
+
 /**
  * Calculate shipping cost based on configuration and order details
  * (Wrapper for backward compatibility)
  */
 export function calculateShippingCost(
-    shippingConfig: any,
+    shippingConfig: StorefrontShippingConfig | null | undefined,
     subtotal: number,
     customerCity?: string
 ): number {

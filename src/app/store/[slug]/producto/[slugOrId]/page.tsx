@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { Metadata } from "next"
 import { StoreLayoutClient } from "../../store-layout-client"
-import { getProductDetails } from "../../actions"
+import { getProductDetails, getShippingConfig } from "../../actions"
 import { ProductDetailClient } from "./product-detail-client"
 import { ProductJsonLd } from "@/components/seo/product-json-ld"
 import { headers } from "next/headers"
@@ -116,7 +116,10 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     const { organization, product, productWithVariants, badges, promotions, relatedProducts } = data
 
     // Cargar reseñas publicadas del producto en paralelo (no bloquea si falla)
-    const { reviews, summary: reviewSummary } = await getPublishedProductReviews(product.id)
+    const [{ reviews, summary: reviewSummary }, shippingConfig] = await Promise.all([
+        getPublishedProductReviews(product.id),
+        getShippingConfig(organization.slug),
+    ])
 
     // Construir URL canónica del producto
     const productUrl = organization.custom_domain
@@ -151,6 +154,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                     initialIsSubdomain={initialIsSubdomain}
                     reviews={reviews}
                     reviewSummary={reviewSummary}
+                    shippingConfig={shippingConfig}
                 />
             </StoreLayoutClient>
         </>
