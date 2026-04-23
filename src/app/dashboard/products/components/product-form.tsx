@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { createProduct, updateProduct } from "../actions"
-import { ProductData, CreateProductInput, ConfigOption, PriceTier } from "@/types/product"
-import { getBadges } from "../../badges/actions"
+import { ProductData, CreateProductInput, ConfigOption, PriceTier, ProductVariant } from "@/types/product"
+import { getBadges, BadgeData } from "../../badges/actions"
 import { RichTextEditor } from "./rich-text-editor"
 import { ImageUpload } from "./image-upload"
 import { VariantsEditor } from "./variants-editor"
@@ -13,6 +13,7 @@ import { CategoriesInput } from "./categories-input"
 import { ConfigurableOptionsEditor } from "./configurable-options-editor"
 import { BundleEditor } from "./bundle-editor"
 import { PriceTiersEditor } from "./price-tiers-editor"
+import { ProductStructuredContentEditor } from "./ProductStructuredContentEditor"
 import { BundleItem } from "@/types/product"
 import { enhanceProductDescription } from "../ai-actions"
 
@@ -35,15 +36,17 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [salePrice, setSalePrice] = useState(initialData?.sale_price?.toString() || "")
     const [images, setImages] = useState<string[]>(initialData?.images || [])
     const [categories, setCategories] = useState<string[]>(initialData?.categories || [])
-    const [variants, setVariants] = useState<Array<{
-        type: string; values: string[];
-        hasPriceAdjustment?: boolean; priceAdjustments?: Record<string, number>;
-        hasStockByVariant?: boolean; stockByVariant?: Record<string, number>;
-        hasImageMapping?: boolean; images?: Record<string, string | string[]>;
-    }>>(initialData?.variants || [])
-    const [isSubscription, setIsSubscription] = useState(initialData?.is_subscription ?? false)
-    const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable ?? false)
-    const [isActive, setIsActive] = useState(initialData?.is_active ?? true)
+    const [variants, setVariants] = useState<ProductVariant[]>(initialData?.variants || [])
+
+    // Advance features
+    const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable || false)
+    const [isActive, setIsActive] = useState<boolean>(initialData?.is_active ?? true)
+    
+    // Structured Content features (SEO, AEO)
+    const [brand, setBrand] = useState(initialData?.brand || "")
+    const [benefits, setBenefits] = useState<string[]>(initialData?.benefits || [])
+    const [specifications, setSpecifications] = useState<Array<{label: string, value: string}>>(initialData?.specifications || [])
+    const [faq, setFaq] = useState<Array<{question: string, answer: string}>>(initialData?.faq || [])
 
     // Subscription configuration state
     const [subscriptionEnabled, setSubscriptionEnabled] = useState(initialData?.subscription_config?.enabled ?? false)
@@ -58,7 +61,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
 
     // Marketing state
     const [badgeId, setBadgeId] = useState(initialData?.badge_id || "")
-    const [badges, setBadges] = useState<any[]>([])
+    const [badges, setBadges] = useState<BadgeData[]>([])
 
     // Bundle state
     const [isBundle, setIsBundle] = useState(initialData?.is_bundle ?? false)
@@ -140,6 +143,11 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
 
                 // Tax override
                 tax_rate: taxRate !== "" ? parseFloat(taxRate) : null,
+                // UI Fields (Stitch Design)
+                brand: brand.trim() || undefined,
+                benefits: benefits.length > 0 ? benefits : undefined,
+                faq: faq.length > 0 ? faq : undefined,
+                specifications: specifications.length > 0 ? specifications : undefined,
                 // SEO fields
                 meta_title: metaTitle.trim() || undefined,
                 meta_description: metaDescription.trim() || undefined,
@@ -165,9 +173,9 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
             }
 
             router.push("/dashboard/products")
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Form submit error:", error)
-            alert(`Error: ${error.message}`)
+            alert(`Error: ${error instanceof Error ? error.message : "Error desconocido"}`)
         } finally {
             setLoading(false)
         }
@@ -258,8 +266,8 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                             } else {
                                                 alert(`Error: ${result.error}`)
                                             }
-                                        } catch (error: any) {
-                                            alert(`Error: ${error.message}`)
+                                        } catch (error: unknown) {
+                                            alert(`Error: ${error instanceof Error ? error.message : "Error desconocido"}`)
                                         } finally {
                                             setIsEnhancing(false)
                                         }
@@ -468,7 +476,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                                 <select
                                                     className="form-select mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark h-10"
                                                     value={subscriptionInterval}
-                                                    onChange={e => setSubscriptionInterval(e.target.value as any)}
+                                                    onChange={e => setSubscriptionInterval(e.target.value as "day" | "week" | "month" | "year")}
                                                 >
                                                     <option value="day">Diario</option>
                                                     <option value="week">Semanal</option>
@@ -487,7 +495,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                                     value={subscriptionIntervalCount}
                                                     onChange={e => setSubscriptionIntervalCount(e.target.value)}
                                                 />
-                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Ej: "2" para cada 2 meses</p>
+                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Ej: &quot;2&quot; para cada 2 meses</p>
                                             </div>
 
                                             <div>
@@ -514,7 +522,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                                     value={subscriptionDiscount}
                                                     onChange={e => setSubscriptionDiscount(e.target.value)}
                                                 />
-                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Se mostrará como "Ahorra X%" en el storefront</p>
+                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Se mostrará como &quot;Ahorra X%&quot; en el storefront</p>
                                             </div>
                                         </div>
                                     </div>
@@ -557,6 +565,18 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         </div>
                     </div>
 
+                    {/* SEO / Structured Content Editor */}
+                    <ProductStructuredContentEditor
+                        brand={brand}
+                        onBrandChange={setBrand}
+                        benefits={benefits}
+                        onBenefitsChange={setBenefits}
+                        specifications={specifications}
+                        onSpecificationsChange={setSpecifications}
+                        faq={faq}
+                        onFaqChange={setFaq}
+                    />
+
                     {/* SEO Section - Collapsible */}
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <button
@@ -581,7 +601,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         {showSeoSection && (
                             <div className="mt-6 flex flex-col gap-6">
                                 <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                                    Optimiza cómo aparece tu producto en buscadores y redes sociales. Usa "Mejorar con IA" para generar automáticamente.
+                                    Optimiza cómo aparece tu producto en buscadores y redes sociales. Usa &quot;Mejorar con IA&quot; para generar automáticamente.
                                 </p>
 
                                 <div>
