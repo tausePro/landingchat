@@ -49,7 +49,7 @@ src/
 │   ├── utils/              # Utilidades (encryption, slug, urls)
 │   └── evolution/          # WhatsApp Evolution API
 ├── types/                  # Tipos TypeScript centralizados
-└── middleware.ts           # Routing de subdominios + auth
+└── proxy.ts                # Routing de subdominios + auth
 
 migrations/                 # SQL migrations para Supabase
 .kiro/specs/               # Especificaciones de Kiro
@@ -85,7 +85,7 @@ import fc from 'fast-check'
 **Áreas críticas (requieren >80% cobertura):**
 - `src/lib/utils/encryption.ts`
 - `src/app/api/webhooks/payments/`
-- `src/middleware.ts`
+- `src/proxy.ts`
 - `src/lib/ai/tool-executor.ts`
 
 **Comandos:**
@@ -101,11 +101,20 @@ npm run test src/__tests__/lib  # Tests específicos
 - ❌ NO usar `any` - usar `unknown` o tipos específicos
 - ✅ Usar Zod para validación de inputs
 - ✅ Usar `ActionResult<T>` para retornos de server actions
+- ✅ Si se toca un archivo y hay `any` o deuda local de tipado de bajo riesgo en el mismo bloque/flujo, corregirla dentro del slice
+- ❌ NO convertir un fix acotado en un refactor transversal solo por perseguir deuda técnica
 
 **React:**
 - ✅ Componentes funcionales con hooks
 - ✅ Server Components por defecto, `'use client'` solo cuando necesario
 - ❌ NO usar `<img>` - usar `next/image`
+
+## 🧠 Preservación de contexto
+
+- Toda decisión importante de arquitectura o rollout debe quedar en `docs-private/` si pertenece a un frente activo
+- `AGENTS.md` debe reflejar reglas estables del proyecto, no solo contexto temporal
+- Si un frente tiene invariantes operativos claros, documentarlos explícitamente para que no dependan de la memoria del chat
+- Antes de asumir arquitectura o fuentes de datos, revisar primero la documentación vigente del workspace y luego el código autoridad
 
 **Server Actions:**
 ```typescript
@@ -216,12 +225,13 @@ import { createServiceClient } from '@/lib/supabase/server'
 
 ## ⚠️ Errores Comunes a Evitar
 
-- **No romper el middleware** - Es crítico para routing
+- **No romper el proxy** - Es crítico para routing
 - **No hardcodear URLs** - Usar `getStoreLink()`, `getChatUrl()`
 - **No olvidar RLS** - Cada tabla nueva necesita políticas
 - **No loguear datos sensibles** - Passwords, tokens, tarjetas
 - **No modificar schema.sql** - Usar migraciones incrementales
 - **No usar `any`** - Siempre tipar correctamente
+- **No dejar contexto importante solo en el chat** - persistir decisiones en `AGENTS.md` o `docs-private/` según corresponda
 
 ## 📚 Documentación Adicional
 
