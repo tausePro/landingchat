@@ -26,6 +26,37 @@ interface ProductDetailClientProps {
     reviewSummary?: ProductReviewSummary | null
 }
 
+interface ProductDescriptionProps {
+    description: string
+}
+
+function ProductDescription({ description }: ProductDescriptionProps) {
+    const hasLongDescription = description.length > 300
+    const [isExpanded, setIsExpanded] = useState(false)
+
+    return (
+        <div className="mt-6">
+            <div
+                className={`text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none ${hasLongDescription && !isExpanded ? "line-clamp-4" : ""}`}
+                dangerouslySetInnerHTML={{ __html: description }}
+            />
+            {hasLongDescription && (
+                <button
+                    type="button"
+                    onClick={() => setIsExpanded((current) => !current)}
+                    className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:text-slate-900 dark:hover:text-white"
+                    aria-expanded={isExpanded}
+                >
+                    {isExpanded ? "Ver menos" : "Ver más"}
+                    <span className={`material-symbols-outlined text-[18px] transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                        expand_more
+                    </span>
+                </button>
+            )}
+        </div>
+    )
+}
+
 export function ProductDetailClient({ product, productWithVariants, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
@@ -554,9 +585,9 @@ export function ProductDetailClient({ product, productWithVariants, organization
 
                         {/* Description */}
                         {product.description ? (
-                            <div
-                                className="mt-6 text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none md:line-clamp-4 md:hover:line-clamp-none md:transition-all md:cursor-pointer"
-                                dangerouslySetInnerHTML={{ __html: product.description }}
+                            <ProductDescription
+                                key={`${product.id}:${product.description}`}
+                                description={product.description}
                             />
                         ) : (
                             <p className="mt-6 text-slate-600 dark:text-slate-300">
@@ -790,21 +821,9 @@ export function ProductDetailClient({ product, productWithVariants, organization
                             </div>
                         )}
 
-                        {/* Accordions */}
-                        <div className="mt-8 border-t border-slate-200 dark:border-slate-800">
-                            {/* Description accordion (para contenido largo) */}
-                            {product.description && product.description.length > 300 && (
-                                <details className="group border-b border-slate-200 dark:border-slate-800 py-4" open>
-                                    <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
-                                        <span>Descripción completa</span>
-                                        <span className="material-symbols-outlined transform group-open:rotate-180 transition-transform">expand_more</span>
-                                    </summary>
-                                    <div className="mt-4 text-sm text-slate-600 dark:text-slate-400 prose prose-slate dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: product.description }} />
-                                </details>
-                            )}
-
-                            {/* FAQ */}
-                            {product.faq && product.faq.length > 0 && (
+                        {/* FAQ */}
+                        {product.faq && product.faq.length > 0 && (
+                            <div className="mt-8 border-t border-slate-200 dark:border-slate-800">
                                 <details className="group border-b border-slate-200 dark:border-slate-800 py-4">
                                     <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
                                         <span>Preguntas frecuentes</span>
@@ -819,8 +838,8 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                         ))}
                                     </div>
                                 </details>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
