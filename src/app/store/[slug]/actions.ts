@@ -16,10 +16,57 @@ import {
 
 type StorefrontSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
+interface StoreOrganizationSettings {
+    whatsapp?: {
+        phone?: string | null
+    }
+    contact?: {
+        phone?: string | null
+    }
+    [key: string]: unknown
+}
+
 function resolveStorefrontProductOrder(value: unknown): ProductListOrderBy {
     return value === "custom" || value === "price_asc" || value === "price_desc"
         ? value
         : "recent"
+}
+
+async function resolveOrganizationWhatsAppPhone(
+    supabase: StorefrontSupabaseClient,
+    organizationId: string,
+    settings?: StoreOrganizationSettings | null,
+): Promise<string | null> {
+    const configuredPhone = settings?.whatsapp?.phone || settings?.contact?.phone
+    if (configuredPhone) {
+        return configuredPhone
+    }
+
+    const { data: whatsappInstance } = await supabase
+        .from("whatsapp_instances")
+        .select("phone_number")
+        .eq("organization_id", organizationId)
+        .eq("instance_type", "corporate")
+        .eq("status", "connected")
+        .single()
+
+    return whatsappInstance?.phone_number || null
+}
+
+function enrichOrganizationWithWhatsAppPhone<T extends { id: string; settings?: StoreOrganizationSettings | null }>(
+    organization: T,
+    whatsappPhone: string | null,
+): T {
+    return {
+        ...organization,
+        settings: {
+            ...organization.settings,
+            whatsapp: {
+                ...organization.settings?.whatsapp,
+                phone: whatsappPhone,
+            },
+        },
+    }
 }
 
 async function getLegacyStorefrontProducts(params: {
@@ -132,33 +179,8 @@ export async function getStoreData(slug: string, limit?: number) {
         .select("*")
         .eq("organization_id", org.id)
 
-    // 7. Get WhatsApp phone from connected instance if not in settings
-    let whatsappPhone = org.settings?.whatsapp?.phone || org.settings?.contact?.phone
-    if (!whatsappPhone) {
-        const { data: whatsappInstance } = await supabase
-            .from("whatsapp_instances")
-            .select("phone_number")
-            .eq("organization_id", org.id)
-            .eq("instance_type", "corporate")
-            .eq("status", "connected")
-            .single()
-
-        if (whatsappInstance?.phone_number) {
-            whatsappPhone = whatsappInstance.phone_number
-        }
-    }
-
-    // Enrich organization with whatsapp phone
-    const enrichedOrg = {
-        ...org,
-        settings: {
-            ...org.settings,
-            whatsapp: {
-                ...org.settings?.whatsapp,
-                phone: whatsappPhone
-            }
-        }
-    }
+    const whatsappPhone = await resolveOrganizationWhatsAppPhone(supabase, org.id, org.settings)
+    const enrichedOrg = enrichOrganizationWithWhatsAppPhone(org, whatsappPhone)
 
     return {
         organization: enrichedOrg,
@@ -180,6 +202,9 @@ export async function getProductDetails(slug: string, slugOrId: string) {
         .single()
 
     if (orgError || !org) return null
+
+    const whatsappPhone = await resolveOrganizationWhatsAppPhone(supabase, org.id, org.settings)
+    const enrichedOrg = enrichOrganizationWithWhatsAppPhone(org, whatsappPhone)
 
     // 2. Fetch Product - support both UUID and slug
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId)
@@ -246,7 +271,7 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     const { data: relatedProducts } = await relatedProductsQuery
 
     return {
-        organization: org,
+        organization: enrichedOrg,
         product,
         productWithVariants,
         badges: badges || [],

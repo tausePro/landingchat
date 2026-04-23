@@ -91,8 +91,8 @@ interface ProductDetailOrganization {
         branding?: {
             primaryColor?: string
         }
-        storefront?: {
-            testimonials?: StorefrontTestimonial[]
+        whatsapp?: {
+            phone?: string | null
         }
     }
 }
@@ -133,11 +133,9 @@ interface ProductDetailProduct {
     bundle_discount_value?: number | null
 }
 
-interface StorefrontTestimonial {
-    enabled?: boolean
-    name?: string
-    text?: string
-    role?: string
+interface ProductSectionLink {
+    id: string
+    label: string
 }
 
 function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<string, string> {
@@ -162,6 +160,19 @@ function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<st
 
 function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount)
+}
+
+function buildWhatsAppLink(phone: string | null | undefined, message: string): string | null {
+    if (!phone) {
+        return null
+    }
+
+    const normalizedPhone = phone.replace(/\D/g, "")
+    if (!normalizedPhone) {
+        return null
+    }
+
+    return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`
 }
 
 interface ProductDescriptionProps {
@@ -250,6 +261,91 @@ function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProduc
                             className="h-full rounded-full transition-all duration-300"
                             style={{ width: `${progress.progress}%`, backgroundColor: primaryColor }}
                         />
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+interface ProductTrustRailProps {
+    whatsappLink: string | null
+    sectionLinks: ProductSectionLink[]
+    shippingConfig?: StorefrontShippingConfig | null
+    hasFreeShipping: boolean
+    onStartChat: () => void
+}
+
+function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeShipping, onStartChat }: ProductTrustRailProps) {
+    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
+    const hasShippingInfo = hasFreeShipping || Boolean(estimatedDeliveryDays) || Boolean(shippingConfig)
+
+    if (!whatsappLink && sectionLinks.length === 0 && !hasShippingInfo) {
+        return null
+    }
+
+    const shippingMessage = estimatedDeliveryDays
+        ? hasFreeShipping
+            ? `Despacho estimado en ${estimatedDeliveryDays} día${estimatedDeliveryDays === 1 ? "" : "s"} y opciones con envío gratis.`
+            : `Despacho estimado en ${estimatedDeliveryDays} día${estimatedDeliveryDays === 1 ? "" : "s"}.`
+        : hasFreeShipping
+            ? "Este producto ya participa en condiciones reales de envío gratis."
+            : "Calculamos el envío con configuración real de la tienda al momento de comprar."
+
+    return (
+        <div className="mt-6 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Acompañamiento</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                        Te ayudamos a resolver dudas y cerrar la compra por chat.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                            type="button"
+                            onClick={onStartChat}
+                            className="inline-flex items-center gap-2 rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500"
+                        >
+                            <span className="material-symbols-outlined text-[16px]">chat</span>
+                            Abrir chat
+                        </button>
+                        {whatsappLink && (
+                            <a
+                                href={whatsappLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600"
+                            >
+                                <span className="material-symbols-outlined text-[16px]">call</span>
+                                WhatsApp
+                            </a>
+                        )}
+                    </div>
+                </div>
+
+                {hasShippingInfo && (
+                    <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Despacho y entrega</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                            {shippingMessage}
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {sectionLinks.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Explora esta ficha</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {sectionLinks.map((sectionLink) => (
+                            <a
+                                key={sectionLink.id}
+                                href={`#${sectionLink.id}`}
+                                className="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 hover:border-slate-400 dark:hover:border-slate-500"
+                            >
+                                {sectionLink.label}
+                            </a>
+                        ))}
                     </div>
                 </div>
             )}
@@ -461,6 +557,31 @@ export function ProductDetailClient({ product, productWithVariants, organization
     const hasFreeShipping = product.free_shipping_enabled || freeShippingProgress.qualified
     const compareAtPrice = (activePromotion || product.sale_price) ? product.price : null
     const savingsAmount = compareAtPrice ? Math.max(compareAtPrice - currentPrice, 0) : 0
+    const whatsappLink = useMemo(
+        () => buildWhatsAppLink(organization.settings?.whatsapp?.phone, `Hola, quiero más información sobre ${product.name}`),
+        [organization.settings?.whatsapp?.phone, product.name]
+    )
+    const sectionLinks = useMemo<ProductSectionLink[]>(() => {
+        const links: ProductSectionLink[] = []
+
+        if (product.benefits?.length) {
+            links.push({ id: "product-benefits", label: "Beneficios" })
+        }
+
+        if (product.specifications?.length) {
+            links.push({ id: "product-specifications", label: "Especificaciones" })
+        }
+
+        if (product.faq?.length) {
+            links.push({ id: "product-faq", label: "Preguntas" })
+        }
+
+        if (productReviews.length > 0) {
+            links.push({ id: "product-reviews", label: "Reseñas" })
+        }
+
+        return links
+    }, [product.benefits, product.faq, product.specifications, productReviews.length])
 
     // Mapa de imágenes → variante (para sync thumbnail → color selector)
     // y set de imágenes agotadas (para overlay "Agotado")
@@ -717,9 +838,153 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 hasProductLevelFreeShipping={Boolean(product.free_shipping_enabled)}
                             />
 
-                            {/* Selector de cantidad + Precios por tier */}
+                            {/* Info Badges (solo datos reales) */}
+                            <div className="flex flex-wrap gap-3 mt-3">
+                                {product.stock > 0 && (
+                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                                        En stock
+                                    </div>
+                                )}
+
+                                {hasFreeShipping && (
+                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[18px]">local_shipping</span>
+                                        Envío gratis
+                                    </div>
+                                )}
+
+                                {(product.stock > 0 && product.stock < 20) && (
+                                    <div className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[18px]">bolt</span>
+                                        Últimas {product.stock} unidades
+                                    </div>
+                                )}
+                            </div>
+
+                            <ProductTrustRail
+                                whatsappLink={whatsappLink}
+                                sectionLinks={sectionLinks}
+                                shippingConfig={shippingConfig}
+                                hasFreeShipping={hasFreeShipping}
+                                onStartChat={() => handleChat(product.id)}
+                            />
+                        </div>
+
+                        <div className="mt-8 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-5">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                        Configura tu compra
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                                        {selectedVariantTitle
+                                            ? `Selección actual: ${selectedVariantTitle}`
+                                            : "Elige tus opciones y confirma la cantidad antes de comprar."}
+                                    </p>
+                                </div>
+                                {product.stock > 0 && (
+                                    <div className="rounded-full bg-emerald-100 dark:bg-emerald-900/20 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                                        Disponible para compra
+                                    </div>
+                                )}
+                            </div>
+
+                            {productVariants.length > 0 && (
+                                <div className="mt-6 space-y-6">
+                                    {productVariants.map((variant, idx: number) => {
+                                        const isColorVariant = variant.type.toLowerCase().includes('color')
+                                        const hasMany = variant.values.length > 8
+                                        const hasVariantStock = variant.hasStockByVariant && variant.stockByVariant
+                                        const stockByVariant = variant.stockByVariant
+                                        return (
+                                            <div key={idx}>
+                                                <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-3">
+                                                    {variant.type}
+                                                    {isColorVariant && selectedVariants[variant.type] && (
+                                                        <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
+                                                            — {selectedVariants[variant.type]}
+                                                        </span>
+                                                    )}
+                                                </label>
+                                                {isColorVariant ? (
+                                                    <div className={`flex gap-2 flex-wrap ${hasMany ? '' : 'gap-3'}`}>
+                                                        {variant.values.map((value: string, vIdx: number) => {
+                                                            const isSelected = selectedVariants[variant.type] === value
+                                                            const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
+                                                            return (
+                                                                <button
+                                                                    key={vIdx}
+                                                                    onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
+                                                                    disabled={isOutOfStock}
+                                                                    className={`
+                                                                        flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200 relative
+                                                                        ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}
+                                                                        ${isSelected && !isOutOfStock ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : isOutOfStock ? '' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
+                                                                    `}
+                                                                    title={isOutOfStock ? `${value} — Agotado` : value}
+                                                                >
+                                                                    <span
+                                                                        className={`
+                                                                            w-8 h-8 rounded-full shadow-sm border relative overflow-hidden
+                                                                            ${isOutOfStock ? 'ring-1 ring-red-300 dark:ring-red-700' : isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'ring-1 ring-slate-200 dark:ring-slate-700'}
+                                                                        `}
+                                                                        style={{ backgroundColor: getColorHex(value) }}
+                                                                    >
+                                                                        {isOutOfStock && (
+                                                                            <span className="absolute inset-0 flex items-center justify-center">
+                                                                                <span className="block w-[140%] h-[2px] bg-red-500 rotate-45 rounded" />
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                    <span className={`text-[10px] leading-tight text-center max-w-[60px] truncate ${isOutOfStock ? 'line-through text-red-400 dark:text-red-500' : isSelected ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                                        {isOutOfStock ? 'Agotado' : value}
+                                                                    </span>
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex gap-3 flex-wrap">
+                                                        {variant.values.map((value: string, vIdx: number) => {
+                                                            const isSelected = selectedVariants[variant.type] === value
+                                                            const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
+                                                            return (
+                                                                <button
+                                                                    key={vIdx}
+                                                                    onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
+                                                                    disabled={isOutOfStock}
+                                                                    className={`
+                                                                        px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem] relative
+                                                                        ${isOutOfStock
+                                                                            ? 'border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-600 cursor-not-allowed line-through'
+                                                                            : isSelected
+                                                                                ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary'
+                                                                                : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400'
+                                                                        }
+                                                                        transition-all duration-200
+                                                                    `}
+                                                                    title={isOutOfStock ? `${value} — Agotado` : value}
+                                                                >
+                                                                    {value}
+                                                                    {isOutOfStock && (
+                                                                        <span className="absolute -top-2 -right-2 text-[9px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1 rounded font-medium">
+                                                                            Agotado
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+
                             {product.has_quantity_pricing && product.price_tiers && product.price_tiers.length > 0 && (
-                                <div className="mt-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">price_change</span>
                                         <h4 className="text-sm font-bold text-blue-800 dark:text-blue-200">Precios por Cantidad</h4>
@@ -748,7 +1013,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 </div>
                             )}
 
-                            <div className="mt-4 flex flex-wrap items-center gap-4">
+                            <div className="mt-6 flex flex-wrap items-center gap-4">
                                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Cantidad</span>
                                 <div className="flex items-center border border-slate-300 dark:border-slate-600 rounded-lg overflow-hidden">
                                     <button
@@ -785,28 +1050,22 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                 )}
                             </div>
 
-                            {/* Info Badges (solo datos reales) */}
-                            <div className="flex flex-wrap gap-3 mt-3">
-                                {product.stock > 0 && (
-                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                                        En stock
-                                    </div>
-                                )}
-
-                                {hasFreeShipping && (
-                                    <div className="px-3 py-1.5 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">local_shipping</span>
-                                        Envío gratis
-                                    </div>
-                                )}
-
-                                {(product.stock > 0 && product.stock < 20) && (
-                                    <div className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm font-medium flex items-center gap-1.5">
-                                        <span className="material-symbols-outlined text-[18px]">bolt</span>
-                                        Últimas {product.stock} unidades
-                                    </div>
-                                )}
+                            <div className="hidden md:flex flex-col gap-4 mt-6">
+                                <button
+                                    onClick={handleBuyNow}
+                                    className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-14 rounded-lg transform transition-transform duration-200 hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                                    style={{ backgroundColor: primaryColor }}
+                                >
+                                    <span className="material-symbols-outlined">shopping_cart</span>
+                                    <span>Comprar Ya</span>
+                                </button>
+                                <button
+                                    onClick={() => handleChat(product.id)}
+                                    className="flex w-full items-center justify-center gap-3 text-slate-700 dark:text-slate-300 text-base font-bold h-14 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 transform transition-transform duration-200 hover:scale-[1.02] hover:border-slate-400 dark:hover:border-slate-500"
+                                >
+                                    <span className="material-symbols-outlined">chat</span>
+                                    <span>{product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}</span>
+                                </button>
                             </div>
                         </div>
 
@@ -823,8 +1082,8 @@ export function ProductDetailClient({ product, productWithVariants, organization
                         )}
 
                         {/* Reseñas reales del producto (con fallback a testimonios de la organización) */}
-                        {productReviews.length > 0 ? (
-                            <div className="mt-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
+                        {productReviews.length > 0 && (
+                            <div id="product-reviews" className="mt-8 scroll-mt-28 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <div>
                                         <h3 className="text-base font-semibold text-slate-900 dark:text-white">Reseñas de clientes</h3>
@@ -880,147 +1139,11 @@ export function ProductDetailClient({ product, productWithVariants, organization
                                     </p>
                                 )}
                             </div>
-                        ) : (() => {
-                            // Fallback: testimonio de la organización si aún no hay reseñas reales
-                            const testimonials = ((organization.settings?.storefront?.testimonials as StorefrontTestimonial[] | undefined) || []).filter((testimonial) => testimonial.enabled)
-                            const testimonial = testimonials.length > 0
-                                ? testimonials[product.id.charCodeAt(0) % testimonials.length]
-                                : null
-
-                            if (!testimonial) return null
-
-                            return (
-                                <div className="mt-8 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
-                                        {testimonial.name?.charAt(0) || product.name.charAt(0)}
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-slate-700 dark:text-slate-200">
-                                            &ldquo;{testimonial.text}&rdquo;
-                                        </p>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            - {testimonial.name}
-                                            {testimonial.role && <span className="ml-1 text-xs opacity-70">({testimonial.role})</span>}
-                                        </p>
-                                    </div>
-                                </div>
-                            )
-                        })()}
-
-                        {/* Variants */}
-                        <div className="mt-8 space-y-6">
-                            {productVariants.map((variant, idx: number) => {
-                                const isColorVariant = variant.type.toLowerCase().includes('color')
-                                const hasMany = variant.values.length > 8
-                                const hasVariantStock = variant.hasStockByVariant && variant.stockByVariant
-                                const stockByVariant = variant.stockByVariant
-                                return (
-                                    <div key={idx}>
-                                        <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-3">
-                                            {variant.type}
-                                            {isColorVariant && selectedVariants[variant.type] && (
-                                                <span className="ml-2 font-normal text-slate-500 dark:text-slate-400">
-                                                    — {selectedVariants[variant.type]}
-                                                </span>
-                                            )}
-                                        </label>
-                                        {isColorVariant ? (
-                                            <div className={`flex gap-2 flex-wrap ${hasMany ? '' : 'gap-3'}`}>
-                                                {variant.values.map((value: string, vIdx: number) => {
-                                                    const isSelected = selectedVariants[variant.type] === value
-                                                    const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
-                                                    return (
-                                                        <button
-                                                            key={vIdx}
-                                                            onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
-                                                            disabled={isOutOfStock}
-                                                            className={`
-                                                                flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200 relative
-                                                                ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}
-                                                                ${isSelected && !isOutOfStock ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : isOutOfStock ? '' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
-                                                            `}
-                                                            title={isOutOfStock ? `${value} — Agotado` : value}
-                                                        >
-                                                            <span
-                                                                className={`
-                                                                    w-8 h-8 rounded-full shadow-sm border relative overflow-hidden
-                                                                    ${isOutOfStock ? 'ring-1 ring-red-300 dark:ring-red-700' : isSelected ? 'ring-2 ring-primary ring-offset-1 ring-offset-white dark:ring-offset-slate-900 scale-110' : 'ring-1 ring-slate-200 dark:ring-slate-700'}
-                                                                `}
-                                                                style={{ backgroundColor: getColorHex(value) }}
-                                                            >
-                                                                {isOutOfStock && (
-                                                                    <span className="absolute inset-0 flex items-center justify-center">
-                                                                        <span className="block w-[140%] h-[2px] bg-red-500 rotate-45 rounded" />
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                            <span className={`text-[10px] leading-tight text-center max-w-[60px] truncate ${isOutOfStock ? 'line-through text-red-400 dark:text-red-500' : isSelected ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                                {isOutOfStock ? 'Agotado' : value}
-                                                            </span>
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <div className="flex gap-3 flex-wrap">
-                                                {variant.values.map((value: string, vIdx: number) => {
-                                                    const isSelected = selectedVariants[variant.type] === value
-                                                    const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
-                                                    return (
-                                                        <button
-                                                            key={vIdx}
-                                                            onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
-                                                            disabled={isOutOfStock}
-                                                            className={`
-                                                                px-4 py-2 rounded-lg text-sm font-bold min-w-[3rem] relative
-                                                                ${isOutOfStock
-                                                                    ? 'border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-300 dark:text-slate-600 cursor-not-allowed line-through'
-                                                                    : isSelected
-                                                                        ? 'border-2 border-primary bg-blue-50 dark:bg-blue-900/30 text-primary'
-                                                                        : 'border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 hover:border-slate-400'
-                                                                }
-                                                                transition-all duration-200
-                                                            `}
-                                                            title={isOutOfStock ? `${value} — Agotado` : value}
-                                                        >
-                                                            {value}
-                                                            {isOutOfStock && (
-                                                                <span className="absolute -top-2 -right-2 text-[9px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1 rounded font-medium">
-                                                                    Agotado
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )
-                            })}
-                        </div>
-
-                        {/* Desktop CTA */}
-                        <div className="hidden md:flex flex-col gap-4 mt-10">
-                            <button
-                                onClick={handleBuyNow}
-                                className="flex w-full items-center justify-center gap-3 text-white text-base font-bold h-14 rounded-lg transform transition-transform duration-200 hover:scale-[1.02] shadow-lg hover:shadow-xl"
-                                style={{ backgroundColor: primaryColor }}
-                            >
-                                <span className="material-symbols-outlined">shopping_cart</span>
-                                <span>Comprar Ya</span>
-                            </button>
-                            <button
-                                onClick={() => handleChat(product.id)}
-                                className="flex w-full items-center justify-center gap-3 text-slate-700 dark:text-slate-300 text-base font-bold h-14 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 transform transition-transform duration-200 hover:scale-[1.02] hover:border-slate-400 dark:hover:border-slate-500"
-                            >
-                                <span className="material-symbols-outlined">chat</span>
-                                <span>{product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}</span>
-                            </button>
-                        </div>
+                        )}
 
                         {/* Benefits */}
                         {product.benefits && product.benefits.length > 0 && (
-                            <div className="mt-10 border-t border-slate-200 dark:border-slate-800 pt-6">
+                            <div id="product-benefits" className="mt-10 scroll-mt-28 border-t border-slate-200 dark:border-slate-800 pt-6">
                                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Por qué elegir este producto</h3>
                                 <div className="space-y-3">
                                     {product.benefits.map((benefit: string, idx: number) => (
@@ -1037,7 +1160,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
 
                         {/* Specifications as Cards (estilo Playful) */}
                         {product.specifications && product.specifications.length > 0 && (
-                            <div className="mt-8">
+                            <div id="product-specifications" className="mt-8 scroll-mt-28">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {product.specifications.map((spec, idx: number) => (
                                         <div key={idx} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
@@ -1051,7 +1174,7 @@ export function ProductDetailClient({ product, productWithVariants, organization
 
                         {/* FAQ */}
                         {product.faq && product.faq.length > 0 && (
-                            <div className="mt-8 border-t border-slate-200 dark:border-slate-800">
+                            <div id="product-faq" className="mt-8 scroll-mt-28 border-t border-slate-200 dark:border-slate-800">
                                 <details className="group border-b border-slate-200 dark:border-slate-800 py-4">
                                     <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
                                         <span>Preguntas frecuentes</span>
