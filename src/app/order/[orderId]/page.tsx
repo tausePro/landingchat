@@ -23,6 +23,7 @@ import {
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
 import { CartCleaner } from "./components/cart-cleaner"
+import { reconcileEpaycoOrderPayment } from "@/lib/payments/epayco-reconciliation"
 
 interface OrderPageProps {
     params: Promise<{ orderId: string }>
@@ -44,7 +45,22 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
 
     if (!result) return notFound()
 
-    const { order, organization } = result
+    let { order, organization } = result
+
+    if (order.payment_method === "epayco" && order.payment_status === "pending") {
+        const reconciliation = await reconcileEpaycoOrderPayment({
+            organizationId: organization.id,
+            orderId: order.id,
+        })
+
+        if (reconciliation.reconciled) {
+            const refreshed = await getOrderDetails(publicOrganization.slug, orderId, access)
+            if (refreshed) {
+                order = refreshed.order
+                organization = refreshed.organization
+            }
+        }
+    }
 
     const { data: whatsappInstance } = await supabase
         .from("whatsapp_instances")

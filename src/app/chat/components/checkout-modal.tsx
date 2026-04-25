@@ -24,12 +24,19 @@ interface CheckoutModalProps {
     chatId?: string
 }
 
+interface ShippingConfig {
+    default_shipping_rate: number
+    free_shipping_enabled: boolean
+    free_shipping_min_amount: number | null
+    free_shipping_zones: string[] | null
+}
+
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackInitiateCheckout } = useTracking()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
-    const [shippingConfig, setShippingConfig] = useState<any>(null)
+    const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
     const [availableGateways, setAvailableGateways] = useState<Array<{ provider: string, is_active: boolean, is_test_mode: boolean }>>([])
     const [gatewaysLoading, setGatewaysLoading] = useState(true)
@@ -257,11 +264,20 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                 sourceChannel: sourceChannel || trackingParams.source_channel,
                 chatId: chatId,
                 utmData: {
+                    captured_at: trackingParams.captured_at,
                     utm_source: trackingParams.utm_source,
                     utm_medium: trackingParams.utm_medium,
                     utm_campaign: trackingParams.utm_campaign,
                     utm_content: trackingParams.utm_content,
                     utm_term: trackingParams.utm_term,
+                    utm_id: trackingParams.utm_id,
+                    utm_source_platform: trackingParams.utm_source_platform,
+                    campaign_id: trackingParams.campaign_id,
+                    adset_id: trackingParams.adset_id,
+                    ad_id: trackingParams.ad_id,
+                    fbclid: trackingParams.fbclid,
+                    fbc: trackingParams.fbc,
+                    fbp: trackingParams.fbp,
                     referrer: trackingParams.referrer,
                 }
             })
@@ -648,7 +664,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         {manualPaymentInfo?.cod_enabled && (
                                             <div
                                                 className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'contraentrega' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => setPaymentMethod('contraentrega' as any)}
+                                                onClick={() => setPaymentMethod('contraentrega')}
                                             >
                                                 <span className="font-bold">Contra Entrega</span>
                                                 <span className="text-xs text-center text-slate-500">

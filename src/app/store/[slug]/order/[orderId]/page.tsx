@@ -15,6 +15,7 @@ import {
 import { CartCleaner } from "./components/cart-cleaner"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
+import { reconcileEpaycoOrderPayment } from "@/lib/payments/epayco-reconciliation"
 
 interface OrderPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -36,7 +37,22 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
 
     if (!result) return notFound()
 
-    const { order, organization } = result
+    let { order, organization } = result
+
+    if (order.payment_method === "epayco" && order.payment_status === "pending") {
+        const reconciliation = await reconcileEpaycoOrderPayment({
+            organizationId: organization.id,
+            orderId: order.id,
+        })
+
+        if (reconciliation.reconciled) {
+            const refreshed = await getOrderDetails(slug, orderId, access)
+            if (refreshed) {
+                order = refreshed.order
+                organization = refreshed.organization
+            }
+        }
+    }
 
     // Format currency
     const formatCurrency = (amount: number) => {

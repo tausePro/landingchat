@@ -37,6 +37,14 @@ vi.mock("@/lib/notifications/whatsapp", () => ({
 }))
 
 let mockSupabase: ReturnType<typeof createMockSupabase>
+const validEpaycoAmount = fc.double({ min: 10, max: 10000, noNaN: true })
+
+function createPaymentValidationOrder(orderId: string, amount: string) {
+    return {
+        id: orderId,
+        total: Number(amount),
+    }
+}
 
 beforeEach(() => {
     vi.clearAllMocks()
@@ -53,7 +61,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 fc.constantFrom("1", "2", "3", "4", "6"), // codResponse
                 async (refPayco, transactionId, invoice, amount, codResponse) => {
                     const amountStr = amount.toFixed(2)
@@ -104,7 +112,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 fc.constantFrom("1", "2", "3", "4", "6"), // codResponse
                 async (refPayco, transactionId, invoice, amount, codResponse) => {
                     const amountStr = amount.toFixed(2)
@@ -153,7 +161,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 fc.constantFrom("1", "2", "3", "4", "6"), // codResponse
                 async (refPayco, transactionId, invoice, amount, codResponse) => {
                     const amountStr = amount.toFixed(2)
@@ -209,7 +217,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 fc.constantFrom("1", "2", "3", "4", "6"), // codResponse
                 async (refPayco, transactionId, invoice, amount, codResponse) => {
                     const amountStr = amount.toFixed(2)
@@ -225,6 +233,10 @@ describe("ePayco Webhook - Property Tests", () => {
                                 provider_reference: invoice,
                                 status: mappedStatus,
                             },
+                            error: null,
+                        })
+                        .mockResolvedValueOnce({
+                            data: createPaymentValidationOrder(TEST_TRANSACTION.order_id, amountStr),
                             error: null,
                         })
 
@@ -263,6 +275,47 @@ describe("ePayco Webhook - Property Tests", () => {
         )
     })
 
+    it("rejects validly signed ePayco webhooks when amount does not match the order", async () => {
+        const payload = generateEpaycoWebhookPayload(
+            "ref-payco-mismatch",
+            "transaction-mismatch",
+            "order-mismatch",
+            "100.00",
+            "1",
+            "test_integrity_secret",
+            "test_private_key"
+        )
+
+        mockSupabase.mocks.single
+            .mockResolvedValueOnce({ data: TEST_ORG, error: null })
+            .mockResolvedValueOnce({ data: TEST_EPAYCO_CONFIG, error: null })
+            .mockResolvedValueOnce({
+                data: {
+                    ...TEST_TRANSACTION,
+                    provider_transaction_id: payload.x_ref_payco,
+                    status: "pending",
+                    order_id: "order-mismatch",
+                },
+                error: null,
+            })
+            .mockResolvedValueOnce({
+                data: createPaymentValidationOrder("order-mismatch", "99.99"),
+                error: null,
+            })
+
+        const request = createWebhookRequest(
+            `http://localhost:3000/api/webhooks/payments/epayco?org=${TEST_ORG.slug}`,
+            payload
+        )
+
+        const response = await POST(request)
+        const result = await response.json()
+
+        expect(response.status).toBe(400)
+        expect(result.error).toBe("Payment data mismatch")
+        expect(mockSupabase.mocks.update).not.toHaveBeenCalled()
+    })
+
     /**
      * Test de manejo de estados APPROVED para ePayco
      */
@@ -272,7 +325,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 fc.string({ minLength: 5, maxLength: 20 }), // orderId
                 async (refPayco, transactionId, invoice, amount, orderId) => {
                     const amountStr = amount.toFixed(2)
@@ -290,11 +343,18 @@ describe("ePayco Webhook - Property Tests", () => {
                             }, 
                             error: null 
                         }) // existing transaction lookup
+                        .mockResolvedValueOnce({
+                            data: createPaymentValidationOrder(orderId, amountStr),
+                            error: null,
+                        })
                         .mockResolvedValueOnce({ // order lookup for notification
                             data: {
                                 id: orderId,
                                 order_number: `ORD-${orderId}`,
-                                total: Math.round(amount * 100),
+                                total: Number(amountStr),
+                                items: [],
+                                customer_info: {},
+                                utm_data: {},
                                 customers: { name: "Test Customer" },
                                 order_items: [
                                     { quantity: 1, products: { name: "Test Product" } }
@@ -370,7 +430,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 fc.string({ minLength: 5, maxLength: 20 }), // orderId
                 async (refPayco, transactionId, invoice, amount, orderId) => {
                     const amountStr = amount.toFixed(2)
@@ -388,6 +448,10 @@ describe("ePayco Webhook - Property Tests", () => {
                             }, 
                             error: null 
                         }) // existing transaction lookup
+                        .mockResolvedValueOnce({
+                            data: createPaymentValidationOrder(orderId, amountStr),
+                            error: null,
+                        })
 
                     // Mock para los updates
                     mockSupabase.mocks.eq.mockReturnValue({
@@ -454,7 +518,7 @@ describe("ePayco Webhook - Property Tests", () => {
                 fc.string({ minLength: 10, maxLength: 50 }), // refPayco
                 fc.string({ minLength: 10, maxLength: 50 }), // transactionId
                 fc.string({ minLength: 5, maxLength: 20 }), // invoice
-                fc.float({ min: 10, max: 10000 }), // amount
+                validEpaycoAmount, // amount
                 async (refPayco, transactionId, invoice, amount) => {
                     const amountStr = amount.toFixed(2)
                     
