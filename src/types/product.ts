@@ -115,6 +115,7 @@ export const createProductSchema = z.object({
   bundle_items: z.array(bundleItemSchema).default([]),
   bundle_discount_type: z.enum(['fixed', 'percentage']).optional().nullable(),
   bundle_discount_value: z.number().min(0).default(0),
+  bundle_discount_ends_at: z.string().datetime().optional().nullable(),
   // Precios escalonados (mayoreo)
   has_quantity_pricing: z.boolean().default(false),
   price_tiers: z.array(priceTierSchema).optional(),
@@ -188,6 +189,7 @@ export interface ProductData {
   bundle_items?: BundleItem[]
   bundle_discount_type?: 'fixed' | 'percentage' | null
   bundle_discount_value?: number
+  bundle_discount_ends_at?: string | null
   // Precios escalonados (mayoreo)
   has_quantity_pricing?: boolean
   price_tiers?: PriceTier[]

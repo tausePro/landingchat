@@ -20,7 +20,7 @@ interface ProductDetailRawPromotion {
   end_date?: string | null
 }
 
-const LOW_STOCK_THRESHOLD = 5
+const LOW_STOCK_THRESHOLD = 10
 
 export interface ProductDetailVariantSelectionItem {
   id: string
