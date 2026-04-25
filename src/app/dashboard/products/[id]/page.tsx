@@ -2,6 +2,7 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProductForm } from "../components/product-form"
 import { ProductReviewsManager } from "../components/ProductReviewsManager"
 import { getProductById } from "../actions"
+import { createClient } from "@/lib/supabase/server"
 import {
     getProductEngagementSummaryForDashboard,
     getProductReviewsForDashboard,
@@ -29,10 +30,16 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
     }
 
     const product = result.data
+    const supabase = await createClient()
 
-    const [reviewsResult, engagementResult] = await Promise.all([
+    const [reviewsResult, engagementResult, organizationResult] = await Promise.all([
         getProductReviewsForDashboard(id),
         getProductEngagementSummaryForDashboard(id),
+        supabase
+            .from("organizations")
+            .select("slug")
+            .eq("id", product.organization_id)
+            .single(),
     ])
 
     const initialReviews = reviewsResult.success ? reviewsResult.data : []
@@ -44,11 +51,13 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
         : !engagementResult.success
             ? engagementResult.error
             : undefined
+    const storeSlug = organizationResult.data?.slug || ""
 
     return (
         <DashboardLayout>
             <ProductForm
                 organizationId={product.organization_id}
+                storeSlug={storeSlug}
                 initialData={product}
                 isEditing
             />
