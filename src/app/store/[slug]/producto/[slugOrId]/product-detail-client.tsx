@@ -69,8 +69,14 @@ interface ProductFaqItem {
 }
 
 interface ProductBundleItem {
+    product_id?: string | null
     quantity?: number | null
+    variant?: string | null
     product_name?: string | null
+    slug?: string | null
+    price?: number | null
+    image_url?: string | null
+    images?: string[] | null
 }
 
 interface ProductBadgeRules {
@@ -141,6 +147,13 @@ interface ProductDetailProduct {
 interface ProductSectionLink {
     id: string
     label: string
+}
+
+interface HeroValueRow {
+    id: string
+    icon: string
+    label: string
+    value?: string | null
 }
 
 function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<string, string> {
@@ -216,23 +229,225 @@ function buildWhatsAppLink(phone: string | null | undefined, message: string): s
 
 interface ProductDescriptionProps {
     description: string
+    primaryColor: string
 }
 
-function ProductDescription({ description }: ProductDescriptionProps) {
-    const hasLongDescription = description.length > 300
+type ProductDescriptionBlock =
+    | { id: string; type: "heading"; text: string }
+    | { id: string; type: "paragraph"; text: string }
+    | { id: string; type: "bulletList"; items: string[] }
+    | { id: string; type: "feature"; marker: string; title: string; body?: string }
+
+function stripHtmlTags(value: string): string {
+    return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+}
+
+function looksLikeHtml(value: string): boolean {
+    return /<\/?[a-z][\s\S]*>/i.test(value)
+}
+
+function splitMarker(value: string): { marker: string | null; text: string } {
+    const chars = Array.from(value.trim())
+    const marker = chars[0] ?? ""
+    if (!marker || /^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ¿¡]/.test(marker)) {
+        return { marker: null, text: value.trim() }
+    }
+
+    const text = chars.slice(1).join("").trim()
+    return text ? { marker, text } : { marker: null, text: value.trim() }
+}
+
+function isBulletLine(value: string): boolean {
+    return /^[-*•]\s+/.test(value.trim())
+}
+
+function normalizeBulletLine(value: string): string {
+    return value.trim().replace(/^[-*•]\s+/, "").trim()
+}
+
+function isHeadingLine(value: string): boolean {
+    const { text } = splitMarker(value)
+    const letters = Array.from(text).filter((char) => /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(char))
+    if (letters.length < 4) {
+        return false
+    }
+
+    const uppercaseLetters = letters.filter((char) => char === char.toUpperCase())
+    const uppercaseRatio = uppercaseLetters.length / letters.length
+    return uppercaseRatio >= 0.72 && text.length <= 96
+}
+
+function parsePlainDescription(description: string): ProductDescriptionBlock[] {
+    const blocks: ProductDescriptionBlock[] = []
+    const lines = description
+        .replace(/\r\n/g, "\n")
+        .split("\n")
+        .map((line) => line.trim())
+
+    let paragraph: string[] = []
+    let bulletItems: string[] = []
+
+    const flushParagraph = () => {
+        if (paragraph.length === 0) {
+            return
+        }
+
+        blocks.push({
+            id: `paragraph-${blocks.length}`,
+            type: "paragraph",
+            text: paragraph.join(" "),
+        })
+        paragraph = []
+    }
+
+    const flushBullets = () => {
+        if (bulletItems.length === 0) {
+            return
+        }
+
+        blocks.push({
+            id: `bullets-${blocks.length}`,
+            type: "bulletList",
+            items: bulletItems,
+        })
+        bulletItems = []
+    }
+
+    lines.forEach((line) => {
+        if (!line) {
+            flushParagraph()
+            flushBullets()
+            return
+        }
+
+        if (isBulletLine(line)) {
+            flushParagraph()
+            bulletItems.push(normalizeBulletLine(line))
+            return
+        }
+
+        if (isHeadingLine(line)) {
+            flushParagraph()
+            flushBullets()
+            blocks.push({
+                id: `heading-${blocks.length}`,
+                type: "heading",
+                text: splitMarker(line).text,
+            })
+            return
+        }
+
+        const marker = splitMarker(line)
+        if (marker.marker) {
+            flushParagraph()
+            flushBullets()
+            blocks.push({
+                id: `feature-${blocks.length}`,
+                type: "feature",
+                marker: marker.marker,
+                title: marker.text,
+            })
+            return
+        }
+
+        const previousBlock = blocks[blocks.length - 1]
+        if (previousBlock?.type === "feature" && !previousBlock.body) {
+            previousBlock.body = line
+            return
+        }
+
+        flushBullets()
+        paragraph.push(line)
+    })
+
+    flushParagraph()
+    flushBullets()
+
+    return blocks
+}
+
+function ProductDescription({ description, primaryColor }: ProductDescriptionProps) {
+    const isHtml = looksLikeHtml(description)
+    const plainTextLength = isHtml ? stripHtmlTags(description).length : description.length
+    const hasLongDescription = plainTextLength > 520
     const [isExpanded, setIsExpanded] = useState(false)
+    const blocks = useMemo(() => isHtml ? [] : parsePlainDescription(description), [description, isHtml])
+    const visibleBlocks = isExpanded ? blocks : blocks.slice(0, 7)
+    const hasHiddenBlocks = !isHtml && blocks.length > visibleBlocks.length
 
     return (
-        <div className="mt-6">
-            <div
-                className={`text-slate-600 dark:text-slate-300 prose prose-slate dark:prose-invert max-w-none ${hasLongDescription && !isExpanded ? "line-clamp-4" : ""}`}
-                dangerouslySetInnerHTML={{ __html: description }}
-            />
-            {hasLongDescription && (
+        <section className="mt-8 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 sm:p-6">
+            <div className="mb-5 flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
+                    <span className="material-symbols-outlined text-[20px]">auto_stories</span>
+                </span>
+                <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Experiencia del producto</p>
+                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">Lo que estás comprando</h2>
+                </div>
+            </div>
+
+            {isHtml ? (
+                <div
+                    className={`prose prose-slate max-w-none text-slate-600 dark:prose-invert dark:text-slate-300 prose-p:leading-7 prose-headings:tracking-[-0.02em] prose-strong:text-slate-900 dark:prose-strong:text-white ${hasLongDescription && !isExpanded ? "line-clamp-[14]" : ""}`}
+                    dangerouslySetInnerHTML={{ __html: description }}
+                />
+            ) : (
+                <div className="space-y-5">
+                    {visibleBlocks.map((block) => {
+                        if (block.type === "heading") {
+                            return (
+                                <h3 key={block.id} className="pt-2 text-lg font-extrabold uppercase tracking-[-0.015em] text-slate-950 dark:text-white">
+                                    {block.text}
+                                </h3>
+                            )
+                        }
+
+                        if (block.type === "bulletList") {
+                            return (
+                                <ul key={block.id} className="grid gap-2 sm:grid-cols-2">
+                                    {block.items.map((item, index) => (
+                                        <li key={`${block.id}-${index}-${item}`} className="flex gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-medium leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+                                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: primaryColor }} />
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )
+                        }
+
+                        if (block.type === "feature") {
+                            return (
+                                <article key={block.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                                    <div className="flex items-start gap-3">
+                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm dark:bg-slate-950">
+                                            {block.marker}
+                                        </span>
+                                        <div>
+                                            <h4 className="font-bold leading-6 text-slate-950 dark:text-white">{block.title}</h4>
+                                            {block.body && (
+                                                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{block.body}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </article>
+                            )
+                        }
+
+                        return (
+                            <p key={block.id} className="text-[15px] leading-7 text-slate-600 dark:text-slate-300">
+                                {block.text}
+                            </p>
+                        )
+                    })}
+                </div>
+            )}
+
+            {(hasLongDescription || hasHiddenBlocks) && (
                 <button
                     type="button"
                     onClick={() => setIsExpanded((current) => !current)}
-                    className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors hover:text-slate-900 dark:hover:text-white"
+                    className="mt-5 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
                     aria-expanded={isExpanded}
                 >
                     {isExpanded ? "Ver menos" : "Ver más"}
@@ -241,7 +456,7 @@ function ProductDescription({ description }: ProductDescriptionProps) {
                     </span>
                 </button>
             )}
-        </div>
+        </section>
     )
 }
 
@@ -452,7 +667,6 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const soldCount = extProduct.sold_count
     const viewingCount = extProduct.viewing_count
     const aiRecommendation = extProduct.ai_recommendation
-    const showUrgencyTimer = false
 
     // Reseñas reales del producto (filtrar válidas) + resolver summary
     const productReviews = useMemo(
@@ -800,29 +1014,30 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     }
 
     const featuredReview = productReviews[0] ?? null
-    const heroValueRows: Array<{ icon: string; label: string; value?: string | null }> = product.is_bundle && product.bundle_items?.length
-        ? product.bundle_items.slice(0, 4).map((item) => ({
+    const heroValueRows: HeroValueRow[] = product.is_bundle && product.bundle_items?.length
+        ? product.bundle_items.slice(0, 4).map((item, index) => ({
+            id: `bundle-item-${index}-${item.product_id ?? item.product_name ?? "included"}`,
             icon: "inventory_2",
-            label: `${(item.quantity ?? 0) > 1 ? `${item.quantity}x ` : ""}${item.product_name || "Producto incluido"}`,
-            value: null,
+            label: `${(item.quantity ?? 0) > 1 ? `${item.quantity}x ` : ""}${item.product_name || "Producto configurado"}`,
+            value: item.variant ?? null,
         }))
         : (() => {
-            const rows: Array<{ icon: string; label: string; value?: string | null }> = []
+            const rows: HeroValueRow[] = []
 
             if (selectedVariantTitle) {
-                rows.push({ icon: "tune", label: "Selección actual", value: selectedVariantTitle })
+                rows.push({ id: "selected-variant", icon: "tune", label: "Selección actual", value: selectedVariantTitle })
             }
 
-            product.specifications?.slice(0, 2).forEach((spec) => {
-                rows.push({ icon: "check_circle", label: spec.label, value: spec.value })
+            product.specifications?.slice(0, 2).forEach((spec, index) => {
+                rows.push({ id: `spec-${index}-${spec.label}`, icon: "check_circle", label: spec.label, value: spec.value })
             })
 
             if (minimumQuantity > 1) {
-                rows.push({ icon: "shopping_bag", label: "Compra mínima", value: `${minimumQuantity} unidades` })
+                rows.push({ id: "minimum-quantity", icon: "shopping_bag", label: "Compra mínima", value: `${minimumQuantity} unidades` })
             }
 
             if (hasQuantityPricing && viewModel.quantityPricing.priceTiers?.length) {
-                rows.push({ icon: "price_change", label: "Precios por cantidad", value: `${viewModel.quantityPricing.priceTiers.length} niveles` })
+                rows.push({ id: "quantity-pricing", icon: "price_change", label: "Precios por cantidad", value: `${viewModel.quantityPricing.priceTiers.length} niveles` })
             }
 
             return rows.slice(0, 4)
@@ -850,6 +1065,11 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         : savingsAmount > 0
             ? `Ahorro real de ${formatCurrency(savingsAmount)} frente al valor regular.`
             : (selectedVariantTitle ? `Precio final para ${selectedVariantTitle}.` : "Precio final para la selección actual.")
+    const activePromotionLabel = activePromotion
+        ? activePromotion.type === "percentage"
+            ? `${activePromotion.value}% OFF aplicado`
+            : `${formatCurrency(activePromotion.value)} OFF aplicado`
+        : null
 
     // Mapa de imágenes → variante (para sync thumbnail → color selector)
     // y set de imágenes agotadas (para overlay "Agotado")
@@ -956,7 +1176,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                         const isOOS = outOfStockImages.has(img)
                                         return (
                                             <button
-                                                key={idx}
+                                                key={`product-image-${idx}-${img}`}
                                                 onClick={() => {
                                                     setSelectedImage(img)
                                                     const mapped = imageToVariant.get(img)
@@ -982,14 +1202,25 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
 
                     {/* Right Column: Info */}
                     <div className="flex flex-col lg:pt-1">
-                        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: accentColor }}>
-                            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
-                            {brandOrCategory}
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: accentColor, backgroundColor: accentSurface }}>
+                                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                                {brandOrCategory}
+                            </span>
+                            {activePromotionLabel && (
+                                <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-rose-600 dark:bg-rose-500/20 dark:text-rose-300">
+                                    {activePromotionLabel}
+                                </span>
+                            )}
                         </div>
 
                         <h1 className="mb-3 text-[28px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 dark:text-white sm:text-[32px]">
                             {product.name}
                         </h1>
+
+                        <p className="mb-4 max-w-2xl text-[15px] leading-7 text-slate-600 dark:text-slate-300">
+                            {priceSupportLabel}
+                        </p>
 
                         {resolvedReviewSummary && (
                             <div className="mb-4 flex flex-wrap items-center gap-2.5 text-[13px] text-slate-500 dark:text-slate-400">
@@ -1059,7 +1290,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 </div>
                                 <div className="flex flex-col">
                                     {heroValueRows.map((item) => (
-                                        <div key={`${item.icon}-${item.label}`} className="flex items-center justify-between border-b border-slate-100 py-1.5 text-[13px] last:border-0 dark:border-slate-800">
+                                        <div key={item.id} className="flex items-center justify-between border-b border-slate-100 py-1.5 text-[13px] last:border-0 dark:border-slate-800">
                                             <span className="flex items-center gap-2 text-slate-900 dark:text-slate-200">
                                                 <span className="material-symbols-outlined text-[16px]" style={{ color: accentColor }}>{item.icon}</span>
                                                 {item.label}
@@ -1124,7 +1355,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         <div className="mb-4">
                             <div className="mb-1.5 flex justify-between text-[12px] text-slate-500 dark:text-slate-400">
                                 <span>Disponibilidad</span>
-                                <strong className="text-rose-600 dark:text-rose-400">
+                                <strong className={`rounded-full px-2 py-0.5 text-[11px] ${inventoryBadgeClass}`}>
                                     {resolvedInventory.inStock && hasKnownAvailableQuantity && availableQuantity <= 10
                                         ? `¡Quedan solo ${availableQuantity}!`
                                         : resolvedInventory.inStock ? "Disponible hoy" : "Agotado"}
@@ -1140,23 +1371,6 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 />
                             </div>
                         </div>
-
-                        {/* Urgency Timer */}
-                        {showUrgencyTimer && (
-                            <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-[#fed7aa] bg-[#fff7ed] p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
-                                <span className="material-symbols-outlined text-[20px] text-[#c2410c] dark:text-orange-400">alarm</span>
-                                <div>
-                                    <div className="text-[13px] font-semibold text-[#c2410c] dark:text-orange-400">⚡ Precio de oferta termina en</div>
-                                    <div className="mt-0.5 flex items-center gap-1">
-                                        <span className="rounded-md bg-white px-2 py-0.5 text-[15px] font-extrabold tracking-[0.03em] text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400 [font-variant-numeric:tabular-nums]">02</span>
-                                        <span className="font-extrabold text-rose-600 dark:text-rose-400">:</span>
-                                        <span className="rounded-md bg-white px-2 py-0.5 text-[15px] font-extrabold tracking-[0.03em] text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400 [font-variant-numeric:tabular-nums]">47</span>
-                                        <span className="font-extrabold text-rose-600 dark:text-rose-400">:</span>
-                                        <span className="rounded-md bg-white px-2 py-0.5 text-[15px] font-extrabold tracking-[0.03em] text-rose-600 shadow-sm dark:bg-slate-900 dark:text-rose-400 [font-variant-numeric:tabular-nums]">13</span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
 
                         {/* Shipping Progress */}
                         <div className="mb-4">
@@ -1177,7 +1391,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                         const hasVariantStock = variant.hasStockByVariant && variant.stockByVariant
                                         const stockByVariant = variant.stockByVariant
                                         return (
-                                            <div key={idx}>
+                                            <div key={`variant-group-${idx}-${variant.type}`}>
                                                 <label className="text-sm font-semibold text-slate-800 dark:text-slate-200 block mb-3">
                                                     {variant.type}
                                                     {isColorVariant && selectedVariants[variant.type] && (
@@ -1193,7 +1407,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                             const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
                                                             return (
                                                                 <button
-                                                                    key={vIdx}
+                                                                    key={`variant-color-${variant.type}-${vIdx}-${value}`}
                                                                     onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
                                                                     disabled={isOutOfStock}
                                                                     className={`
@@ -1230,7 +1444,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                             const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
                                                             return (
                                                                 <button
-                                                                    key={vIdx}
+                                                                    key={`variant-value-${variant.type}-${vIdx}-${value}`}
                                                                     onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
                                                                     disabled={isOutOfStock}
                                                                     className={`
@@ -1277,7 +1491,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                         {(viewModel.quantityPricing.priceTiers as ProductPriceTier[]).map((tier, idx: number) => {
                                             const isActive = effectiveQuantity >= tier.min_quantity && (!tier.max_quantity || effectiveQuantity <= tier.max_quantity)
                                             return (
-                                                <div key={idx} className={`flex items-center justify-between rounded-[12px] px-3 py-2 text-sm transition-colors ${isActive ? 'ring-1' : ''}`} style={isActive ? { backgroundColor: accentSurfaceStrong, borderColor: accentBorder } : undefined}>
+                                                <div key={`price-tier-${idx}-${tier.min_quantity}-${tier.max_quantity ?? "plus"}`} className={`flex items-center justify-between rounded-[12px] px-3 py-2 text-sm transition-colors ${isActive ? 'ring-1' : ''}`} style={isActive ? { backgroundColor: accentSurfaceStrong, borderColor: accentBorder } : undefined}>
                                                     <span className={isActive ? 'font-medium text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}>
                                                         {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} unidades
                                                         {tier.label && <span className="ml-1 text-xs" style={{ color: accentColor }}>({tier.label})</span>}
@@ -1386,6 +1600,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <ProductDescription
                                 key={`${product.id}:${product.description}`}
                                 description={product.description}
+                                primaryColor={primaryColor}
                             />
                         ) : (
                             <p className="mt-6 text-slate-600 dark:text-slate-300">
@@ -1459,7 +1674,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Por qué elegir este producto</h3>
                                 <div className="space-y-3">
                                     {product.benefits.map((benefit: string, idx: number) => (
-                                        <div key={idx} className="flex items-center gap-3">
+                                        <div key={`benefit-${idx}-${benefit}`} className="flex items-center gap-3">
                                             <div className="flex-shrink-0 size-6 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
                                                 <span className="material-symbols-outlined text-sm text-green-600 dark:text-green-400">check</span>
                                             </div>
@@ -1475,7 +1690,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <div id="product-specifications" className="mt-8 scroll-mt-28">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     {product.specifications.map((spec, idx: number) => (
-                                        <div key={idx} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                        <div key={`spec-card-${idx}-${spec.label}`} className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
                                             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{spec.label}</p>
                                             <p className="text-sm font-bold text-slate-900 dark:text-white mt-1">{spec.value}</p>
                                         </div>
@@ -1494,7 +1709,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     </summary>
                                     <div className="mt-4 space-y-4">
                                         {product.faq.map((item, idx: number) => (
-                                            <div key={idx}>
+                                            <div key={`faq-${idx}-${item.question}`}>
                                                 <p className="font-medium text-slate-900 dark:text-white">{item.question}</p>
                                                 <p className="text-slate-600 dark:text-slate-400 mt-1 text-sm">{item.answer}</p>
                                             </div>
@@ -1508,10 +1723,13 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
 
                 {/* Bundle / Qué incluye — full width debajo del grid principal */}
                 {product.is_bundle && product.bundle_items && product.bundle_items.length > 0 && (
-                    <div className="mt-12 border-t border-slate-200 dark:border-slate-800 pt-8">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Qué incluye</h2>
-                            <span className="text-sm text-slate-500 dark:text-slate-400">
+                    <section className="mt-14 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 sm:p-8">
+                        <div className="mb-7 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Caja completa</p>
+                                <h2 className="mt-1 text-2xl font-extrabold tracking-[-0.025em] text-slate-950 dark:text-white">Qué incluye</h2>
+                            </div>
+                            <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                                 {product.bundle_items.length} productos
                                 {(product.bundle_discount_type && (product.bundle_discount_value ?? 0) > 0) && (
                                     <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
@@ -1520,17 +1738,54 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 )}
                             </span>
                         </div>
-                        <div className="flex flex-wrap gap-3">
-                            {product.bundle_items.map((item, idx: number) => (
-                                <div key={idx} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-                                    <span className="material-symbols-outlined text-primary text-lg">inventory_2</span>
-                                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                        {(item.quantity ?? 0) > 1 && `${item.quantity}x `}{item.product_name || `Producto`}
-                                    </span>
-                                </div>
-                            ))}
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {product.bundle_items.map((item, idx: number) => {
+                                const bundleItemImage = item.image_url || item.images?.[0] || null
+                                const bundleItemName = item.product_name || "Producto configurado"
+                                const bundleItemHref = item.slug || item.product_id
+                                    ? getStoreLink(`/producto/${item.slug || item.product_id}`, isSubdomain, slug)
+                                    : null
+                                const content = (
+                                    <>
+                                        <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm dark:bg-slate-950">
+                                            {bundleItemImage ? (
+                                                <Image src={bundleItemImage} alt={bundleItemName} fill className="object-cover" sizes="56px" />
+                                            ) : (
+                                                <span className="flex h-full w-full items-center justify-center text-white" style={{ backgroundColor: primaryColor }}>
+                                                    <span className="material-symbols-outlined text-[22px]">inventory_2</span>
+                                                </span>
+                                            )}
+                                        </span>
+                                        <div className="min-w-0">
+                                            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                                                {(item.quantity ?? 0) > 1 ? `${item.quantity} unidades` : `Incluido ${idx + 1}`}
+                                            </p>
+                                            <h3 className="mt-1 text-sm font-bold leading-6 text-slate-950 dark:text-white">
+                                                {bundleItemName}
+                                            </h3>
+                                            {item.variant && (
+                                                <p className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">{item.variant}</p>
+                                            )}
+                                        </div>
+                                    </>
+                                )
+
+                                return bundleItemHref ? (
+                                    <Link
+                                        key={`bundle-item-full-${idx}-${item.product_id ?? item.product_name ?? "included"}`}
+                                        href={bundleItemHref}
+                                        className="group flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white hover:shadow-sm dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-950/70"
+                                    >
+                                        {content}
+                                    </Link>
+                                ) : (
+                                    <article key={`bundle-item-full-${idx}-${item.product_name ?? "included"}`} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                                        {content}
+                                    </article>
+                                )
+                            })}
                         </div>
-                    </div>
+                    </section>
                 )}
 
                 {/* Customers Also Bought */}
