@@ -14,7 +14,7 @@ export interface ConfigOption {
     choices?: string[]
     min?: number
     max?: number
-    default?: any
+    default?: unknown
     affects_preview?: boolean
     price_modifier?: number
     accept_formats?: string[]
@@ -128,7 +128,7 @@ export function ConfigurableOptionsEditor({ options, onChange }: ConfigurableOpt
                                 <Label className="text-xs">Tipo</Label>
                                 <select
                                     value={option.type}
-                                    onChange={(e) => updateOption(index, { type: e.target.value as any })}
+                                    onChange={(e) => updateOption(index, { type: e.target.value as ConfigOption['type'] })}
                                     className="form-select mt-1 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary text-sm h-9 border border-border-light dark:border-border-dark"
                                 >
                                     <option value="text">Texto</option>
@@ -244,7 +244,7 @@ export function ConfigurableOptionsEditor({ options, onChange }: ConfigurableOpt
                                     <Input
                                         type="number"
                                         placeholder="1"
-                                        value={option.default || ""}
+                                        value={String(option.default || "")}
                                         onChange={(e) => updateOption(index, { default: parseInt(e.target.value) || undefined })}
                                         className="mt-1 text-sm h-9"
                                     />

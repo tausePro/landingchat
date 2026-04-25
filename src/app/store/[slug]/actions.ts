@@ -28,6 +28,113 @@ interface StoreOrganizationSettings {
     [key: string]: unknown
 }
 
+interface StorefrontBundleItem {
+    product_id?: string | null
+    quantity?: number | null
+    variant?: string | null
+    product_name?: string | null
+    slug?: string | null
+    price?: number | null
+    image_url?: string | null
+    images?: string[] | null
+}
+
+interface BundleProductRow {
+    id: string
+    name: string
+    slug?: string | null
+    price?: number | null
+    image_url?: string | null
+    images?: string[] | null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getOptionalString(value: unknown): string | null {
+    return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+function getOptionalNumber(value: unknown): number | null {
+    return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function getOptionalStringArray(value: unknown): string[] | null {
+    if (!Array.isArray(value)) {
+        return null
+    }
+
+    const values = value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    return values.length > 0 ? values : null
+}
+
+function normalizeStorefrontBundleItem(value: unknown): StorefrontBundleItem | null {
+    if (!isRecord(value)) {
+        return null
+    }
+
+    return {
+        product_id: getOptionalString(value.product_id),
+        quantity: getOptionalNumber(value.quantity),
+        variant: getOptionalString(value.variant),
+        product_name: getOptionalString(value.product_name),
+        slug: getOptionalString(value.slug),
+        price: getOptionalNumber(value.price),
+        image_url: getOptionalString(value.image_url),
+        images: getOptionalStringArray(value.images),
+    }
+}
+
+async function enrichStorefrontBundleItems(params: {
+    supabase: StorefrontSupabaseClient
+    organizationId: string
+    bundleItems: unknown
+}): Promise<StorefrontBundleItem[]> {
+    const items = Array.isArray(params.bundleItems)
+        ? params.bundleItems.map(normalizeStorefrontBundleItem).filter((item): item is StorefrontBundleItem => item !== null)
+        : []
+
+    if (items.length === 0) {
+        return []
+    }
+
+    const productIds = Array.from(new Set(items.map((item) => item.product_id).filter((id): id is string => Boolean(id))))
+    if (productIds.length === 0) {
+        return items
+    }
+
+    const { data: bundleProducts, error: bundleProductsError } = await params.supabase
+        .from("products")
+        .select("id, name, slug, price, image_url, images")
+        .eq("organization_id", params.organizationId)
+        .neq("is_active", false)
+        .in("id", productIds)
+
+    if (bundleProductsError) {
+        console.error("[getProductDetails] Error fetching bundle products:", bundleProductsError)
+        return items
+    }
+
+    const productsById = new Map<string, BundleProductRow>()
+    ;(bundleProducts || []).forEach((product) => {
+        productsById.set(product.id, product)
+    })
+
+    return items.map((item) => {
+        const bundleProduct = item.product_id ? productsById.get(item.product_id) : null
+
+        return {
+            ...item,
+            product_name: bundleProduct?.name ?? item.product_name ?? null,
+            slug: bundleProduct?.slug ?? item.slug ?? null,
+            price: bundleProduct?.price ?? item.price ?? null,
+            image_url: bundleProduct?.image_url ?? item.image_url ?? null,
+            images: bundleProduct?.images ?? item.images ?? null,
+        }
+    })
+}
+
 function resolveStorefrontProductOrder(value: unknown): ProductListOrderBy {
     return value === "custom" || value === "price_asc" || value === "price_desc"
         ? value
@@ -228,11 +335,22 @@ export async function getProductDetails(slug: string, slugOrId: string) {
 
     if (productError || !product) return null
 
+    const productForDetail = product.is_bundle
+        ? {
+            ...product,
+            bundle_items: await enrichStorefrontBundleItems({
+                supabase,
+                organizationId: org.id,
+                bundleItems: product.bundle_items,
+            }),
+        }
+        : product
+
     let productWithVariants = null
 
     try {
         productWithVariants = await getProductWithVariants({
-            productId: product.id,
+            productId: productForDetail.id,
             organizationId: org.id,
             client: supabase,
         })
@@ -262,24 +380,24 @@ export async function getProductDetails(slug: string, slugOrId: string) {
         .select("id, name, slug, price, image_url, images")
         .eq("organization_id", org.id)
         .eq("is_active", true)
-        .neq("id", product.id)
+        .neq("id", productForDetail.id)
         .limit(4)
 
     // Try to get products from the same category first
-    if (product.category) {
-        relatedProductsQuery = relatedProductsQuery.eq("category", product.category)
+    if (productForDetail.category) {
+        relatedProductsQuery = relatedProductsQuery.eq("category", productForDetail.category)
     }
 
     const { data: relatedProducts } = await relatedProductsQuery
     const viewModel = buildProductDetailViewModel({
-        product: product as ProductData,
+        product: productForDetail as ProductData,
         productWithVariants,
         promotions: promotions || [],
     })
 
     return {
         organization: enrichedOrg,
-        product,
+        product: productForDetail,
         productWithVariants,
         viewModel,
         badges: badges || [],

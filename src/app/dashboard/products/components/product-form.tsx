@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { createProduct, updateProduct } from "../actions"
-import { ProductData, CreateProductInput, ConfigOption, PriceTier } from "@/types/product"
-import { getBadges } from "../../badges/actions"
+import { createProduct, updateProduct, deleteProduct } from "../actions"
+import { ProductData, CreateProductInput, ConfigOption, PriceTier, ProductVariant } from "@/types/product"
+import { getBadges, BadgeData } from "../../badges/actions"
 import { RichTextEditor } from "./rich-text-editor"
 import { ImageUpload } from "./image-upload"
 import { VariantsEditor } from "./variants-editor"
@@ -13,6 +13,7 @@ import { CategoriesInput } from "./categories-input"
 import { ConfigurableOptionsEditor } from "./configurable-options-editor"
 import { BundleEditor } from "./bundle-editor"
 import { PriceTiersEditor } from "./price-tiers-editor"
+import { ProductStructuredContentEditor } from "./ProductStructuredContentEditor"
 import { BundleItem } from "@/types/product"
 import { enhanceProductDescription } from "../ai-actions"
 
@@ -35,15 +36,18 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
     const [salePrice, setSalePrice] = useState(initialData?.sale_price?.toString() || "")
     const [images, setImages] = useState<string[]>(initialData?.images || [])
     const [categories, setCategories] = useState<string[]>(initialData?.categories || [])
-    const [variants, setVariants] = useState<Array<{
-        type: string; values: string[];
-        hasPriceAdjustment?: boolean; priceAdjustments?: Record<string, number>;
-        hasStockByVariant?: boolean; stockByVariant?: Record<string, number>;
-        hasImageMapping?: boolean; images?: Record<string, string | string[]>;
-    }>>(initialData?.variants || [])
-    const [isSubscription, setIsSubscription] = useState(initialData?.is_subscription ?? false)
-    const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable ?? false)
-    const [isActive, setIsActive] = useState(initialData?.is_active ?? true)
+    const [variants, setVariants] = useState<ProductVariant[]>(initialData?.variants || [])
+
+    // Advance features
+    const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable || false)
+    const [isActive, setIsActive] = useState<boolean>(initialData?.is_active ?? true)
+    const [isFeatured, setIsFeatured] = useState<boolean>(initialData?.is_featured ?? false)
+    
+    // Structured Content features (SEO, AEO)
+    const [brand, setBrand] = useState(initialData?.brand || "")
+    const [benefits, setBenefits] = useState<string[]>(initialData?.benefits || [])
+    const [specifications, setSpecifications] = useState<Array<{label: string, value: string}>>(initialData?.specifications || [])
+    const [faq, setFaq] = useState<Array<{question: string, answer: string}>>(initialData?.faq || [])
 
     // Subscription configuration state
     const [subscriptionEnabled, setSubscriptionEnabled] = useState(initialData?.subscription_config?.enabled ?? false)
@@ -58,7 +62,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
 
     // Marketing state
     const [badgeId, setBadgeId] = useState(initialData?.badge_id || "")
-    const [badges, setBadges] = useState<any[]>([])
+    const [badges, setBadges] = useState<BadgeData[]>([])
 
     // Bundle state
     const [isBundle, setIsBundle] = useState(initialData?.is_bundle ?? false)
@@ -140,6 +144,12 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
 
                 // Tax override
                 tax_rate: taxRate !== "" ? parseFloat(taxRate) : null,
+                // UI Fields (Stitch Design)
+                is_featured: isFeatured,
+                brand: brand.trim() || undefined,
+                benefits: benefits.length > 0 ? benefits : undefined,
+                faq: faq.length > 0 ? faq : undefined,
+                specifications: specifications.length > 0 ? specifications : undefined,
                 // SEO fields
                 meta_title: metaTitle.trim() || undefined,
                 meta_description: metaDescription.trim() || undefined,
@@ -165,9 +175,9 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
             }
 
             router.push("/dashboard/products")
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Form submit error:", error)
-            alert(`Error: ${error.message}`)
+            alert(`Error: ${error instanceof Error ? error.message : "Error desconocido"}`)
         } finally {
             setLoading(false)
         }
@@ -258,8 +268,8 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                             } else {
                                                 alert(`Error: ${result.error}`)
                                             }
-                                        } catch (error: any) {
-                                            alert(`Error: ${error.message}`)
+                                        } catch (error: unknown) {
+                                            alert(`Error: ${error instanceof Error ? error.message : "Error desconocido"}`)
                                         } finally {
                                             setIsEnhancing(false)
                                         }
@@ -335,196 +345,203 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Advanced Options */}
-                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
-                        <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Opciones Avanzadas</h2>
-                        <div className="mt-6 flex flex-col gap-4">
-                            {/* Bundle/Combo Toggle */}
-                            <div className="flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
+                {/* Advanced Options */}
+                <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Opciones Avanzadas</h2>
+                    <div className="mt-6 flex flex-col gap-4">
+                        {/* Bundle/Combo Toggle */}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-500 shrink-0">
+                                        <span className="material-symbols-outlined text-xl">inventory_2</span>
+                                    </div>
                                     <div>
-                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-primary">inventory_2</span>
-                                            Bundle/Combo
-                                        </h3>
-                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
-                                            Agrupa varios productos en un combo con descuento.
-                                        </p>
+                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Bundle y Combo</h3>
+                                        <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-0.5">Agrupa varios productos en un combo con descuento.</p>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="sr-only peer"
-                                            checked={isBundle}
-                                            onChange={e => {
-                                                setIsBundle(e.target.checked)
-                                                // Reset subscription if enabling bundle
-                                                if (e.target.checked) {
-                                                    setSubscriptionEnabled(false)
-                                                }
-                                            }}
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                                    </label>
                                 </div>
-
-                                {/* Bundle Editor */}
-                                {isBundle && (
-                                    <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-primary/20">
-                                        <BundleEditor
-                                            items={bundleItems}
-                                            onChange={setBundleItems}
-                                            discountType={bundleDiscountType}
-                                            discountValue={bundleDiscountValue}
-                                            onDiscountTypeChange={setBundleDiscountType}
-                                            onDiscountValueChange={setBundleDiscountValue}
-                                            organizationId={organizationId}
-                                        />
-                                    </div>
-                                )}
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={isBundle}
+                                        onChange={e => {
+                                            setIsBundle(e.target.checked)
+                                            // Reset subscription if enabling bundle
+                                            if (e.target.checked) {
+                                                setSubscriptionEnabled(false)
+                                            }
+                                        }}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                </label>
                             </div>
 
-                            <div className="border-t border-border-light dark:border-border-dark"></div>
-
-                            {/* Precios por Cantidad Toggle */}
-                            <div className="flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-primary">price_change</span>
-                                            Precios por Cantidad
-                                        </h3>
-                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
-                                            Configura precios diferenciados para compras al por mayor.
-                                        </p>
-                                    </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="sr-only peer"
-                                            checked={hasQuantityPricing}
-                                            onChange={e => setHasQuantityPricing(e.target.checked)}
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                                    </label>
+                            {/* Bundle Editor */}
+                            {isBundle && (
+                                <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-primary/20">
+                                    <BundleEditor
+                                        items={bundleItems}
+                                        onChange={setBundleItems}
+                                        discountType={bundleDiscountType}
+                                        discountValue={bundleDiscountValue}
+                                        onDiscountTypeChange={setBundleDiscountType}
+                                        onDiscountValueChange={setBundleDiscountValue}
+                                        organizationId={organizationId}
+                                    />
                                 </div>
+                            )}
+                        </div>
 
-                                {/* Price Tiers Editor */}
-                                {hasQuantityPricing && (
-                                    <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-primary/20">
-                                        <PriceTiersEditor
-                                            tiers={priceTiers}
-                                            onChange={setPriceTiers}
-                                            minimumQuantity={minimumQuantity}
-                                            onMinimumQuantityChange={setMinimumQuantity}
-                                        />
+                        {/* Precios por Cantidad Toggle */}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-500 shrink-0">
+                                        <span className="material-symbols-outlined text-xl">price_change</span>
                                     </div>
-                                )}
+                                    <div>
+                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Precios por Cantidad</h3>
+                                        <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-0.5">Configura precios diferenciados para compras al por mayor.</p>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={hasQuantityPricing}
+                                        onChange={e => setHasQuantityPricing(e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                </label>
                             </div>
 
-                            <div className="border-t border-border-light dark:border-border-dark"></div>
+                            {/* Price Tiers Editor */}
+                            {hasQuantityPricing && (
+                                <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-primary/20">
+                                    <PriceTiersEditor
+                                        tiers={priceTiers}
+                                        onChange={setPriceTiers}
+                                        minimumQuantity={minimumQuantity}
+                                        onMinimumQuantityChange={setMinimumQuantity}
+                                    />
+                                </div>
+                            )}
+                        </div>
 
-                            {/* Subscription Toggle */}
-                            <div className="flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
+                        {/* Subscription Toggle */}
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-500 shrink-0">
+                                        <span className="material-symbols-outlined text-xl">sync</span>
+                                    </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Vender por Suscripción</h3>
-                                        <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">Permite a los clientes suscribirse a este producto.</p>
+                                        <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-0.5">Permite a los clientes suscribirse a este producto.</p>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            className="sr-only peer"
-                                            checked={subscriptionEnabled}
-                                            onChange={e => setSubscriptionEnabled(e.target.checked)}
-                                        />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-                                    </label>
                                 </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={subscriptionEnabled}
+                                        onChange={e => setSubscriptionEnabled(e.target.checked)}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/50 dark:peer-focus:ring-primary/80 rounded-full peer dark:bg-border-dark peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
 
-                                {/* Subscription Configuration Fields */}
-                                {subscriptionEnabled && (
-                                    <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-border-light dark:border-border-dark space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Precio de Suscripción (COP)</label>
-                                                <div className="relative mt-2">
-                                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
-                                                    <input
-                                                        className="form-input w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-7"
-                                                        placeholder="45000"
-                                                        type="number"
-                                                        step="100"
-                                                        value={subscriptionPrice}
-                                                        onChange={e => setSubscriptionPrice(e.target.value)}
-                                                        required={subscriptionEnabled}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div>
-                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Periodicidad</label>
-                                                <select
-                                                    className="form-select mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark h-10"
-                                                    value={subscriptionInterval}
-                                                    onChange={e => setSubscriptionInterval(e.target.value as any)}
-                                                >
-                                                    <option value="day">Diario</option>
-                                                    <option value="week">Semanal</option>
-                                                    <option value="month">Mensual</option>
-                                                    <option value="year">Anual</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Cada cuántos</label>
+                            {/* Subscription Configuration Fields */}
+                            {subscriptionEnabled && (
+                                <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-border-light dark:border-border-dark space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Precio de Suscripción (COP)</label>
+                                            <div className="relative mt-2">
+                                                <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
                                                 <input
-                                                    className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
-                                                    placeholder="1"
+                                                    className="form-input w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-7"
+                                                    placeholder="45000"
                                                     type="number"
-                                                    min="1"
-                                                    value={subscriptionIntervalCount}
-                                                    onChange={e => setSubscriptionIntervalCount(e.target.value)}
+                                                    step="100"
+                                                    value={subscriptionPrice}
+                                                    onChange={e => setSubscriptionPrice(e.target.value)}
+                                                    required={subscriptionEnabled}
                                                 />
-                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Ej: "2" para cada 2 meses</p>
-                                            </div>
-
-                                            <div>
-                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Días de prueba gratis (opcional)</label>
-                                                <input
-                                                    className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
-                                                    placeholder="7"
-                                                    type="number"
-                                                    min="0"
-                                                    value={subscriptionTrialDays}
-                                                    onChange={e => setSubscriptionTrialDays(e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div className="md:col-span-2">
-                                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Descuento vs Precio Único (%, opcional)</label>
-                                                <input
-                                                    className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
-                                                    placeholder="10"
-                                                    type="number"
-                                                    min="0"
-                                                    max="100"
-                                                    step="0.1"
-                                                    value={subscriptionDiscount}
-                                                    onChange={e => setSubscriptionDiscount(e.target.value)}
-                                                />
-                                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Se mostrará como "Ahorra X%" en el storefront</p>
                                             </div>
                                         </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Periodicidad</label>
+                                            <select
+                                                className="form-select mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark h-10"
+                                                value={subscriptionInterval}
+                                                onChange={e => setSubscriptionInterval(e.target.value as "day" | "week" | "month" | "year")}
+                                            >
+                                                <option value="day">Diario</option>
+                                                <option value="week">Semanal</option>
+                                                <option value="month">Mensual</option>
+                                                <option value="year">Anual</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Cada cuántos</label>
+                                            <input
+                                                className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                                placeholder="1"
+                                                type="number"
+                                                min="1"
+                                                value={subscriptionIntervalCount}
+                                                onChange={e => setSubscriptionIntervalCount(e.target.value)}
+                                            />
+                                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Ej: &quot;2&quot; para cada 2 meses</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Días de prueba gratis (opcional)</label>
+                                            <input
+                                                className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                                placeholder="7"
+                                                type="number"
+                                                min="0"
+                                                value={subscriptionTrialDays}
+                                                onChange={e => setSubscriptionTrialDays(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Descuento vs Precio Único (%, opcional)</label>
+                                            <input
+                                                className="form-input mt-2 w-full rounded-lg bg-white dark:bg-gray-800 text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border border-border-light dark:border-border-dark placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                                placeholder="10"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                                value={subscriptionDiscount}
+                                                onChange={e => setSubscriptionDiscount(e.target.value)}
+                                            />
+                                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">Se mostrará como &quot;Ahorra X%&quot; en el storefront</p>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                            <div className="border-t border-border-light dark:border-border-dark"></div>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex flex-col gap-4">
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Producto Configurable</h3>
-                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">Permite personalizar el producto a través del Agente.</p>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-500 shrink-0">
+                                        <span className="material-symbols-outlined text-xl">settings</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Producto Configurable</h3>
+                                        <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-0.5">Permite personalizar el producto a través del Agente.</p>
+                                    </div>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input
@@ -557,6 +574,18 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         </div>
                     </div>
 
+                    {/* SEO / Structured Content Editor */}
+                    <ProductStructuredContentEditor
+                        brand={brand}
+                        onBrandChange={setBrand}
+                        benefits={benefits}
+                        onBenefitsChange={setBenefits}
+                        specifications={specifications}
+                        onSpecificationsChange={setSpecifications}
+                        faq={faq}
+                        onFaqChange={setFaq}
+                    />
+
                     {/* SEO Section - Collapsible */}
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <button
@@ -581,7 +610,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                         {showSeoSection && (
                             <div className="mt-6 flex flex-col gap-6">
                                 <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                                    Optimiza cómo aparece tu producto en buscadores y redes sociales. Usa "Mejorar con IA" para generar automáticamente.
+                                    Optimiza cómo aparece tu producto en buscadores y redes sociales. Usa &quot;Mejorar con IA&quot; para generar automáticamente.
                                 </p>
 
                                 <div>
@@ -723,9 +752,13 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Estado</label>
-                                <div className="flex items-center justify-between mt-2">
-                                    <p className="text-text-light-secondary dark:text-text-dark-secondary">Producto Activo</p>
+                                <div className={`flex items-center justify-between mt-2 p-3 rounded-lg border ${isActive ? 'bg-primary/5 border-primary/20' : 'bg-background-light dark:bg-background-dark border-border-light dark:border-border-dark'}`}>
+                                    <div>
+                                        <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Estado</label>
+                                        <p className={`text-xs mt-0.5 font-medium ${isActive ? 'text-primary' : 'text-text-light-secondary dark:text-text-dark-secondary'}`}>
+                                            {isActive ? 'Producto Activo' : 'Producto Inactivo'}
+                                        </p>
+                                    </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input
                                             type="checkbox"
@@ -766,6 +799,56 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                             </p>
                         </div>
                     </div>
+
+                    {/* Acciones Rápidas */}
+                    {isEditing && (
+                        <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                            <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Acciones rápidas</h2>
+                            <div className="mt-6 flex flex-col gap-3">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsFeatured(!isFeatured)}
+                                    className={`flex items-center gap-3 w-full p-3 rounded-lg border transition-colors text-sm font-medium ${isFeatured ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-text-light-primary dark:text-text-dark-primary'}`}
+                                >
+                                    <span className="material-symbols-outlined text-primary text-xl">done</span>
+                                    {isFeatured ? 'Marcado como destacado' : 'Marcar como destacado'}
+                                </button>
+                                <a 
+                                    href={`/store/${organizationId}/producto/${initialData?.slug || initialData?.id}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="flex items-center gap-3 w-full p-3 rounded-lg border border-border-light hover:bg-background-light dark:border-border-dark dark:hover:bg-background-dark text-text-light-primary dark:text-text-dark-primary transition-colors text-sm font-medium"
+                                >
+                                    <span className="material-symbols-outlined text-primary text-xl">visibility</span>
+                                    Ver en la tienda
+                                </a>
+                                <button 
+                                    type="button" 
+                                    onClick={async () => {
+                                        if (!initialData?.id) return
+                                        if (!confirm(`¿Estás seguro de eliminar "${name || initialData.name}"? Esta acción no se puede deshacer.`)) {
+                                            return
+                                        }
+
+                                        try {
+                                            const result = await deleteProduct(initialData.id)
+                                            if (result.success) {
+                                                router.push("/dashboard/products")
+                                            } else {
+                                                alert(`Error al eliminar: ${result.error}`)
+                                            }
+                                        } catch (error: unknown) {
+                                            alert(`Error al eliminar: ${error instanceof Error ? error.message : "Error desconocido"}`)
+                                        }
+                                    }}
+                                    className="flex items-center gap-3 w-full p-3 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-colors text-sm font-medium"
+                                >
+                                    <span className="material-symbols-outlined text-xl">delete</span>
+                                    Eliminar producto
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </form>
