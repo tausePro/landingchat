@@ -54,9 +54,10 @@ interface ProductPromotion {
     target_ids?: string[]
     type: "percentage" | "fixed" | string
     value: number
+    end_date?: string | null
 }
 
-type ProductPromotionDisplay = Pick<ProductPromotion, "type" | "value">
+type ProductPromotionDisplay = Pick<ProductPromotion, "type" | "value" | "end_date">
 
 interface ProductSpecification {
     label: string
@@ -142,6 +143,7 @@ interface ProductDetailProduct {
     bundle_items?: ProductBundleItem[] | null
     bundle_discount_type?: "percentage" | string | null
     bundle_discount_value?: number | null
+    bundle_discount_ends_at?: string | null
 }
 
 interface ProductSectionLink {
@@ -178,6 +180,13 @@ function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<st
 
 function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount)
+}
+
+function calculateBundleDiscountAmount(subtotal: number, type?: string | null, value?: number | null): number {
+    if (subtotal <= 0 || !type || !value || value <= 0) return 0
+
+    const discount = type === "percentage" ? subtotal * (value / 100) : type === "fixed" ? value : 0
+    return Math.max(0, Math.min(subtotal, discount))
 }
 
 function normalizeHexColor(color: string | undefined, fallback: string): string {
@@ -225,6 +234,58 @@ function buildWhatsAppLink(phone: string | null | undefined, message: string): s
     }
 
     return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`
+}
+
+interface CountdownTime {
+    days: number
+    hours: number
+    minutes: number
+    seconds: number
+}
+
+function getCountdownTime(endsAt: string): CountdownTime | null {
+    const target = new Date(endsAt).getTime()
+    if (!Number.isFinite(target)) return null
+
+    const totalSeconds = Math.floor((target - Date.now()) / 1000)
+    if (totalSeconds <= 0) return null
+
+    const days = Math.floor(totalSeconds / 86400)
+    const hours = Math.floor((totalSeconds % 86400) / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    return { days, hours, minutes, seconds }
+}
+
+function formatCountdownPart(value: number): string {
+    return value.toString().padStart(2, "0")
+}
+
+function OfferCountdown({ endsAt, accentColor }: { endsAt: string; accentColor: string }) {
+    const [remaining, setRemaining] = useState<CountdownTime | null>(null)
+
+    useEffect(() => {
+        const updateRemaining = () => setRemaining(getCountdownTime(endsAt))
+
+        updateRemaining()
+        const intervalId = window.setInterval(updateRemaining, 1000)
+
+        return () => window.clearInterval(intervalId)
+    }, [endsAt])
+
+    if (!remaining) return null
+
+    return (
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+            <span className="material-symbols-outlined text-[17px]" style={{ color: accentColor }}>timer</span>
+            <span>Descuento termina en</span>
+            <span className="ml-auto tabular-nums">
+                {remaining.days > 0 ? `${remaining.days}d ` : ""}
+                {formatCountdownPart(remaining.hours)}:{formatCountdownPart(remaining.minutes)}:{formatCountdownPart(remaining.seconds)}
+            </span>
+        </div>
+    )
 }
 
 interface ProductDescriptionProps {
@@ -807,11 +868,13 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         ? {
             type: resolvedHeadlinePricing.active_promotion.type,
             value: resolvedHeadlinePricing.active_promotion.value,
+            end_date: resolvedHeadlinePricing.active_promotion.end_date,
         }
         : legacyPricing.activePromotion
             ? {
                 type: legacyPricing.activePromotion.type,
                 value: legacyPricing.activePromotion.value,
+                end_date: legacyPricing.activePromotion.end_date,
             }
             : null
     const selectedVariantTitle = useMemo(() => {
@@ -901,7 +964,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                 title: selectedVariantTitle
                     ? `${selectedVariantTitle} disponible para compra`
                     : "Variante disponible para compra",
-                description: `${resolvedInventory.totalStock} unidade${resolvedInventory.totalStock === 1 ? "d" : "s"} activas sumadas entre variantes.`,
+                description: "Disponibilidad confirmada para la variante seleccionada.",
             }
         }
 
@@ -909,9 +972,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             tone: "ok",
             badge: "En stock",
             title: "Disponible para compra",
-            description: resolvedInventory.totalStock !== null
-                ? `${resolvedInventory.totalStock} unidade${resolvedInventory.totalStock === 1 ? "d" : "s"} disponibles actualmente.`
-                : "Disponibilidad confirmada para compra.",
+            description: "Disponibilidad confirmada para compra.",
         }
     }, [availableQuantity, hasInsufficientStockForMinimum, minimumQuantity, resolvedInventory, selectedVariantTitle])
     const inventoryBadgeClass = inventoryMessage.tone === "critical"
@@ -989,8 +1050,31 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         [shippingConfig, totalPrice]
     )
     const hasFreeShipping = product.free_shipping_enabled || freeShippingProgress.qualified
-    const compareAtPrice = resolvedHeadlinePricing ? resolvedHeadlinePricing.compare_at_to_show : (legacyPricing.activePromotion || product.sale_price) ? product.price : null
+    const bundleSubtotal = useMemo(() => {
+        if (!product.is_bundle || !product.bundle_items?.length) return 0
+
+        return product.bundle_items.reduce((sum, item) => {
+            const itemPrice = typeof item.price === "number" && Number.isFinite(item.price) ? item.price : 0
+            const itemQuantity = typeof item.quantity === "number" && item.quantity > 0 ? item.quantity : 1
+
+            return sum + itemPrice * itemQuantity
+        }, 0)
+    }, [product.bundle_items, product.is_bundle])
+    const bundleConfiguredDiscountAmount = calculateBundleDiscountAmount(
+        bundleSubtotal,
+        product.bundle_discount_type,
+        product.bundle_discount_value
+    )
+    const hasBundleConfiguredDiscount = product.is_bundle && bundleConfiguredDiscountAmount > 0
+    const productCompareAtPrice = resolvedHeadlinePricing ? resolvedHeadlinePricing.compare_at_to_show : (legacyPricing.activePromotion || product.sale_price) ? product.price : null
+    const bundleCompareAtPrice = product.is_bundle && bundleSubtotal > currentPrice ? bundleSubtotal : null
+    const compareAtPrice = bundleCompareAtPrice ?? productCompareAtPrice
     const savingsAmount = compareAtPrice ? Math.max(compareAtPrice - currentPrice, 0) : 0
+    const offerCountdownEndsAt = product.is_bundle && hasBundleConfiguredDiscount && product.bundle_discount_ends_at && getCountdownTime(product.bundle_discount_ends_at)
+        ? product.bundle_discount_ends_at
+        : activePromotion?.end_date && getCountdownTime(activePromotion.end_date)
+            ? activePromotion.end_date
+            : null
     const whatsappLink = useMemo(
         () => buildWhatsAppLink(organization.settings?.whatsapp?.phone, `Hola, quiero más información sobre ${product.name}`),
         [organization.settings?.whatsapp?.phone, product.name]
@@ -1064,7 +1148,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         ? `Total actual ${formatCurrency(totalPrice)} · ${formatCurrency(unitPrice)} por unidad.`
         : savingsAmount > 0
             ? `Ahorro real de ${formatCurrency(savingsAmount)} frente al valor regular.`
-            : (selectedVariantTitle ? `Precio final para ${selectedVariantTitle}.` : "Precio final para la selección actual.")
+            : hasBundleConfiguredDiscount
+                ? `Descuento del bundle configurado: ${formatCurrency(bundleConfiguredDiscountAmount)} sobre el valor individual.`
+                : (selectedVariantTitle ? `Precio final para ${selectedVariantTitle}.` : "Precio final para la selección actual.")
     const activePromotionLabel = activePromotion
         ? activePromotion.type === "percentage"
             ? `${activePromotion.value}% OFF aplicado`
@@ -1277,9 +1363,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     </span>
                                 )}
                             </div>
-                            <div className="mt-1.5 text-[13px] text-slate-600 dark:text-slate-300">
-                                o <strong style={{ color: accentColor }}>3 cuotas de {formatCurrency(currentPrice / 3)}</strong> sin intereses con tu tarjeta
-                            </div>
+                            {offerCountdownEndsAt && (
+                                <OfferCountdown endsAt={offerCountdownEndsAt} accentColor={accentColor} />
+                            )}
                         </div>
 
                         {/* Value Stack */}
@@ -1298,19 +1384,27 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                             {item.value && <span className="text-slate-500 dark:text-slate-400 [font-variant-numeric:tabular-nums]">{item.value}</span>}
                                         </div>
                                     ))}
-                                    {product.is_bundle && compareAtPrice && (
+                                    {product.is_bundle && (compareAtPrice || hasBundleConfiguredDiscount) && (
                                         <>
-                                            <div className="mt-1 flex justify-between border-t-2 border-dashed border-slate-200 pt-2.5 text-[13.5px] font-bold text-slate-900 dark:border-slate-800 dark:text-white">
-                                                <span>Valor individual</span>
-                                                <span className="text-slate-400 line-through dark:text-slate-500">{formatCurrency(compareAtPrice)}</span>
-                                            </div>
+                                            {bundleSubtotal > 0 && (
+                                                <div className="mt-1 flex justify-between border-t-2 border-dashed border-slate-200 pt-2.5 text-[13.5px] font-bold text-slate-900 dark:border-slate-800 dark:text-white">
+                                                    <span>Valor individual</span>
+                                                    <span className="text-slate-400 line-through dark:text-slate-500">{formatCurrency(bundleSubtotal)}</span>
+                                                </div>
+                                            )}
+                                            {hasBundleConfiguredDiscount && (
+                                                <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
+                                                    <span>Descuento configurado</span>
+                                                    <span>-{formatCurrency(bundleConfiguredDiscountAmount)}</span>
+                                                </div>
+                                            )}
                                             <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-slate-900 dark:text-white">
                                                 <span>Precio del kit hoy</span>
                                                 <span style={{ color: accentColor }}>{formatCurrency(currentPrice)}</span>
                                             </div>
                                             {savingsAmount > 0 && (
                                                 <div className="mt-1 text-right text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                    🎉 Ahorras {formatCurrency(savingsAmount)} ({(savingsAmount / compareAtPrice * 100).toFixed(0)}% descuento)
+                                                    🎉 Ahorras {formatCurrency(savingsAmount)} ({compareAtPrice ? (savingsAmount / compareAtPrice * 100).toFixed(0) : 0}% descuento)
                                                 </div>
                                             )}
                                         </>

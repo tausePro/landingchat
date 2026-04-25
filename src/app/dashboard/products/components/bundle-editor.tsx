@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -25,8 +26,10 @@ interface BundleEditorProps {
     onChange: (items: BundleItem[]) => void
     discountType: 'fixed' | 'percentage' | null
     discountValue: number
+    discountEndsAt: string
     onDiscountTypeChange: (type: 'fixed' | 'percentage' | null) => void
     onDiscountValueChange: (value: number) => void
+    onDiscountEndsAtChange: (value: string) => void
     organizationId: string
 }
 
@@ -35,8 +38,10 @@ export function BundleEditor({
     onChange,
     discountType,
     discountValue,
+    discountEndsAt,
     onDiscountTypeChange,
     onDiscountValueChange,
+    onDiscountEndsAtChange,
     organizationId
 }: BundleEditorProps) {
     const [products, setProducts] = useState<ProductOption[]>([])
@@ -156,11 +161,9 @@ export function BundleEditor({
                             return (
                                 <div key={item.product_id} className="flex items-center gap-4 p-3">
                                     {product.image_url && (
-                                        <img
-                                            src={product.image_url}
-                                            alt={product.name}
-                                            className="w-12 h-12 object-cover rounded"
-                                        />
+                                        <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-slate-100 dark:bg-slate-800">
+                                            <Image src={product.image_url} alt={product.name} fill className="object-cover" sizes="48px" />
+                                        </span>
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-text-light-primary dark:text-text-dark-primary truncate">
@@ -207,12 +210,16 @@ export function BundleEditor({
 
             {/* Discount Configuration */}
             {items.length > 0 && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-2">
                         <Label>Tipo de Descuento</Label>
                         <Select
                             value={discountType || "none"}
-                            onValueChange={(v) => onDiscountTypeChange(v === 'none' ? null : v as 'fixed' | 'percentage')}
+                            onValueChange={(v) => {
+                                const nextType = v === 'none' ? null : v as 'fixed' | 'percentage'
+                                onDiscountTypeChange(nextType)
+                                if (!nextType) onDiscountEndsAtChange("")
+                            }}
                         >
                             <SelectTrigger>
                                 <SelectValue />
@@ -236,6 +243,20 @@ export function BundleEditor({
                                 value={discountValue}
                                 onChange={(e) => onDiscountValueChange(parseFloat(e.target.value) || 0)}
                             />
+                        </div>
+                    )}
+                    {discountType && (
+                        <div className="space-y-2">
+                            <Label htmlFor="bundle-discount-ends-at">Finaliza el Descuento</Label>
+                            <Input
+                                id="bundle-discount-ends-at"
+                                type="datetime-local"
+                                value={discountEndsAt}
+                                onChange={(e) => onDiscountEndsAtChange(e.target.value)}
+                            />
+                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                                Opcional. Activa la cuenta regresiva en la tienda.
+                            </p>
                         </div>
                     )}
                 </div>

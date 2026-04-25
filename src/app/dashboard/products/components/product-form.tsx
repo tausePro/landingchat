@@ -28,6 +28,23 @@ interface ProductFormProps {
 
 type ProductFormSection = "info" | "pricing" | "variants" | "content" | "advanced" | "seo"
 
+function toDateTimeLocalInputValue(value?: string | null): string {
+    if (!value) return ""
+
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ""
+
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    return localDate.toISOString().slice(0, 16)
+}
+
+function toNullableIsoDateTime(value: string): string | null {
+    if (!value) return null
+
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
 export function ProductForm({ organizationId, storeSlug = "", initialData, isEditing = false }: ProductFormProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
@@ -77,6 +94,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
     const [bundleItems, setBundleItems] = useState<BundleItem[]>(initialData?.bundle_items || [])
     const [bundleDiscountType, setBundleDiscountType] = useState<'fixed' | 'percentage' | null>(initialData?.bundle_discount_type || null)
     const [bundleDiscountValue, setBundleDiscountValue] = useState(initialData?.bundle_discount_value ?? 0)
+    const [bundleDiscountEndsAt, setBundleDiscountEndsAt] = useState(toDateTimeLocalInputValue(initialData?.bundle_discount_ends_at))
 
     // Price tiers state (precios por cantidad/mayoreo)
     const [hasQuantityPricing, setHasQuantityPricing] = useState(initialData?.has_quantity_pricing ?? false)
@@ -157,6 +175,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                 bundle_items: isBundle ? bundleItems : [],
                 bundle_discount_type: isBundle ? bundleDiscountType : undefined,
                 bundle_discount_value: isBundle ? bundleDiscountValue : 0,
+                bundle_discount_ends_at: isBundle ? toNullableIsoDateTime(bundleDiscountEndsAt) : null,
                 // Precios escalonados (mayoreo)
                 has_quantity_pricing: hasQuantityPricing,
                 price_tiers: hasQuantityPricing ? priceTiers : undefined,
@@ -453,6 +472,8 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                         discountValue={bundleDiscountValue}
                                         onDiscountTypeChange={setBundleDiscountType}
                                         onDiscountValueChange={setBundleDiscountValue}
+                                        discountEndsAt={bundleDiscountEndsAt}
+                                        onDiscountEndsAtChange={setBundleDiscountEndsAt}
                                         organizationId={organizationId}
                                     />
                                 </div>
