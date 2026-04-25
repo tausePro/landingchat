@@ -16,16 +16,24 @@ import { PriceTiersEditor } from "./price-tiers-editor"
 import { ProductStructuredContentEditor } from "./ProductStructuredContentEditor"
 import { BundleItem } from "@/types/product"
 import { enhanceProductDescription } from "../ai-actions"
+import { useIsSubdomain } from "@/hooks/use-is-subdomain"
+import { getProductUrl } from "@/lib/utils/store-urls"
 
 interface ProductFormProps {
     organizationId: string
+    storeSlug?: string
     initialData?: ProductData
     isEditing?: boolean
 }
 
-export function ProductForm({ organizationId, initialData, isEditing = false }: ProductFormProps) {
+type ProductFormSection = "info" | "pricing" | "variants" | "content" | "advanced" | "seo"
+
+export function ProductForm({ organizationId, storeSlug = "", initialData, isEditing = false }: ProductFormProps) {
     const router = useRouter()
+    const isSubdomain = useIsSubdomain()
     const [loading, setLoading] = useState(false)
+    const [activeSection, setActiveSection] = useState<ProductFormSection>("info")
+    const [sectionsRailOpen, setSectionsRailOpen] = useState(true)
 
     // Form state
     const [name, setName] = useState(initialData?.name || "")
@@ -96,6 +104,18 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
         }
         loadBadges()
     }, [])
+
+    const sections: Array<{ id: ProductFormSection; label: string; icon: string; configured?: boolean }> = [
+        { id: "info", label: "Información", icon: "edit_note", configured: Boolean(name.trim() && description.trim()) },
+        { id: "pricing", label: "Precio y stock", icon: "payments", configured: Boolean(price && stock !== "") },
+        { id: "variants", label: "Variantes", icon: "tune", configured: variants.length > 0 },
+        { id: "content", label: "Contenido", icon: "auto_stories", configured: Boolean(brand || benefits.length > 0 || specifications.length > 0 || faq.length > 0) },
+        { id: "advanced", label: "Avanzado", icon: "settings_suggest", configured: isBundle || hasQuantityPricing || subscriptionEnabled || isConfigurable },
+        { id: "seo", label: "SEO", icon: "search", configured: Boolean(metaTitle || metaDescription || keywords.length > 0) },
+    ]
+    const productStoreUrl = initialData && (storeSlug || isSubdomain)
+        ? getProductUrl(initialData.slug || initialData.id, isSubdomain, storeSlug)
+        : null
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -209,10 +229,55 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                 </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 flex flex-col gap-8">
+            <div className={`mt-8 grid grid-cols-1 gap-5 items-start ${sectionsRailOpen ? "xl:grid-cols-[11rem_minmax(0,1fr)_21rem] 2xl:grid-cols-[12rem_minmax(0,1fr)_22rem]" : "xl:grid-cols-[3.75rem_minmax(0,1fr)_21rem] 2xl:grid-cols-[3.75rem_minmax(0,1fr)_22rem]"}`}>
+                <aside className={`rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark xl:sticky xl:top-6 ${sectionsRailOpen ? "p-3" : "p-2"}`}>
+                    <div className={`flex items-center pb-3 ${sectionsRailOpen ? "justify-between px-2" : "justify-center"}`}>
+                        {sectionsRailOpen && (
+                            <div className="text-xs font-semibold uppercase tracking-wider text-text-light-secondary dark:text-text-dark-secondary">
+                                Secciones
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setSectionsRailOpen(!sectionsRailOpen)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-light-secondary transition-colors hover:bg-background-light hover:text-text-light-primary dark:text-text-dark-secondary dark:hover:bg-background-dark dark:hover:text-text-dark-primary"
+                            aria-label={sectionsRailOpen ? "Cerrar secciones" : "Abrir secciones"}
+                            title={sectionsRailOpen ? "Cerrar secciones" : "Abrir secciones"}
+                        >
+                            <span className="material-symbols-outlined text-lg">
+                                {sectionsRailOpen ? "keyboard_double_arrow_left" : "keyboard_double_arrow_right"}
+                            </span>
+                        </button>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto xl:flex-col xl:overflow-visible">
+                        {sections.map(section => {
+                            const isSelected = activeSection === section.id
+                            return (
+                                <button
+                                    key={section.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveSection(section.id)
+                                        if (section.id === "seo") setShowSeoSection(true)
+                                        document.getElementById(`product-section-${section.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                    }}
+                                    className={`relative flex shrink-0 items-center gap-2 rounded-lg py-2 text-left text-sm transition-colors xl:w-full ${sectionsRailOpen ? "px-3" : "justify-center px-2"} ${isSelected ? "bg-primary/10 font-semibold text-primary" : "text-text-light-primary hover:bg-background-light dark:text-text-dark-primary dark:hover:bg-background-dark"}`}
+                                    title={section.label}
+                                >
+                                    <span className="material-symbols-outlined text-lg">{section.icon}</span>
+                                    {sectionsRailOpen && <span>{section.label}</span>}
+                                    {section.configured && (
+                                        <span className={sectionsRailOpen ? "ml-auto h-1.5 w-1.5 rounded-full bg-primary" : "absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary"} />
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </aside>
+
+                <div className="min-w-0 flex flex-col gap-8">
                     {/* General Info */}
-                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <div id="product-section-info" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Información General</h2>
                         <div className="mt-6 grid grid-cols-1 gap-6">
                             <div>
@@ -286,7 +351,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     </div>
 
                     {/* Inventory & Pricing */}
-                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <div id="product-section-pricing" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Inventario y Precios</h2>
                         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -345,12 +410,10 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                             </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Advanced Options */}
-                <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
-                    <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Opciones Avanzadas</h2>
-                    <div className="mt-6 flex flex-col gap-4">
+                    {/* Advanced Options */}
+                    <div id="product-section-advanced" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                        <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Opciones Avanzadas</h2>
+                        <div className="mt-6 flex flex-col gap-4">
                         {/* Bundle/Combo Toggle */}
                         <div className="flex flex-col gap-4">
                             <div className="flex items-center justify-between">
@@ -564,10 +627,11 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                 </div>
                             )}
                         </div>
+                        </div>
                     </div>
 
                     {/* Attributes & Variants */}
-                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <div id="product-section-variants" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Atributos y Variantes</h2>
                         <div className="mt-6">
                             <VariantsEditor variants={variants} onChange={setVariants} productImages={images} />
@@ -575,19 +639,21 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     </div>
 
                     {/* SEO / Structured Content Editor */}
-                    <ProductStructuredContentEditor
-                        brand={brand}
-                        onBrandChange={setBrand}
-                        benefits={benefits}
-                        onBenefitsChange={setBenefits}
-                        specifications={specifications}
-                        onSpecificationsChange={setSpecifications}
-                        faq={faq}
-                        onFaqChange={setFaq}
-                    />
+                    <div id="product-section-content" className="scroll-mt-8">
+                        <ProductStructuredContentEditor
+                            brand={brand}
+                            onBrandChange={setBrand}
+                            benefits={benefits}
+                            onBenefitsChange={setBenefits}
+                            specifications={specifications}
+                            onSpecificationsChange={setSpecifications}
+                            faq={faq}
+                            onFaqChange={setFaq}
+                        />
+                    </div>
 
                     {/* SEO Section - Collapsible */}
-                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <div id="product-section-seo" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <button
                             type="button"
                             onClick={() => setShowSeoSection(!showSeoSection)}
@@ -706,7 +772,7 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                     </div>
                 </div>
 
-                <div className="lg:col-span-1 flex flex-col gap-8">
+                <div className="flex flex-col gap-8 xl:sticky xl:top-6">
                     {/* Images */}
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Imágenes del Producto</h2>
@@ -813,15 +879,17 @@ export function ProductForm({ organizationId, initialData, isEditing = false }: 
                                     <span className="material-symbols-outlined text-primary text-xl">done</span>
                                     {isFeatured ? 'Marcado como destacado' : 'Marcar como destacado'}
                                 </button>
-                                <a 
-                                    href={`/store/${organizationId}/producto/${initialData?.slug || initialData?.id}`} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="flex items-center gap-3 w-full p-3 rounded-lg border border-border-light hover:bg-background-light dark:border-border-dark dark:hover:bg-background-dark text-text-light-primary dark:text-text-dark-primary transition-colors text-sm font-medium"
-                                >
-                                    <span className="material-symbols-outlined text-primary text-xl">visibility</span>
-                                    Ver en la tienda
-                                </a>
+                                {productStoreUrl && (
+                                    <a
+                                        href={productStoreUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 w-full p-3 rounded-lg border border-border-light hover:bg-background-light dark:border-border-dark dark:hover:bg-background-dark text-text-light-primary dark:text-text-dark-primary transition-colors text-sm font-medium"
+                                    >
+                                        <span className="material-symbols-outlined text-primary text-xl">visibility</span>
+                                        Ver en la tienda
+                                    </a>
+                                )}
                                 <button 
                                     type="button" 
                                     onClick={async () => {
