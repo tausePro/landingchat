@@ -7,6 +7,7 @@
  */
 
 import crypto from "crypto"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 interface MetaConversionsConfig {
     pixelId: string
@@ -23,6 +24,8 @@ interface UserData {
     clientIpAddress?: string
     clientUserAgent?: string
     externalId?: string
+    fbc?: string
+    fbp?: string
 }
 
 interface PurchaseEventData {
@@ -84,6 +87,12 @@ function prepareUserData(userData: UserData): Record<string, string> {
     }
     if (userData.externalId) {
         prepared.external_id = hashData(userData.externalId)
+    }
+    if (userData.fbc) {
+        prepared.fbc = userData.fbc
+    }
+    if (userData.fbp) {
+        prepared.fbp = userData.fbp
     }
 
     return prepared
@@ -176,8 +185,10 @@ export async function trackServerPurchase(
         customerPhone?: string
         customerName?: string
         customerCity?: string
+        fbc?: string
+        fbp?: string
     },
-    supabase: any
+    supabase: SupabaseClient
 ): Promise<void> {
     try {
         // Obtener configuración de tracking de la organización
@@ -218,6 +229,8 @@ export async function trackServerPurchase(
                 city: order.customerCity,
                 country: "CO", // Default Colombia
                 externalId: order.id,
+                fbc: order.fbc,
+                fbp: order.fbp,
             },
             customData: {
                 currency: order.currency || "COP",

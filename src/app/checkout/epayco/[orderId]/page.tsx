@@ -68,6 +68,7 @@ export default async function EpaycoCheckoutPage({ params, searchParams }: PageP
     })
     const orderUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}`, orderAccessToken)
     const gatewayErrorUrl = appendStorefrontAccessParam(`${baseUrl}/order/${orderId}/error?reason=gateway_not_configured`, orderAccessToken)
+    const confirmationUrl = `${appUrl}/api/webhooks/payments/epayco?org=${organization.slug}`
 
     // 3. Verificar que la orden está pendiente de pago
     if (order.payment_status !== "pending") {
@@ -106,7 +107,7 @@ export default async function EpaycoCheckoutPage({ params, searchParams }: PageP
         
         // URLs de respuesta (usando dominio personalizado)
         responseUrl: orderUrl,
-        confirmationUrl: `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payments/epayco?org=${organization.slug}`,
+        confirmationUrl,
         
         // Información de la tienda
         storeName: organization.name || "Tienda",

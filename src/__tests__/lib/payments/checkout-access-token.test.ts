@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import crypto from "crypto"
 import { EpaycoGateway } from "@/lib/payments/epayco-gateway"
 import { WompiGateway } from "@/lib/payments/wompi-gateway"
 
@@ -74,5 +75,30 @@ describe("checkout access token propagation", () => {
             expect(checkoutUrl.searchParams.get("access")).toBe(accessToken)
             expect(checkoutUrl.pathname).toMatch(new RegExp(`/checkout/.+/${orderId}$`))
         }
+    })
+})
+
+describe("ePayco signature validation", () => {
+    it("validates x_signature with P_CUST_ID_CLIENTE and P_KEY separated by caret", () => {
+        const gateway = createEpaycoGateway()
+        const payload = {
+            x_ref_payco: "ref-payco-123",
+            x_transaction_id: "transaction-123",
+            x_amount: "25000.00",
+            x_currency_code: "COP",
+        }
+        const signature = crypto
+            .createHash("sha256")
+            .update([
+                "customer-id",
+                "private-key",
+                payload.x_ref_payco,
+                payload.x_transaction_id,
+                payload.x_amount,
+                payload.x_currency_code,
+            ].join("^"))
+            .digest("hex")
+
+        expect(gateway.validateWebhookSignature(payload, signature)).toBe(true)
     })
 })

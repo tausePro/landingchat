@@ -9,8 +9,26 @@ import { decrypt } from "@/lib/utils/encryption"
 import crypto from "crypto"
 import { logger } from "@/lib/logger"
 import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 const log = logger("webhooks/payments-epayco")
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getOptionalString(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function getEpaycoOrderAttribution(value: unknown): { fbc?: string; fbp?: string } {
+    if (!isRecord(value)) return {}
+
+    return {
+        fbc: getOptionalString(value.fbc) || getOptionalString(value._fbc),
+        fbp: getOptionalString(value.fbp) || getOptionalString(value._fbp),
+    }
+}
 
 interface EpaycoWebhookPayload {
     x_ref_payco: string
@@ -170,6 +188,20 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
                 return NextResponse.json({ received: true, duplicate: true })
             }
 
+            if (existingTx.order_id) {
+                const isPaymentDataValid = await validateEpaycoOrderPaymentData(supabase, existingTx.order_id, org.id, payload)
+                if (!isPaymentDataValid) {
+                    await logWebhook(supabase, "epayco", "error", payload, {
+                        error: "Payment amount or currency mismatch",
+                        orderId: existingTx.order_id,
+                    })
+                    return NextResponse.json(
+                        { error: "Payment data mismatch" },
+                        { status: 400 }
+                    )
+                }
+            }
+
             // Actualizar transacción existente
             await supabase
                 .from("store_transactions")
@@ -203,6 +235,20 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
 
             if (txByRef) {
                 const shouldReplayOrderSideEffects = txByRef.status !== status
+
+                if (txByRef.order_id) {
+                    const isPaymentDataValid = await validateEpaycoOrderPaymentData(supabase, txByRef.order_id, org.id, payload)
+                    if (!isPaymentDataValid) {
+                        await logWebhook(supabase, "epayco", "error", payload, {
+                            error: "Payment amount or currency mismatch",
+                            orderId: txByRef.order_id,
+                        })
+                        return NextResponse.json(
+                            { error: "Payment data mismatch" },
+                            { status: 400 }
+                        )
+                    }
+                }
 
                 // Actualizar con el ID de transacción del proveedor
                 await supabase
@@ -245,6 +291,20 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
                     .eq("organization_id", org.id)
                     .single()
 
+                if (order) {
+                    const isPaymentDataValid = await validateEpaycoOrderPaymentData(supabase, order.id, org.id, payload)
+                    if (!isPaymentDataValid) {
+                        await logWebhook(supabase, "epayco", "error", payload, {
+                            error: "Payment amount or currency mismatch",
+                            orderId: order.id,
+                        })
+                        return NextResponse.json(
+                            { error: "Payment data mismatch" },
+                            { status: 400 }
+                        )
+                    }
+                }
+
                 // Crear nueva transacción con el order_id si encontramos la orden
                 const { data: newTx } = await supabase
                     .from("store_transactions")
@@ -264,7 +324,6 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
                     .select("id")
                     .single()
 
-                // Si encontramos la orden, actualizarla
                 if (order) {
                     await processOrderUpdate(supabase, order.id, status, org.id)
                 }
@@ -297,7 +356,7 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
  * Procesa la actualización de una orden basada en el estado del pago
  */
 async function processOrderUpdate(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseClient,
     orderId: string,
     status: "pending" | "approved" | "declined" | "voided" | "error",
     organizationId: string
@@ -305,13 +364,13 @@ async function processOrderUpdate(
     const paymentStatus =
         status === "approved"
             ? "paid"
-            : status === "declined"
+            : status === "declined" || status === "error"
                 ? "failed"
                 : status === "voided"
                     ? "refunded"
                     : "pending"
 
-    const orderStatus = status === "approved" ? "confirmed" : status === "declined" ? "cancelled" : undefined
+    const orderStatus = status === "approved" ? "confirmed" : status === "declined" || status === "error" ? "cancelled" : undefined
 
     // Fase 0.4 post-mortem (hotfix v1.10.58): removimos `confirmed_at` del
     // UPDATE porque la columna NO existe en `public.orders` y el UPDATE entero
@@ -352,6 +411,7 @@ async function processOrderUpdate(
                     total,
                     items,
                     customer_info,
+                    utm_data,
                     customers(name, email, phone)
                 `)
                 .eq("id", orderId)
@@ -366,6 +426,7 @@ async function processOrderUpdate(
                     phone?: string
                     city?: string
                 } | null
+                const attribution = getEpaycoOrderAttribution(order.utm_data)
 
                 // Items del jsonb (formato de transformCartItemsToOrderItems)
                 const itemsJsonb = Array.isArray(order.items)
@@ -434,6 +495,8 @@ async function processOrderUpdate(
                             customerPhone: customer?.phone || customerInfo?.phone,
                             customerName: customer?.name || customerInfo?.name,
                             customerCity: customerInfo?.city,
+                            fbc: attribution.fbc,
+                            fbp: attribution.fbp,
                         },
                         supabase
                     )
@@ -455,12 +518,52 @@ async function processOrderUpdate(
     }
 }
 
+async function validateEpaycoOrderPaymentData(
+    supabase: SupabaseClient,
+    orderId: string,
+    organizationId: string,
+    payload: EpaycoWebhookPayload
+): Promise<boolean> {
+    const { data: order, error } = await supabase
+        .from("orders")
+        .select("id, total")
+        .eq("id", orderId)
+        .eq("organization_id", organizationId)
+        .single()
+
+    if (error || !order) {
+        log.error("Order not found for ePayco payment validation", {
+            orderId,
+            organizationId,
+            error: error?.message,
+        })
+        return false
+    }
+
+    const expectedAmount = Math.round(Number(order.total) * 100)
+    const paidAmount = Math.round(Number.parseFloat(payload.x_amount) * 100)
+    const currency = payload.x_currency_code?.trim().toUpperCase()
+    const isValid = Number.isFinite(paidAmount) && expectedAmount === paidAmount && currency === "COP"
+
+    if (!isValid) {
+        log.error("Invalid ePayco payment data", {
+            orderId,
+            organizationId,
+            expectedAmount,
+            paidAmount,
+            currency,
+        })
+    }
+
+    return isValid
+}
+
 /**
  * Registra el evento del webhook en la tabla webhook_logs
  * Columnas reales: webhook_type, event_type, instance_name, payload, headers, processing_result, error_message
  */
 async function logWebhook(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseClient,
     webhookType: string,
     processingResult: string,
     payload: unknown,
