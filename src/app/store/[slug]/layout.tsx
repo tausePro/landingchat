@@ -28,7 +28,7 @@ export async function generateMetadata(
     const { name, favicon_url, seo_title, seo_description, seo_keywords } = organization
 
     return {
-        title: seo_title || `${name} | LandingChat Store`,
+        title: seo_title || name,
         description: seo_description || `Bienvenido a la tienda de ${name}.`,
         keywords: seo_keywords ? seo_keywords.split(",") : undefined,
         icons: {
@@ -37,9 +37,10 @@ export async function generateMetadata(
             apple: favicon_url || "/apple-touch-icon.png",
         },
         openGraph: {
-            title: seo_title || `${name} | LandingChat Store`,
+            title: seo_title || name,
             description: seo_description || `Bienvenido a la tienda de ${name}.`,
             images: organization.logo_url ? [organization.logo_url] : [],
+            siteName: name,
         }
     }
 }
