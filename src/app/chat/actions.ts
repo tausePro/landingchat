@@ -53,11 +53,20 @@ interface CreateOrderParams {
     sourceChannel?: "web" | "chat" | "whatsapp"
     chatId?: string
     utmData?: {
+        captured_at?: string
         utm_source?: string
         utm_medium?: string
         utm_campaign?: string
         utm_content?: string
         utm_term?: string
+        utm_id?: string
+        utm_source_platform?: string
+        campaign_id?: string
+        adset_id?: string
+        ad_id?: string
+        fbclid?: string
+        fbc?: string
+        fbp?: string
         referrer?: string
     }
 }
