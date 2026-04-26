@@ -12,6 +12,23 @@ import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
 
 const log = logger("webhooks/payments/wompi")
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getOptionalString(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function getWompiOrderAttribution(value: unknown): { fbc?: string; fbp?: string } {
+    if (!isRecord(value)) return {}
+
+    return {
+        fbc: getOptionalString(value.fbc) || getOptionalString(value._fbc),
+        fbp: getOptionalString(value.fbp) || getOptionalString(value._fbp),
+    }
+}
+
 interface WompiWebhookPayload {
     event: string
     data: {
@@ -323,6 +340,7 @@ async function processOrderUpdate(
                     total,
                     items,
                     customer_info,
+                    utm_data,
                     customers(name, email, phone)
                 `)
                 .eq("id", orderId)
@@ -336,7 +354,9 @@ async function processOrderUpdate(
                     email?: string
                     phone?: string
                     city?: string
+                    state?: string
                 } | null
+                const attribution = getWompiOrderAttribution(order.utm_data)
 
                 // Items del jsonb (formato de transformCartItemsToOrderItems)
                 const itemsJsonb = Array.isArray(order.items)
@@ -344,6 +364,7 @@ async function processOrderUpdate(
                         product_id?: string | null
                         product_name?: string | null
                         quantity?: number | null
+                        unit_price?: number | null
                     }>)
                     : []
 
@@ -404,11 +425,15 @@ async function processOrderUpdate(
                                 .map((item) => ({
                                     productId: item.product_id as string,
                                     quantity: item.quantity as number,
+                                    unitPrice: typeof item.unit_price === "number" ? item.unit_price : undefined,
                                 })),
                             customerEmail: customer?.email || customerInfo?.email,
                             customerPhone: customer?.phone || customerInfo?.phone,
                             customerName: customer?.name || customerInfo?.name,
                             customerCity: customerInfo?.city,
+                            customerState: customerInfo?.state,
+                            fbc: attribution.fbc,
+                            fbp: attribution.fbp,
                         },
                         supabase
                     )

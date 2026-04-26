@@ -40,6 +40,7 @@ interface OrderItemJsonb {
     product_id?: string | null
     product_name?: string | null
     quantity?: number | null
+    unit_price?: number | null
 }
 
 interface CustomerInfoJsonb {
@@ -47,6 +48,7 @@ interface CustomerInfoJsonb {
     email?: string | null
     phone?: string | null
     city?: string | null
+    state?: string | null
 }
 
 interface CustomerRow {
@@ -253,11 +255,13 @@ async function runApprovedOrderSideEffects(params: {
                     .map((item) => ({
                         productId: item.product_id as string,
                         quantity: item.quantity as number,
+                        unitPrice: typeof item.unit_price === "number" ? item.unit_price : undefined,
                     })),
                 customerEmail: customer?.email || customerInfo?.email || undefined,
                 customerPhone: customer?.phone || customerInfo?.phone || undefined,
                 customerName: customer?.name || customerInfo?.name || undefined,
                 customerCity: customerInfo?.city || undefined,
+                customerState: customerInfo?.state || undefined,
                 fbc: attribution.fbc,
                 fbp: attribution.fbp,
             },

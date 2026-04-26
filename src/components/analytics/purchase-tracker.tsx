@@ -6,7 +6,16 @@ import { useTracking } from "./tracking-provider"
 interface PurchaseTrackerProps {
     orderId: string
     orderTotal: number
-    orderItems?: Array<{ id: string; name: string; quantity: number; price: number }>
+    orderItems?: Array<{
+        id?: string
+        product_id?: string
+        productId?: string
+        name?: string
+        product_name?: string
+        quantity?: number
+        price?: number
+        unit_price?: number
+    }>
     currency?: string
 }
 
@@ -23,7 +32,9 @@ export function PurchaseTracker({
         // Evitar tracking duplicado
         if (hasTracked.current) return
         
-        const contentIds = orderItems.map(item => item.id)
+        const contentIds = orderItems
+            .map(item => item.product_id || item.productId || item.id)
+            .filter((id): id is string => typeof id === "string" && id.length > 0)
         
         // Función para intentar trackear
         const attemptTrack = () => {

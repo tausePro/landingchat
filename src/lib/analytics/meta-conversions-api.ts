@@ -20,6 +20,7 @@ interface UserData {
     firstName?: string
     lastName?: string
     city?: string
+    state?: string
     country?: string
     clientIpAddress?: string
     clientUserAgent?: string
@@ -37,6 +38,7 @@ interface PurchaseEventData {
         currency: string
         value: number
         contentIds?: string[]
+        contents?: Array<{ id: string; quantity: number; item_price?: number }>
         contentType?: string
         orderId?: string
         numItems?: number
@@ -53,6 +55,14 @@ function hashData(data: string): string {
         .digest("hex")
 }
 
+function normalizeMetaPhone(phone: string): string {
+    const digits = phone.replace(/\D/g, "")
+    if (digits.length === 10 && digits.startsWith("3")) {
+        return `57${digits}`
+    }
+    return digits
+}
+
 /**
  * Prepara los datos del usuario hasheados para Meta
  */
@@ -63,9 +73,7 @@ function prepareUserData(userData: UserData): Record<string, string> {
         prepared.em = hashData(userData.email)
     }
     if (userData.phone) {
-        // Normalizar teléfono: solo números
-        const normalizedPhone = userData.phone.replace(/\D/g, "")
-        prepared.ph = hashData(normalizedPhone)
+        prepared.ph = hashData(normalizeMetaPhone(userData.phone))
     }
     if (userData.firstName) {
         prepared.fn = hashData(userData.firstName)
@@ -75,6 +83,9 @@ function prepareUserData(userData: UserData): Record<string, string> {
     }
     if (userData.city) {
         prepared.ct = hashData(userData.city)
+    }
+    if (userData.state) {
+        prepared.st = hashData(userData.state)
     }
     if (userData.country) {
         prepared.country = hashData(userData.country)
@@ -127,6 +138,7 @@ export async function sendPurchaseEvent(
                     currency: eventData.customData.currency,
                     value: eventData.customData.value,
                     content_ids: eventData.customData.contentIds,
+                    contents: eventData.customData.contents,
                     content_type: eventData.customData.contentType || "product",
                     order_id: eventData.customData.orderId,
                     num_items: eventData.customData.numItems,
@@ -180,11 +192,12 @@ export async function trackServerPurchase(
         orderNumber?: string
         total: number
         currency?: string
-        items?: Array<{ productId: string; quantity: number }>
+        items?: Array<{ productId: string; quantity: number; unitPrice?: number }>
         customerEmail?: string
         customerPhone?: string
         customerName?: string
         customerCity?: string
+        customerState?: string
         fbc?: string
         fbp?: string
     },
@@ -223,6 +236,7 @@ export async function trackServerPurchase(
         const nameParts = order.customerName?.split(" ") || []
         const firstName = nameParts[0]
         const lastName = nameParts.slice(1).join(" ")
+        const validItems = order.items?.filter((item) => item.productId && item.quantity > 0) || []
 
         const eventData: PurchaseEventData = {
             eventId: `purchase_${order.id}`,
@@ -234,6 +248,7 @@ export async function trackServerPurchase(
                 firstName,
                 lastName,
                 city: order.customerCity,
+                state: order.customerState,
                 country: "CO", // Default Colombia
                 externalId: order.id,
                 fbc: order.fbc,
@@ -242,10 +257,15 @@ export async function trackServerPurchase(
             customData: {
                 currency: order.currency || "COP",
                 value: order.total,
-                contentIds: order.items?.map((item) => item.productId),
+                contentIds: validItems.map((item) => item.productId),
+                contents: validItems.map((item) => ({
+                    id: item.productId,
+                    quantity: item.quantity,
+                    item_price: item.unitPrice,
+                })),
                 contentType: "product",
                 orderId: order.orderNumber || order.id,
-                numItems: order.items?.reduce((sum, item) => sum + item.quantity, 0),
+                numItems: validItems.reduce((sum, item) => sum + item.quantity, 0),
             },
         }
 
