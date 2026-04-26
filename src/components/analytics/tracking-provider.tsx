@@ -3,6 +3,7 @@
 import { createContext, useContext, ReactNode, useMemo } from "react"
 import { useMetaPixel } from "./meta-pixel"
 import { usePosthogTracking } from "./use-posthog-tracking"
+import { getTrackingParams } from "@/hooks/use-tracking-params"
 
 export interface TrackingContextType {
     trackViewContent: (contentId: string, contentName: string, value?: number, currency?: string) => void
@@ -25,6 +26,45 @@ const noopTracking: TrackingContextType = {
 }
 
 const TrackingContext = createContext<TrackingContextType | null>(null)
+
+type MetaFunnelEventName = "ViewContent" | "AddToCart" | "InitiateCheckout"
+
+function createMetaEventId(eventName: MetaFunnelEventName): string {
+    return `${eventName.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function sendMetaCapiFunnelEvent(params: {
+    slug?: string
+    eventName: MetaFunnelEventName
+    eventId: string
+    customData: {
+        currency: string
+        value: number
+        contentIds?: string[]
+        contents?: Array<{ id: string; quantity: number; item_price?: number }>
+        contentType: string
+    }
+}) {
+    if (!params.slug || typeof window === "undefined") {
+        return
+    }
+
+    const trackingParams = getTrackingParams(params.slug)
+
+    void fetch(`/api/store/${encodeURIComponent(params.slug)}/meta-capi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+            eventName: params.eventName,
+            eventId: params.eventId,
+            eventSourceUrl: window.location.href,
+            fbc: trackingParams.fbc,
+            fbp: trackingParams.fbp,
+            customData: params.customData,
+        }),
+    }).catch(() => undefined)
+}
 
 interface TrackingProviderProps {
     children: ReactNode
@@ -60,20 +100,62 @@ export function TrackingProvider({
 
         return {
             trackViewContent: (contentId, contentName, value, currency) => {
+                const eventId = createMetaEventId("ViewContent")
+                const resolvedCurrency = currency || "COP"
+                const resolvedValue = value || 0
                 if (metaPixelEnabled) {
-                    metaPixel.trackViewContent(contentId, contentName, value, currency)
+                    metaPixel.trackViewContent(contentId, contentName, value, currency, eventId)
+                    sendMetaCapiFunnelEvent({
+                        slug: organizationSlug,
+                        eventName: "ViewContent",
+                        eventId,
+                        customData: {
+                            currency: resolvedCurrency,
+                            value: resolvedValue,
+                            contentIds: [contentId],
+                            contents: [{ id: contentId, quantity: 1, item_price: resolvedValue }],
+                            contentType: "product",
+                        },
+                    })
                 }
                 posthogTracking.trackViewContent(contentId, contentName, value, currency)
             },
             trackAddToCart: (contentId, contentName, value, currency) => {
+                const eventId = createMetaEventId("AddToCart")
+                const resolvedCurrency = currency || "COP"
                 if (metaPixelEnabled) {
-                    metaPixel.trackAddToCart(contentId, contentName, value, currency)
+                    metaPixel.trackAddToCart(contentId, contentName, value, currency, eventId)
+                    sendMetaCapiFunnelEvent({
+                        slug: organizationSlug,
+                        eventName: "AddToCart",
+                        eventId,
+                        customData: {
+                            currency: resolvedCurrency,
+                            value,
+                            contentIds: [contentId],
+                            contents: [{ id: contentId, quantity: 1, item_price: value }],
+                            contentType: "product",
+                        },
+                    })
                 }
                 posthogTracking.trackAddToCart(contentId, contentName, value, currency)
             },
             trackInitiateCheckout: (value, currency, contentIds) => {
+                const eventId = createMetaEventId("InitiateCheckout")
+                const resolvedCurrency = currency || "COP"
                 if (metaPixelEnabled) {
-                    metaPixel.trackInitiateCheckout(value, currency, contentIds)
+                    metaPixel.trackInitiateCheckout(value, currency, contentIds, eventId)
+                    sendMetaCapiFunnelEvent({
+                        slug: organizationSlug,
+                        eventName: "InitiateCheckout",
+                        eventId,
+                        customData: {
+                            currency: resolvedCurrency,
+                            value,
+                            contentIds,
+                            contentType: "product",
+                        },
+                    })
                 }
                 posthogTracking.trackInitiateCheckout(value, currency, contentIds)
             },
@@ -97,7 +179,7 @@ export function TrackingProvider({
                 }
             },
         }
-    }, [metaPixelEnabled, metaPixel, posthogTracking, posthogEnabled])
+    }, [metaPixelEnabled, metaPixel, posthogTracking, organizationSlug, posthogEnabled])
 
 
     return (

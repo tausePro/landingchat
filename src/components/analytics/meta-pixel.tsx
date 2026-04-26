@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import Image from "next/image"
 import Script from "next/script"
 
 interface MetaPixelProps {
@@ -10,8 +11,8 @@ interface MetaPixelProps {
 // Declarar tipos globales para Meta Pixel
 declare global {
     interface Window {
-        fbq?: (...args: any[]) => void
-        _fbq?: (...args: any[]) => void
+        fbq?: (...args: unknown[]) => void
+        _fbq?: (...args: unknown[]) => void
     }
 }
 
@@ -49,9 +50,10 @@ export function MetaPixel({ pixelId }: MetaPixelProps) {
             />
             {/* Noscript fallback */}
             <noscript>
-                <img
+                <Image
                     height="1"
                     width="1"
+                    unoptimized
                     style={{ display: "none" }}
                     src={`https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`}
                     alt=""
@@ -63,13 +65,17 @@ export function MetaPixel({ pixelId }: MetaPixelProps) {
 
 // Hook para trackear eventos de Meta Pixel
 export function useMetaPixel() {
-    const trackEvent = (eventName: string, parameters?: Record<string, any>) => {
+    const trackEvent = (eventName: string, parameters?: Record<string, unknown>, eventId?: string) => {
         if (typeof window !== "undefined" && window.fbq) {
+            if (eventId) {
+                window.fbq("track", eventName, parameters, { eventID: eventId })
+                return
+            }
             window.fbq("track", eventName, parameters)
         }
     }
 
-    const trackCustomEvent = (eventName: string, parameters?: Record<string, any>) => {
+    const trackCustomEvent = (eventName: string, parameters?: Record<string, unknown>) => {
         if (typeof window !== "undefined" && window.fbq) {
             window.fbq("trackCustom", eventName, parameters)
         }
@@ -79,31 +85,31 @@ export function useMetaPixel() {
         trackEvent,
         trackCustomEvent,
         // Eventos específicos de e-commerce
-        trackViewContent: (contentId: string, contentName: string, value?: number, currency = "COP") => {
+        trackViewContent: (contentId: string, contentName: string, value?: number, currency = "COP", eventId?: string) => {
             trackEvent("ViewContent", {
                 content_ids: [contentId],
                 content_name: contentName,
                 content_type: "product",
                 value: value,
                 currency: currency,
-            })
+            }, eventId)
         },
-        trackAddToCart: (contentId: string, contentName: string, value: number, currency = "COP") => {
+        trackAddToCart: (contentId: string, contentName: string, value: number, currency = "COP", eventId?: string) => {
             trackEvent("AddToCart", {
                 content_ids: [contentId],
                 content_name: contentName,
                 content_type: "product",
                 value: value,
                 currency: currency,
-            })
+            }, eventId)
         },
-        trackInitiateCheckout: (value: number, currency = "COP", contentIds?: string[]) => {
+        trackInitiateCheckout: (value: number, currency = "COP", contentIds?: string[], eventId?: string) => {
             trackEvent("InitiateCheckout", {
                 value: value,
                 currency: currency,
                 content_ids: contentIds,
                 content_type: "product",
-            })
+            }, eventId)
         },
         trackPurchase: (value: number, currency = "COP", contentIds?: string[], orderId?: string) => {
             if (typeof window !== "undefined" && window.fbq) {
