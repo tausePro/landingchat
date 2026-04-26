@@ -9,12 +9,14 @@
 import crypto from "crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-interface MetaConversionsConfig {
+export interface MetaConversionsConfig {
     pixelId: string
     accessToken: string
 }
 
-interface UserData {
+export type MetaCapiEventName = "ViewContent" | "AddToCart" | "InitiateCheckout" | "Purchase"
+
+export interface UserData {
     email?: string
     phone?: string
     firstName?: string
@@ -29,7 +31,8 @@ interface UserData {
     fbp?: string
 }
 
-interface PurchaseEventData {
+export interface MetaCapiEventData {
+    eventName: MetaCapiEventName
     eventId: string
     eventTime: number
     eventSourceUrl?: string
@@ -44,6 +47,8 @@ interface PurchaseEventData {
         numItems?: number
     }
 }
+
+type PurchaseEventData = Omit<MetaCapiEventData, "eventName">
 
 /**
  * Hash de datos para Meta (SHA256)
@@ -112,9 +117,9 @@ function prepareUserData(userData: UserData): Record<string, string> {
 /**
  * Envía evento Purchase a Meta Conversions API
  */
-export async function sendPurchaseEvent(
+export async function sendMetaCapiEvent(
     config: MetaConversionsConfig,
-    eventData: PurchaseEventData
+    eventData: MetaCapiEventData
 ): Promise<{ success: boolean; error?: string }> {
     const { pixelId, accessToken } = config
 
@@ -128,7 +133,7 @@ export async function sendPurchaseEvent(
     const payload = {
         data: [
             {
-                event_name: "Purchase",
+                event_name: eventData.eventName,
                 event_time: eventData.eventTime,
                 event_id: eventData.eventId,
                 event_source_url: eventData.eventSourceUrl,
@@ -166,6 +171,7 @@ export async function sendPurchaseEvent(
         }
 
         console.log("[Meta CAPI] Purchase event sent successfully:", {
+            eventName: eventData.eventName,
             eventId: eventData.eventId,
             orderId: eventData.customData.orderId,
             value: eventData.customData.value,
@@ -180,6 +186,16 @@ export async function sendPurchaseEvent(
             error: error instanceof Error ? error.message : "Unknown error" 
         }
     }
+}
+
+export async function sendPurchaseEvent(
+    config: MetaConversionsConfig,
+    eventData: PurchaseEventData
+): Promise<{ success: boolean; error?: string }> {
+    return sendMetaCapiEvent(config, {
+        eventName: "Purchase",
+        ...eventData,
+    })
 }
 
 /**
