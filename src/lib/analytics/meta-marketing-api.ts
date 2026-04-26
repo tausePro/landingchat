@@ -13,10 +13,17 @@ export interface MetaAdAccount {
     account_status: number
 }
 
+type MetaCampaignStatus = 'ACTIVE' | 'PAUSED' | 'DELETED' | 'ARCHIVED'
+export type MetaDatePreset = 'today' | 'yesterday' | 'this_week' | 'last_7d' | 'last_14d' | 'last_30d' | 'last_90d' | 'this_month' | 'last_month'
+type MetaAction = {
+    action_type: string
+    value: string
+}
+
 export interface MetaCampaign {
     id: string
     name: string
-    status: 'ACTIVE' | 'PAUSED' | 'DELETED' | 'ARCHIVED'
+    status: MetaCampaignStatus
     objective: string
     created_time: string
     updated_time: string
@@ -32,12 +39,13 @@ export interface MetaCampaignInsights {
     cpc: number
     cpm: number
     ctr: number
-    actions?: Array<{
-        action_type: string
-        value: string
-    }>
+    actions?: MetaAction[]
     date_start: string
     date_stop: string
+    campaign_status?: MetaCampaignStatus
+    objective?: string
+    created_time?: string
+    updated_time?: string
 }
 
 export interface MetaDailyInsight {
@@ -90,6 +98,70 @@ export interface MetaAdsConfig {
 
 const META_API_VERSION = 'v22.0'
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
+
+interface MetaCampaignInsightApiItem {
+    campaign_id?: string
+    campaign_name?: string
+    impressions?: string
+    clicks?: string
+    spend?: string
+    reach?: string
+    cpc?: string
+    cpm?: string
+    ctr?: string
+    actions?: MetaAction[]
+    date_start?: string
+    date_stop?: string
+}
+
+const parseIntegerMetric = (value: string | undefined) => parseInt(value || '0')
+const parseDecimalMetric = (value: string | undefined) => parseFloat(value || '0')
+
+export function isMetaConversionAction(actionType: string): boolean {
+    const normalized = actionType.toLowerCase()
+    return normalized.includes('purchase') || normalized.includes('lead') || normalized.includes('complete_registration')
+}
+
+function sumConversionActions(actions: MetaAction[] | undefined): number {
+    return (actions || [])
+        .filter((action) => isMetaConversionAction(action.action_type))
+        .reduce((sum, action) => sum + parseIntegerMetric(action.value), 0)
+}
+
+export function createEmptyCampaignInsight(
+    campaign: MetaCampaign,
+    dates: { dateStart?: string; dateEnd?: string } = {}
+): MetaCampaignInsights {
+    return {
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        impressions: 0,
+        clicks: 0,
+        spend: 0,
+        reach: 0,
+        cpc: 0,
+        cpm: 0,
+        ctr: 0,
+        actions: [],
+        date_start: dates.dateStart || '',
+        date_stop: dates.dateEnd || '',
+        campaign_status: campaign.status,
+        objective: campaign.objective,
+        created_time: campaign.created_time,
+        updated_time: campaign.updated_time,
+    }
+}
+
+function mergeCampaignMetadata(insight: MetaCampaignInsights, campaign: MetaCampaign): MetaCampaignInsights {
+    return {
+        ...insight,
+        campaign_name: insight.campaign_name || campaign.name,
+        campaign_status: campaign.status,
+        objective: campaign.objective,
+        created_time: campaign.created_time,
+        updated_time: campaign.updated_time,
+    }
+}
 
 /**
  * Obtiene las cuentas publicitarias del usuario
@@ -158,7 +230,7 @@ export async function getCampaigns(config: MetaAdsConfig): Promise<{
 export async function getCampaignInsights(
     config: MetaAdsConfig,
     options?: {
-        datePreset?: 'today' | 'yesterday' | 'this_week' | 'last_7d' | 'last_14d' | 'last_30d' | 'this_month' | 'last_month'
+        datePreset?: MetaDatePreset
         dateStart?: string // YYYY-MM-DD
         dateEnd?: string   // YYYY-MM-DD
         campaignIds?: string[]
@@ -200,19 +272,19 @@ export async function getCampaignInsights(
         }
 
         // Transformar datos
-        const insights: MetaCampaignInsights[] = (result.data || []).map((item: any) => ({
-            campaign_id: item.campaign_id,
-            campaign_name: item.campaign_name,
-            impressions: parseInt(item.impressions || '0'),
-            clicks: parseInt(item.clicks || '0'),
-            spend: parseFloat(item.spend || '0'),
-            reach: parseInt(item.reach || '0'),
-            cpc: parseFloat(item.cpc || '0'),
-            cpm: parseFloat(item.cpm || '0'),
-            ctr: parseFloat(item.ctr || '0'),
+        const insights: MetaCampaignInsights[] = ((result.data || []) as MetaCampaignInsightApiItem[]).map((item) => ({
+            campaign_id: item.campaign_id || '',
+            campaign_name: item.campaign_name || '',
+            impressions: parseIntegerMetric(item.impressions),
+            clicks: parseIntegerMetric(item.clicks),
+            spend: parseDecimalMetric(item.spend),
+            reach: parseIntegerMetric(item.reach),
+            cpc: parseDecimalMetric(item.cpc),
+            cpm: parseDecimalMetric(item.cpm),
+            ctr: parseDecimalMetric(item.ctr),
             actions: item.actions,
-            date_start: item.date_start,
-            date_stop: item.date_stop,
+            date_start: item.date_start || '',
+            date_stop: item.date_stop || '',
         }))
 
         return { success: true, data: insights }
@@ -231,7 +303,7 @@ export async function getCampaignDailyInsights(
     config: MetaAdsConfig,
     campaignId: string,
     options?: {
-        datePreset?: string
+        datePreset?: MetaDatePreset
         dateStart?: string
         dateEnd?: string
     }
@@ -264,18 +336,16 @@ export async function getCampaignDailyInsights(
 
         const data: MetaDailyInsight[] = (result.data || []).map((item: Record<string, string | Array<{action_type: string, value: string}>>) => {
             const actions = (item.actions as Array<{action_type: string, value: string}> | undefined) || []
-            const conversions = actions
-                .filter((a) => ['purchase', 'complete_registration', 'lead'].includes(a.action_type))
-                .reduce((sum, a) => sum + parseInt(a.value || '0'), 0)
+            const conversions = sumConversionActions(actions)
             return {
                 date: item.date_start as string,
-                impressions: parseInt((item.impressions as string) || '0'),
-                clicks: parseInt((item.clicks as string) || '0'),
-                spend: parseFloat((item.spend as string) || '0'),
-                reach: parseInt((item.reach as string) || '0'),
-                cpc: parseFloat((item.cpc as string) || '0'),
-                cpm: parseFloat((item.cpm as string) || '0'),
-                ctr: parseFloat((item.ctr as string) || '0'),
+                impressions: parseIntegerMetric(item.impressions as string | undefined),
+                clicks: parseIntegerMetric(item.clicks as string | undefined),
+                spend: parseDecimalMetric(item.spend as string | undefined),
+                reach: parseIntegerMetric(item.reach as string | undefined),
+                cpc: parseDecimalMetric(item.cpc as string | undefined),
+                cpm: parseDecimalMetric(item.cpm as string | undefined),
+                ctr: parseDecimalMetric(item.ctr as string | undefined),
                 conversions,
             }
         })
@@ -293,7 +363,7 @@ export async function getCampaignAdSets(
     config: MetaAdsConfig,
     campaignId: string,
     options?: {
-        datePreset?: string
+        datePreset?: MetaDatePreset
         dateStart?: string
         dateEnd?: string
     }
@@ -326,18 +396,16 @@ export async function getCampaignAdSets(
 
         const data: MetaAdSet[] = (result.data || []).map((item: Record<string, string | Array<{action_type: string, value: string}>>) => {
             const actions = (item.actions as Array<{action_type: string, value: string}> | undefined) || []
-            const conversions = actions
-                .filter((a) => ['purchase', 'complete_registration', 'lead'].includes(a.action_type))
-                .reduce((sum, a) => sum + parseInt(a.value || '0'), 0)
+            const conversions = sumConversionActions(actions)
             return {
                 adset_id: item.adset_id as string,
                 adset_name: item.adset_name as string,
-                impressions: parseInt((item.impressions as string) || '0'),
-                clicks: parseInt((item.clicks as string) || '0'),
-                spend: parseFloat((item.spend as string) || '0'),
-                reach: parseInt((item.reach as string) || '0'),
-                cpc: parseFloat((item.cpc as string) || '0'),
-                ctr: parseFloat((item.ctr as string) || '0'),
+                impressions: parseIntegerMetric(item.impressions as string | undefined),
+                clicks: parseIntegerMetric(item.clicks as string | undefined),
+                spend: parseDecimalMetric(item.spend as string | undefined),
+                reach: parseIntegerMetric(item.reach as string | undefined),
+                cpc: parseDecimalMetric(item.cpc as string | undefined),
+                ctr: parseDecimalMetric(item.ctr as string | undefined),
                 conversions,
             }
         })
@@ -355,7 +423,7 @@ export async function getCampaignAds(
     config: MetaAdsConfig,
     campaignId: string,
     options?: {
-        datePreset?: string
+        datePreset?: MetaDatePreset
         dateStart?: string
         dateEnd?: string
     }
@@ -388,19 +456,17 @@ export async function getCampaignAds(
 
         const data: MetaAd[] = (result.data || []).map((item: Record<string, string | Array<{action_type: string, value: string}>>) => {
             const actions = (item.actions as Array<{action_type: string, value: string}> | undefined) || []
-            const conversions = actions
-                .filter((a) => ['purchase', 'complete_registration', 'lead'].includes(a.action_type))
-                .reduce((sum, a) => sum + parseInt(a.value || '0'), 0)
+            const conversions = sumConversionActions(actions)
             return {
                 ad_id: item.ad_id as string,
                 ad_name: item.ad_name as string,
                 adset_name: item.adset_name as string,
-                impressions: parseInt((item.impressions as string) || '0'),
-                clicks: parseInt((item.clicks as string) || '0'),
-                spend: parseFloat((item.spend as string) || '0'),
-                reach: parseInt((item.reach as string) || '0'),
-                cpc: parseFloat((item.cpc as string) || '0'),
-                ctr: parseFloat((item.ctr as string) || '0'),
+                impressions: parseIntegerMetric(item.impressions as string | undefined),
+                clicks: parseIntegerMetric(item.clicks as string | undefined),
+                spend: parseDecimalMetric(item.spend as string | undefined),
+                reach: parseIntegerMetric(item.reach as string | undefined),
+                cpc: parseDecimalMetric(item.cpc as string | undefined),
+                ctr: parseDecimalMetric(item.ctr as string | undefined),
                 conversions,
             }
         })
@@ -545,7 +611,7 @@ export async function getAdCreatives(
  */
 export async function getCampaignsSummary(
     config: MetaAdsConfig,
-    datePreset: string = 'last_7d',
+    datePreset: MetaDatePreset = 'last_7d',
     options?: { dateStart?: string; dateEnd?: string }
 ): Promise<{
     success: boolean
@@ -562,14 +628,43 @@ export async function getCampaignsSummary(
 }> {
     const insightOptions = options?.dateStart && options?.dateEnd
         ? { dateStart: options.dateStart, dateEnd: options.dateEnd }
-        : { datePreset: datePreset as any }
-    const insightsResult = await getCampaignInsights(config, insightOptions)
+        : { datePreset }
+    const [campaignsResult, insightsResult] = await Promise.all([
+        getCampaigns(config),
+        getCampaignInsights(config, insightOptions),
+    ])
     
     if (!insightsResult.success || !insightsResult.data) {
         return { success: false, error: insightsResult.error }
     }
 
-    const campaigns = insightsResult.data
+    if (!campaignsResult.success || !campaignsResult.data) {
+        return { success: false, error: campaignsResult.error }
+    }
+
+    const insightsByCampaignId = new Map(
+        insightsResult.data
+            .filter((insight) => insight.campaign_id)
+            .map((insight) => [insight.campaign_id, insight])
+    )
+    const campaignsById = new Map(campaignsResult.data.map((campaign) => [campaign.id, campaign]))
+    const activeOrMeasuredCampaigns = campaignsResult.data
+        .filter((campaign) => campaign.status === 'ACTIVE' || insightsByCampaignId.has(campaign.id))
+        .map((campaign) => {
+            const insight = insightsByCampaignId.get(campaign.id)
+            return insight
+                ? mergeCampaignMetadata(insight, campaign)
+                : createEmptyCampaignInsight(campaign, options)
+        })
+    const insightsWithoutCampaignMetadata = insightsResult.data.filter(
+        (insight) => insight.campaign_id && !campaignsById.has(insight.campaign_id)
+    )
+    const campaigns = [...activeOrMeasuredCampaigns, ...insightsWithoutCampaignMetadata]
+        .sort((a, b) => {
+            if (a.campaign_status === 'ACTIVE' && b.campaign_status !== 'ACTIVE') return -1
+            if (a.campaign_status !== 'ACTIVE' && b.campaign_status === 'ACTIVE') return 1
+            return b.spend - a.spend
+        })
     
     const summary = {
         totalSpend: campaigns.reduce((sum, c) => sum + c.spend, 0),
