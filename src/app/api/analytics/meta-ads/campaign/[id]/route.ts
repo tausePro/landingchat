@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getCampaigns, getCampaignInsights, getCampaignDailyInsights, getCampaignAdSets, getCampaignAds, getAdCreatives, MetaAdsConfig } from "@/lib/analytics/meta-marketing-api"
-
-type DatePresetValue = 'today' | 'yesterday' | 'this_week' | 'last_7d' | 'last_14d' | 'last_30d' | 'this_month' | 'last_month'
+import { createEmptyCampaignInsight, getCampaigns, getCampaignInsights, getCampaignDailyInsights, getCampaignAdSets, getCampaignAds, getAdCreatives, type MetaDatePreset } from "@/lib/analytics/meta-marketing-api"
 
 async function getMetaConfig(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
     const { data: profile } = await supabase
@@ -21,13 +19,15 @@ async function getMetaConfig(supabase: Awaited<ReturnType<typeof createClient>>,
 
     const trackingConfig = org?.tracking_config as {
         meta_access_token?: string
+        meta_marketing_access_token?: string
         meta_ad_account_id?: string
     } | null
+    const marketingAccessToken = trackingConfig?.meta_marketing_access_token || trackingConfig?.meta_access_token
 
-    if (!trackingConfig?.meta_access_token || !trackingConfig?.meta_ad_account_id) return null
+    if (!marketingAccessToken || !trackingConfig?.meta_ad_account_id) return null
 
     return {
-        accessToken: trackingConfig.meta_access_token,
+        accessToken: marketingAccessToken,
         adAccountId: trackingConfig.meta_ad_account_id,
     }
 }
@@ -55,7 +55,7 @@ export async function GET(
         const dateStart = searchParams.get("date_start") || undefined
         const dateEnd = searchParams.get("date_end") || undefined
 
-        const typedPreset = datePreset as DatePresetValue
+        const typedPreset = datePreset as MetaDatePreset
         const dateOptions = dateStart && dateEnd ? { dateStart, dateEnd } : { datePreset: typedPreset }
 
         // Obtener datos en paralelo
@@ -69,7 +69,7 @@ export async function GET(
 
         // Buscar info básica de la campaña
         const campaign = campaignsResult.data?.find((c) => c.id === campaignId) || null
-        const summary = summaryResult.data?.[0] || null
+        const summary = summaryResult.data?.[0] || (campaign ? createEmptyCampaignInsight(campaign, { dateStart, dateEnd }) : null)
         const rawAds = adsResult.data || []
 
         // Enriquecer ads con creativos via Batch API (1 sola request)

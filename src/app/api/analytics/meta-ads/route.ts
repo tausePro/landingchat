@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getCampaignsSummary, getCampaigns } from "@/lib/analytics/meta-marketing-api"
+import { getCampaignsSummary, type MetaDatePreset } from "@/lib/analytics/meta-marketing-api"
 
 export async function GET(request: NextRequest) {
     try {
@@ -31,14 +31,16 @@ export async function GET(request: NextRequest) {
 
         const trackingConfig = org?.tracking_config as {
             meta_access_token?: string
+            meta_marketing_access_token?: string
             meta_ad_account_id?: string
         } | null
+        const marketingAccessToken = trackingConfig?.meta_marketing_access_token || trackingConfig?.meta_access_token
 
-        if (!trackingConfig?.meta_access_token || !trackingConfig?.meta_ad_account_id) {
+        if (!marketingAccessToken || !trackingConfig?.meta_ad_account_id) {
             return NextResponse.json({ 
                 error: "Meta Ads not configured",
                 configured: false,
-                message: "Configura tu Meta Access Token y Ad Account ID en Configuración > Tracking"
+                message: "Configura tu Meta Marketing API Token y Ad Account ID en Configuración > Tracking"
             }, { status: 400 })
         }
 
@@ -51,10 +53,10 @@ export async function GET(request: NextRequest) {
         // Obtener resumen de campañas
         const result = await getCampaignsSummary(
             {
-                accessToken: trackingConfig.meta_access_token,
+                accessToken: marketingAccessToken,
                 adAccountId: trackingConfig.meta_ad_account_id,
             },
-            datePreset,
+            datePreset as MetaDatePreset,
             dateStart && dateEnd ? { dateStart, dateEnd } : undefined
         )
 

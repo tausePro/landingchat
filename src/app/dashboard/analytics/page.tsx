@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AnalyticsCharts } from "./components/analytics-charts"
@@ -278,7 +278,7 @@ async function getAnalyticsData() {
         trackingEnabled: {
             posthog: Boolean(org.tracking_config?.posthog_enabled),
             metaPixel: Boolean(org.tracking_config?.meta_pixel_id),
-            metaCapi: Boolean(org.tracking_config?.meta_access_token),
+            metaCapi: Boolean(org.tracking_config?.meta_capi_access_token || org.tracking_config?.meta_access_token),
         },
         topProducts,
         lowStockProducts,

@@ -198,14 +198,21 @@ export async function trackServerPurchase(
             .eq("id", organizationId)
             .single()
 
-        if (!org?.tracking_config?.meta_pixel_id || !org?.tracking_config?.meta_access_token) {
+        const trackingConfig = org?.tracking_config as {
+            meta_pixel_id?: string
+            meta_capi_access_token?: string
+            meta_access_token?: string
+        } | null
+        const capiAccessToken = trackingConfig?.meta_capi_access_token || trackingConfig?.meta_access_token
+
+        if (!org || !trackingConfig?.meta_pixel_id || !capiAccessToken) {
             console.log("[Meta CAPI] Organization does not have Meta CAPI configured, skipping")
             return
         }
 
         const config: MetaConversionsConfig = {
-            pixelId: org.tracking_config.meta_pixel_id,
-            accessToken: org.tracking_config.meta_access_token,
+            pixelId: trackingConfig.meta_pixel_id,
+            accessToken: capiAccessToken,
         }
 
         // Construir URL del evento

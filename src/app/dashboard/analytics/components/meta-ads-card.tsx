@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 interface CampaignInsight {
     campaign_id: string
     campaign_name: string
+    campaign_status?: string
     impressions: number
     clicks: number
     spend: number
@@ -48,9 +49,10 @@ export function MetaAdsCard() {
     const [datePreset, setDatePreset] = useState<DatePreset>("last_30d")
     const [customStart, setCustomStart] = useState("")
     const [customEnd, setCustomEnd] = useState("")
+    const [appliedCustomStart, setAppliedCustomStart] = useState("")
+    const [appliedCustomEnd, setAppliedCustomEnd] = useState("")
     const [showCustom, setShowCustom] = useState(false)
     const [dateLabel, setDateLabel] = useState("30d")
-    const [fetchTrigger, setFetchTrigger] = useState(0)
 
     useEffect(() => {
         async function fetchData() {
@@ -58,8 +60,8 @@ export function MetaAdsCard() {
             setError(null)
             try {
                 let url = `/api/analytics/meta-ads?date_preset=${datePreset}`
-                if (datePreset === "custom" && customStart && customEnd) {
-                    url = `/api/analytics/meta-ads?date_start=${customStart}&date_end=${customEnd}`
+                if (datePreset === "custom" && appliedCustomStart && appliedCustomEnd) {
+                    url = `/api/analytics/meta-ads?date_start=${appliedCustomStart}&date_end=${appliedCustomEnd}`
                 }
                 const res = await fetch(url)
                 const json = await res.json()
@@ -82,7 +84,7 @@ export function MetaAdsCard() {
             }
         }
         fetchData()
-    }, [datePreset, fetchTrigger])
+    }, [datePreset, appliedCustomStart, appliedCustomEnd])
 
     function handlePreset(preset: Exclude<DatePreset, "custom">) {
         setShowCustom(false)
@@ -92,9 +94,10 @@ export function MetaAdsCard() {
 
     function handleCustomApply() {
         if (customStart && customEnd) {
+            setAppliedCustomStart(customStart)
+            setAppliedCustomEnd(customEnd)
             setDatePreset("custom")
             setDateLabel(`${customStart} → ${customEnd}`)
-            setFetchTrigger((t) => t + 1)
         }
     }
 
@@ -107,6 +110,12 @@ export function MetaAdsCard() {
 
     const formatNumber = (n: number) =>
         new Intl.NumberFormat("es-CO").format(n)
+
+    const sortedCampaigns = [...(data?.campaigns || [])].sort((a, b) => {
+        if (a.campaign_status === "ACTIVE" && b.campaign_status !== "ACTIVE") return -1
+        if (a.campaign_status !== "ACTIVE" && b.campaign_status === "ACTIVE") return 1
+        return b.spend - a.spend
+    })
 
     // Estado: No configurado
     if (!configured) {
@@ -124,7 +133,7 @@ export function MetaAdsCard() {
                         <span className="material-symbols-outlined text-5xl mb-3 block text-blue-300">link_off</span>
                         <p className="font-medium">Meta Ads no configurado</p>
                         <p className="text-sm mt-2 max-w-md mx-auto">
-                            Para ver tus campañas, configura tu <strong>Meta Access Token</strong> y{" "}
+                            Para ver tus campañas, configura tu <strong>Meta Marketing API Token</strong> y{" "}
                             <strong>Ad Account ID</strong> en Configuración &gt; Tracking.
                         </p>
                     </div>
@@ -213,7 +222,7 @@ export function MetaAdsCard() {
                             </button>
                         </div>
                     </div>
-                    <CardDescription>Sin campañas activas en este período</CardDescription>
+                    <CardDescription>Sin campañas disponibles</CardDescription>
                     {showCustom && (
                         <div className="flex items-center gap-2 mt-2">
                             <input
@@ -242,8 +251,8 @@ export function MetaAdsCard() {
                 <CardContent>
                     <div className="text-center py-8 text-muted-foreground">
                         <span className="material-symbols-outlined text-4xl mb-2 block">info</span>
-                        <p className="text-sm">No se encontraron campañas con datos en el período: {dateLabel}.</p>
-                        <p className="text-xs mt-1">Prueba seleccionando otro rango de fechas.</p>
+                        <p className="text-sm">No se encontraron campañas para el período: {dateLabel}.</p>
+                        <p className="text-xs mt-1">Si hay campañas activas en Meta, revisa el token de Marketing API y el Ad Account ID.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -337,22 +346,27 @@ export function MetaAdsCard() {
                 </div>
 
                 {/* Campaigns Table */}
-                {data.campaigns.length > 1 && (
+                {data.campaigns.length > 0 && (
                     <div>
                         <h4 className="text-sm font-medium text-muted-foreground mb-3">
                             Campañas ({data.campaigns.length})
                         </h4>
                         <div className="space-y-2">
-                            {data.campaigns
-                                .sort((a, b) => b.spend - a.spend)
-                                .map((campaign) => (
+                            {sortedCampaigns.map((campaign) => (
                                     <div
                                         key={campaign.campaign_id}
                                         onClick={() => router.push(`/dashboard/analytics/campaign/${campaign.campaign_id}`)}
                                         className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                     >
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{campaign.campaign_name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium truncate">{campaign.campaign_name}</p>
+                                                {campaign.campaign_status === "ACTIVE" && (
+                                                    <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                        Activa
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                                                 <span>{formatCurrency(campaign.spend)}</span>
                                                 <span>{formatNumber(campaign.impressions)} imp.</span>
