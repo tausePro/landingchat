@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +33,8 @@ interface OrganizationFormProps {
 const fallbackTrackingConfig: OrganizationTrackingConfig = {
     meta_pixel_id: "",
     meta_access_token: "",
+    meta_capi_access_token: "",
+    meta_marketing_access_token: "",
     meta_ad_account_id: "",
     google_analytics_id: "",
     tiktok_pixel_id: "",
@@ -45,6 +48,13 @@ const fallbackSettings: OrganizationSettingsOverrides = {
 }
 
 export function OrganizationForm({ organization }: OrganizationFormProps) {
+    const trackingConfig = (organization.tracking_config as OrganizationTrackingConfig | null) || {}
+    const initialTrackingConfig: OrganizationTrackingConfig = {
+        ...fallbackTrackingConfig,
+        ...trackingConfig,
+        meta_capi_access_token: trackingConfig.meta_capi_access_token || trackingConfig.meta_access_token || "",
+        meta_marketing_access_token: trackingConfig.meta_marketing_access_token || "",
+    }
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
         name: organization.name,
@@ -56,7 +66,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         seo_title: organization.seo_title || "",
         seo_description: organization.seo_description || "",
         seo_keywords: organization.seo_keywords || "",
-        tracking_config: (organization.tracking_config as OrganizationTrackingConfig) || fallbackTrackingConfig,
+        tracking_config: initialTrackingConfig,
         settings: (organization.settings as OrganizationSettingsOverrides) || fallbackSettings,
     })
 
@@ -73,8 +83,8 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         try {
             await updateOrganization(formData)
             alert("Organización actualizada correctamente")
-        } catch (error: any) {
-            alert(`Error: ${error.message}`)
+        } catch (error: unknown) {
+            alert(`Error: ${error instanceof Error ? error.message : "No se pudo actualizar la organización"}`)
         } finally {
             setLoading(false)
         }
@@ -212,9 +222,11 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         {formData.logo_url && (
                                             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                                 <p className="text-xs text-muted-foreground mb-2">Logo actual:</p>
-                                                <img
+                                                <Image
                                                     src={formData.logo_url}
                                                     alt="Logo actual"
+                                                    width={160}
+                                                    height={48}
                                                     className="h-12 w-auto object-contain"
                                                 />
                                             </div>
@@ -231,9 +243,11 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         {formData.favicon_url && (
                                             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                                 <p className="text-xs text-muted-foreground mb-2">Favicon actual:</p>
-                                                <img
+                                                <Image
                                                     src={formData.favicon_url}
                                                     alt="Favicon actual"
+                                                    width={32}
+                                                    height={32}
                                                     className="h-8 w-8 object-contain"
                                                 />
                                             </div>
@@ -298,25 +312,41 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label htmlFor="metaPixel">Meta Pixel ID (Facebook)</Label>
+                                            <Label htmlFor="metaPixel">Meta Dataset / Pixel ID</Label>
                                             <Input
                                                 id="metaPixel"
-                                                value={formData.tracking_config.meta_pixel_id}
+                                                value={formData.tracking_config.meta_pixel_id || ""}
                                                 onChange={(e) => updateTrackingConfig("meta_pixel_id", e.target.value)}
                                                 placeholder="Ej: 123456789012345"
                                             />
+                                            <p className="text-xs text-muted-foreground">
+                                                ID del conjunto de datos/píxel usado por Meta Events Manager.
+                                            </p>
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="metaAccessToken">Meta Conversions API Token</Label>
+                                            <Label htmlFor="metaCapiAccessToken">Meta CAPI Token (compras)</Label>
                                             <Input
-                                                id="metaAccessToken"
+                                                id="metaCapiAccessToken"
                                                 type="password"
-                                                value={formData.tracking_config.meta_access_token || ""}
-                                                onChange={(e) => updateTrackingConfig("meta_access_token", e.target.value)}
+                                                value={formData.tracking_config.meta_capi_access_token || ""}
+                                                onChange={(e) => updateTrackingConfig("meta_capi_access_token", e.target.value)}
                                                 placeholder="EAAxxxxxxx..."
                                             />
                                             <p className="text-xs text-muted-foreground">
-                                                Token para tracking server-side de compras. Obtener en Meta Business Suite → Events Manager.
+                                                Token del dataset para enviar compras server-side por Conversions API.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="metaMarketingAccessToken">Meta Marketing API Token</Label>
+                                            <Input
+                                                id="metaMarketingAccessToken"
+                                                type="password"
+                                                value={formData.tracking_config.meta_marketing_access_token || ""}
+                                                onChange={(e) => updateTrackingConfig("meta_marketing_access_token", e.target.value)}
+                                                placeholder="EAAxxxxxxx..."
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Token con permisos de lectura de anuncios para campañas, conjuntos y resultados.
                                             </p>
                                         </div>
                                         <div className="space-y-2">

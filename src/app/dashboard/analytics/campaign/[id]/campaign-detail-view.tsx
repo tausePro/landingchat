@@ -124,6 +124,11 @@ const objectiveLabels: Record<string, string> = {
     VIDEO_VIEWS: "Vistas de video",
 }
 
+function isMetaConversionAction(actionType: string): boolean {
+    const normalized = actionType.toLowerCase()
+    return normalized.includes("purchase") || normalized.includes("lead") || normalized.includes("complete_registration")
+}
+
 export function CampaignDetailView({ campaignId }: { campaignId: string }) {
     const router = useRouter()
     const [data, setData] = useState<CampaignDetailData | null>(null)
@@ -153,7 +158,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                 : `Últimos ${datePreset.replace("last_", "").replace("d", " días").replace("_month", " mes")}`
 
         const conversions = data.summary?.actions
-            ?.filter((a) => ["purchase", "complete_registration", "lead"].includes(a.action_type))
+            ?.filter((a) => isMetaConversionAction(a.action_type))
             .reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0
 
         try {
@@ -251,7 +256,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
     const formatDate = (dateStr: string) => formatBogotaDayKey(dateStr + "T00:00:00")
 
     const totalConversions = data?.summary?.actions
-        ?.filter((a) => ["purchase", "complete_registration", "lead"].includes(a.action_type))
+        ?.filter((a) => isMetaConversionAction(a.action_type))
         .reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0
 
     const chartData = data?.daily.map((d) => ({
