@@ -425,6 +425,7 @@ async function processOrderUpdate(
                     email?: string
                     phone?: string
                     city?: string
+                    state?: string
                 } | null
                 const attribution = getEpaycoOrderAttribution(order.utm_data)
 
@@ -434,6 +435,7 @@ async function processOrderUpdate(
                         product_id?: string | null
                         product_name?: string | null
                         quantity?: number | null
+                        unit_price?: number | null
                     }>)
                     : []
 
@@ -490,11 +492,13 @@ async function processOrderUpdate(
                                 .map((item) => ({
                                     productId: item.product_id as string,
                                     quantity: item.quantity as number,
+                                    unitPrice: typeof item.unit_price === "number" ? item.unit_price : undefined,
                                 })),
                             customerEmail: customer?.email || customerInfo?.email,
                             customerPhone: customer?.phone || customerInfo?.phone,
                             customerName: customer?.name || customerInfo?.name,
                             customerCity: customerInfo?.city,
+                            customerState: customerInfo?.state,
                             fbc: attribution.fbc,
                             fbp: attribution.fbp,
                         },

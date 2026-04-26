@@ -9,17 +9,20 @@
 import crypto from "crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-interface MetaConversionsConfig {
+export interface MetaConversionsConfig {
     pixelId: string
     accessToken: string
 }
 
-interface UserData {
+export type MetaCapiEventName = "ViewContent" | "AddToCart" | "InitiateCheckout" | "Purchase"
+
+export interface UserData {
     email?: string
     phone?: string
     firstName?: string
     lastName?: string
     city?: string
+    state?: string
     country?: string
     clientIpAddress?: string
     clientUserAgent?: string
@@ -28,7 +31,8 @@ interface UserData {
     fbp?: string
 }
 
-interface PurchaseEventData {
+export interface MetaCapiEventData {
+    eventName: MetaCapiEventName
     eventId: string
     eventTime: number
     eventSourceUrl?: string
@@ -37,11 +41,14 @@ interface PurchaseEventData {
         currency: string
         value: number
         contentIds?: string[]
+        contents?: Array<{ id: string; quantity: number; item_price?: number }>
         contentType?: string
         orderId?: string
         numItems?: number
     }
 }
+
+type PurchaseEventData = Omit<MetaCapiEventData, "eventName">
 
 /**
  * Hash de datos para Meta (SHA256)
@@ -51,6 +58,14 @@ function hashData(data: string): string {
         .createHash("sha256")
         .update(data.toLowerCase().trim())
         .digest("hex")
+}
+
+function normalizeMetaPhone(phone: string): string {
+    const digits = phone.replace(/\D/g, "")
+    if (digits.length === 10 && digits.startsWith("3")) {
+        return `57${digits}`
+    }
+    return digits
 }
 
 /**
@@ -63,9 +78,7 @@ function prepareUserData(userData: UserData): Record<string, string> {
         prepared.em = hashData(userData.email)
     }
     if (userData.phone) {
-        // Normalizar teléfono: solo números
-        const normalizedPhone = userData.phone.replace(/\D/g, "")
-        prepared.ph = hashData(normalizedPhone)
+        prepared.ph = hashData(normalizeMetaPhone(userData.phone))
     }
     if (userData.firstName) {
         prepared.fn = hashData(userData.firstName)
@@ -75,6 +88,9 @@ function prepareUserData(userData: UserData): Record<string, string> {
     }
     if (userData.city) {
         prepared.ct = hashData(userData.city)
+    }
+    if (userData.state) {
+        prepared.st = hashData(userData.state)
     }
     if (userData.country) {
         prepared.country = hashData(userData.country)
@@ -101,9 +117,9 @@ function prepareUserData(userData: UserData): Record<string, string> {
 /**
  * Envía evento Purchase a Meta Conversions API
  */
-export async function sendPurchaseEvent(
+export async function sendMetaCapiEvent(
     config: MetaConversionsConfig,
-    eventData: PurchaseEventData
+    eventData: MetaCapiEventData
 ): Promise<{ success: boolean; error?: string }> {
     const { pixelId, accessToken } = config
 
@@ -117,7 +133,7 @@ export async function sendPurchaseEvent(
     const payload = {
         data: [
             {
-                event_name: "Purchase",
+                event_name: eventData.eventName,
                 event_time: eventData.eventTime,
                 event_id: eventData.eventId,
                 event_source_url: eventData.eventSourceUrl,
@@ -127,6 +143,7 @@ export async function sendPurchaseEvent(
                     currency: eventData.customData.currency,
                     value: eventData.customData.value,
                     content_ids: eventData.customData.contentIds,
+                    contents: eventData.customData.contents,
                     content_type: eventData.customData.contentType || "product",
                     order_id: eventData.customData.orderId,
                     num_items: eventData.customData.numItems,
@@ -154,6 +171,7 @@ export async function sendPurchaseEvent(
         }
 
         console.log("[Meta CAPI] Purchase event sent successfully:", {
+            eventName: eventData.eventName,
             eventId: eventData.eventId,
             orderId: eventData.customData.orderId,
             value: eventData.customData.value,
@@ -170,6 +188,16 @@ export async function sendPurchaseEvent(
     }
 }
 
+export async function sendPurchaseEvent(
+    config: MetaConversionsConfig,
+    eventData: PurchaseEventData
+): Promise<{ success: boolean; error?: string }> {
+    return sendMetaCapiEvent(config, {
+        eventName: "Purchase",
+        ...eventData,
+    })
+}
+
 /**
  * Helper para enviar Purchase desde webhook de pago
  */
@@ -180,11 +208,12 @@ export async function trackServerPurchase(
         orderNumber?: string
         total: number
         currency?: string
-        items?: Array<{ productId: string; quantity: number }>
+        items?: Array<{ productId: string; quantity: number; unitPrice?: number }>
         customerEmail?: string
         customerPhone?: string
         customerName?: string
         customerCity?: string
+        customerState?: string
         fbc?: string
         fbp?: string
     },
@@ -223,6 +252,7 @@ export async function trackServerPurchase(
         const nameParts = order.customerName?.split(" ") || []
         const firstName = nameParts[0]
         const lastName = nameParts.slice(1).join(" ")
+        const validItems = order.items?.filter((item) => item.productId && item.quantity > 0) || []
 
         const eventData: PurchaseEventData = {
             eventId: `purchase_${order.id}`,
@@ -234,6 +264,7 @@ export async function trackServerPurchase(
                 firstName,
                 lastName,
                 city: order.customerCity,
+                state: order.customerState,
                 country: "CO", // Default Colombia
                 externalId: order.id,
                 fbc: order.fbc,
@@ -242,10 +273,15 @@ export async function trackServerPurchase(
             customData: {
                 currency: order.currency || "COP",
                 value: order.total,
-                contentIds: order.items?.map((item) => item.productId),
+                contentIds: validItems.map((item) => item.productId),
+                contents: validItems.map((item) => ({
+                    id: item.productId,
+                    quantity: item.quantity,
+                    item_price: item.unitPrice,
+                })),
                 contentType: "product",
                 orderId: order.orderNumber || order.id,
-                numItems: order.items?.reduce((sum, item) => sum + item.quantity, 0),
+                numItems: validItems.reduce((sum, item) => sum + item.quantity, 0),
             },
         }
 
