@@ -7,6 +7,7 @@ export interface ExpandLegacyVariantsInput {
   baseStock?: number | null
   baseSku?: string | null
   baseImageUrl?: string | null
+  baseIsActive?: boolean | null
   legacyVariants: ProductVariant[]
 }
 
@@ -184,6 +185,7 @@ export function expandLegacyVariantsToVariantDrafts(
   const baseStock = Math.floor(normalizeNonNegativeNumber(input.baseStock) ?? 0)
   const baseTitle = input.productName?.trim() || "Default"
   const baseImageUrl = input.baseImageUrl?.trim() || null
+  const baseIsActive = input.baseIsActive ?? true
   const normalizedVariants = input.legacyVariants
     .map((variant) => normalizeLegacyVariant(variant))
     .filter((variant): variant is NormalizedLegacyVariant => variant !== null)
@@ -194,7 +196,7 @@ export function expandLegacyVariantsToVariantDrafts(
       sku: input.baseSku?.trim() || null,
       position: 0,
       is_default: true,
-      is_active: true,
+      is_active: baseIsActive,
       price: basePrice,
       compare_at_price: baseCompareAtPrice,
       stock_quantity: baseStock,
@@ -211,7 +213,7 @@ export function expandLegacyVariantsToVariantDrafts(
       sku: position === 0 ? input.baseSku?.trim() || null : null,
       position,
       is_default: position === 0,
-      is_active: true,
+      is_active: baseIsActive,
       price,
       compare_at_price: resolveCompareAtPrice(baseCompareAtPrice, price, normalizedVariants, optionValues),
       stock_quantity: resolveStock(baseStock, normalizedVariants, optionValues),

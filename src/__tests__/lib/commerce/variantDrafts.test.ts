@@ -154,4 +154,19 @@ describe("expandLegacyVariantsToVariantDrafts", () => {
 
     expect(result[0]?.stock_quantity).toBe(2)
   })
+
+  it("propaga estado inactivo del producto a los drafts", () => {
+    const result = expandLegacyVariantsToVariantDrafts({
+      ...baseInput,
+      baseIsActive: false,
+      legacyVariants: [
+        {
+          type: "Color",
+          values: ["Rojo", "Azul"],
+        },
+      ],
+    })
+
+    expect(result.every((variant) => variant.is_active === false)).toBe(true)
+  })
 })
