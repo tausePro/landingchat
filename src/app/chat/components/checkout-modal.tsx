@@ -502,70 +502,111 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         }).format(price)
     }
 
+    const checkoutSteps = [
+        { key: "contact", label: "Datos" },
+        { key: "payment", label: "Pago" },
+        { key: "success", label: "Listo" },
+    ]
+    const currentStepIndex = checkoutSteps.findIndex(item => item.key === step)
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] w-[95vw] bg-white dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden flex flex-col">
-                <DialogHeader className="flex-shrink-0">
-                    <DialogTitle>
+            <DialogContent className="max-h-[90vh] w-[95vw] bg-white dark:bg-slate-900 text-slate-900 dark:text-white overflow-hidden flex flex-col sm:max-w-[640px] lg:max-w-[860px]">
+                <DialogHeader className="flex-shrink-0 space-y-4">
+                    <DialogTitle className="text-xl">
                         {step === 'contact' && "Información de Envío"}
                         {step === 'payment' && "Pago y Confirmación"}
                         {step === 'success' && "¡Orden Recibida!"}
                     </DialogTitle>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                            {checkoutSteps.map((item, index) => (
+                                <div key={item.key} className="flex flex-1 items-center gap-2">
+                                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
+                                        index <= currentStepIndex
+                                            ? "border-primary bg-primary text-white"
+                                            : "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800"
+                                    }`}>
+                                        {index + 1}
+                                    </div>
+                                    <span className={index <= currentStepIndex ? "text-slate-900 dark:text-white" : ""}>{item.label}</span>
+                                    {index < checkoutSteps.length - 1 && <div className="hidden h-px flex-1 bg-slate-200 dark:bg-slate-700 sm:block" />}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                            {step === 'contact' && "Completa tus datos para confirmar disponibilidad de envío y preparar tu pedido."}
+                            {step === 'payment' && "Revisa el total final antes de confirmar. No cambiaremos el monto después de crear la orden."}
+                            {step === 'success' && "Tu orden quedó registrada. Conserva el enlace para consultar el estado."}
+                        </p>
+                    </div>
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto pr-2 -mr-2">
                     {step === 'contact' && (
-                        <form onSubmit={handleSubmitContact} className="space-y-4 py-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre Completo</Label>
-                                <Input
-                                    id="name"
-                                    name="name"
-                                    required
-                                    value={formData.name}
-                                    onChange={handleInputChange}
-                                    placeholder="Ej. Juan Pérez"
-                                    className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
-                                />
+                        <form onSubmit={handleSubmitContact} className="grid gap-4 py-4 lg:grid-cols-2 lg:items-start">
+                            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-900/20 dark:text-blue-200 lg:col-span-2">
+                                Usaremos estos datos solo para coordinar el envío, enviarte actualizaciones por WhatsApp y generar tu comprobante.
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Email <span className="text-gray-400 text-xs font-normal">(Opcional)</span>
-                                </Label>
-                                <Input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    placeholder="juan@ejemplo.com"
-                                    className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono (WhatsApp)</Label>
-                                <div className="flex">
-                                    <div className="inline-flex items-center justify-center px-4 rounded-l-xl border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium">
-                                        🇨🇴 +57
-                                    </div>
+                            <div className="space-y-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nombre completo</Label>
                                     <Input
-                                        id="phone"
-                                        name="phone"
-                                        type="tel"
+                                        id="name"
+                                        name="name"
                                         required
-                                        value={formData.phone}
+                                        autoComplete="name"
+                                        value={formData.name}
                                         onChange={handleInputChange}
-                                        placeholder="300 123 4567"
-                                        className="flex-1 h-12 rounded-l-none rounded-r-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                        placeholder="Ej. Juan Pérez"
+                                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                     />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Email <span className="text-gray-400 text-xs font-normal">(Opcional)</span>
+                                    </Label>
+                                    <Input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        autoComplete="email"
+                                        value={formData.email}
+                                        onChange={handleInputChange}
+                                        placeholder="juan@ejemplo.com"
+                                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">Teléfono (WhatsApp)</Label>
+                                    <div className="flex">
+                                        <div className="inline-flex items-center justify-center px-4 rounded-l-xl border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium">
+                                            🇨🇴 +57
+                                        </div>
+                                        <Input
+                                            id="phone"
+                                            name="phone"
+                                            type="tel"
+                                            required
+                                            autoComplete="tel-national"
+                                            inputMode="tel"
+                                            value={formData.phone}
+                                            onChange={handleInputChange}
+                                            placeholder="300 123 4567"
+                                            className="flex-1 h-12 rounded-l-none rounded-r-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Tax/Invoicing Fields */}
-                            <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-4">
+                            <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-4">
                                 <h4 className="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-dark mb-2 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-lg">receipt_long</span> Información de Facturación
                                 </h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Estos datos permiten emitir el comprobante de compra y evitar retrasos al crear la orden.
+                                </p>
 
                                 <div>
                                     <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">Documento de Identidad</Label>
@@ -586,6 +627,8 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                             id="document_number"
                                             name="document_number"
                                             required
+                                            autoComplete="off"
+                                            inputMode="numeric"
                                             value={formData.document_number}
                                             onChange={handleInputChange}
                                             placeholder="Número"
@@ -648,8 +691,11 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 )}
                             </div>
 
-                            <div>
+                            <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4">
                                 <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Ubicación</Label>
+                                <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+                                    Confirmamos la cobertura de envío con tu ciudad antes de pasar al pago.
+                                </p>
                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                     <Select value={formData.state} onValueChange={(value) => handleSelectChange('state', value)}>
                                         <SelectTrigger className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm">
@@ -671,6 +717,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         id="city"
                                         name="city"
                                         required
+                                        autoComplete="address-level2"
                                         value={formData.city}
                                         onChange={handleInputChange}
                                         placeholder="Ciudad"
@@ -687,70 +734,144 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                     id="address"
                                     name="address"
                                     required
+                                    autoComplete="street-address"
                                     value={formData.address}
                                     onChange={handleInputChange}
                                     placeholder="Dirección completa"
                                     className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
                                 />
                             </div>
-                            <div className="pt-4 space-y-3">
+                            <div className="pt-4 space-y-3 lg:col-span-2">
                                 <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold">
-                                    Continuar al Pago
+                                    Confirmar envío y continuar
                                 </Button>
                                 <div className="flex items-center justify-center gap-2 text-slate-400 opacity-80">
-                                    <svg className="size-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                    <span className="text-xs font-medium">Información segura y encriptada SSL 256-bit.</span>
+                                    <span className="material-symbols-outlined text-base text-green-500">lock</span>
+                                    <span className="text-xs font-medium">Tus datos se usan únicamente para procesar esta compra.</span>
                                 </div>
                             </div>
                         </form>
                     )}
 
                     {step === 'payment' && (
-                        <div className="space-y-6 py-4">
+                        <div className="grid gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-start">
                             {/* Coupon Input */}
-                            <div className="space-y-2">
-                                {appliedCoupon ? (
-                                    <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
-                                        <div className="flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-green-600 text-lg">confirmation_number</span>
-                                            <div>
-                                                <span className="font-mono font-bold text-green-700 dark:text-green-300 text-sm">{appliedCoupon.code}</span>
-                                                <p className="text-xs text-green-600 dark:text-green-400">{appliedCoupon.description}</p>
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    {appliedCoupon ? (
+                                        <div className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined text-green-600 text-lg">confirmation_number</span>
+                                                <div>
+                                                    <span className="font-mono font-bold text-green-700 dark:text-green-300 text-sm">{appliedCoupon.code}</span>
+                                                    <p className="text-xs text-green-600 dark:text-green-400">{appliedCoupon.description}</p>
+                                                </div>
                                             </div>
+                                            <button onClick={handleRemoveCoupon} className="text-red-500 hover:text-red-700 p-1">
+                                                <span className="material-symbols-outlined text-sm">close</span>
+                                            </button>
                                         </div>
-                                        <button onClick={handleRemoveCoupon} className="text-red-500 hover:text-red-700 p-1">
-                                            <span className="material-symbols-outlined text-sm">close</span>
-                                        </button>
+                                    ) : (
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Código de cupón"
+                                                value={couponCode}
+                                                onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(null) }}
+                                                className="h-10 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
+                                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleApplyCoupon())}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={handleApplyCoupon}
+                                                disabled={couponLoading || !couponCode.trim()}
+                                                className="h-10 px-4 shrink-0 text-sm"
+                                            >
+                                                {couponLoading ? "..." : "Aplicar"}
+                                            </Button>
+                                        </div>
+                                    )}
+                                    {couponError && (
+                                        <p className="text-xs text-red-500">{couponError}</p>
+                                    )}
+                                </div>
+
+                                {/* Payment Method Selection */}
+                                <div className="space-y-3">
+                                    <div>
+                                        <Label>Método de pago</Label>
+                                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                            Elige cómo quieres pagar. Si algo falla, conservaremos la orden para que puedas reintentarlo.
+                                        </p>
                                     </div>
-                                ) : (
-                                    <div className="flex gap-2">
-                                        <Input
-                                            placeholder="Código de cupón"
-                                            value={couponCode}
-                                            onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(null) }}
-                                            className="h-10 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
-                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleApplyCoupon())}
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={handleApplyCoupon}
-                                            disabled={couponLoading || !couponCode.trim()}
-                                            className="h-10 px-4 shrink-0 text-sm"
-                                        >
-                                            {couponLoading ? "..." : "Aplicar"}
-                                        </Button>
-                                    </div>
-                                )}
-                                {couponError && (
-                                    <p className="text-xs text-red-500">{couponError}</p>
-                                )}
+                                    {gatewaysLoading ? (
+                                        <div className="text-center py-4 text-slate-500">
+                                            Cargando métodos de pago...
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {/* Show available payment gateways */}
+                                            {availableGateways.map((gateway) => (
+                                                <div
+                                                    key={gateway.provider}
+                                                    className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                    onClick={() => handlePaymentMethodChange(gateway.provider as 'wompi' | 'epayco' | 'manual')}
+                                                >
+                                                    <span className="font-bold">
+                                                        {gateway.provider === 'wompi' && 'Wompi'}
+                                                        {gateway.provider === 'epayco' && 'ePayco'}
+                                                    </span>
+                                                    <span className="text-xs text-center text-slate-500">
+                                                        {gateway.provider === 'wompi' && 'Tarjetas, PSE, Nequi'}
+                                                        {gateway.provider === 'epayco' && 'Tarjetas, PSE, Nequi'}
+                                                    </span>
+                                                    {gateway.is_test_mode && (
+                                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                                            Pruebas
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ))}
+
+                                            {/* Show manual payment only if bank_transfer_enabled */}
+                                            {manualPaymentInfo?.bank_transfer_enabled && (
+                                                <div
+                                                    className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                    onClick={() => handlePaymentMethodChange('manual')}
+                                                >
+                                                    <span className="font-bold">Transferencia</span>
+                                                    <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
+                                                </div>
+                                            )}
+
+                                            {/* Show COD option if enabled */}
+                                            {manualPaymentInfo?.cod_enabled && (
+                                                <div
+                                                    className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'contraentrega' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                    onClick={() => handlePaymentMethodChange('contraentrega')}
+                                                >
+                                                    <span className="font-bold">Contra Entrega</span>
+                                                    <span className="text-xs text-center text-slate-500">
+                                                        Paga al recibir
+                                                        {(manualPaymentInfo.cod_additional_cost ?? 0) > 0 && (
+                                                            <span className="block text-amber-600">+${(manualPaymentInfo.cod_additional_cost ?? 0).toLocaleString('es-CO')}</span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Order Summary */}
-                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-2 text-sm">
+                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3 text-sm lg:sticky lg:top-0">
+                                <div>
+                                    <h4 className="font-semibold text-slate-900 dark:text-white">Resumen de tu pedido</h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Este es el total final antes de crear la orden.
+                                    </p>
+                                </div>
                                 <div className="space-y-2 pb-2 border-b border-slate-200 dark:border-slate-700 mb-2">
                                     {items.map((item) => (
                                         <div key={item.id} className="flex justify-between items-start gap-3">
@@ -804,71 +925,9 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 </div>
                             </div>
 
-                            {/* Payment Method Selection */}
-                            <div className="space-y-3">
-                                <Label>Método de Pago</Label>
-                                {gatewaysLoading ? (
-                                    <div className="text-center py-4 text-slate-500">
-                                        Cargando métodos de pago...
-                                    </div>
-                                ) : (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {/* Show available payment gateways */}
-                                        {availableGateways.map((gateway) => (
-                                            <div
-                                                key={gateway.provider}
-                                                className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => handlePaymentMethodChange(gateway.provider as 'wompi' | 'epayco' | 'manual')}
-                                            >
-                                                <span className="font-bold">
-                                                    {gateway.provider === 'wompi' && 'Wompi'}
-                                                    {gateway.provider === 'epayco' && 'ePayco'}
-                                                </span>
-                                                <span className="text-xs text-center text-slate-500">
-                                                    {gateway.provider === 'wompi' && 'Tarjetas, PSE, Nequi'}
-                                                    {gateway.provider === 'epayco' && 'Tarjetas, PSE, Nequi'}
-                                                </span>
-                                                {gateway.is_test_mode && (
-                                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                                        Pruebas
-                                                    </span>
-                                                )}
-                                            </div>
-                                        ))}
-
-                                        {/* Show manual payment only if bank_transfer_enabled */}
-                                        {manualPaymentInfo?.bank_transfer_enabled && (
-                                            <div
-                                                className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => handlePaymentMethodChange('manual')}
-                                            >
-                                                <span className="font-bold">Transferencia</span>
-                                                <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
-                                            </div>
-                                        )}
-
-                                        {/* Show COD option if enabled */}
-                                        {manualPaymentInfo?.cod_enabled && (
-                                            <div
-                                                className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'contraentrega' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => handlePaymentMethodChange('contraentrega')}
-                                            >
-                                                <span className="font-bold">Contra Entrega</span>
-                                                <span className="text-xs text-center text-slate-500">
-                                                    Paga al recibir
-                                                    {manualPaymentInfo.cod_additional_cost && manualPaymentInfo.cod_additional_cost > 0 && (
-                                                        <span className="block text-amber-600">+${manualPaymentInfo.cod_additional_cost.toLocaleString('es-CO')}</span>
-                                                    )}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
                             {/* Bank Transfer Details - Show when manual payment selected */}
                             {paymentMethod === 'manual' && manualPaymentInfo && manualPaymentInfo.bank_transfer_enabled && (
-                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3">
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3 lg:col-start-1">
                                     <h4 className="font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-2">
                                         <span className="material-symbols-outlined">account_balance</span>
                                         Datos para Transferencia
@@ -915,7 +974,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                             )}
 
                             {!gatewaysLoading && !hasConfiguredPaymentMethods && (
-                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+                                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 lg:col-start-1">
                                     <div className="flex items-start gap-3">
                                         <span className="material-symbols-outlined text-amber-500">info</span>
                                         <div>
@@ -927,20 +986,18 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 </div>
                             )}
 
-                            <div className="space-y-3 pt-2">
+                            <div className="space-y-3 pt-2 lg:col-start-1">
                                 <div className="flex gap-3">
                                     <Button variant="outline" onClick={() => setStep('contact')} className="flex-1">
                                         Atrás
                                     </Button>
                                     <Button onClick={handlePlaceOrder} disabled={loading || gatewaysLoading || !hasConfiguredPaymentMethods} className="flex-1 bg-primary text-white hover:bg-primary/90">
-                                        {loading ? "Procesando..." : "Confirmar Orden"}
+                                        {loading ? "Creando orden..." : "Confirmar pedido"}
                                     </Button>
                                 </div>
                                 <div className="flex items-center justify-center gap-2 text-slate-400 opacity-80">
-                                    <svg className="size-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                    <span className="text-xs font-medium">Información segura y encriptada SSL 256-bit.</span>
+                                    <span className="material-symbols-outlined text-base text-green-500">verified_user</span>
+                                    <span className="text-xs font-medium">Pago procesado por métodos seguros de la tienda.</span>
                                 </div>
                             </div>
                         </div>
