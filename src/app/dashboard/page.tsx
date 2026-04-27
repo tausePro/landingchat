@@ -3,12 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getDashboardStats } from "./dashboard-actions"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { DashboardCharts } from "./components/dashboard-charts"
 import { VisitorsCard } from "./components/visitors-card"
 import { StatWidget } from "./components/stat-widget"
 import { Greeting } from "./components/greeting"
 
 export const dynamic = 'force-dynamic'
+
+function renderTrendBadge(value: number, suffix = "%") {
+    return (
+        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${value >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+            {value >= 0 ? '+' : ''}{value}{suffix}
+        </span>
+    )
+}
 
 export default async function DashboardPage() {
     let stats
@@ -23,6 +30,7 @@ export default async function DashboardPage() {
         // Para otros errores, usar datos por defecto
         stats = {
             userName: "Usuario",
+            organizationId: "",
             organizationSlug: "",
             organizationName: "Mi Tienda",
             industry: "ecommerce",
@@ -55,13 +63,6 @@ export default async function DashboardPage() {
     const re = stats.realEstate
 
     // Saludo se calcula en el cliente (Greeting component) para usar timezone local
-
-    // Formato de trend badge
-    const TrendBadge = ({ value, suffix = "%" }: { value: number; suffix?: string }) => (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${value >= 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-            {value >= 0 ? '+' : ''}{value}{suffix}
-        </span>
-    )
 
     // Icono por tipo de actividad
     const activityIcons: Record<string, { icon: string; color: string; bg: string }> = {
@@ -217,7 +218,7 @@ export default async function DashboardPage() {
                                         <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                                             <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-lg">payments</span>
                                         </div>
-                                        <TrendBadge value={stats.revenue.growth} />
+                                        {renderTrendBadge(stats.revenue.growth)}
                                     </div>
                                     <div className="mt-6 space-y-1">
                                         <p className="text-2xl font-bold tracking-tight text-text-light-primary dark:text-text-dark-primary">
@@ -230,7 +231,7 @@ export default async function DashboardPage() {
                                 </CardContent>
                             </Card>
 
-                            <VisitorsCard organizationSlug={stats.organizationSlug} />
+                            <VisitorsCard organizationId={stats.organizationId} organizationSlug={stats.organizationSlug} />
 
                             <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80">
                                 <CardContent className="flex h-full flex-col justify-between p-5">
@@ -238,7 +239,7 @@ export default async function DashboardPage() {
                                         <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                                             <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-lg">chat</span>
                                         </div>
-                                        <TrendBadge value={stats.chats.growth} />
+                                        {renderTrendBadge(stats.chats.growth)}
                                     </div>
                                     <div className="mt-6 space-y-1">
                                         <p className="text-2xl font-bold tracking-tight text-text-light-primary dark:text-text-dark-primary">
@@ -257,7 +258,7 @@ export default async function DashboardPage() {
                                         <div className="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
                                             <span className="material-symbols-outlined text-indigo-600 dark:text-indigo-400 text-lg">trending_up</span>
                                         </div>
-                                        <TrendBadge value={stats.chats.conversionRate} />
+                                        {renderTrendBadge(stats.chats.conversionRate)}
                                     </div>
                                     <div className="mt-6 space-y-1">
                                         <p className="text-2xl font-bold tracking-tight text-text-light-primary dark:text-text-dark-primary">
@@ -371,7 +372,7 @@ export default async function DashboardPage() {
                                     <span className="text-xl font-bold tracking-tight">
                                         {formatCurrency(weeklyRevenueTotal)}
                                     </span>
-                                    <TrendBadge value={stats.revenue.growth} />
+                                    {renderTrendBadge(stats.revenue.growth)}
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-5">
