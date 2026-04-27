@@ -4,6 +4,11 @@ import { createContext, useContext, ReactNode, useMemo } from "react"
 import { useMetaPixel } from "./meta-pixel"
 import { usePosthogTracking } from "./use-posthog-tracking"
 import { getTrackingParams } from "@/hooks/use-tracking-params"
+import {
+    trackFirstPartyAnalyticsEvent,
+    type AnalyticsEventProperties,
+    type AnalyticsEventName,
+} from "@/lib/analytics/first-party-events"
 
 export interface TrackingContextType {
     trackViewContent: (contentId: string, contentName: string, value?: number, currency?: string) => void
@@ -13,6 +18,17 @@ export interface TrackingContextType {
     trackPageView: (path?: string, props?: Record<string, unknown>) => void
     trackViewCategory: (categoryId: string, categoryName: string) => void
     trackSearch: (searchQuery: string, contentIds?: string[]) => void
+    trackEvent: (
+        eventName: AnalyticsEventName,
+        params?: {
+            value?: number
+            currency?: string
+            contentIds?: string[]
+            orderId?: string
+            sourceChannel?: "web" | "chat" | "whatsapp" | "instagram" | "messenger"
+            properties?: AnalyticsEventProperties
+        }
+    ) => void
 }
 
 const noopTracking: TrackingContextType = {
@@ -23,6 +39,7 @@ const noopTracking: TrackingContextType = {
     trackPageView: () => {},
     trackViewCategory: () => {},
     trackSearch: () => {},
+    trackEvent: () => {},
 }
 
 const TrackingContext = createContext<TrackingContextType | null>(null)
@@ -94,7 +111,7 @@ export function TrackingProvider({
     })
 
     const trackingMethods = useMemo<TrackingContextType>(() => {
-        if (!metaPixelEnabled && !posthogEnabled) {
+        if (!metaPixelEnabled && !posthogEnabled && !organizationSlug) {
             return noopTracking
         }
 
@@ -119,6 +136,15 @@ export function TrackingProvider({
                     })
                 }
                 posthogTracking.trackViewContent(contentId, contentName, value, currency)
+                trackFirstPartyAnalyticsEvent(organizationSlug, {
+                    eventName: "view_content",
+                    contentIds: [contentId],
+                    value: resolvedValue,
+                    currency: resolvedCurrency,
+                    properties: {
+                        contentName,
+                    },
+                })
             },
             trackAddToCart: (contentId, contentName, value, currency) => {
                 const eventId = createMetaEventId("AddToCart")
@@ -139,6 +165,15 @@ export function TrackingProvider({
                     })
                 }
                 posthogTracking.trackAddToCart(contentId, contentName, value, currency)
+                trackFirstPartyAnalyticsEvent(organizationSlug, {
+                    eventName: "add_to_cart",
+                    contentIds: [contentId],
+                    value,
+                    currency: resolvedCurrency,
+                    properties: {
+                        contentName,
+                    },
+                })
             },
             trackInitiateCheckout: (value, currency, contentIds) => {
                 const eventId = createMetaEventId("InitiateCheckout")
@@ -158,15 +193,33 @@ export function TrackingProvider({
                     })
                 }
                 posthogTracking.trackInitiateCheckout(value, currency, contentIds)
+                trackFirstPartyAnalyticsEvent(organizationSlug, {
+                    eventName: "checkout_started",
+                    contentIds,
+                    value,
+                    currency: resolvedCurrency,
+                })
             },
             trackPurchase: (value, currency, contentIds, orderId) => {
+                const resolvedCurrency = currency || "COP"
                 if (metaPixelEnabled) {
                     metaPixel.trackPurchase(value, currency, contentIds, orderId)
                 }
                 posthogTracking.trackPurchase(value, currency, contentIds, orderId)
+                trackFirstPartyAnalyticsEvent(organizationSlug, {
+                    eventName: "purchase",
+                    contentIds,
+                    orderId,
+                    value,
+                    currency: resolvedCurrency,
+                })
             },
             trackPageView: (path, props) => {
                 posthogTracking.trackPageView(path, props)
+                trackFirstPartyAnalyticsEvent(organizationSlug, {
+                    eventName: "page_view",
+                    path,
+                })
             },
             trackViewCategory: (categoryId, categoryName) => {
                 if (metaPixelEnabled) {
@@ -177,6 +230,17 @@ export function TrackingProvider({
                 if (metaPixelEnabled) {
                     metaPixel.trackSearch(searchQuery, contentIds)
                 }
+            },
+            trackEvent: (eventName, params) => {
+                trackFirstPartyAnalyticsEvent(organizationSlug, {
+                    eventName,
+                    sourceChannel: params?.sourceChannel,
+                    contentIds: params?.contentIds,
+                    orderId: params?.orderId,
+                    value: params?.value,
+                    currency: params?.currency,
+                    properties: params?.properties,
+                })
             },
         }
     }, [metaPixelEnabled, metaPixel, posthogTracking, organizationSlug, posthogEnabled])

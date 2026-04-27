@@ -4,15 +4,90 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import { AnalyticsCharts } from "./components/analytics-charts"
 import { TrafficSources } from "./components/traffic-sources"
-import { ConversionFunnel } from "./components/conversion-funnel"
+import { ConversionFunnelV2, type FunnelProduct, type FunnelStage } from "./components/conversion-funnel-v2"
 import { SalesSources } from "./components/sales-sources"
 import { MetaAdsCard } from "./components/meta-ads-card"
 import { TopProductsCard } from "./components/top-products-card"
 import { RevenueByChannelCard } from "./components/revenue-by-channel-card"
 import { AiPerformanceCard } from "./components/ai-performance-card"
 import { formatBogotaDayKey } from "@/lib/utils/date"
+import { CampaignPerformanceCard, type CampaignPerformance } from "./components/campaign-performance-card"
 
 export const dynamic = 'force-dynamic'
+
+type AnalyticsEventRow = {
+    event_name: string
+    session_id: string | null
+    order_id: string | null
+    content_ids: string[] | null
+    value: number | string | null
+    properties: Record<string, unknown> | null
+    occurred_at: string
+}
+
+type AnalyticsAttribution = {
+    utmSource?: string
+    utmCampaign?: string
+    utmSourcePlatform?: string
+    campaignId?: string
+    fbclid?: string
+    fbc?: string
+    fbp?: string
+}
+
+type AnalyticsOrderItem = {
+    productId: string
+    productName: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getStringValue(record: Record<string, unknown>, key: string): string | undefined {
+    const value = record[key]
+    return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function toNumber(value: unknown): number {
+    if (typeof value === "number") return value
+    if (typeof value === "string") {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : 0
+    }
+    return 0
+}
+
+function getAttribution(properties: Record<string, unknown> | null): AnalyticsAttribution | null {
+    if (!properties || !isRecord(properties.attribution)) return null
+
+    return {
+        utmSource: getStringValue(properties.attribution, "utmSource"),
+        utmCampaign: getStringValue(properties.attribution, "utmCampaign"),
+        utmSourcePlatform: getStringValue(properties.attribution, "utmSourcePlatform"),
+        campaignId: getStringValue(properties.attribution, "campaignId"),
+        fbclid: getStringValue(properties.attribution, "fbclid"),
+        fbc: getStringValue(properties.attribution, "fbc"),
+        fbp: getStringValue(properties.attribution, "fbp"),
+    }
+}
+
+function getOrderItems(items: unknown): AnalyticsOrderItem[] {
+    if (!Array.isArray(items)) return []
+
+    return items.reduce<AnalyticsOrderItem[]>((acc, item) => {
+        if (!isRecord(item)) return acc
+
+        const productId = getStringValue(item, "product_id") || getStringValue(item, "productId") || getStringValue(item, "id")
+        if (!productId) return acc
+
+        acc.push({
+            productId,
+            productName: getStringValue(item, "product_name") || getStringValue(item, "name") || `Producto ${productId.slice(0, 8)}`,
+        })
+        return acc
+    }, [])
+}
 
 async function getAnalyticsData() {
     const supabase = await createClient()
@@ -42,9 +117,9 @@ async function getAnalyticsData() {
     // Filtrar por status válidos (mismo criterio que dashboard-actions.ts)
     const validStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "completed"]
 
-    // Fetch org, orders, chats, and products in parallel
+    // Fetch org, orders, chats, products and analytics events in parallel
     // Messages se fetchean después en batches (necesitan chatIds primero)
-    const [orgResult, ordersResult, chatsResult, productsResult] = await Promise.all([
+    const [orgResult, ordersResult, chatsResult, productsResult, analyticsEventsResult] = await Promise.all([
         supabase
             .from("organizations")
             .select("id, name, slug, tracking_config")
@@ -65,14 +140,19 @@ async function getAnalyticsData() {
         supabase
             .from("products")
             .select("id, name, stock, image_url, is_active")
+            .eq("organization_id", orgId),
+        supabase
+            .from("analytics_events")
+            .select("event_name, session_id, order_id, content_ids, value, properties, occurred_at")
             .eq("organization_id", orgId)
-            .eq("is_active", true),
+            .gte("occurred_at", thirtyDaysAgo.toISOString()),
     ])
 
     const org = orgResult.data
     const orders = ordersResult.data
     const chats = chatsResult.data
     const products = productsResult.data
+    const analyticsEvents = (analyticsEventsResult.data || []) as AnalyticsEventRow[]
 
     if (!org) {
         redirect("/onboarding")
@@ -136,6 +216,190 @@ async function getAnalyticsData() {
 
     // Conversión real del chat (solo órdenes que vinieron del chat / total chats)
     const chatConversionRate = totalChats > 0 ? ((ordersFromChat / totalChats) * 100).toFixed(1) : "0"
+
+    const productNameById = new Map<string, string>()
+    ;(products || []).forEach(product => {
+        productNameById.set(product.id, product.name)
+    })
+
+    const orderItemsByOrderId = new Map<string, AnalyticsOrderItem[]>()
+    orders?.forEach(order => {
+        const orderItems = getOrderItems(order.items)
+        orderItemsByOrderId.set(order.id, orderItems)
+        orderItems.forEach(item => {
+            if (!productNameById.has(item.productId)) {
+                productNameById.set(item.productId, item.productName)
+            }
+        })
+    })
+
+    const getEventProductIds = (event: AnalyticsEventRow) => {
+        const contentIds = event.content_ids?.filter((id): id is string => typeof id === "string" && id.length > 0) || []
+        if (contentIds.length > 0) return contentIds
+        if (!event.order_id) return []
+        return orderItemsByOrderId.get(event.order_id)?.map(item => item.productId) || []
+    }
+
+    const getEventProductName = (event: AnalyticsEventRow, productId: string) => {
+        const contentName = event.content_ids?.length === 1 && event.properties
+            ? getStringValue(event.properties, "contentName")
+            : undefined
+
+        return productNameById.get(productId) || contentName || `Producto ${productId.slice(0, 8)}`
+    }
+
+    const getFunnelProducts = (eventNames: string[]): FunnelProduct[] => {
+        const productStats = new Map<string, FunnelProduct>()
+
+        analyticsEvents
+            .filter(event => eventNames.includes(event.event_name))
+            .forEach(event => {
+                const productIds = Array.from(new Set(getEventProductIds(event)))
+
+                productIds.forEach(productId => {
+                    const current = productStats.get(productId)
+                    if (current) {
+                        current.count += 1
+                    } else {
+                        productStats.set(productId, {
+                            productId,
+                            productName: getEventProductName(event, productId),
+                            count: 1,
+                        })
+                    }
+                })
+            })
+
+        return Array.from(productStats.values())
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3)
+    }
+
+    const campaignStats = new Map<string, CampaignPerformance>()
+    analyticsEvents.forEach(event => {
+        const attribution = getAttribution(event.properties)
+        if (!attribution) return
+
+        const sourceText = `${attribution.utmSource || ""} ${attribution.utmSourcePlatform || ""}`.toLowerCase()
+        const isMetaCampaign = sourceText.includes("facebook")
+            || sourceText.includes("instagram")
+            || sourceText.includes("meta")
+            || sourceText.includes("fb")
+            || sourceText.includes("ig")
+            || Boolean(attribution.fbclid || attribution.fbc || attribution.fbp)
+
+        if (!isMetaCampaign) return
+
+        const campaignName = attribution.utmCampaign || attribution.campaignId || "Meta sin campaña"
+        const source = attribution.utmSource || attribution.utmSourcePlatform || "Meta"
+        const key = `${source}:${campaignName}`
+        const current = campaignStats.get(key) || {
+            campaignName,
+            source,
+            visits: 0,
+            productViews: 0,
+            addToCart: 0,
+            checkouts: 0,
+            purchases: 0,
+            revenue: 0,
+        }
+
+        if (event.event_name === "page_view") current.visits += 1
+        if (event.event_name === "view_content") current.productViews += 1
+        if (event.event_name === "add_to_cart") current.addToCart += 1
+        if (event.event_name === "checkout_started") current.checkouts += 1
+        if (event.event_name === "purchase") {
+            current.purchases += 1
+            current.revenue += toNumber(event.value)
+        }
+
+        campaignStats.set(key, current)
+    })
+
+    const campaignPerformance = Array.from(campaignStats.values())
+        .sort((a, b) => b.revenue - a.revenue || b.purchases - a.purchases || b.visits - a.visits)
+        .slice(0, 5)
+
+    const uniqueEventCount = (eventNames: string[]) => {
+        const events = analyticsEvents.filter(event => eventNames.includes(event.event_name))
+        const uniqueKeys = new Set(events.map((event, index) => event.session_id || event.order_id || `${event.event_name}-${index}`))
+        return uniqueKeys.size
+    }
+
+    const paidOrders = orders?.filter(order => order.payment_status === "paid").length || 0
+    const fallbackPaidOrders = paidOrders || totalOrders
+    const funnelStages: FunnelStage[] = [
+        {
+            label: "Visitas tienda",
+            value: uniqueEventCount(["page_view"]) || totalChats,
+            icon: "visibility",
+            color: "bg-blue-500",
+        },
+        {
+            label: "Producto visto",
+            value: uniqueEventCount(["view_content"]),
+            icon: "inventory_2",
+            color: "bg-cyan-500",
+            products: getFunnelProducts(["view_content"]),
+        },
+        {
+            label: "Agregó al carrito",
+            value: uniqueEventCount(["add_to_cart"]),
+            icon: "add_shopping_cart",
+            color: "bg-indigo-500",
+            products: getFunnelProducts(["add_to_cart"]),
+        },
+        {
+            label: "Inició checkout",
+            value: uniqueEventCount(["checkout_started"]),
+            icon: "shopping_cart_checkout",
+            color: "bg-purple-500",
+            products: getFunnelProducts(["checkout_started"]),
+        },
+        {
+            label: "Completó datos",
+            value: uniqueEventCount(["checkout_contact_submitted"]),
+            icon: "assignment_turned_in",
+            color: "bg-amber-500",
+            products: getFunnelProducts(["checkout_contact_submitted"]),
+        },
+        {
+            label: "Orden creada",
+            value: uniqueEventCount(["checkout_order_created"]) || totalOrders,
+            icon: "receipt_long",
+            color: "bg-orange-500",
+            products: getFunnelProducts(["checkout_order_created"]),
+        },
+        {
+            label: "Compra pagada",
+            value: uniqueEventCount(["purchase"]) || fallbackPaidOrders,
+            icon: "payments",
+            color: "bg-green-500",
+            products: getFunnelProducts(["purchase"]),
+        },
+    ]
+
+    const criticalDropOff = funnelStages.slice(1).reduce<{
+        from: string
+        to: string
+        lost: number
+        percentage: number
+    } | null>((current, stage, index) => {
+        const previous = funnelStages[index]
+        const lost = Math.max(previous.value - stage.value, 0)
+        const percentage = previous.value > 0 ? (lost / previous.value) * 100 : 0
+
+        if (!current || percentage > current.percentage) {
+            return {
+                from: previous.label,
+                to: stage.label,
+                lost,
+                percentage,
+            }
+        }
+
+        return current
+    }, null)
 
     // ============================================================
     // Top Products (de items JSONB en orders)
@@ -279,7 +543,13 @@ async function getAnalyticsData() {
             posthog: Boolean(org.tracking_config?.posthog_enabled),
             metaPixel: Boolean(org.tracking_config?.meta_pixel_id),
             metaCapi: Boolean(org.tracking_config?.meta_capi_access_token || org.tracking_config?.meta_access_token),
+            firstParty: true,
         },
+        funnel: {
+            stages: funnelStages,
+            criticalDropOff,
+        },
+        campaignPerformance,
         topProducts,
         lowStockProducts,
         revenueBySource,
@@ -344,6 +614,10 @@ export default async function AnalyticsPage() {
                         }`}>
                         <span className={`w-2 h-2 rounded-full mr-2 ${data.trackingEnabled.metaCapi ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
                         Meta CAPI {data.trackingEnabled.metaCapi ? 'Activo' : 'Inactivo'}
+                    </span>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full mr-2 bg-emerald-500"></span>
+                        First-party Activo
                     </span>
                 </div>
 
@@ -413,14 +687,21 @@ export default async function AnalyticsPage() {
 
                 {/* Conversion Funnel + Sales Sources */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <ConversionFunnel
-                        totalChats={data.metrics.totalChats}
-                        ordersFromChat={data.metrics.ordersFromChat}
-                        chatConversionRate={data.metrics.chatConversionRate}
+                    <ConversionFunnelV2
+                        stages={data.funnel.stages}
+                        criticalDropOff={data.funnel.criticalDropOff}
                     />
+                    <CampaignPerformanceCard campaigns={data.campaignPerformance} />
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-2">
                     <SalesSources
                         ordersBySource={data.ordersBySource}
                         totalOrders={data.metrics.totalOrders}
+                    />
+                    <RevenueByChannelCard
+                        revenueBySource={data.revenueBySource}
+                        totalRevenue={data.metrics.totalRevenue}
                     />
                 </div>
 
@@ -430,17 +711,11 @@ export default async function AnalyticsPage() {
                         topProducts={data.topProducts}
                         lowStockProducts={data.lowStockProducts}
                     />
-                    <RevenueByChannelCard
-                        revenueBySource={data.revenueBySource}
-                        totalRevenue={data.metrics.totalRevenue}
-                    />
+                    <MetaAdsCard />
                 </div>
 
                 {/* AI Performance */}
                 <AiPerformanceCard {...data.aiPerformance} />
-
-                {/* Meta Ads */}
-                <MetaAdsCard />
             </div>
         </DashboardLayout>
     )
