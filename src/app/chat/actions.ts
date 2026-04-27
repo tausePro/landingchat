@@ -271,7 +271,7 @@ export async function getAvailablePaymentGateways(slug: string) {
         // Get active payment gateways
         const { data: gateways, error: gatewaysError } = await supabase
             .from("payment_gateway_configs")
-            .select("provider, is_active, is_test_mode")
+            .select("provider, is_active, is_test_mode, config")
             .eq("organization_id", org.id)
             .eq("is_active", true)
 

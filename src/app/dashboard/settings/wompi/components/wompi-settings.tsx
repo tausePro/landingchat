@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, ExternalLink, Copy } from "lucide-react"
 import { saveWompiConfig, getWompiConfig, testWompiConnection } from "../actions"
+import { PaymentBrandingSelector } from "../../payments/components/payment-branding-selector"
 
 interface WompiConfig {
     isActive: boolean
@@ -19,6 +20,17 @@ interface WompiConfig {
     privateKey: string
     integritySecret: string
     eventsSecret: string
+    logoUrl: string
+}
+
+function getGatewayLogoUrl(data: Record<string, unknown>) {
+    const config = data.config
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return ""
+    }
+
+    const logoUrl = (config as Record<string, unknown>).logo_url
+    return typeof logoUrl === "string" ? logoUrl : ""
 }
 
 export function WompiSettings() {
@@ -38,6 +50,7 @@ export function WompiSettings() {
         privateKey: "",
         integritySecret: "",
         eventsSecret: "",
+        logoUrl: "",
     })
 
     useEffect(() => {
@@ -56,6 +69,7 @@ export function WompiSettings() {
                     privateKey: "",
                     integritySecret: "",
                     eventsSecret: "",
+                    logoUrl: getGatewayLogoUrl(data),
                 })
                 setHasExistingCredentials(!!(data.private_key_encrypted))
                 setWebhookUrl((data.webhook_url as string) || null)
@@ -353,6 +367,13 @@ export function WompiSettings() {
                             Necesario para validar webhooks. Encuéntralo en Wompi → Desarrolladores → Secretos → Eventos
                         </p>
                     </div>
+
+                    <PaymentBrandingSelector
+                        key={config.logoUrl}
+                        provider="wompi"
+                        providerName="Wompi"
+                        initialLogoUrl={config.logoUrl}
+                    />
 
                     {/* Activar Pasarela */}
                     <div className="flex items-center justify-between rounded-lg border p-4">
