@@ -2,6 +2,7 @@
 
 import { useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { getFirstPartyAnalyticsSessionId } from "@/lib/analytics/first-party-events"
 import { usePathname } from "next/navigation"
 
 interface StorePresenceProps {
@@ -65,6 +66,7 @@ export function StorePresence({ slug }: StorePresenceProps) {
                 : undefined
             const status = {
                 online_at: new Date().toISOString(),
+                sessionId: getFirstPartyAnalyticsSessionId(),
                 page: pathname,
                 pageType: presencePage.pageType,
                 pageLabel: presencePage.pageLabel,

@@ -78,7 +78,7 @@ export interface TrackAnalyticsEventInput {
 const SESSION_STORAGE_KEY = "landingchat_analytics_session_id"
 const SENSITIVE_QUERY_KEYS = new Set(["access", "token", "auth", "code", "state", "session", "password", "secret", "key"])
 
-function getSessionId(): string | undefined {
+export function getFirstPartyAnalyticsSessionId(): string | undefined {
     if (typeof window === "undefined") return undefined
 
     const existing = window.sessionStorage.getItem(SESSION_STORAGE_KEY)
@@ -152,7 +152,7 @@ export function trackFirstPartyAnalyticsEvent(slug: string | undefined, input: T
         keepalive: true,
         body: JSON.stringify({
             eventName: input.eventName,
-            sessionId: getSessionId(),
+            sessionId: getFirstPartyAnalyticsSessionId(),
             sourceChannel: input.sourceChannel ?? trackingParams.source_channel,
             path: sanitizePath(input.path ?? defaultPath),
             referrer: sanitizePath(input.referrer ?? trackingParams.referrer ?? (document.referrer || undefined)),

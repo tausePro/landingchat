@@ -39,6 +39,7 @@ export interface AgentStatus {
 
 export interface DashboardStats {
     userName: string
+    organizationId: string
     organizationSlug: string
     organizationName: string
     industry: string
@@ -103,9 +104,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
     // Helper for date ranges
     const now = new Date()
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString()
     const thirtyDaysAgo = new Date(now.setDate(now.getDate() - 30)).toISOString()
 
     // 1. REVENUE & ORDERS
@@ -386,6 +384,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
         return {
             userName,
+            organizationId: orgId,
             organizationSlug,
             organizationName,
             industry,
@@ -433,6 +432,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         // Para otros errores, retornar datos vacíos
         return {
             userName: "Usuario",
+            organizationId: "",
             organizationSlug: "",
             organizationName: "Mi Tienda",
             industry: "ecommerce",
