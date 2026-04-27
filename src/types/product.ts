@@ -44,7 +44,7 @@ export const configOptionSchema = z.object({
   choices_with_price: z.array(choiceWithPriceSchema).optional(), // Nuevo: choices con precio
   min: z.number().optional(),
   max: z.number().optional(),
-  default: z.any().optional(),
+  default: z.unknown().optional(),
   affects_preview: z.boolean().optional(),
   price_modifier: z.number().optional(), // Precio adicional por esta opción
   accept_formats: z.array(z.string()).optional(), // Para type 'image': ["png", "jpg", "svg"]
