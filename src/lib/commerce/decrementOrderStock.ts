@@ -300,6 +300,22 @@ export async function decrementOrderStock(
         }
     }
 
+    const hasErrors = results.some((item) => Boolean(item.error))
+    if (hasErrors) {
+        log.error("Stock decrement finished with errors; order will remain retryable", {
+            orderId,
+            organizationId,
+            errors: results.filter((item) => Boolean(item.error)).length,
+        })
+
+        return {
+            orderId,
+            organizationId,
+            skipped: false,
+            items: results,
+        }
+    }
+
     // 5. Marcar la orden como decrementada (idempotencia)
     await markOrderDecremented(supabase, orderId, organizationId)
 
