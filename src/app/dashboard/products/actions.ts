@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug"
+import { resolveDefaultVariantPricingSync, type DefaultVariantPricingSyncResult } from "@/lib/commerce/defaultVariantPricingSync"
 import {
   createProductSchema,
   updateProductSchema,
@@ -19,6 +20,19 @@ export type {
   UpdateProductInput,
   ProductData,
 } from "@/types/product"
+
+function readOptionalNumber(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  return null
+}
 
 // ============================================================================
 // Sync de variante default con product_variants (Commerce Reset Fase 2)
@@ -49,9 +63,33 @@ async function syncDefaultVariant(
     const variantData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
+    let resolvedPricing: DefaultVariantPricingSyncResult | null = null
 
-    if (data.price !== undefined) variantData.price = data.price
-    if (data.sale_price !== undefined) variantData.compare_at_price = data.sale_price || null
+    const loadResolvedPricing = async () => {
+      if (resolvedPricing) {
+        return resolvedPricing
+      }
+
+      const { data: productPricing } = await supabase
+        .from("products")
+        .select("price, sale_price")
+        .eq("id", productId)
+        .eq("organization_id", organizationId)
+        .single()
+
+      resolvedPricing = resolveDefaultVariantPricingSync({
+        price: readOptionalNumber(productPricing?.price) ?? data.price,
+        sale_price: readOptionalNumber(productPricing?.sale_price) ?? data.sale_price,
+      })
+
+      return resolvedPricing
+    }
+
+    if (data.price !== undefined || data.sale_price !== undefined) {
+      const pricing = await loadResolvedPricing()
+      variantData.price = pricing.price
+      variantData.compare_at_price = pricing.compare_at_price
+    }
     if (data.stock !== undefined) variantData.stock_quantity = data.stock
     if (data.sku !== undefined) variantData.sku = data.sku || null
     if (data.image_url !== undefined) variantData.image_url = data.image_url || null
@@ -72,6 +110,7 @@ async function syncDefaultVariant(
         .update(variantData)
         .eq("id", existing.id)
     } else {
+      const pricing = await loadResolvedPricing()
       // Crear variante default si no existe (producto nuevo o backfill faltante)
       await supabase
         .from("product_variants")
@@ -83,8 +122,8 @@ async function syncDefaultVariant(
           position: 0,
           is_default: true,
           is_active: data.is_active ?? true,
-          price: data.price ?? 0,
-          compare_at_price: data.sale_price || null,
+          price: pricing.price,
+          compare_at_price: pricing.compare_at_price,
           stock_quantity: data.stock ?? 0,
           image_url: data.image_url || null,
           option_values: [],
