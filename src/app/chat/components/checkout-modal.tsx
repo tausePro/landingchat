@@ -827,30 +827,34 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                             {availableGateways.map((gateway) => {
                                                 const logoUrl = getPaymentGatewayLogoUrl(gateway)
                                                 const providerName = gateway.provider === 'wompi' ? 'Wompi' : 'ePayco'
+                                                const providerDescription = gateway.provider === 'wompi'
+                                                    ? 'Tarjetas, PSE, Nequi'
+                                                    : 'Tarjetas y PSE'
 
                                                 return (
                                                     <div
                                                         key={gateway.provider}
-                                                        className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                        className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
                                                         onClick={() => handlePaymentMethodChange(gateway.provider as 'wompi' | 'epayco' | 'manual')}
                                                     >
                                                         {logoUrl ? (
-                                                            <div className="flex h-8 w-full items-center justify-center">
+                                                            <div className="flex min-h-16 w-full items-center justify-center">
                                                                 <Image
                                                                     src={logoUrl}
                                                                     alt={`Logo de ${providerName}`}
-                                                                    width={96}
-                                                                    height={32}
-                                                                    className="max-h-8 w-auto object-contain"
+                                                                    width={180}
+                                                                    height={72}
+                                                                    className="max-h-16 w-full object-contain"
                                                                 />
                                                             </div>
                                                         ) : (
-                                                            <span className="font-bold">{providerName}</span>
+                                                            <>
+                                                                <span className="font-bold">{providerName}</span>
+                                                                <span className="text-xs text-center text-slate-500">
+                                                                    {providerDescription}
+                                                                </span>
+                                                            </>
                                                         )}
-                                                        <span className="text-xs text-center text-slate-500">
-                                                            {gateway.provider === 'wompi' && 'Tarjetas, PSE, Nequi'}
-                                                            {gateway.provider === 'epayco' && 'Tarjetas, PSE, Nequi'}
-                                                        </span>
                                                         {gateway.is_test_mode && (
                                                             <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
                                                                 Pruebas
