@@ -12,6 +12,7 @@ import { RevenueByChannelCard } from "./components/revenue-by-channel-card"
 import { AiPerformanceCard } from "./components/ai-performance-card"
 import { formatBogotaDayKey } from "@/lib/utils/date"
 import { CampaignPerformanceCard, type CampaignPerformance } from "./components/campaign-performance-card"
+import { CheckoutIntelligenceCard, type CheckoutIntelligence } from "./components/checkout-intelligence-card"
 
 export const dynamic = 'force-dynamic'
 
@@ -326,6 +327,125 @@ async function getAnalyticsData() {
         return uniqueKeys.size
     }
 
+    const checkoutStageInputs = [
+        { label: "Inició checkout", eventNames: ["checkout_started"], icon: "shopping_cart_checkout" },
+        { label: "Completó datos", eventNames: ["checkout_contact_submitted"], icon: "assignment_turned_in" },
+        { label: "Seleccionó pago", eventNames: ["checkout_payment_method_selected"], icon: "credit_card" },
+        { label: "Orden creada", eventNames: ["checkout_order_created"], icon: "receipt_long" },
+        { label: "Redirección o instrucciones", eventNames: ["checkout_payment_redirect_started", "checkout_payment_instructions_shown"], icon: "payments" },
+        { label: "Compra pagada", eventNames: ["purchase"], icon: "task_alt" },
+    ]
+    const checkoutStages = checkoutStageInputs.map((stage, index) => {
+        const value = uniqueEventCount(stage.eventNames)
+        const previousValue = index === 0 ? value : uniqueEventCount(checkoutStageInputs[index - 1].eventNames)
+        const dropOffFromPrevious = index === 0 ? 0 : Math.max(previousValue - value, 0)
+
+        return {
+            label: stage.label,
+            value,
+            icon: stage.icon,
+            dropOffFromPrevious,
+            dropOffRate: previousValue > 0 ? (dropOffFromPrevious / previousValue) * 100 : 0,
+        }
+    })
+    const biggestCheckoutLeak = checkoutStages.slice(1).reduce<CheckoutIntelligence["biggestLeak"]>((current, stage, index) => {
+        const previous = checkoutStages[index]
+
+        if (!current || stage.dropOffRate > current.percentage) {
+            return {
+                from: previous.label,
+                to: stage.label,
+                lost: stage.dropOffFromPrevious,
+                percentage: stage.dropOffRate,
+            }
+        }
+
+        return current
+    }, null)
+    const checkoutIssues = [
+        {
+            label: "Datos de contacto rechazados",
+            count: uniqueEventCount(["checkout_contact_validation_failed"]),
+            detail: "Sesiones bloqueadas por validación de datos.",
+            icon: "assignment_late",
+            severity: "warning" as const,
+        },
+        {
+            label: "Envío no disponible",
+            count: uniqueEventCount(["checkout_shipping_unavailable"]),
+            detail: "Sesiones donde la ciudad o zona no pudo continuar.",
+            icon: "local_shipping",
+            severity: "warning" as const,
+        },
+        {
+            label: "Orden no creada",
+            count: uniqueEventCount(["checkout_order_create_failed"]),
+            detail: "Intentos que no llegaron a crear orden.",
+            icon: "receipt_long",
+            severity: "danger" as const,
+        },
+        {
+            label: "Pasarela no abrió",
+            count: uniqueEventCount(["checkout_gateway_load_failed"]),
+            detail: "Órdenes creadas con fallo al iniciar pago.",
+            icon: "credit_card_off",
+            severity: "danger" as const,
+        },
+        {
+            label: "Pago fallido",
+            count: uniqueEventCount(["payment_failed"]),
+            detail: "Pagos reportados como fallidos.",
+            icon: "error",
+            severity: "danger" as const,
+        },
+        {
+            label: "Pago pendiente",
+            count: uniqueEventCount(["payment_pending"]),
+            detail: "Usuarios que aún no completan confirmación de pago.",
+            icon: "pending",
+            severity: "warning" as const,
+        },
+    ].filter(issue => issue.count > 0)
+    const checkoutProductStats = new Map<string, { productName: string; checkouts: number; purchases: number }>()
+    analyticsEvents.forEach(event => {
+        if (event.event_name !== "checkout_started" && event.event_name !== "purchase") return
+
+        const productIds = Array.from(new Set(getEventProductIds(event)))
+        productIds.forEach(productId => {
+            const current = checkoutProductStats.get(productId) || {
+                productName: getEventProductName(event, productId),
+                checkouts: 0,
+                purchases: 0,
+            }
+
+            if (event.event_name === "checkout_started") current.checkouts += 1
+            if (event.event_name === "purchase") current.purchases += 1
+            checkoutProductStats.set(productId, current)
+        })
+    })
+    const checkoutProductRisks = Array.from(checkoutProductStats.entries())
+        .map(([productId, stats]) => ({
+            productId,
+            productName: stats.productName,
+            checkouts: stats.checkouts,
+            purchases: stats.purchases,
+            dropOffRate: stats.checkouts > 0 ? (Math.max(stats.checkouts - stats.purchases, 0) / stats.checkouts) * 100 : 0,
+        }))
+        .filter(product => product.checkouts > product.purchases)
+        .sort((a, b) => b.dropOffRate - a.dropOffRate || b.checkouts - a.checkouts)
+        .slice(0, 5)
+    const checkoutStarted = checkoutStages[0]?.value || 0
+    const checkoutPurchases = checkoutStages[checkoutStages.length - 1]?.value || 0
+    const checkoutIntelligence: CheckoutIntelligence = {
+        started: checkoutStarted,
+        purchases: checkoutPurchases,
+        checkoutToPurchaseRate: checkoutStarted > 0 ? (checkoutPurchases / checkoutStarted) * 100 : 0,
+        biggestLeak: biggestCheckoutLeak,
+        stages: checkoutStages,
+        issues: checkoutIssues,
+        productRisks: checkoutProductRisks,
+    }
+
     const paidOrders = orders?.filter(order => order.payment_status === "paid").length || 0
     const fallbackPaidOrders = paidOrders || totalOrders
     const funnelStages: FunnelStage[] = [
@@ -550,6 +670,7 @@ async function getAnalyticsData() {
             criticalDropOff,
         },
         campaignPerformance,
+        checkoutIntelligence,
         topProducts,
         lowStockProducts,
         revenueBySource,
@@ -693,6 +814,8 @@ export default async function AnalyticsPage() {
                     />
                     <CampaignPerformanceCard campaigns={data.campaignPerformance} />
                 </div>
+
+                <CheckoutIntelligenceCard intelligence={data.checkoutIntelligence} />
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     <SalesSources
