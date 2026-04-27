@@ -3,6 +3,7 @@ import Link from "next/link"
 import { Clock } from "lucide-react"
 import { getOrderDetails } from "../../../actions"
 import { CheckStatusButton } from "./check-status-button"
+import { OrderStatusTracker } from "@/components/analytics/order-status-tracker"
 
 interface PendingPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -29,6 +30,12 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
 
     return (
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center p-4">
+            <OrderStatusTracker
+                eventName="payment_pending"
+                orderId={order.id}
+                orderTotal={order.total}
+                paymentMethod={order.payment_method}
+            />
             <div className="max-w-2xl w-full">
                 <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-8 text-center">
                     {/* Pending Icon */}

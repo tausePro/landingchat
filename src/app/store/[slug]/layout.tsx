@@ -3,6 +3,7 @@ import { headers } from "next/headers"
 import { getStoreData } from "./actions"
 import { MetaPixel } from "@/components/analytics/meta-pixel"
 import { TrackingProvider } from "@/components/analytics/tracking-provider"
+import { StorefrontPageTracker } from "@/components/analytics/StorefrontPageTracker"
 import { OrganizationJsonLd } from "@/components/seo/organization-json-ld"
 import { ForceLightTheme } from "@/components/store/force-light-theme"
 
@@ -92,6 +93,7 @@ export default async function StoreLayout({
                 organizationName={organization?.name}
                 posthogEnabled={posthogEnabled}
             >
+                <StorefrontPageTracker />
                 {children}
             </TrackingProvider>
         </>
