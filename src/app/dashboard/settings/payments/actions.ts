@@ -1,5 +1,6 @@
 "use server"
 
+import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { encrypt, decrypt } from "@/lib/utils/encryption"
@@ -9,11 +10,17 @@ import {
     failure,
     type PaymentGatewayConfig,
     PaymentGatewayConfigInputSchema,
+    PaymentProviderSchema,
     deserializePaymentGatewayConfig,
     type ManualPaymentMethods,
     ManualPaymentMethodsInputSchema,
     deserializeManualPaymentMethods,
 } from "@/types"
+
+const PaymentGatewayBrandingInputSchema = z.object({
+    provider: PaymentProviderSchema,
+    logo_url: z.union([z.string().url(), z.literal(""), z.null()]).optional(),
+})
 
 /**
  * Obtiene la organización del usuario actual
@@ -216,6 +223,82 @@ export async function savePaymentConfig(
     } catch (error) {
         return failure(
             error instanceof Error ? error.message : "Error al guardar configuración"
+        )
+    }
+}
+
+export async function savePaymentGatewayBranding(
+    input: unknown
+): Promise<ActionResult<PaymentGatewayConfig>> {
+    try {
+        const organizationId = await getCurrentOrganization()
+        if (!organizationId) {
+            return failure("No autorizado")
+        }
+
+        const validation = PaymentGatewayBrandingInputSchema.safeParse(input)
+        if (!validation.success) {
+            return failure(validation.error.issues[0].message)
+        }
+
+        const data = validation.data
+        const supabase = await createClient()
+        const { data: existingConfig, error: existingError } = await supabase
+            .from("payment_gateway_configs")
+            .select("*")
+            .eq("organization_id", organizationId)
+            .eq("provider", data.provider)
+            .single()
+
+        if (existingError || !existingConfig) {
+            return failure("Configura la pasarela antes de agregar un logo")
+        }
+
+        const currentConfig =
+            existingConfig.config &&
+            typeof existingConfig.config === "object" &&
+            !Array.isArray(existingConfig.config)
+                ? existingConfig.config
+                : {}
+
+        const logoUrl = typeof data.logo_url === "string" ? data.logo_url.trim() : null
+        const nextConfig = {
+            ...currentConfig,
+            logo_url: logoUrl || null,
+        }
+
+        const { data: result, error } = await supabase
+            .from("payment_gateway_configs")
+            .update({
+                config: nextConfig,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("organization_id", organizationId)
+            .eq("provider", data.provider)
+            .select()
+            .single()
+
+        if (error) {
+            return failure(error.message)
+        }
+
+        revalidatePath("/dashboard/settings/payments")
+        revalidatePath(`/dashboard/settings/${data.provider}`)
+
+        const config = deserializePaymentGatewayConfig(result)
+        return success({
+            ...config,
+            private_key_encrypted: config.private_key_encrypted ? "***" : null,
+            integrity_secret_encrypted: config.integrity_secret_encrypted
+                ? "***"
+                : null,
+            encryption_key_encrypted: config.encryption_key_encrypted
+                ? "***"
+                : null,
+        })
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al guardar branding"
         )
     }
 }

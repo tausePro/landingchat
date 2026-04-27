@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,18 @@ interface ShippingConfig {
     free_shipping_zones: string[] | null
 }
 
+interface PaymentGatewayOption {
+    provider: string
+    is_active: boolean
+    is_test_mode: boolean
+    config?: Record<string, unknown> | null
+}
+
+function getPaymentGatewayLogoUrl(gateway: PaymentGatewayOption) {
+    const logoUrl = gateway.config?.logo_url
+    return typeof logoUrl === "string" && logoUrl.trim().length > 0 ? logoUrl : null
+}
+
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackInitiateCheckout, trackEvent } = useTracking()
@@ -38,7 +51,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const [loading, setLoading] = useState(false)
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
-    const [availableGateways, setAvailableGateways] = useState<Array<{ provider: string, is_active: boolean, is_test_mode: boolean }>>([])
+    const [availableGateways, setAvailableGateways] = useState<PaymentGatewayOption[]>([])
     const [gatewaysLoading, setGatewaysLoading] = useState(true)
     const [manualPaymentInfo, setManualPaymentInfo] = useState<{
         bank_transfer_enabled?: boolean
@@ -811,27 +824,45 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                     ) : (
                                         <div className="grid grid-cols-2 gap-3">
                                             {/* Show available payment gateways */}
-                                            {availableGateways.map((gateway) => (
-                                                <div
-                                                    key={gateway.provider}
-                                                    className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                    onClick={() => handlePaymentMethodChange(gateway.provider as 'wompi' | 'epayco' | 'manual')}
-                                                >
-                                                    <span className="font-bold">
-                                                        {gateway.provider === 'wompi' && 'Wompi'}
-                                                        {gateway.provider === 'epayco' && 'ePayco'}
-                                                    </span>
-                                                    <span className="text-xs text-center text-slate-500">
-                                                        {gateway.provider === 'wompi' && 'Tarjetas, PSE, Nequi'}
-                                                        {gateway.provider === 'epayco' && 'Tarjetas, PSE, Nequi'}
-                                                    </span>
-                                                    {gateway.is_test_mode && (
-                                                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                                                            Pruebas
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ))}
+                                            {availableGateways.map((gateway) => {
+                                                const logoUrl = getPaymentGatewayLogoUrl(gateway)
+                                                const providerName = gateway.provider === 'wompi' ? 'Wompi' : 'ePayco'
+                                                const providerDescription = gateway.provider === 'wompi'
+                                                    ? 'Tarjetas, PSE, Nequi'
+                                                    : 'Tarjetas y PSE'
+
+                                                return (
+                                                    <div
+                                                        key={gateway.provider}
+                                                        className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
+                                                        onClick={() => handlePaymentMethodChange(gateway.provider as 'wompi' | 'epayco' | 'manual')}
+                                                    >
+                                                        {logoUrl ? (
+                                                            <div className="flex min-h-16 w-full items-center justify-center">
+                                                                <Image
+                                                                    src={logoUrl}
+                                                                    alt={`Logo de ${providerName}`}
+                                                                    width={180}
+                                                                    height={72}
+                                                                    className="max-h-16 w-full object-contain"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <span className="font-bold">{providerName}</span>
+                                                                <span className="text-xs text-center text-slate-500">
+                                                                    {providerDescription}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                        {gateway.is_test_mode && (
+                                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                                                Pruebas
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })}
 
                                             {/* Show manual payment only if bank_transfer_enabled */}
                                             {manualPaymentInfo?.bank_transfer_enabled && (

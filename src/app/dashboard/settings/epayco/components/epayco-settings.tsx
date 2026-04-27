@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, ExternalLink } from "lucide-react"
 import { saveEpaycoConfig, getEpaycoConfig, testEpaycoConnection } from "@/app/dashboard/settings/epayco/actions"
+import { PaymentBrandingSelector } from "@/app/dashboard/settings/payments/components/payment-branding-selector"
 
 interface EpaycoConfig {
     isActive: boolean
@@ -19,6 +20,17 @@ interface EpaycoConfig {
     privateKey: string
     customerId: string
     encryptionKey: string
+    logoUrl: string
+}
+
+function getGatewayLogoUrl(data: Record<string, unknown>) {
+    const config = data.config
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+        return ""
+    }
+
+    const logoUrl = (config as Record<string, unknown>).logo_url
+    return typeof logoUrl === "string" ? logoUrl : ""
 }
 
 export function EpaycoSettings() {
@@ -35,7 +47,8 @@ export function EpaycoSettings() {
         publicKey: "",
         privateKey: "",
         customerId: "",
-        encryptionKey: ""
+        encryptionKey: "",
+        logoUrl: "",
     })
 
     // Cargar configuración existente
@@ -47,13 +60,15 @@ export function EpaycoSettings() {
         try {
             const result = await getEpaycoConfig()
             if (result.success && result.data) {
+                const data = result.data as Record<string, unknown>
                 setConfig({
-                    isActive: result.data.is_active || false,
-                    isTestMode: result.data.is_test_mode ?? true,
-                    publicKey: result.data.public_key || "",
-                    privateKey: "", // No mostrar la clave encriptada
-                    customerId: "", // No mostrar el ID encriptado
-                    encryptionKey: "" // No mostrar la clave encriptada
+                    isActive: (data.is_active as boolean) || false,
+                    isTestMode: (data.is_test_mode as boolean) ?? true,
+                    publicKey: (data.public_key as string) || "",
+                    privateKey: "",
+                    customerId: "",
+                    encryptionKey: "",
+                    logoUrl: getGatewayLogoUrl(data),
                 })
             }
         } catch (error) {
@@ -85,7 +100,7 @@ export function EpaycoSettings() {
             } else {
                 toast.error(result.error || "Error al guardar configuración")
             }
-        } catch (error) {
+        } catch {
             toast.error("Error inesperado al guardar")
         } finally {
             setLoading(false)
@@ -111,7 +126,7 @@ export function EpaycoSettings() {
                     : result.error || "Error de conexión"
                 toast.error(errorMessage)
             }
-        } catch (error) {
+        } catch {
             setConnectionStatus('error')
             toast.error("Error al probar conexión")
         } finally {
@@ -301,6 +316,13 @@ export function EpaycoSettings() {
                             Tu llave de encriptación de ePayco (requerida para webhooks)
                         </p>
                     </div>
+
+                    <PaymentBrandingSelector
+                        key={config.logoUrl}
+                        provider="epayco"
+                        providerName="ePayco"
+                        initialLogoUrl={config.logoUrl}
+                    />
 
                     {/* Activar Pasarela */}
                     <div className="flex items-center justify-between rounded-lg border p-4">
