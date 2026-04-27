@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +33,7 @@ interface ShippingConfig {
 
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
-    const { trackInitiateCheckout } = useTracking()
+    const { trackInitiateCheckout, trackEvent } = useTracking()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
@@ -55,50 +55,55 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     const [couponCode, setCouponCode] = useState("")
     const [couponLoading, setCouponLoading] = useState(false)
     const [couponError, setCouponError] = useState<string | null>(null)
+    const hasTrackedCheckoutOpen = useRef(false)
 
     useEffect(() => {
-        if (isOpen) {
-            // Track InitiateCheckout event when modal opens
+        if (!isOpen) {
+            hasTrackedCheckoutOpen.current = false
+            return
+        }
+
+        if (!hasTrackedCheckoutOpen.current) {
+            hasTrackedCheckoutOpen.current = true
             const contentIds = items.map(item => getCartItemProductId(item))
             trackInitiateCheckout(total(), "COP", contentIds)
-
-            // Load shipping configuration
-            getShippingConfig(slug).then(result => {
-                if (result.success && result.config) {
-                    setShippingConfig(result.config)
-                } else {
-                    // Default shipping config
-                    setShippingConfig({
-                        default_shipping_rate: 0,
-                        free_shipping_enabled: false,
-                        free_shipping_min_amount: null,
-                        free_shipping_zones: null
-                    })
-                }
-            })
-
-            // Load available payment gateways
-            setGatewaysLoading(true)
-            getAvailablePaymentGateways(slug).then(result => {
-                if (result.success) {
-                    setAvailableGateways(result.gateways)
-                    // Set default payment method based on available gateways
-                    if (result.gateways.length > 0) {
-                        setPaymentMethod(result.gateways[0].provider as 'wompi' | 'epayco' | 'manual')
-                    } else {
-                        setPaymentMethod('manual')
-                    }
-                }
-                setGatewaysLoading(false)
-            })
-
-            // Load manual payment info
-            getManualPaymentInfo(slug).then(result => {
-                if (result.success && result.data) {
-                    setManualPaymentInfo(result.data)
-                }
-            })
         }
+    }, [isOpen, items, total, trackInitiateCheckout])
+
+    useEffect(() => {
+        if (!isOpen) return
+
+        getShippingConfig(slug).then(result => {
+            if (result.success && result.config) {
+                setShippingConfig(result.config)
+            } else {
+                setShippingConfig({
+                    default_shipping_rate: 0,
+                    free_shipping_enabled: false,
+                    free_shipping_min_amount: null,
+                    free_shipping_zones: null
+                })
+            }
+        })
+
+        setGatewaysLoading(true)
+        getAvailablePaymentGateways(slug).then(result => {
+            if (result.success) {
+                setAvailableGateways(result.gateways)
+                if (result.gateways.length > 0) {
+                    setPaymentMethod(result.gateways[0].provider as 'wompi' | 'epayco' | 'manual')
+                } else {
+                    setPaymentMethod('manual')
+                }
+            }
+            setGatewaysLoading(false)
+        })
+
+        getManualPaymentInfo(slug).then(result => {
+            if (result.success && result.data) {
+                setManualPaymentInfo(result.data)
+            }
+        })
     }, [isOpen, slug])
 
     const [formData, setFormData] = useState({
@@ -172,6 +177,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
     // Calculate local fallback fee
     const localFee = (paymentMethod === 'contraentrega' && manualPaymentInfo?.cod_additional_cost) ? manualPaymentInfo.cod_additional_cost : 0
     const displayFee = orderSummary?.paymentMethodFee ?? localFee
+    const hasConfiguredPaymentMethods = availableGateways.length > 0 || Boolean(manualPaymentInfo?.bank_transfer_enabled || manualPaymentInfo?.cod_enabled)
 
     // Coupon discount - reactivo, aplica solo a items que correspondan
     const couponDiscount = calculateCouponDiscount(appliedCoupon, subtotal, items.map(item => toCouponCartItem(item)))
@@ -197,14 +203,42 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
             const result = await validateCoupon(slug, couponCode.trim(), subtotal)
             if (result.success && result.coupon) {
                 setAppliedCoupon(result.coupon)
+                trackEvent("cart_coupon_applied", {
+                    value: subtotal,
+                    currency: "COP",
+                    contentIds: items.map(item => getCartItemProductId(item)),
+                    sourceChannel,
+                    properties: {
+                        couponCode: result.coupon.code,
+                        discountAmount: calculateCouponDiscount(result.coupon, subtotal, items.map(item => toCouponCartItem(item))),
+                    },
+                })
                 setCouponCode("")
                 toast.success(`¡Cupón ${result.coupon.code} aplicado!`)
             } else {
                 setCouponError(result.error || "Cupón inválido")
                 setAppliedCoupon(null)
+                trackEvent("cart_coupon_failed", {
+                    value: subtotal,
+                    currency: "COP",
+                    sourceChannel,
+                    properties: {
+                        couponCode: couponCode.trim().toUpperCase(),
+                        failureReason: result.error || "invalid_coupon",
+                    },
+                })
             }
         } catch {
             setCouponError("Error al validar cupón")
+            trackEvent("cart_coupon_failed", {
+                value: subtotal,
+                currency: "COP",
+                sourceChannel,
+                properties: {
+                    couponCode: couponCode.trim().toUpperCase(),
+                    failureReason: "validation_error",
+                },
+            })
         } finally {
             setCouponLoading(false)
         }
@@ -221,17 +255,47 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
 
         // Validate required fields
         if (!formData.document_type || !formData.document_number || !formData.person_type) {
+            trackEvent("checkout_contact_validation_failed", {
+                value: finalTotal,
+                currency: "COP",
+                contentIds: items.map(item => getCartItemProductId(item)),
+                sourceChannel,
+                properties: {
+                    validationField: "billing",
+                    itemCount: items.length,
+                },
+            })
             toast.error("Por favor completa todos los campos de facturación")
             return
         }
 
         if (!formData.state) {
+            trackEvent("checkout_contact_validation_failed", {
+                value: finalTotal,
+                currency: "COP",
+                contentIds: items.map(item => getCartItemProductId(item)),
+                sourceChannel,
+                properties: {
+                    validationField: "state",
+                    itemCount: items.length,
+                },
+            })
             toast.error("Por favor selecciona tu departamento")
             return
         }
 
         // Check shipping availability to customer's city
         if (!shippingAvailability.available) {
+            trackEvent("checkout_shipping_unavailable", {
+                value: finalTotal,
+                currency: "COP",
+                contentIds: items.map(item => getCartItemProductId(item)),
+                sourceChannel,
+                properties: {
+                    validationField: "city",
+                    failureReason: shippingAvailability.message || "shipping_unavailable",
+                },
+            })
             toast.error(shippingAvailability.message || "No realizamos envíos a tu ciudad por el momento")
             return
         }
@@ -241,10 +305,47 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
             toast.warning("Se recomienda ingresar el nombre de la empresa para personas jurídicas")
         }
 
+        trackEvent("checkout_contact_submitted", {
+            value: finalTotal,
+            currency: "COP",
+            contentIds: items.map(item => getCartItemProductId(item)),
+            sourceChannel,
+            properties: {
+                itemCount: items.length,
+                cartValue: subtotal,
+                shippingCost: couponFreeShipping ? 0 : shippingCost,
+                discountAmount: couponDiscount,
+                hasCoupon: Boolean(appliedCoupon),
+            },
+        })
+        trackEvent("checkout_payment_method_selected", {
+            value: finalTotal,
+            currency: "COP",
+            contentIds: items.map(item => getCartItemProductId(item)),
+            sourceChannel,
+            properties: {
+                paymentMethod,
+            },
+        })
         setStep('payment')
     }
 
     const handlePlaceOrder = async () => {
+        if (!hasConfiguredPaymentMethods) {
+            trackEvent("checkout_order_create_failed", {
+                value: finalTotal,
+                currency: "COP",
+                contentIds: items.map(item => getCartItemProductId(item)),
+                sourceChannel,
+                properties: {
+                    failureReason: "no_payment_methods_configured",
+                    paymentMethod,
+                },
+            })
+            toast.error("La tienda no tiene métodos de pago disponibles en este momento.")
+            return
+        }
+
         setLoading(true)
         try {
             // Obtener tracking params (UTM, referrer, etc.)
@@ -285,19 +386,92 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
             if (result.success) {
                 if (result.order) {
                     setCreatedOrderId(result.order.id) // Store ID for redirection
+                    trackEvent("checkout_order_created", {
+                        value: finalTotal,
+                        currency: "COP",
+                        contentIds: items.map(item => getCartItemProductId(item)),
+                        orderId: result.order.id,
+                        sourceChannel,
+                        properties: {
+                            paymentMethod,
+                            itemCount: items.length,
+                            shippingCost: couponFreeShipping ? 0 : shippingCost,
+                            discountAmount: couponDiscount,
+                            hasCoupon: Boolean(appliedCoupon),
+                        },
+                    })
                 }
 
                 // If payment URL exists, redirect to gateway
                 if (result.paymentUrl) {
+                    trackEvent("checkout_payment_redirect_started", {
+                        value: finalTotal,
+                        currency: "COP",
+                        contentIds: items.map(item => getCartItemProductId(item)),
+                        orderId: result.order?.id,
+                        sourceChannel,
+                        properties: {
+                            paymentMethod,
+                            gateway: paymentMethod === "wompi" || paymentMethod === "epayco" ? paymentMethod : undefined,
+                        },
+                    })
                     window.location.href = result.paymentUrl
                     return
                 }
 
                 // Manual payment - show success
+                trackEvent("checkout_payment_instructions_shown", {
+                    value: finalTotal,
+                    currency: "COP",
+                    contentIds: items.map(item => getCartItemProductId(item)),
+                    orderId: result.order?.id,
+                    sourceChannel,
+                    properties: {
+                        paymentMethod,
+                    },
+                })
                 setStep('success')
                 clearCart()
             } else {
-                toast.error("Error al crear la orden: " + result.error)
+                if (result.order) {
+                    setCreatedOrderId(result.order.id)
+                    trackEvent("checkout_order_created", {
+                        value: finalTotal,
+                        currency: "COP",
+                        contentIds: items.map(item => getCartItemProductId(item)),
+                        orderId: result.order.id,
+                        sourceChannel,
+                        properties: {
+                            paymentMethod,
+                            itemCount: items.length,
+                        },
+                    })
+                    trackEvent("checkout_gateway_load_failed", {
+                        value: finalTotal,
+                        currency: "COP",
+                        contentIds: items.map(item => getCartItemProductId(item)),
+                        orderId: result.order.id,
+                        sourceChannel,
+                        properties: {
+                            paymentMethod,
+                            gateway: paymentMethod === "wompi" || paymentMethod === "epayco" ? paymentMethod : undefined,
+                            failureReason: result.error || "payment_initialization_failed",
+                        },
+                    })
+                    toast.error("Tu orden fue creada, pero no pudimos abrir el pago. Puedes reintentarlo desde el detalle del pedido.")
+                } else {
+                    trackEvent("checkout_order_create_failed", {
+                        value: finalTotal,
+                        currency: "COP",
+                        contentIds: items.map(item => getCartItemProductId(item)),
+                        sourceChannel,
+                        properties: {
+                            paymentMethod,
+                            failureReason: result.error || "order_create_failed",
+                        },
+                    })
+                    toast.error("Error al crear la orden: " + result.error)
+                }
             }
         } catch (error) {
             console.error(error)
@@ -305,6 +479,19 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         } finally {
             setLoading(false)
         }
+    }
+
+    const handlePaymentMethodChange = (method: 'wompi' | 'epayco' | 'manual' | 'contraentrega') => {
+        setPaymentMethod(method)
+        trackEvent("checkout_payment_method_selected", {
+            value: finalTotal,
+            currency: "COP",
+            contentIds: items.map(item => getCartItemProductId(item)),
+            sourceChannel,
+            properties: {
+                paymentMethod: method,
+            },
+        })
     }
 
     const formatPrice = (price: number) => {
@@ -631,7 +818,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                             <div
                                                 key={gateway.provider}
                                                 className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === gateway.provider ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => setPaymentMethod(gateway.provider as 'wompi' | 'epayco' | 'manual')}
+                                                onClick={() => handlePaymentMethodChange(gateway.provider as 'wompi' | 'epayco' | 'manual')}
                                             >
                                                 <span className="font-bold">
                                                     {gateway.provider === 'wompi' && 'Wompi'}
@@ -653,7 +840,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         {manualPaymentInfo?.bank_transfer_enabled && (
                                             <div
                                                 className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'manual' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => setPaymentMethod('manual')}
+                                                onClick={() => handlePaymentMethodChange('manual')}
                                             >
                                                 <span className="font-bold">Transferencia</span>
                                                 <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
@@ -664,7 +851,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                         {manualPaymentInfo?.cod_enabled && (
                                             <div
                                                 className={`border rounded-lg p-3 cursor-pointer flex flex-col items-center gap-2 transition-all ${paymentMethod === 'contraentrega' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-slate-200 hover:border-slate-300'}`}
-                                                onClick={() => setPaymentMethod('contraentrega')}
+                                                onClick={() => handlePaymentMethodChange('contraentrega')}
                                             >
                                                 <span className="font-bold">Contra Entrega</span>
                                                 <span className="text-xs text-center text-slate-500">
@@ -727,14 +914,13 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                 </div>
                             )}
 
-                            {/* No bank info configured message */}
-                            {paymentMethod === 'manual' && (!manualPaymentInfo || !manualPaymentInfo.bank_transfer_enabled) && (
+                            {!gatewaysLoading && !hasConfiguredPaymentMethods && (
                                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
                                     <div className="flex items-start gap-3">
                                         <span className="material-symbols-outlined text-amber-500">info</span>
                                         <div>
                                             <p className="text-sm text-amber-800 dark:text-amber-200">
-                                                Después de confirmar tu orden, recibirás instrucciones de pago por WhatsApp o correo.
+                                                La tienda no tiene métodos de pago disponibles en este momento. Intenta más tarde o contacta a la tienda.
                                             </p>
                                         </div>
                                     </div>
@@ -746,7 +932,7 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                                     <Button variant="outline" onClick={() => setStep('contact')} className="flex-1">
                                         Atrás
                                     </Button>
-                                    <Button onClick={handlePlaceOrder} disabled={loading} className="flex-1 bg-primary text-white hover:bg-primary/90">
+                                    <Button onClick={handlePlaceOrder} disabled={loading || gatewaysLoading || !hasConfiguredPaymentMethods} className="flex-1 bg-primary text-white hover:bg-primary/90">
                                         {loading ? "Procesando..." : "Confirmar Orden"}
                                     </Button>
                                 </div>

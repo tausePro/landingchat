@@ -4,9 +4,10 @@ import { getCartItemLineId, getCartItemProductId, toCouponCartItem, toOrderSumma
 import { cn } from "@/lib/utils"
 import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/utils/shipping"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { validateCoupon, calculateOrderSummary } from "@/app/chat/actions"
 import { calculateCouponDiscount } from "@/lib/utils/coupon"
+import { useTracking } from "@/components/analytics/tracking-provider"
 
 interface RecommendationItem {
     id: string
@@ -28,13 +29,31 @@ interface CartSidebarProps {
 
 export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", recommendations = [], onClose, onCheckout }: CartSidebarProps) {
     const { items, removeItem, updateQuantity, total, addItem, appliedCoupon, setAppliedCoupon } = useCartStore()
+    const { trackAddToCart, trackEvent } = useTracking()
     const [showCouponInput, setShowCouponInput] = useState(false)
     const [couponCode, setCouponCode] = useState("")
     const [couponLoading, setCouponLoading] = useState(false)
     const [couponError, setCouponError] = useState<string | null>(null)
     const [taxInfo, setTaxInfo] = useState<{ tax: number; baseSubtotal: number; pricesIncludeTax: boolean } | null>(null)
+    const hasTrackedOpen = useRef(false)
 
     const currentTotal = total()
+
+    useEffect(() => {
+        if (hasTrackedOpen.current || items.length === 0) return
+
+        hasTrackedOpen.current = true
+        trackEvent("cart_opened", {
+            value: currentTotal,
+            currency: "COP",
+            contentIds: items.map(item => getCartItemProductId(item)),
+            properties: {
+                itemCount: items.length,
+                cartValue: currentTotal,
+                hasCoupon: Boolean(appliedCoupon),
+            },
+        })
+    }, [appliedCoupon, currentTotal, items, trackEvent])
 
     // Descuento reactivo: recalcular cada vez que cambia el carrito
     // Pasar items para que cupones targeted solo apliquen a productos/categorías correspondientes
@@ -74,13 +93,38 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
             const result = await validateCoupon(slug, couponCode.trim(), currentTotal)
             if (result.success && result.coupon) {
                 setAppliedCoupon(result.coupon)
+                trackEvent("cart_coupon_applied", {
+                    value: currentTotal,
+                    currency: "COP",
+                    contentIds: items.map(item => getCartItemProductId(item)),
+                    properties: {
+                        couponCode: result.coupon.code,
+                        discountAmount: calculateCouponDiscount(result.coupon, currentTotal, items.map(item => toCouponCartItem(item))),
+                    },
+                })
                 setCouponCode("")
                 setShowCouponInput(false)
             } else {
                 setCouponError(result.error || "Cupón inválido")
+                trackEvent("cart_coupon_failed", {
+                    value: currentTotal,
+                    currency: "COP",
+                    properties: {
+                        couponCode: couponCode.trim().toUpperCase(),
+                        failureReason: result.error || "invalid_coupon",
+                    },
+                })
             }
         } catch {
             setCouponError("Error al validar cupón")
+            trackEvent("cart_coupon_failed", {
+                value: currentTotal,
+                currency: "COP",
+                properties: {
+                    couponCode: couponCode.trim().toUpperCase(),
+                    failureReason: "validation_error",
+                },
+            })
         } finally {
             setCouponLoading(false)
         }
@@ -114,6 +158,29 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
             compare_at_price: crossSellProduct.sale_price ? crossSellProduct.price : null,
             image_url: crossSellProduct.image_url,
             categories: crossSellProduct.categories,
+        })
+        trackAddToCart(crossSellProduct.id, crossSellProduct.name, crossSellProduct.sale_price || crossSellProduct.price, "COP")
+    }
+
+    const handleRemoveItem = (lineId: string, productId: string, itemTotal: number) => {
+        removeItem(lineId)
+        trackEvent("cart_item_removed", {
+            value: itemTotal,
+            currency: "COP",
+            contentIds: [productId],
+        })
+    }
+
+    const handleUpdateQuantity = (lineId: string, productId: string, previousQuantity: number, newQuantity: number, itemValue: number) => {
+        updateQuantity(lineId, newQuantity)
+        trackEvent("cart_quantity_changed", {
+            value: itemValue,
+            currency: "COP",
+            contentIds: [productId],
+            properties: {
+                previousQuantity,
+                newQuantity,
+            },
         })
     }
 
@@ -180,7 +247,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                             {items.map((item) => (
                                 <div key={getCartItemLineId(item)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3 shadow-sm relative group hover:border-primary/30 transition-colors">
                                     <button 
-                                        onClick={() => removeItem(getCartItemLineId(item))}
+                                        onClick={() => handleRemoveItem(getCartItemLineId(item), getCartItemProductId(item), item.unit_price * item.quantity)}
                                         className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                                     >
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -201,12 +268,12 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                                 <span className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(item.unit_price)}</span>
                                                 <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-700 rounded-lg px-1.5 py-0.5 border border-gray-100 dark:border-gray-600">
                                                     <button 
-                                                        onClick={() => updateQuantity(getCartItemLineId(item), Math.max(0, item.quantity - 1))}
+                                                        onClick={() => handleUpdateQuantity(getCartItemLineId(item), getCartItemProductId(item), item.quantity, Math.max(0, item.quantity - 1), item.unit_price * Math.max(0, item.quantity - 1))}
                                                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[12px] font-bold px-1"
                                                     >-</button>
                                                     <span className="text-[10px] font-medium w-3 text-center text-gray-700 dark:text-gray-200">{item.quantity}</span>
                                                     <button 
-                                                        onClick={() => updateQuantity(getCartItemLineId(item), item.quantity + 1)}
+                                                        onClick={() => handleUpdateQuantity(getCartItemLineId(item), getCartItemProductId(item), item.quantity, item.quantity + 1, item.unit_price * (item.quantity + 1))}
                                                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[12px] font-bold px-1"
                                                     >+</button>
                                                 </div>
