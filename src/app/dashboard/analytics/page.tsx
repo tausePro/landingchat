@@ -13,6 +13,7 @@ import { AiPerformanceCard } from "./components/ai-performance-card"
 import { formatBogotaDayKey } from "@/lib/utils/date"
 import { CampaignPerformanceCard, type CampaignPerformance } from "./components/campaign-performance-card"
 import { CheckoutIntelligenceCard, type CheckoutIntelligence } from "./components/checkout-intelligence-card"
+import { ProactiveNudgeCard, type ProactiveNudgeAnalytics } from "./components/proactive-nudge-card"
 
 export const dynamic = 'force-dynamic'
 
@@ -446,6 +447,68 @@ async function getAnalyticsData() {
         productRisks: checkoutProductRisks,
     }
 
+    const proactiveNudgeEvents = analyticsEvents.filter(event =>
+        event.event_name === "proactive_nudge_shown"
+        || event.event_name === "proactive_nudge_clicked"
+        || event.event_name === "proactive_nudge_dismissed"
+    )
+    const proactiveNudgeProductStats = new Map<string, {
+        productName: string
+        shown: number
+        clicked: number
+        dismissed: number
+    }>()
+    let proactiveNudgeShown = 0
+    let proactiveNudgeClicked = 0
+    let proactiveNudgeDismissed = 0
+    let proactiveNudgeWebChatClicks = 0
+    let proactiveNudgeWhatsappClicks = 0
+
+    proactiveNudgeEvents.forEach(event => {
+        if (event.event_name === "proactive_nudge_shown") proactiveNudgeShown += 1
+        if (event.event_name === "proactive_nudge_clicked") proactiveNudgeClicked += 1
+        if (event.event_name === "proactive_nudge_dismissed") proactiveNudgeDismissed += 1
+
+        const destination = event.properties ? getStringValue(event.properties, "destination") : undefined
+        if (event.event_name === "proactive_nudge_clicked" && destination === "web_chat") proactiveNudgeWebChatClicks += 1
+        if (event.event_name === "proactive_nudge_clicked" && destination === "whatsapp_fallback") proactiveNudgeWhatsappClicks += 1
+
+        const productIds = Array.from(new Set(getEventProductIds(event)))
+        productIds.forEach(productId => {
+            const current = proactiveNudgeProductStats.get(productId) || {
+                productName: getEventProductName(event, productId),
+                shown: 0,
+                clicked: 0,
+                dismissed: 0,
+            }
+
+            if (event.event_name === "proactive_nudge_shown") current.shown += 1
+            if (event.event_name === "proactive_nudge_clicked") current.clicked += 1
+            if (event.event_name === "proactive_nudge_dismissed") current.dismissed += 1
+            proactiveNudgeProductStats.set(productId, current)
+        })
+    })
+
+    const proactiveNudgeAnalytics: ProactiveNudgeAnalytics = {
+        shown: proactiveNudgeShown,
+        clicked: proactiveNudgeClicked,
+        dismissed: proactiveNudgeDismissed,
+        ctr: proactiveNudgeShown > 0 ? (proactiveNudgeClicked / proactiveNudgeShown) * 100 : 0,
+        webChatClicks: proactiveNudgeWebChatClicks,
+        whatsappClicks: proactiveNudgeWhatsappClicks,
+        topProducts: Array.from(proactiveNudgeProductStats.entries())
+            .map(([productId, stats]) => ({
+                productId,
+                productName: stats.productName,
+                shown: stats.shown,
+                clicked: stats.clicked,
+                dismissed: stats.dismissed,
+                ctr: stats.shown > 0 ? (stats.clicked / stats.shown) * 100 : 0,
+            }))
+            .sort((a, b) => b.clicked - a.clicked || b.shown - a.shown || b.ctr - a.ctr)
+            .slice(0, 5),
+    }
+
     const paidOrders = orders?.filter(order => order.payment_status === "paid").length || 0
     const fallbackPaidOrders = paidOrders || totalOrders
     const funnelStages: FunnelStage[] = [
@@ -671,6 +734,7 @@ async function getAnalyticsData() {
         },
         campaignPerformance,
         checkoutIntelligence,
+        proactiveNudgeAnalytics,
         topProducts,
         lowStockProducts,
         revenueBySource,
@@ -816,6 +880,8 @@ export default async function AnalyticsPage() {
                 </div>
 
                 <CheckoutIntelligenceCard intelligence={data.checkoutIntelligence} />
+
+                <ProactiveNudgeCard analytics={data.proactiveNudgeAnalytics} />
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     <SalesSources
