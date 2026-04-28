@@ -17,6 +17,7 @@ import { useTrackingParams } from "@/hooks/use-tracking-params"
 import { ConversationalLayout } from "@/components/store/layouts/conversational-layout"
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
+import { ProactiveChatBubble } from "@/components/store/proactive-chat-bubble"
 import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
 
 // ... (in render)
@@ -101,9 +102,10 @@ interface StoreLayoutClientProps {
     hideHeaderOnMobile?: boolean
     initialIsSubdomain?: boolean
     defaultChatProductId?: string
+    defaultChatProductName?: string | null
 }
 
-export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId, defaultChatProductName }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientIsSubdomain = useIsSubdomain()
@@ -383,6 +385,17 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                         </button>
                     )}
                 </div>
+            )}
+
+            {!USE_CONVERSATIONAL_LAYOUT && !isRealEstate && defaultChatProductId && !showGateModal && !isCheckoutOpen && (
+                <ProactiveChatBubble
+                    slug={slug}
+                    productId={defaultChatProductId}
+                    productName={defaultChatProductName}
+                    primaryColor={primaryColor}
+                    onStartChat={handleStartChat}
+                    whatsappPhone={organization.settings?.whatsapp?.phone}
+                />
             )}
         </div>
     )
