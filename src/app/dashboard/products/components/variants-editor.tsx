@@ -1,21 +1,18 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo, useState } from "react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 
-interface VariantValue {
-    name: string
-    priceAdjustment: number
-}
-
 interface Variant {
     type: string
     values: string[]
     hasPriceAdjustment?: boolean
-    priceAdjustments?: Record<string, number> // { "S": 0, "XL": 5000 }
+    priceAdjustments?: Record<string, number> // Legacy field
+    variantPrices?: Record<string, number>
     hasStockByVariant?: boolean
     stockByVariant?: Record<string, number> // { "S": 10, "M": 5, "L": 0 }
     hasImageMapping?: boolean
@@ -26,18 +23,58 @@ interface VariantsEditorProps {
     variants: Variant[]
     onChange: (variants: Variant[]) => void
     productImages: string[]
+    basePrice: number
 }
 
-export function VariantsEditor({ variants, onChange, productImages = [] }: VariantsEditorProps) {
+interface SellableVariantCombination {
+    title: string
+    key: string
+}
+
+function getVariantOptionKey(optionValues: Array<{ option_name: string; value: string }>): string {
+    return optionValues.map((optionValue) => `${optionValue.option_name}:${optionValue.value}`).join("|")
+}
+
+function buildSellableVariantCombinations(variants: Variant[]): SellableVariantCombination[] {
+    const configuredVariants = variants
+        .map((variant) => ({
+            type: variant.type.trim(),
+            values: variant.values.map((value) => value.trim()).filter(Boolean),
+        }))
+        .filter((variant) => variant.type && variant.values.length > 0)
+
+    if (configuredVariants.length === 0) {
+        return []
+    }
+
+    return configuredVariants
+        .reduce<Array<Array<{ option_name: string; value: string }>>>(
+            (combinations, variant) => combinations.flatMap((combination) => (
+                variant.values.map((value) => [
+                    ...combination,
+                    { option_name: variant.type, value },
+                ])
+            )),
+            [[]],
+        )
+        .map((optionValues) => ({
+            title: optionValues.map((optionValue) => optionValue.value).join(" / "),
+            key: getVariantOptionKey(optionValues),
+        }))
+}
+
+export function VariantsEditor({ variants, onChange, productImages = [], basePrice }: VariantsEditorProps) {
     // Local state for input values (allows free typing)
     const [localValues, setLocalValues] = useState<string[]>(
         variants.map(v => v.values.join(', '))
     )
 
-    // Sync local state when variants prop changes externally
-    useEffect(() => {
-        setLocalValues(variants.map(v => v.values.join(', ')))
-    }, [variants.length])
+    const sellableVariantCombinations = useMemo(
+        () => buildSellableVariantCombinations(variants),
+        [variants],
+    )
+    const variantPricingEnabled = variants.some((variant) => variant.hasPriceAdjustment)
+    const variantPrices = variants.find((variant) => variant.variantPrices)?.variantPrices ?? {}
 
     const handleAdd = () => {
         const newVariants = [...variants, { type: "", values: [], hasPriceAdjustment: false, priceAdjustments: {} }]
@@ -69,14 +106,7 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
         const values = valuesStr.split(',').map(v => v.trim()).filter(v => v.length > 0)
 
         const newVariants = [...variants]
-        // Preserve existing price adjustments for values that still exist
-        const oldAdjustments = newVariants[index].priceAdjustments || {}
-        const newAdjustments: Record<string, number> = {}
-        values.forEach(v => {
-            newAdjustments[v] = oldAdjustments[v] || 0
-        })
-
-        newVariants[index] = { ...newVariants[index], values, priceAdjustments: newAdjustments }
+        newVariants[index] = { ...newVariants[index], values, priceAdjustments: {} }
         onChange(newVariants)
 
         const newLocalValues = [...localValues]
@@ -91,31 +121,49 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
         }
     }
 
-    const handlePriceToggle = (index: number, enabled: boolean) => {
-        const newVariants = [...variants]
-        newVariants[index] = { ...newVariants[index], hasPriceAdjustment: enabled }
-        if (!enabled) {
-            // Reset all price adjustments to 0 when disabled
-            const resetAdjustments: Record<string, number> = {}
-            newVariants[index].values.forEach(v => {
-                resetAdjustments[v] = 0
-            })
-            newVariants[index].priceAdjustments = resetAdjustments
+    const handleVariantPricingToggle = (enabled: boolean) => {
+        const newVariants = variants.map((variant, index) => ({
+            ...variant,
+            hasPriceAdjustment: index === 0 ? enabled : false,
+            variantPrices: index === 0 && enabled ? variant.variantPrices ?? {} : {},
+            priceAdjustments: {},
+        }))
+        if (!newVariants[0]) {
+            return
         }
         onChange(newVariants)
     }
 
-    const handlePriceChange = (variantIndex: number, valueName: string, price: string) => {
-        const newVariants = [...variants]
-        const adjustments = { ...(newVariants[variantIndex].priceAdjustments || {}) }
-        adjustments[valueName] = parseFloat(price) || 0
-        newVariants[variantIndex] = { ...newVariants[variantIndex], priceAdjustments: adjustments }
+    const handleVariantPriceChange = (combinationKey: string, price: string) => {
+        const newVariants = variants.map((variant, index) => ({
+            ...variant,
+            hasPriceAdjustment: index === 0,
+            priceAdjustments: {},
+        }))
+        if (!newVariants[0]) {
+            return
+        }
+
+        const nextPrices = { ...(newVariants[0].variantPrices || {}) }
+        const parsedPrice = Number(price)
+
+        if (price.trim() === "" || !Number.isFinite(parsedPrice) || parsedPrice < 0) {
+            delete nextPrices[combinationKey]
+        } else {
+            nextPrices[combinationKey] = parsedPrice
+        }
+
+        newVariants[0] = {
+            ...newVariants[0],
+            hasPriceAdjustment: true,
+            variantPrices: nextPrices,
+            priceAdjustments: {},
+        }
         onChange(newVariants)
     }
 
-    const formatPrice = (price: number) => {
-        if (price === 0) return ""
-        return price > 0 ? `+$${price.toLocaleString()}` : `-$${Math.abs(price).toLocaleString()}`
+    const formatCurrency = (price: number) => {
+        return `$${price.toLocaleString()}`
     }
 
     const handleStockToggle = (index: number, enabled: boolean) => {
@@ -222,50 +270,9 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
                                         className="px-2 py-1 bg-primary/10 text-primary text-sm rounded-md flex items-center gap-1"
                                     >
                                         {val}
-                                        {variant.hasPriceAdjustment && variant.priceAdjustments?.[val] !== 0 && (
-                                            <span className="text-xs opacity-70">
-                                                {formatPrice(variant.priceAdjustments?.[val] || 0)}
-                                            </span>
-                                        )}
                                     </span>
                                 ))}
                             </div>
-
-                            {/* Price Adjustment Toggle */}
-                            <div className="flex items-center gap-3 pt-2 border-t">
-                                <Checkbox
-                                    id={`price-toggle-${index}`}
-                                    checked={variant.hasPriceAdjustment || false}
-                                    onCheckedChange={(checked) => handlePriceToggle(index, checked as boolean)}
-                                />
-                                <Label htmlFor={`price-toggle-${index}`} className="cursor-pointer text-sm font-normal">
-                                    Esta variante afecta el precio
-                                </Label>
-                            </div>
-
-                            {/* Price Inputs per Value */}
-                            {variant.hasPriceAdjustment && (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                    {variant.values.map((val) => (
-                                        <div key={val} className="flex flex-col gap-1">
-                                            <Label className="text-xs text-muted-foreground">{val}</Label>
-                                            <div className="relative">
-                                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+$</span>
-                                                <Input
-                                                    type="number"
-                                                    className="pl-8 h-8 text-sm"
-                                                    value={variant.priceAdjustments?.[val] || ""}
-                                                    onChange={(e) => handlePriceChange(index, val, e.target.value)}
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <p className="col-span-full text-xs text-muted-foreground mt-1">
-                                        Ej: XL +$5,000 se suma al precio base
-                                    </p>
-                                </div>
-                            )}
 
                             {/* Stock by Variant Toggle */}
                             <div className="flex items-center gap-3 pt-2 border-t">
@@ -357,10 +364,12 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
                                                                         }
                                                                     `}
                                                                 >
-                                                                    <img
+                                                                    <Image
                                                                         src={img}
                                                                         alt={`Opción para ${val}`}
-                                                                        className="w-full h-full object-cover"
+                                                                        fill
+                                                                        sizes="48px"
+                                                                        className="object-cover"
                                                                     />
                                                                     {isSelected && (
                                                                         <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
@@ -384,6 +393,44 @@ export function VariantsEditor({ variants, onChange, productImages = [] }: Varia
                     )}
                 </div>
             ))}
+            {sellableVariantCombinations.length > 0 && (
+                <div className="flex flex-col gap-4 p-4 border rounded-lg bg-background/50">
+                    <div className="flex items-center gap-3">
+                        <Checkbox
+                            id="variant-pricing-toggle"
+                            checked={variantPricingEnabled}
+                            onCheckedChange={(checked) => handleVariantPricingToggle(checked as boolean)}
+                        />
+                        <Label htmlFor="variant-pricing-toggle" className="cursor-pointer text-sm font-normal">
+                            Definir precio por variante vendible
+                        </Label>
+                    </div>
+
+                    {variantPricingEnabled && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                            {sellableVariantCombinations.map((combination) => (
+                                <div key={combination.key} className="flex flex-col gap-1">
+                                    <Label className="text-xs text-muted-foreground">{combination.title}</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            className="pl-6 h-8 text-sm"
+                                            value={variantPrices[combination.key] ?? ""}
+                                            onChange={(e) => handleVariantPriceChange(combination.key, e.target.value)}
+                                            placeholder={basePrice > 0 ? String(basePrice) : "0"}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                            <p className="col-span-full text-xs text-muted-foreground mt-1">
+                                Cada combinación es una variante vendible con precio absoluto. Si dejas un campo vacío se usará el precio base actual: {formatCurrency(basePrice)}.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
             <Button
                 type="button"
                 variant="outline"

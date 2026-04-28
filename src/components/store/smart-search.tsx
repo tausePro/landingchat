@@ -1,14 +1,15 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import { Search, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ProductCard } from "@/components/store/product-card"
 import { useDebounce } from "use-debounce"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
 import { useTracking } from "@/components/analytics/tracking-provider"
+import type { VariantPriceRange } from "@/types/product"
 
 interface SmartSearchProps {
     slug: string
@@ -21,6 +22,7 @@ interface Product {
     id: string
     name: string
     price: number
+    price_range?: VariantPriceRange
     image_url?: string
     slug?: string
 }
@@ -36,6 +38,32 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
     const searchRef = useRef<HTMLDivElement>(null)
     const isSubdomain = useIsSubdomain()
     const { trackSearch } = useTracking()
+    const currencyFormatter = new Intl.NumberFormat('es-CO', {
+        style: 'currency',
+        currency: 'COP',
+        minimumFractionDigits: 0
+    })
+
+    const searchProducts = useCallback(async (searchQuery: string) => {
+        setIsLoading(true)
+        try {
+            const response = await fetch(`/api/store/${slug}/products?search=${encodeURIComponent(searchQuery)}&limit=${SEARCH_LIMIT}`)
+            if (response.ok) {
+                const data = await response.json()
+                const products = data.products || []
+                setResults(products)
+                setShowResults(true)
+
+                // Track Search event en Meta Pixel
+                const contentIds = products.map((p: Product) => p.id)
+                trackSearch(searchQuery, contentIds)
+            }
+        } catch (error) {
+            console.error('Error searching products:', error)
+        } finally {
+            setIsLoading(false)
+        }
+    }, [slug, trackSearch])
 
     // Buscar productos cuando cambie la query
     useEffect(() => {
@@ -45,7 +73,7 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
             setResults([])
             setShowResults(false)
         }
-    }, [debouncedQuery])
+    }, [debouncedQuery, searchProducts])
 
     // Cerrar resultados al hacer click fuera
     useEffect(() => {
@@ -58,27 +86,6 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
         document.addEventListener('mousedown', handleClickOutside)
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
-
-    const searchProducts = async (searchQuery: string) => {
-        setIsLoading(true)
-        try {
-            const response = await fetch(`/api/store/${slug}/products?search=${encodeURIComponent(searchQuery)}&limit=${SEARCH_LIMIT}`)
-            if (response.ok) {
-                const data = await response.json()
-                const products = data.products || []
-                setResults(products)
-                setShowResults(true)
-                
-                // Track Search event en Meta Pixel
-                const contentIds = products.map((p: Product) => p.id)
-                trackSearch(searchQuery, contentIds)
-            }
-        } catch (error) {
-            console.error('Error searching products:', error)
-        } finally {
-            setIsLoading(false)
-        }
-    }
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
@@ -133,6 +140,9 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
                             <div className="p-2 space-y-2">
                                 {results.map((product) => {
                                     const productUrl = getStoreLink(`/producto/${product.slug || product.id}`, isSubdomain, slug)
+                                    const priceLabel = product.price_range?.has_range
+                                        ? `${currencyFormatter.format(product.price_range.min_price)} - ${currencyFormatter.format(product.price_range.max_price)}`
+                                        : currencyFormatter.format(product.price)
                                     return (
                                     <a
                                         key={product.id}
@@ -144,20 +154,18 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
                                         }}
                                     >
                                         {product.image_url && (
-                                            <img 
-                                                src={product.image_url} 
+                                            <Image
+                                                src={product.image_url}
                                                 alt={product.name}
+                                                width={48}
+                                                height={48}
                                                 className="w-12 h-12 object-cover rounded-lg"
                                             />
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium text-gray-900 truncate">{product.name}</p>
                                             <p className="text-sm text-gray-500">
-                                                {new Intl.NumberFormat('es-CO', {
-                                                    style: 'currency',
-                                                    currency: 'COP',
-                                                    minimumFractionDigits: 0
-                                                }).format(product.price)}
+                                                {priceLabel}
                                             </p>
                                         </div>
                                     </a>
@@ -173,14 +181,14 @@ export function SmartSearch({ slug, onStartChat, primaryColor, placeholder = "¿
                                         className="w-full flex items-center gap-2"
                                     >
                                         <MessageCircle className="w-4 h-4" />
-                                        Pregúntale al asistente sobre "{query}"
+                                        Pregúntale al asistente sobre &quot;{query}&quot;
                                     </Button>
                                 </div>
                             )}
                         </>
                     ) : query.trim().length > 2 ? (
                         <div className="p-4 text-center">
-                            <p className="text-gray-500 mb-3">No encontramos productos para "{query}"</p>
+                            <p className="text-gray-500 mb-3">No encontramos productos para &quot;{query}&quot;</p>
                             <Button
                                 onClick={handleChatWithQuery}
                                 size="sm"

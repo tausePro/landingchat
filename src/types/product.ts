@@ -44,7 +44,7 @@ export const configOptionSchema = z.object({
   choices_with_price: z.array(choiceWithPriceSchema).optional(), // Nuevo: choices con precio
   min: z.number().optional(),
   max: z.number().optional(),
-  default: z.any().optional(),
+  default: z.unknown().optional(),
   affects_preview: z.boolean().optional(),
   price_modifier: z.number().optional(), // Precio adicional por esta opción
   accept_formats: z.array(z.string()).optional(), // Para type 'image': ["png", "jpg", "svg"]
@@ -56,7 +56,8 @@ export const variantSchema = z.object({
   values: z.array(z.string()),
   priceAdjustment: z.number().optional(), // Legacy field
   hasPriceAdjustment: z.boolean().optional(),
-  priceAdjustments: z.record(z.string(), z.number()).optional(), // { "XL": 5000, "XXL": 10000 }
+  priceAdjustments: z.record(z.string(), z.number()).optional(), // Legacy field
+  variantPrices: z.record(z.string(), z.number()).optional(),
   hasStockByVariant: z.boolean().optional(),
   stockByVariant: z.record(z.string(), z.number()).optional(), // { "S": 10, "M": 5, "L": 0 }
   hasImageMapping: z.boolean().optional(),
@@ -331,6 +332,7 @@ export interface ProductWithVariantsListItem extends ProductWithVariantsReadMode
   legacy_price: number | null
   legacy_sale_price: number | null
   legacy_stock: number | null
+  legacy_variants: ProductVariant[] | null
   badge_id: string | null
 }
 

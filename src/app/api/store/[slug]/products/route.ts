@@ -44,6 +44,7 @@ export async function GET(
                     id: storefrontProduct.id,
                     name: storefrontProduct.name,
                     price: storefrontProduct.sale_price ?? storefrontProduct.price,
+                    price_range: storefrontProduct.price_range,
                     image_url: storefrontProduct.image_url || null,
                     slug: storefrontProduct.slug,
                     description: storefrontProduct.description,

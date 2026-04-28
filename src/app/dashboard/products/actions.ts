@@ -4,15 +4,21 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { generateSlug, generateUniqueSlug } from "@/lib/utils/slug"
 import { resolveDefaultVariantPricingSync, type DefaultVariantPricingSyncResult } from "@/lib/commerce/defaultVariantPricingSync"
+import { expandLegacyVariantsToVariantDrafts } from "@/lib/commerce/variantDrafts"
+import { syncVariantDrafts } from "@/lib/commerce/syncVariantDrafts"
 import {
   createProductSchema,
   updateProductSchema,
+  variantSchema,
   type CreateProductInput,
   type UpdateProductInput,
   type ProductData,
+  type ProductVariant,
 } from "@/types/product"
 import { type ActionResult, success, failure } from "@/types/common"
 import { canCreateResource } from "@/lib/utils/subscription"
+
+const legacyVariantsSchema = variantSchema.array()
 
 // Re-export types for backward compatibility
 export type {
@@ -32,6 +38,35 @@ function readOptionalNumber(value: unknown): number | null {
   }
 
   return null
+}
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+function readNullableOptionalString(value: unknown): string | null | undefined {
+  if (value === null) {
+    return null
+  }
+
+  return readOptionalString(value) ?? undefined
+}
+
+function readOptionalBoolean(value: unknown): boolean | null {
+  return typeof value === "boolean" ? value : null
+}
+
+function readNullableOptionalNumber(value: unknown): number | null | undefined {
+  if (value === null) {
+    return null
+  }
+
+  return readOptionalNumber(value) ?? undefined
+}
+
+function readLegacyVariants(value: unknown): ProductVariant[] {
+  const parsed = legacyVariantsSchema.safeParse(value)
+  return parsed.success ? parsed.data : []
 }
 
 // ============================================================================
@@ -132,6 +167,55 @@ async function syncDefaultVariant(
   } catch (error) {
     // No fallar la operación principal si la sync falla
     console.error("[syncDefaultVariant] Error syncing variant:", error)
+  }
+}
+
+async function syncProductVariantsFromLegacyEditor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  productId: string,
+  organizationId: string,
+  data: {
+    price?: number
+    sale_price?: number | null
+    stock?: number
+    sku?: string | null
+    image_url?: string | null
+    is_active?: boolean
+    name?: string
+    variants?: ProductVariant[]
+  },
+) {
+  try {
+    const { data: productSource } = await supabase
+      .from("products")
+      .select("name, price, sale_price, stock, sku, image_url, is_active, variants")
+      .eq("id", productId)
+      .eq("organization_id", organizationId)
+      .single()
+
+    const pricing = resolveDefaultVariantPricingSync({
+      price: readOptionalNumber(productSource?.price) ?? data.price,
+      sale_price: readNullableOptionalNumber(productSource?.sale_price) ?? data.sale_price,
+    })
+    const drafts = expandLegacyVariantsToVariantDrafts({
+      productName: readOptionalString(productSource?.name) ?? data.name,
+      basePrice: pricing.price,
+      baseCompareAtPrice: pricing.compare_at_price,
+      baseStock: readOptionalNumber(productSource?.stock) ?? data.stock,
+      baseSku: readOptionalString(productSource?.sku) ?? data.sku,
+      baseImageUrl: readOptionalString(productSource?.image_url) ?? data.image_url,
+      baseIsActive: readOptionalBoolean(productSource?.is_active) ?? data.is_active,
+      legacyVariants: data.variants ?? readLegacyVariants(productSource?.variants),
+    })
+
+    await syncVariantDrafts({
+      client: supabase,
+      productId,
+      organizationId,
+      drafts,
+    })
+  } catch (error) {
+    console.error("[syncProductVariantsFromLegacyEditor] Error syncing variants:", error)
   }
 }
 
@@ -271,8 +355,7 @@ export async function createProduct(
       return failure(error.message)
     }
 
-    // Sincronizar variante default en product_variants (Commerce Reset Fase 2)
-    await syncDefaultVariant(supabase, data.id, profile.organization_id, {
+    await syncProductVariantsFromLegacyEditor(supabase, data.id, profile.organization_id, {
       price: parsed.data.price,
       sale_price: parsed.data.sale_price,
       stock: parsed.data.stock,
@@ -280,6 +363,7 @@ export async function createProduct(
       image_url: parsed.data.image_url,
       is_active: parsed.data.is_active,
       name: parsed.data.name,
+      variants: parsed.data.variants,
     })
 
     revalidatePath("/dashboard/products")
@@ -337,7 +421,18 @@ export async function updateProduct(
       .eq("id", user.id)
       .single()
 
-    if (profile?.organization_id) {
+    if (profile?.organization_id && parsed.data.variants !== undefined) {
+      await syncProductVariantsFromLegacyEditor(supabase, id, profile.organization_id, {
+        price: parsed.data.price,
+        sale_price: parsed.data.sale_price,
+        stock: parsed.data.stock,
+        sku: parsed.data.sku,
+        image_url: parsed.data.image_url,
+        is_active: parsed.data.is_active,
+        name: parsed.data.name,
+        variants: parsed.data.variants,
+      })
+    } else if (profile?.organization_id) {
       await syncDefaultVariant(supabase, id, profile.organization_id, {
         price: parsed.data.price,
         sale_price: parsed.data.sale_price,
@@ -448,12 +543,15 @@ export async function quickUpdateProduct(
 
     if (error) return failure(error.message)
 
-    // Sincronizar variante default (Commerce Reset Fase 2)
-    const syncData: Record<string, unknown> = {}
+    const syncData: {
+      price?: number
+      sale_price?: number | null
+      stock?: number
+    } = {}
     if (field === "price") syncData.price = value
     if (field === "sale_price") syncData.sale_price = value === 0 ? null : value
     if (field === "stock") syncData.stock = value
-    await syncDefaultVariant(supabase, id, profile.organization_id, syncData)
+    await syncProductVariantsFromLegacyEditor(supabase, id, profile.organization_id, syncData)
 
     revalidatePath("/dashboard/products")
     return success(undefined)
@@ -494,8 +592,7 @@ export async function toggleProductStatus(
 
     if (error) return failure(error.message)
 
-    // Sincronizar variante default (Commerce Reset Fase 2)
-    await syncDefaultVariant(supabase, id, profile.organization_id, { is_active: isActive })
+    await syncProductVariantsFromLegacyEditor(supabase, id, profile.organization_id, { is_active: isActive })
 
     revalidatePath("/dashboard/products")
     return success(undefined)
@@ -941,15 +1038,29 @@ export async function importProductsCsv(csvContent: string): Promise<ActionResul
         result.errors.push(`Fila ${i + 1} (${id}): ${error.message}`)
       } else {
         result.updated++
-        // Sincronizar variante default (Commerce Reset Fase 2)
-        await syncDefaultVariant(supabase, id, profile.organization_id, {
-          price: updateData.price as number | undefined,
-          sale_price: updateData.sale_price as number | null | undefined,
-          stock: updateData.stock as number | undefined,
-          sku: updateData.sku as string | null | undefined,
-          is_active: updateData.is_active as boolean | undefined,
-          name: updateData.name as string | undefined,
-        })
+        const syncData: {
+          price?: number
+          sale_price?: number | null
+          stock?: number
+          sku?: string | null
+          is_active?: boolean
+          name?: string
+        } = {}
+        const parsedPrice = readOptionalNumber(updateData.price)
+        const parsedSalePrice = readNullableOptionalNumber(updateData.sale_price)
+        const parsedStock = readOptionalNumber(updateData.stock)
+        const parsedSku = readNullableOptionalString(updateData.sku)
+        const parsedIsActive = readOptionalBoolean(updateData.is_active)
+        const parsedName = readOptionalString(updateData.name)
+
+        if (parsedPrice !== null) syncData.price = parsedPrice
+        if (parsedSalePrice !== undefined) syncData.sale_price = parsedSalePrice
+        if (parsedStock !== null) syncData.stock = Math.floor(parsedStock)
+        if (parsedSku !== undefined) syncData.sku = parsedSku
+        if (parsedIsActive !== null) syncData.is_active = parsedIsActive
+        if (parsedName !== null) syncData.name = parsedName
+
+        await syncProductVariantsFromLegacyEditor(supabase, id, profile.organization_id, syncData)
       }
     }
 

@@ -122,6 +122,13 @@ describe("GET /api/store/[slug]/products", () => {
           id: "product-1",
           name: "Camiseta Premium",
           price: 65000,
+          price_range: {
+            has_range: false,
+            min_price: 65000,
+            max_price: 65000,
+            min_compare_at: null,
+            max_compare_at: null,
+          },
           image_url: "https://example.com/variant.jpg",
           slug: "camiseta-premium",
           description: "Algodón pesado",

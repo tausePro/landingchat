@@ -6,6 +6,7 @@ import {
   toCouponCartItem,
   toOrderSummaryItem,
   toTargetCartLineItem,
+  useCartStore,
 } from "@/store/cart-store"
 
 describe("cart-store contract", () => {
@@ -109,5 +110,35 @@ describe("cart-store contract", () => {
       quantity: 2,
       image_url: "https://example.com/variant.jpg",
     })
+  })
+
+  it("mantiene líneas separadas para combinaciones vendibles del mismo producto con precios diferentes", () => {
+    useCartStore.setState({ items: [], organizationSlug: null, isOpen: false, appliedCoupon: null })
+
+    useCartStore.getState().addItem({
+      id: "product-1:Color:Rojo|Talla:S",
+      product_id: "product-1",
+      variant_title: "Rojo / S",
+      product_name: "Camiseta Premium",
+      unit_price: 50000,
+    })
+    useCartStore.getState().addItem({
+      id: "product-1:Color:Rojo|Talla:M",
+      product_id: "product-1",
+      variant_title: "Rojo / M",
+      product_name: "Camiseta Premium",
+      unit_price: 58000,
+    })
+
+    expect(useCartStore.getState().items).toHaveLength(2)
+    expect(useCartStore.getState().items.map((item) => ({
+      id: item.id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+    }))).toEqual([
+      { id: "product-1:Color:Rojo|Talla:S", quantity: 1, unit_price: 50000 },
+      { id: "product-1:Color:Rojo|Talla:M", quantity: 1, unit_price: 58000 },
+    ])
+    expect(useCartStore.getState().total()).toBe(108000)
   })
 })
