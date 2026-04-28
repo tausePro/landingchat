@@ -25,6 +25,9 @@ const analyticsEventNameSchema = z.enum([
     "payment_pending",
     "payment_failed",
     "payment_retry_clicked",
+    "proactive_nudge_shown",
+    "proactive_nudge_clicked",
+    "proactive_nudge_dismissed",
     "purchase",
 ])
 
@@ -62,6 +65,10 @@ const analyticsPropertiesSchema = z.object({
     previousQuantity: z.number().int().nonnegative().optional(),
     newQuantity: z.number().int().nonnegative().optional(),
     hasCoupon: z.boolean().optional(),
+    proactiveNudgeId: z.string().min(1).max(200).optional(),
+    placement: z.enum(["pdp", "storefront"]).optional(),
+    trigger: z.enum(["time_on_page"]).optional(),
+    destination: z.enum(["web_chat", "whatsapp_fallback"]).optional(),
     attribution: analyticsAttributionSchema.optional(),
 }).strict().default({})
 

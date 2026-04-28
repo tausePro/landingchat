@@ -143,6 +143,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 hideNavigation={false}
                 hideHeaderOnMobile={false}
                 initialIsSubdomain={initialIsSubdomain}
+                defaultChatProductId={product.id}
+                defaultChatProductName={product.name}
             >
                 <ProductDetailClient
                     product={product}
