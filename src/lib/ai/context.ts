@@ -10,6 +10,14 @@ interface Product {
     image_url?: string
     images?: string[]
     variants?: Array<{ type: string; values: string[] }>
+    variant_options?: Array<{ name: string; values: string[] }>
+    available_variants?: Array<{
+        title: string
+        price: number
+        compare_at_price: number | null
+        stock: number
+        available: boolean
+    }>
     // Producto configurable
     is_configurable?: boolean
     configurable_options?: Array<{
@@ -30,6 +38,39 @@ interface Product {
         label?: string
     }>
     minimum_quantity?: number
+}
+
+function formatCurrentProductVariantContext(currentProduct: Product): string {
+    const variantOptions = currentProduct.variant_options || []
+    const availableVariants = currentProduct.available_variants || []
+    const legacyVariants = currentProduct.variants || []
+
+    const optionLines = variantOptions.length > 0
+        ? variantOptions.map((option) => `- ${option.name}: ${option.values.join(", ")}`).join("\n")
+        : legacyVariants.map((variant) => `- ${variant.type}: ${variant.values.join(", ")}`).join("\n")
+
+    const availableVariantLines = availableVariants
+        .filter((variant) => variant.available)
+        .map((variant) => {
+            const compareAt = variant.compare_at_price && variant.compare_at_price > variant.price
+                ? ` antes $${variant.compare_at_price.toLocaleString()}`
+                : ""
+
+            return `- ${variant.title}: $${variant.price.toLocaleString()}${compareAt}, stock ${variant.stock}`
+        })
+        .join("\n")
+
+    if (!optionLines && !availableVariantLines) {
+        return ""
+    }
+
+    return `
+VARIANTES/OPCIONES DISPONIBLES:
+${optionLines || "No hay opciones agrupadas."}
+${availableVariantLines ? `
+VARIANTES VENDIBLES:
+${availableVariantLines}` : ""}
+INSTRUCCIÓN: Si el cliente pregunta por aromas, sabores, tamaños, colores u opciones, responde con TODAS las opciones disponibles; no respondas solo con la variante default.`
 }
 
 interface Customer {
@@ -110,6 +151,7 @@ El cliente está viendo AHORA MISMO: "${currentProduct.name}"
 ID: ${currentProduct.id}
 Precio base: ${currentProduct.price.toLocaleString()}
 Stock: ${currentProduct.stock}
+${formatCurrentProductVariantContext(currentProduct)}
 ${currentProduct.has_quantity_pricing && currentProduct.price_tiers ? `
 PRECIOS POR CANTIDAD (MAYOREO):
 ${currentProduct.price_tiers.map(t => `- ${t.min_quantity}${t.max_quantity ? `-${t.max_quantity}` : '+'} unidades: $${t.unit_price.toLocaleString()}/u${t.label ? ` (${t.label})` : ''}`).join('\n')}
@@ -214,6 +256,7 @@ ${customer ? `CLIENTE: ${customer.full_name || customer.name || 'Cliente'}. Sal�
 ${currentProduct ? `
 CONTEXTO ACTUAL: El cliente está viendo "${currentProduct.name}"
 Precio base: ${currentProduct.price.toLocaleString()}, Stock: ${currentProduct.stock}
+${formatCurrentProductVariantContext(currentProduct)}
 ${currentProduct.has_quantity_pricing && currentProduct.price_tiers ? `
 PRECIOS POR CANTIDAD: ${currentProduct.price_tiers.map(t => `${t.min_quantity}${t.max_quantity ? `-${t.max_quantity}` : '+'}: $${t.unit_price.toLocaleString()}/u`).join(' | ')}
 ${currentProduct.minimum_quantity ? `(Mínimo: ${currentProduct.minimum_quantity} unidades)` : ''}` : ''}

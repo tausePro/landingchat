@@ -1067,7 +1067,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             price: priceToUse,
             unit_price: priceToUse,
             compare_at_price: resolvedQuantityPricing?.compare_at_to_show ?? cartVariant?.compare_at_price ?? (product.sale_price ? product.price : null),
-            image_url: cartVariant?.image_url || product.image_url || selectedImage,
+            image_url: selectedImage || cartVariant?.image_url || product.image_url,
             categories: product.categories ?? undefined,
         }
 
