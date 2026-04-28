@@ -28,6 +28,7 @@ const analyticsEventNameSchema = z.enum([
     "proactive_nudge_shown",
     "proactive_nudge_clicked",
     "proactive_nudge_dismissed",
+    "proactive_nudge_chat_started",
     "purchase",
 ])
 
@@ -47,6 +48,11 @@ const analyticsAttributionSchema = z.object({
     fbc: z.string().min(1).max(255).optional(),
     fbp: z.string().min(1).max(255).optional(),
     referrer: z.string().min(1).max(500).optional(),
+    entryPoint: z.enum(["proactive_nudge"]).optional(),
+    proactiveNudgeId: z.string().min(1).max(200).optional(),
+    proactiveNudgeProductId: z.string().min(1).max(200).optional(),
+    proactiveNudgeProductName: z.string().min(1).max(200).optional(),
+    proactiveNudgeDestination: z.enum(["web_chat", "whatsapp_fallback"]).optional(),
 }).strict()
 
 const analyticsPropertiesSchema = z.object({
@@ -65,7 +71,11 @@ const analyticsPropertiesSchema = z.object({
     previousQuantity: z.number().int().nonnegative().optional(),
     newQuantity: z.number().int().nonnegative().optional(),
     hasCoupon: z.boolean().optional(),
+    chatId: z.string().uuid().optional(),
+    entryPoint: z.enum(["proactive_nudge"]).optional(),
     proactiveNudgeId: z.string().min(1).max(200).optional(),
+    proactiveNudgeProductId: z.string().min(1).max(200).optional(),
+    proactiveNudgeProductName: z.string().min(1).max(200).optional(),
     placement: z.enum(["pdp", "storefront"]).optional(),
     trigger: z.enum(["time_on_page"]).optional(),
     destination: z.enum(["web_chat", "whatsapp_fallback"]).optional(),

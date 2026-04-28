@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { MessageCircle, X } from "lucide-react"
 import { useTracking } from "@/components/analytics/tracking-provider"
+import { setProactiveNudgeAttribution } from "@/hooks/use-tracking-params"
 
 const DEFAULT_DELAY_MS = 9000
 const DEFAULT_COOLDOWN_MS = 24 * 60 * 60 * 1000
@@ -13,7 +14,7 @@ interface ProactiveChatBubbleProps {
     productId: string
     productName?: string | null
     primaryColor: string
-    onStartChat: (productId: string, context: string) => void
+    onStartChat: (productId: string, context: string, params?: Record<string, string>) => void
     whatsappPhone?: string | null
     delayMs?: number
     cooldownMs?: number
@@ -109,6 +110,12 @@ export function ProactiveChatBubble({
 
     const handlePrimaryClick = () => {
         storeCooldown(storageKey)
+        setProactiveNudgeAttribution(slug, {
+            proactiveNudgeId: storageKey,
+            productId,
+            productName: productName ?? undefined,
+            destination: "web_chat",
+        })
         tracking.trackEvent("proactive_nudge_clicked", {
             sourceChannel: "web",
             contentIds: [productId],
@@ -120,7 +127,13 @@ export function ProactiveChatBubble({
                 destination: "web_chat",
             },
         })
-        onStartChat(productId, context)
+        onStartChat(productId, context, {
+            entry_point: "proactive_nudge",
+            proactive_nudge_id: storageKey,
+            proactive_nudge_product_id: productId,
+            proactive_nudge_product_name: contentName,
+            proactive_nudge_destination: "web_chat",
+        })
     }
 
     const handleDismiss = () => {
@@ -140,6 +153,12 @@ export function ProactiveChatBubble({
 
     const handleWhatsAppClick = () => {
         storeCooldown(storageKey)
+        setProactiveNudgeAttribution(slug, {
+            proactiveNudgeId: storageKey,
+            productId,
+            productName: productName ?? undefined,
+            destination: "whatsapp_fallback",
+        })
         tracking.trackEvent("proactive_nudge_clicked", {
             sourceChannel: "web",
             contentIds: [productId],

@@ -15,7 +15,12 @@ export interface ProactiveNudgeAnalytics {
     shown: number
     clicked: number
     dismissed: number
+    chatsStarted: number
+    orders: number
+    revenue: number
     ctr: number
+    chatStartRate: number
+    orderRate: number
     webChatClicks: number
     whatsappClicks: number
     topProducts: ProactiveNudgeProductInsight[]
@@ -31,6 +36,14 @@ function formatPercentage(value: number): string {
 
 function formatNumber(value: number): string {
     return value.toLocaleString("es-CO")
+}
+
+function formatCurrency(value: number): string {
+    return new Intl.NumberFormat("es-CO", {
+        style: "currency",
+        currency: "COP",
+        minimumFractionDigits: 0,
+    }).format(value)
 }
 
 export function ProactiveNudgeCard({ analytics }: ProactiveNudgeCardProps) {
@@ -64,6 +77,32 @@ export function ProactiveNudgeCard({ analytics }: ProactiveNudgeCardProps) {
                     <div className="rounded-lg bg-muted/50 p-3">
                         <div className="text-2xl font-bold">{formatNumber(analytics.dismissed)}</div>
                         <div className="text-xs text-muted-foreground">Cerradas</div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-300">{formatNumber(analytics.chatsStarted)}</div>
+                        <div className="text-xs text-muted-foreground">Chats iniciados</div>
+                    </div>
+                    <div className="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-300">{formatNumber(analytics.orders)}</div>
+                        <div className="text-xs text-muted-foreground">Órdenes atribuidas</div>
+                    </div>
+                    <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-900/20">
+                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-300">{formatCurrency(analytics.revenue)}</div>
+                        <div className="text-xs text-muted-foreground">Revenue atribuido</div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-lg border px-3 py-2">
+                        <div className="font-semibold">{formatPercentage(analytics.chatStartRate)}</div>
+                        <div className="text-xs text-muted-foreground">Click → chat</div>
+                    </div>
+                    <div className="rounded-lg border px-3 py-2">
+                        <div className="font-semibold">{formatPercentage(analytics.orderRate)}</div>
+                        <div className="text-xs text-muted-foreground">Chat → orden</div>
                     </div>
                 </div>
 

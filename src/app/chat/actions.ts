@@ -68,6 +68,11 @@ interface CreateOrderParams {
         fbc?: string
         fbp?: string
         referrer?: string
+        entry_point?: "proactive_nudge"
+        proactive_nudge_id?: string
+        proactive_nudge_product_id?: string
+        proactive_nudge_product_name?: string
+        proactive_nudge_destination?: "web_chat" | "whatsapp_fallback"
     }
 }
 

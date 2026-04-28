@@ -35,6 +35,8 @@ type AnalyticsAttribution = {
     fbclid?: string
     fbc?: string
     fbp?: string
+    entryPoint?: string
+    proactiveNudgeId?: string
 }
 
 type AnalyticsOrderItem = {
@@ -71,6 +73,8 @@ function getAttribution(properties: Record<string, unknown> | null): AnalyticsAt
         fbclid: getStringValue(properties.attribution, "fbclid"),
         fbc: getStringValue(properties.attribution, "fbc"),
         fbp: getStringValue(properties.attribution, "fbp"),
+        entryPoint: getStringValue(properties.attribution, "entryPoint"),
+        proactiveNudgeId: getStringValue(properties.attribution, "proactiveNudgeId"),
     }
 }
 
@@ -451,6 +455,7 @@ async function getAnalyticsData() {
         event.event_name === "proactive_nudge_shown"
         || event.event_name === "proactive_nudge_clicked"
         || event.event_name === "proactive_nudge_dismissed"
+        || event.event_name === "proactive_nudge_chat_started"
     )
     const proactiveNudgeProductStats = new Map<string, {
         productName: string
@@ -461,17 +466,22 @@ async function getAnalyticsData() {
     let proactiveNudgeShown = 0
     let proactiveNudgeClicked = 0
     let proactiveNudgeDismissed = 0
+    let proactiveNudgeChatsStarted = 0
     let proactiveNudgeWebChatClicks = 0
     let proactiveNudgeWhatsappClicks = 0
+    const proactiveNudgeChatIds = new Set<string>()
 
     proactiveNudgeEvents.forEach(event => {
         if (event.event_name === "proactive_nudge_shown") proactiveNudgeShown += 1
         if (event.event_name === "proactive_nudge_clicked") proactiveNudgeClicked += 1
         if (event.event_name === "proactive_nudge_dismissed") proactiveNudgeDismissed += 1
+        if (event.event_name === "proactive_nudge_chat_started") proactiveNudgeChatsStarted += 1
 
         const destination = event.properties ? getStringValue(event.properties, "destination") : undefined
+        const chatId = event.properties ? getStringValue(event.properties, "chatId") : undefined
         if (event.event_name === "proactive_nudge_clicked" && destination === "web_chat") proactiveNudgeWebChatClicks += 1
         if (event.event_name === "proactive_nudge_clicked" && destination === "whatsapp_fallback") proactiveNudgeWhatsappClicks += 1
+        if (event.event_name === "proactive_nudge_chat_started" && chatId) proactiveNudgeChatIds.add(chatId)
 
         const productIds = Array.from(new Set(getEventProductIds(event)))
         productIds.forEach(productId => {
@@ -488,12 +498,25 @@ async function getAnalyticsData() {
             proactiveNudgeProductStats.set(productId, current)
         })
     })
+    const proactiveNudgeOrders = (orders || []).filter(order => {
+        const utmData = isRecord(order.utm_data) ? order.utm_data : null
+        const orderEntryPoint = utmData ? getStringValue(utmData, "entry_point") : undefined
+
+        return orderEntryPoint === "proactive_nudge"
+            || Boolean(order.chat_id && proactiveNudgeChatIds.has(order.chat_id))
+    })
+    const proactiveNudgeRevenue = proactiveNudgeOrders.reduce((sum, order) => sum + (order.total || 0), 0)
 
     const proactiveNudgeAnalytics: ProactiveNudgeAnalytics = {
         shown: proactiveNudgeShown,
         clicked: proactiveNudgeClicked,
         dismissed: proactiveNudgeDismissed,
+        chatsStarted: proactiveNudgeChatsStarted,
+        orders: proactiveNudgeOrders.length,
+        revenue: proactiveNudgeRevenue,
         ctr: proactiveNudgeShown > 0 ? (proactiveNudgeClicked / proactiveNudgeShown) * 100 : 0,
+        chatStartRate: proactiveNudgeWebChatClicks > 0 ? (proactiveNudgeChatsStarted / proactiveNudgeWebChatClicks) * 100 : 0,
+        orderRate: proactiveNudgeChatsStarted > 0 ? (proactiveNudgeOrders.length / proactiveNudgeChatsStarted) * 100 : 0,
         webChatClicks: proactiveNudgeWebChatClicks,
         whatsappClicks: proactiveNudgeWhatsappClicks,
         topProducts: Array.from(proactiveNudgeProductStats.entries())
