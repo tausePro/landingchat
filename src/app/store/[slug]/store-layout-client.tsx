@@ -224,7 +224,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
         }
     }, [searchParams, organization.slug, router, isSubdomain, isRealEstate])
 
-    const handleStartChat = (productId?: string, query?: string) => {
+    const handleStartChat = (productId?: string, query?: string, attributionParams?: Record<string, string>) => {
         // Verificar si ya está identificado (con validación de UUID)
         const customerId = getStoredUUID(`customer_${organization.slug}`)
         const effectiveProductId = productId || defaultChatProductId
@@ -237,6 +237,9 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
             const params = new URLSearchParams()
             if (effectiveProductId) params.set('product', effectiveProductId)
             if (query) params.set('context', query)
+            Object.entries(attributionParams ?? {}).forEach(([key, value]) => {
+                params.set(key, value)
+            })
             if (params.toString()) chatUrl += `?${params.toString()}`
 
             router.push(chatUrl)

@@ -32,6 +32,11 @@ const aiChatSchema = z.object({
     customerId: z.string().uuid().optional(),
     currentProductId: z.string().uuid().optional(),
     context: z.string().optional(),
+    entryPoint: z.enum(["proactive_nudge"]).optional(),
+    proactiveNudgeId: z.string().min(1).max(200).optional(),
+    proactiveNudgeProductId: z.string().min(1).max(200).optional(),
+    proactiveNudgeProductName: z.string().min(1).max(200).optional(),
+    proactiveNudgeDestination: z.enum(["web_chat", "whatsapp_fallback"]).optional(),
     cartItems: z.array(cartItemSchema).optional() // Carrito del frontend
 })
 
@@ -68,7 +73,19 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const { message, chatId, slug, customerId: requestedCustomerId, currentProductId, cartItems } = validation.data
+        const {
+            message,
+            chatId,
+            slug,
+            customerId: requestedCustomerId,
+            currentProductId,
+            cartItems,
+            entryPoint,
+            proactiveNudgeId,
+            proactiveNudgeProductId,
+            proactiveNudgeProductName,
+            proactiveNudgeDestination,
+        } = validation.data
 
         const supabase = createServiceClient()
 
@@ -250,7 +267,12 @@ export async function POST(request: NextRequest) {
             content: message,
             metadata: {
                 source: "web_chat",
-                ...(currentProductId ? { product_context: currentProductId } : {})
+                ...(currentProductId ? { product_context: currentProductId } : {}),
+                ...(entryPoint ? { entry_point: entryPoint } : {}),
+                ...(proactiveNudgeId ? { proactive_nudge_id: proactiveNudgeId } : {}),
+                ...(proactiveNudgeProductId ? { proactive_nudge_product_id: proactiveNudgeProductId } : {}),
+                ...(proactiveNudgeProductName ? { proactive_nudge_product_name: proactiveNudgeProductName } : {}),
+                ...(proactiveNudgeDestination ? { proactive_nudge_destination: proactiveNudgeDestination } : {}),
             }
         })
 
