@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation"
 import { resolveProductDetailInventory, type ProductDetailViewModel } from "@/lib/commerce/productDetailViewModel"
 import { findVariantBySelectedOptions } from "@/lib/commerce/productWithVariants"
 import { resolveVariantPricing } from "@/lib/commerce/variantPricing"
+import { getVariantOptionKey } from "@/lib/commerce/variantDrafts"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { getStoredUUID } from "@/lib/utils/storage"
@@ -45,6 +46,7 @@ interface ProductVariantOption {
     stockByVariant?: Record<string, number>
     hasPriceAdjustment?: boolean
     priceAdjustments?: Record<string, number>
+    variantPrices?: Record<string, number>
     hasImageMapping?: boolean
     images?: Record<string, string | string[]>
 }
@@ -795,15 +797,27 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
 
     const legacyPricing = useMemo<{ currentPrice: number; activePromotion: ProductPromotion | null }>(() => {
         let price = product.sale_price || product.price
-
-        // 1. Add Variant Adjustments
-        productVariants.forEach((variant) => {
+        const selectedOptionValues = productVariants.flatMap((variant) => {
             const selectedValue = selectedVariants[variant.type]
-            if (selectedValue && variant.hasPriceAdjustment && variant.priceAdjustments) {
-                const adjustment = variant.priceAdjustments[selectedValue] || 0
-                price += adjustment
-            }
+            return selectedValue ? [{ option_name: variant.type, value: selectedValue }] : []
         })
+        const selectedPriceKey = selectedOptionValues.length === productVariants.length
+            ? getVariantOptionKey(selectedOptionValues)
+            : null
+        const variantPrices = productVariants.find((variant) => variant.variantPrices)?.variantPrices
+        const selectedVariantPrice = selectedPriceKey ? variantPrices?.[selectedPriceKey] : undefined
+
+        if (typeof selectedVariantPrice === "number" && Number.isFinite(selectedVariantPrice) && selectedVariantPrice >= 0) {
+            price = selectedVariantPrice
+        } else {
+            productVariants.forEach((variant) => {
+                const selectedValue = selectedVariants[variant.type]
+                if (selectedValue && variant.hasPriceAdjustment && variant.priceAdjustments) {
+                    const adjustment = variant.priceAdjustments[selectedValue] || 0
+                    price += adjustment
+                }
+            })
+        }
 
         // 2. Apply Promotions
         let bestPromo: ProductPromotion | null = null

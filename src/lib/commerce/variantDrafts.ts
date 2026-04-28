@@ -27,7 +27,7 @@ export interface ProductVariantDraft {
 interface NormalizedLegacyVariant {
   type: string
   values: string[]
-  priceAdjustments: Record<string, number>
+  variantPrices: Record<string, number>
   stockByVariant: Record<string, number>
   images: Record<string, string | string[]>
   hasStockByVariant: boolean
@@ -36,14 +36,6 @@ interface NormalizedLegacyVariant {
 
 function normalizeNonNegativeNumber(value: number | null | undefined): number | null {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return null
-  }
-
-  return value
-}
-
-function normalizeFiniteNumber(value: number | null | undefined): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
     return null
   }
 
@@ -78,7 +70,7 @@ function normalizeLegacyVariant(variant: ProductVariant): NormalizedLegacyVarian
   return {
     type,
     values,
-    priceAdjustments: variant.priceAdjustments ?? {},
+    variantPrices: variant.variantPrices ?? {},
     stockByVariant: variant.stockByVariant ?? {},
     images: variant.images ?? {},
     hasStockByVariant: variant.hasStockByVariant ?? false,
@@ -100,38 +92,35 @@ function buildCombinations(
   )
 }
 
+export function getVariantOptionKey(optionValues: VariantOptionValue[]): string {
+  return optionValues
+    .map((optionValue) => `${optionValue.option_name}:${optionValue.value}`)
+    .join("|")
+}
+
+function getVariantTitle(optionValues: VariantOptionValue[]): string {
+  return optionValues.map((optionValue) => optionValue.value).join(" / ")
+}
+
 function resolvePrice(
   basePrice: number,
-  variants: NormalizedLegacyVariant[],
+  variantPrices: Record<string, number>,
   optionValues: VariantOptionValue[],
 ): number {
-  const adjustment = optionValues.reduce((total, optionValue) => {
-    const variant = variants.find((candidate) => candidate.type === optionValue.option_name)
-    const valueAdjustment = variant?.priceAdjustments[optionValue.value]
-    return total + (normalizeFiniteNumber(valueAdjustment) ?? 0)
-  }, 0)
+  const absolutePrice = normalizeNonNegativeNumber(variantPrices[getVariantOptionKey(optionValues)])
 
-  return Math.max(0, basePrice + adjustment)
+  return absolutePrice ?? basePrice
 }
 
 function resolveCompareAtPrice(
   baseCompareAtPrice: number | null,
   price: number,
-  variants: NormalizedLegacyVariant[],
-  optionValues: VariantOptionValue[],
 ): number | null {
   if (baseCompareAtPrice === null) {
     return null
   }
 
-  const adjustment = optionValues.reduce((total, optionValue) => {
-    const variant = variants.find((candidate) => candidate.type === optionValue.option_name)
-    const valueAdjustment = variant?.priceAdjustments[optionValue.value]
-    return total + (normalizeFiniteNumber(valueAdjustment) ?? 0)
-  }, 0)
-  const compareAtPrice = baseCompareAtPrice + adjustment
-
-  return compareAtPrice > price ? compareAtPrice : null
+  return baseCompareAtPrice > price ? baseCompareAtPrice : null
 }
 
 function resolveStock(
@@ -189,6 +178,10 @@ export function expandLegacyVariantsToVariantDrafts(
   const normalizedVariants = input.legacyVariants
     .map((variant) => normalizeLegacyVariant(variant))
     .filter((variant): variant is NormalizedLegacyVariant => variant !== null)
+  const variantPrices = normalizedVariants.reduce<Record<string, number>>((prices, variant) => ({
+    ...prices,
+    ...variant.variantPrices,
+  }), {})
 
   if (normalizedVariants.length === 0) {
     return [{
@@ -206,16 +199,16 @@ export function expandLegacyVariantsToVariantDrafts(
   }
 
   return buildCombinations(normalizedVariants).map((optionValues, position) => {
-    const price = resolvePrice(basePrice, normalizedVariants, optionValues)
+    const price = resolvePrice(basePrice, variantPrices, optionValues)
 
     return {
-      title: optionValues.map((optionValue) => optionValue.value).join(" / "),
+      title: getVariantTitle(optionValues),
       sku: position === 0 ? input.baseSku?.trim() || null : null,
       position,
       is_default: position === 0,
       is_active: baseIsActive,
       price,
-      compare_at_price: resolveCompareAtPrice(baseCompareAtPrice, price, normalizedVariants, optionValues),
+      compare_at_price: resolveCompareAtPrice(baseCompareAtPrice, price),
       stock_quantity: resolveStock(baseStock, normalizedVariants, optionValues),
       image_url: resolveImageUrl(baseImageUrl, normalizedVariants, optionValues),
       option_values: optionValues,

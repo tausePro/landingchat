@@ -43,6 +43,11 @@ describe("expandLegacyVariantsToVariantDrafts", () => {
         {
           type: "Color",
           values: ["Rojo", "Azul"],
+          hasPriceAdjustment: true,
+          variantPrices: {
+            "Color:Rojo|Talla:M": 58000,
+            "Color:Azul|Talla:M": 57000,
+          },
           hasImageMapping: true,
           images: {
             Rojo: ["https://example.com/red-1.jpg", "https://example.com/red-2.jpg"],
@@ -51,10 +56,6 @@ describe("expandLegacyVariantsToVariantDrafts", () => {
         {
           type: "Talla",
           values: ["S", "M"],
-          hasPriceAdjustment: true,
-          priceAdjustments: {
-            M: 5000,
-          },
           hasStockByVariant: true,
           stockByVariant: {
             S: 3,
@@ -88,8 +89,8 @@ describe("expandLegacyVariantsToVariantDrafts", () => {
       sku: null,
       position: 1,
       is_default: false,
-      price: 55000,
-      compare_at_price: 65000,
+      price: 58000,
+      compare_at_price: 60000,
       stock_quantity: 2,
       image_url: "https://example.com/red-1.jpg",
     })
@@ -109,7 +110,7 @@ describe("expandLegacyVariantsToVariantDrafts", () => {
     expect(result.map((variant) => variant.title)).toEqual(["Rojo", "Azul"])
   })
 
-  it("clampa precios negativos derivados de ajustes legacy", () => {
+  it("ignora precios absolutos inválidos y usa precio base", () => {
     const result = expandLegacyVariantsToVariantDrafts({
       productName: "Liquidación",
       basePrice: 10000,
@@ -122,14 +123,14 @@ describe("expandLegacyVariantsToVariantDrafts", () => {
           type: "Estado",
           values: ["Outlet"],
           hasPriceAdjustment: true,
-          priceAdjustments: {
-            Outlet: -15000,
+          variantPrices: {
+            "Estado:Outlet": -15000,
           },
         },
       ],
     })
 
-    expect(result[0]?.price).toBe(0)
+    expect(result[0]?.price).toBe(10000)
     expect(result[0]?.compare_at_price).toBeNull()
   })
 

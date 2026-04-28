@@ -655,7 +655,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                     <div id="product-section-variants" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Atributos y Variantes</h2>
                         <div className="mt-6">
-                            <VariantsEditor variants={variants} onChange={setVariants} productImages={images} />
+                            <VariantsEditor variants={variants} onChange={setVariants} productImages={images} basePrice={parseFloat(price) || 0} />
                         </div>
                     </div>
 

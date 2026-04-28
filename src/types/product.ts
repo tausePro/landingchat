@@ -56,7 +56,8 @@ export const variantSchema = z.object({
   values: z.array(z.string()),
   priceAdjustment: z.number().optional(), // Legacy field
   hasPriceAdjustment: z.boolean().optional(),
-  priceAdjustments: z.record(z.string(), z.number()).optional(), // { "XL": 5000, "XXL": 10000 }
+  priceAdjustments: z.record(z.string(), z.number()).optional(), // Legacy field
+  variantPrices: z.record(z.string(), z.number()).optional(),
   hasStockByVariant: z.boolean().optional(),
   stockByVariant: z.record(z.string(), z.number()).optional(), // { "S": 10, "M": 5, "L": 0 }
   hasImageMapping: z.boolean().optional(),
