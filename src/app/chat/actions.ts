@@ -189,10 +189,10 @@ function transformCartItemsToOrderItems(cartItems: Array<{
         quantity: item.quantity,
         unit_price: item.unit_price || item.price,
         total_price: (item.unit_price || item.price) * item.quantity,
-        variant_info: item.variant_title
+        variant_info: item.variant_id || item.variant_title
             ? {
                 variant_id: item.variant_id ?? null,
-                variant_title: item.variant_title,
+                variant_title: item.variant_title ?? null,
                 compare_at_price: item.compare_at_price ?? null,
             }
             : null,

@@ -29,8 +29,11 @@ interface UpdateCall {
 }
 
 interface RpcRow {
+  variant_id?: string | null
   previous_stock: number
   new_stock: number
+  previous_variant_stock?: number | null
+  new_variant_stock?: number | null
   was_sufficient: boolean
   variant_updated: boolean
 }
@@ -98,6 +101,8 @@ function createMockClient(params: {
           {
             previous_stock: 10,
             new_stock: 8,
+            previous_variant_stock: 10,
+            new_variant_stock: 8,
             was_sufficient: true,
             variant_updated: true,
           },
@@ -155,6 +160,8 @@ describe("decrementOrderStock", () => {
             {
               previous_stock: 10,
               new_stock: 8,
+              previous_variant_stock: 10,
+              new_variant_stock: 8,
               was_sufficient: true,
               variant_updated: true,
             },
@@ -170,9 +177,12 @@ describe("decrementOrderStock", () => {
     expect(result.items).toEqual([
       {
         productId: "product-1",
+        variantId: null,
         quantity: 2,
         previousStock: 10,
         newStock: 8,
+        previousVariantStock: 10,
+        newVariantStock: 8,
         wasSufficient: true,
         variantUpdated: true,
       },
@@ -184,6 +194,7 @@ describe("decrementOrderStock", () => {
           p_product_id: "product-1",
           p_organization_id: "org-1",
           p_quantity: 2,
+          p_variant_id: null,
         },
       },
     ])
@@ -222,9 +233,12 @@ describe("decrementOrderStock", () => {
     expect(result.items).toEqual([
       {
         productId: "product-1",
+        variantId: null,
         quantity: 2,
         previousStock: null,
         newStock: null,
+        previousVariantStock: null,
+        newVariantStock: null,
         wasSufficient: false,
         variantUpdated: false,
         error: "RPC unavailable",
@@ -232,6 +246,72 @@ describe("decrementOrderStock", () => {
     ])
     expect(calls.rpcs).toHaveLength(1)
     expect(calls.updates).toEqual([])
+  })
+
+  it("envía variant_id a la RPC cuando la orden contiene unidad vendible explícita", async () => {
+    const { client, calls } = createMockClient({
+      orderResult: {
+        data: {
+          id: "order-1",
+          items: [
+            {
+              product_id: "product-1",
+              quantity: 2,
+              variant_info: {
+                variant_id: "variant-lavanda",
+                variant_title: "Lavanda / 2.7 Kg",
+              },
+            },
+          ],
+          stock_decremented_at: null,
+        },
+        error: null,
+      },
+      rpcResults: [
+        {
+          data: [
+            {
+              variant_id: "variant-lavanda",
+              previous_stock: 12,
+              new_stock: 10,
+              previous_variant_stock: 4,
+              new_variant_stock: 2,
+              was_sufficient: true,
+              variant_updated: true,
+            },
+          ],
+          error: null,
+        },
+      ],
+    })
+
+    const result = await decrementOrderStock(client, "order-1", "org-1")
+
+    expect(calls.rpcs).toEqual([
+      {
+        name: "decrement_product_stock",
+        args: {
+          p_product_id: "product-1",
+          p_organization_id: "org-1",
+          p_quantity: 2,
+          p_variant_id: "variant-lavanda",
+        },
+      },
+    ])
+    expect(result.items).toEqual([
+      {
+        productId: "product-1",
+        variantId: "variant-lavanda",
+        quantity: 2,
+        previousStock: 12,
+        newStock: 10,
+        previousVariantStock: 4,
+        newVariantStock: 2,
+        wasSufficient: true,
+        variantUpdated: true,
+      },
+    ])
+    expect(calls.updates).toHaveLength(1)
   })
 
   it("marca como decrementada una orden sin items para evitar reintentos inútiles", async () => {
