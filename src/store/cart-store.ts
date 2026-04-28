@@ -134,6 +134,9 @@ export function normalizeCartItem(value: unknown, quantityOverride?: number): Ca
         return null
     }
 
+    const inputId = typeof record.id === 'string'
+        ? record.id
+        : null
     const variantId = typeof record.variant_id === 'string'
         ? record.variant_id
         : null
@@ -142,7 +145,7 @@ export function normalizeCartItem(value: unknown, quantityOverride?: number): Ca
     const quantity = Math.max(1, Math.trunc(quantityOverride ?? parseNumber(record.quantity) ?? 1))
 
     return {
-        id: variantId ?? productId,
+        id: variantId ?? inputId ?? productId,
         product_id: productId,
         variant_id: variantId,
         variant_title: typeof record.variant_title === 'string' ? record.variant_title : null,
@@ -210,19 +213,11 @@ export const useCartStore = create<CartState>()(
                 const items = get().items
                 const lineId = getCartItemLineId(normalizedProduct)
                 const existingItem = items.find((item) => getCartItemLineId(item) === lineId)
-                const legacyProductItem = !existingItem && normalizedProduct.variant_id
-                    ? items.find((item) => item.product_id === normalizedProduct.product_id && !item.variant_id)
-                    : undefined
-                const targetLineId = existingItem
-                    ? lineId
-                    : legacyProductItem
-                        ? getCartItemLineId(legacyProductItem)
-                        : null
 
-                if (targetLineId) {
+                if (existingItem) {
                     set({
                         items: items.map((item) =>
-                            getCartItemLineId(item) === targetLineId
+                            getCartItemLineId(item) === lineId
                                 ? {
                                     ...item,
                                     variant_id: normalizedProduct.variant_id,

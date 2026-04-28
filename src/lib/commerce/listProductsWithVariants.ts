@@ -7,7 +7,7 @@ import {
   type ProductWithVariantsClient,
 } from "@/lib/commerce/getProductWithVariants"
 import { createClient } from "@/lib/supabase/server"
-import type { ProductWithVariantsListItem } from "@/types/product"
+import { variantSchema, type ProductVariant, type ProductWithVariantsListItem } from "@/types/product"
 
 const MAX_PRODUCTS_LIMIT = 100
 
@@ -16,6 +16,7 @@ export const LIST_PRODUCTS_WITH_VARIANTS_PRODUCT_SELECT = [
   "price",
   "sale_price",
   "stock",
+  "variants",
   "badge_id",
   "display_order",
   "created_at",
@@ -99,6 +100,17 @@ function getLegacyStock(product: unknown): number | null {
   }
 
   return parseLegacyNumber(record.stock)
+}
+
+function getLegacyVariants(product: unknown): ProductVariant[] | null {
+  const record = asRecord(product)
+
+  if (!record) {
+    return null
+  }
+
+  const parsed = variantSchema.array().safeParse(record.variants)
+  return parsed.success ? parsed.data : null
 }
 
 function getBadgeId(product: unknown): string | null {
@@ -200,6 +212,7 @@ export async function listProductsWithVariants({
       legacy_price: getLegacyPrice(product),
       legacy_sale_price: getLegacySalePrice(product),
       legacy_stock: getLegacyStock(product),
+      legacy_variants: getLegacyVariants(product),
       badge_id: getBadgeId(product),
     }
   })

@@ -130,6 +130,17 @@ describe("listProductsWithVariants", () => {
             price: 80000,
             sale_price: 70000,
             stock: 9,
+            variants: [
+              {
+                type: "Talla",
+                values: ["S", "M"],
+                hasPriceAdjustment: true,
+                variantPrices: {
+                  "Talla:S": 65000,
+                  "Talla:M": 68000,
+                },
+              },
+            ],
             badge_id: "badge-1",
             created_at: "2026-01-01T00:00:00Z",
           },
@@ -148,6 +159,7 @@ describe("listProductsWithVariants", () => {
             price: "45000",
             sale_price: null,
             stock: "2",
+            variants: [],
             badge_id: null,
             created_at: "2026-01-02T00:00:00Z",
           },
@@ -192,6 +204,15 @@ describe("listProductsWithVariants", () => {
       legacy_price: 80000,
       legacy_sale_price: 70000,
       legacy_stock: 9,
+      legacy_variants: [{
+        type: "Talla",
+        values: ["S", "M"],
+        hasPriceAdjustment: true,
+        variantPrices: {
+          "Talla:S": 65000,
+          "Talla:M": 68000,
+        },
+      }],
       badge_id: "badge-1",
     })
     expect(result[0].default_variant?.price).toBe(65000)
@@ -201,6 +222,7 @@ describe("listProductsWithVariants", () => {
       legacy_price: 45000,
       legacy_sale_price: null,
       legacy_stock: 2,
+      legacy_variants: [],
       badge_id: null,
     })
 

@@ -59,7 +59,7 @@ describe("createProduct action", () => {
           let didThrow = false
 
           try {
-            result = await createProduct(input as any)
+            result = await createProduct(input as unknown as Parameters<typeof createProduct>[0])
           } catch {
             didThrow = true
           }
@@ -112,7 +112,7 @@ describe("createProduct action", () => {
           let didThrow = false
 
           try {
-            result = await createProduct(input as any)
+            result = await createProduct(input as unknown as Parameters<typeof createProduct>[0])
           } catch {
             didThrow = true
           }

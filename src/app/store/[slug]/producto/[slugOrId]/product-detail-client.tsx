@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation"
 import { resolveProductDetailInventory, type ProductDetailViewModel } from "@/lib/commerce/productDetailViewModel"
 import { findVariantBySelectedOptions } from "@/lib/commerce/productWithVariants"
 import { resolveVariantPricing } from "@/lib/commerce/variantPricing"
+import { getVariantOptionKey } from "@/lib/commerce/variantDrafts"
+import { resolveLegacyVariantPriceRange } from "@/lib/commerce/legacyVariantPriceRange"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { getStoredUUID } from "@/lib/utils/storage"
@@ -45,6 +47,7 @@ interface ProductVariantOption {
     stockByVariant?: Record<string, number>
     hasPriceAdjustment?: boolean
     priceAdjustments?: Record<string, number>
+    variantPrices?: Record<string, number>
     hasImageMapping?: boolean
     images?: Record<string, string | string[]>
 }
@@ -773,6 +776,15 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     // State
     const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => getDefaultSelectedVariants(productVariants))
     const [quantity, setQuantity] = useState(minimumQuantity)
+    const [hasUserSelectedVariant, setHasUserSelectedVariant] = useState(false)
+    const selectedOptionValues = useMemo(() => productVariants.flatMap((variant) => {
+        const selectedValue = selectedVariants[variant.type]
+        return selectedValue ? [{ option_name: variant.type, value: selectedValue }] : []
+    }), [productVariants, selectedVariants])
+    const hasSelectedOptions = selectedOptionValues.length > 0
+    const selectedPriceKey = selectedOptionValues.length === productVariants.length && productVariants.length > 0
+        ? getVariantOptionKey(selectedOptionValues)
+        : null
 
     // Calcular precio unitario según tier de cantidad
     const getUnitPriceForQuantity = (qty: number): number => {
@@ -795,15 +807,20 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
 
     const legacyPricing = useMemo<{ currentPrice: number; activePromotion: ProductPromotion | null }>(() => {
         let price = product.sale_price || product.price
+        const variantPrices = productVariants.find((variant) => variant.variantPrices)?.variantPrices
+        const selectedVariantPrice = selectedPriceKey ? variantPrices?.[selectedPriceKey] : undefined
 
-        // 1. Add Variant Adjustments
-        productVariants.forEach((variant) => {
-            const selectedValue = selectedVariants[variant.type]
-            if (selectedValue && variant.hasPriceAdjustment && variant.priceAdjustments) {
-                const adjustment = variant.priceAdjustments[selectedValue] || 0
-                price += adjustment
-            }
-        })
+        if (typeof selectedVariantPrice === "number" && Number.isFinite(selectedVariantPrice) && selectedVariantPrice >= 0) {
+            price = selectedVariantPrice
+        } else {
+            productVariants.forEach((variant) => {
+                const selectedValue = selectedVariants[variant.type]
+                if (selectedValue && variant.hasPriceAdjustment && variant.priceAdjustments) {
+                    const adjustment = variant.priceAdjustments[selectedValue] || 0
+                    price += adjustment
+                }
+            })
+        }
 
         // 2. Apply Promotions
         let bestPromo: ProductPromotion | null = null
@@ -833,27 +850,25 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             currentPrice: bestPrice,
             activePromotion: bestPromo,
         }
-    }, [product.id, product.price, product.sale_price, productVariants, selectedVariants, typedPromotions])
+    }, [product.id, product.price, product.sale_price, productVariants, selectedPriceKey, selectedVariants, typedPromotions])
 
     const selectedSellableVariant = useMemo(() => {
         if (!productWithVariants) {
-            return viewModel.variants.defaultVariant ?? null
+            return hasSelectedOptions ? null : viewModel.variants.defaultVariant ?? null
         }
-
-        const hasSelectedOptions = Object.values(selectedVariants).some((value) => value.length > 0)
 
         if (!hasSelectedOptions) {
             return productWithVariants.default_variant ?? viewModel.variants.defaultVariant ?? null
         }
 
         return findVariantBySelectedOptions(productWithVariants.variants, selectedVariants)
-    }, [productWithVariants, selectedVariants, viewModel.variants.defaultVariant])
+    }, [hasSelectedOptions, productWithVariants, selectedVariants, viewModel.variants.defaultVariant])
 
-    const pricingVariant = selectedSellableVariant ?? viewModel.variants.defaultVariant
+    const pricingVariant = selectedSellableVariant ?? (hasSelectedOptions ? null : viewModel.variants.defaultVariant)
 
     const resolvedHeadlinePricing = useMemo(() => {
         if (!pricingVariant) {
-            return viewModel.pricing.defaultResolved
+            return hasSelectedOptions ? null : viewModel.pricing.defaultResolved
         }
 
         return resolveVariantPricing(pricingVariant, {
@@ -863,7 +878,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             price_tiers: pricingVariant.is_default ? viewModel.quantityPricing.priceTiers : null,
             has_quantity_pricing: pricingVariant.is_default && viewModel.quantityPricing.enabled,
         })
-    }, [minimumQuantity, pricingVariant, viewModel.categoryIds, viewModel.pricing.defaultResolved, viewModel.promotions, viewModel.quantityPricing.enabled, viewModel.quantityPricing.priceTiers])
+    }, [hasSelectedOptions, minimumQuantity, pricingVariant, viewModel.categoryIds, viewModel.pricing.defaultResolved, viewModel.promotions, viewModel.quantityPricing.enabled, viewModel.quantityPricing.priceTiers])
     const activePromotion: ProductPromotionDisplay | null = resolvedHeadlinePricing?.active_promotion
         ? {
             type: resolvedHeadlinePricing.active_promotion.type,
@@ -893,12 +908,26 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         () => resolveProductDetailInventory(viewModel, selectedSellableVariant?.id),
         [selectedSellableVariant?.id, viewModel]
     )
+    const legacyVariantPriceRange = useMemo(
+        () => resolveLegacyVariantPriceRange({
+            variants: productVariants,
+            basePrice: product.sale_price || product.price,
+        }),
+        [product.price, product.sale_price, productVariants]
+    )
+    const displayPriceRange = viewModel.pricing.resolvedPriceRange?.has_range
+        ? viewModel.pricing.resolvedPriceRange
+        : legacyVariantPriceRange?.has_range
+            ? legacyVariantPriceRange
+            : viewModel.pricing.resolvedPriceRange ?? legacyVariantPriceRange
     const availableQuantity = resolvedInventory.availableQuantity
     const hasKnownAvailableQuantity = typeof availableQuantity === "number"
     const effectiveQuantity = hasKnownAvailableQuantity && availableQuantity >= minimumQuantity
         ? Math.min(quantity, availableQuantity)
         : quantity
     const hasInsufficientStockForMinimum = hasKnownAvailableQuantity && availableQuantity > 0 && availableQuantity < minimumQuantity
+    const hasVariablePriceRange = Boolean(displayPriceRange?.has_range)
+    const shouldShowPriceRange = hasVariablePriceRange && !hasUserSelectedVariant
     const canPurchase = resolvedInventory.inStock
         && !hasInsufficientStockForMinimum
         && (!hasKnownAvailableQuantity || effectiveQuantity <= availableQuantity)
@@ -920,6 +949,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const unitPrice = resolvedQuantityPricing?.final_price ?? (hasQuantityPricing ? getUnitPriceForQuantity(effectiveQuantity) : legacyPricing.currentPrice)
     const totalPrice = unitPrice * effectiveQuantity
     const currentPrice = resolvedHeadlinePricing?.final_price ?? legacyPricing.currentPrice
+    const priceRangeLabel = displayPriceRange
+        ? `${formatCurrency(displayPriceRange.min_price)} - ${formatCurrency(displayPriceRange.max_price)}`
+        : null
 
     const inventoryMessage = useMemo(() => {
         if (!resolvedInventory.inStock) {
@@ -982,6 +1014,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             : "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
 
     const handleVariantChange = (type: string, value: string) => {
+        setHasUserSelectedVariant(true)
         setSelectedVariants(prev => ({ ...prev, [type]: value }))
 
         // Update image if this variant has a mapping for the selected value
@@ -1021,10 +1054,11 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             return
         }
 
-        const cartVariant = selectedSellableVariant ?? viewModel.variants.defaultVariant
+        const cartVariant = selectedSellableVariant ?? (hasSelectedOptions ? null : viewModel.variants.defaultVariant)
         const priceToUse = unitPrice
+        const cartLineId = cartVariant?.id || (selectedPriceKey ? `${product.id}:${selectedPriceKey}` : product.id)
         const productToAdd = {
-            id: cartVariant?.id || product.id,
+            id: cartLineId,
             product_id: product.id,
             variant_id: cartVariant?.id || null,
             variant_title: selectedVariantTitle,
@@ -1066,8 +1100,10 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         product.bundle_discount_value
     )
     const hasBundleConfiguredDiscount = product.is_bundle && bundleConfiguredDiscountAmount > 0
-    const productCompareAtPrice = resolvedHeadlinePricing ? resolvedHeadlinePricing.compare_at_to_show : (legacyPricing.activePromotion || product.sale_price) ? product.price : null
-    const bundleCompareAtPrice = product.is_bundle && bundleSubtotal > currentPrice ? bundleSubtotal : null
+    const productCompareAtPrice = shouldShowPriceRange
+        ? null
+        : resolvedHeadlinePricing ? resolvedHeadlinePricing.compare_at_to_show : (legacyPricing.activePromotion || product.sale_price) ? product.price : null
+    const bundleCompareAtPrice = !shouldShowPriceRange && product.is_bundle && bundleSubtotal > currentPrice ? bundleSubtotal : null
     const compareAtPrice = bundleCompareAtPrice ?? productCompareAtPrice
     const savingsAmount = compareAtPrice ? Math.max(compareAtPrice - currentPrice, 0) : 0
     const offerCountdownEndsAt = product.is_bundle && hasBundleConfiguredDiscount && product.bundle_discount_ends_at && getCountdownTime(product.bundle_discount_ends_at)
@@ -1144,7 +1180,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const inventoryTrustLabel = resolvedInventory.source === "variant"
         ? (selectedVariantTitle ?? "Disponibilidad por variante")
         : inventoryMessage.badge
-    const priceSupportLabel = hasQuantityPricing
+    const priceSupportLabel = shouldShowPriceRange && priceRangeLabel
+        ? "Selecciona una variante para confirmar el precio final."
+        : hasQuantityPricing
         ? `Total actual ${formatCurrency(totalPrice)} · ${formatCurrency(unitPrice)} por unidad.`
         : savingsAmount > 0
             ? `Ahorro real de ${formatCurrency(savingsAmount)} frente al valor regular.`
@@ -1350,7 +1388,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         <div className="mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50">
                             <div className="flex items-baseline gap-3">
                                 <span className="text-[36px] font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">
-                                    {formatCurrency(currentPrice)}
+                                    {shouldShowPriceRange && priceRangeLabel ? priceRangeLabel : formatCurrency(currentPrice)}
                                 </span>
                                 {compareAtPrice && (
                                     <span className="text-[18px] text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums]">

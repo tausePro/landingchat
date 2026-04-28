@@ -68,6 +68,7 @@ function makeProductListItem(
     legacy_price: overrides.legacy_price ?? 80000,
     legacy_sale_price: overrides.legacy_sale_price ?? 70000,
     legacy_stock: overrides.legacy_stock ?? 9,
+    legacy_variants: overrides.legacy_variants ?? null,
     badge_id: hasOverride("badge_id") ? (overrides.badge_id ?? null) : "badge-1",
   }
 }
@@ -202,6 +203,68 @@ describe("mapProductListItemToStorefrontProduct", () => {
       badge_id: "badge-1",
       price: 65000,
       sale_price: null,
+      price_range: {
+        has_range: false,
+        min_price: 65000,
+        max_price: 65000,
+      },
+    })
+  })
+
+  it("preserva rango de precios para vistas de venta con variantes variables", () => {
+    const product = mapProductListItemToStorefrontProduct(
+      makeProductListItem({
+        price_range: {
+          has_range: true,
+          min_price: 50000,
+          max_price: 68000,
+          min_compare_at: null,
+          max_compare_at: null,
+        },
+      }),
+    )
+
+    expect(product.price_range).toEqual({
+      has_range: true,
+      min_price: 50000,
+      max_price: 68000,
+      min_compare_at: null,
+      max_compare_at: null,
+    })
+  })
+
+  it("deriva rango desde precios absolutos legacy cuando el read model target aún no trae rango", () => {
+    const product = mapProductListItemToStorefrontProduct(
+      makeProductListItem({
+        price_range: {
+          has_range: false,
+          min_price: 101000,
+          max_price: 101000,
+          min_compare_at: null,
+          max_compare_at: null,
+        },
+        legacy_price: 101000,
+        legacy_sale_price: null,
+        legacy_variants: [
+          {
+            type: "Colores",
+            values: ["Azul Cielo", "Cafe"],
+            hasPriceAdjustment: true,
+            variantPrices: {
+              "Colores:Azul Cielo": 125000,
+              "Colores:Cafe": 110000,
+            },
+          },
+        ],
+      }),
+    )
+
+    expect(product.price_range).toEqual({
+      has_range: true,
+      min_price: 110000,
+      max_price: 125000,
+      min_compare_at: null,
+      max_compare_at: null,
     })
   })
 
@@ -228,6 +291,11 @@ describe("mapProductListItemToStorefrontProduct", () => {
       badge_id: null,
       price: 45000,
       sale_price: 40000,
+      price_range: {
+        has_range: false,
+        min_price: 40000,
+        max_price: 40000,
+      },
     })
   })
 })

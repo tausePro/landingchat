@@ -1,4 +1,5 @@
-import type { ProductWithVariantsListItem } from "@/types/product"
+import { resolveLegacyVariantPriceRange } from "@/lib/commerce/legacyVariantPriceRange"
+import type { ProductWithVariantsListItem, VariantPriceRange } from "@/types/product"
 
 export interface StorefrontProduct extends Record<string, unknown> {
   id: string
@@ -10,6 +11,7 @@ export interface StorefrontProduct extends Record<string, unknown> {
   categories: string[]
   price: number
   sale_price: number | null
+  price_range: VariantPriceRange
   stock: number
   badge_id: string | null
 }
@@ -41,6 +43,16 @@ function parseStringArray(value: unknown): string[] {
   }
 
   return value.filter((item): item is string => typeof item === "string")
+}
+
+function emptyPriceRange(price = 0): VariantPriceRange {
+  return {
+    has_range: false,
+    min_price: price,
+    max_price: price,
+    min_compare_at: null,
+    max_compare_at: null,
+  }
 }
 
 export function mapLegacyProductRowToStorefrontProduct(product: unknown): StorefrontProduct | null {
@@ -83,6 +95,7 @@ export function mapLegacyProductRowToStorefrontProduct(product: unknown): Storef
     categories: parseStringArray(record.categories),
     price,
     sale_price: normalizedSalePrice,
+    price_range: emptyPriceRange(normalizedSalePrice ?? price),
     stock: Math.max(0, Math.trunc(parseLegacyNumber(record.stock) ?? 0)),
     badge_id: typeof record.badge_id === "string" ? record.badge_id : null,
   }
@@ -179,10 +192,33 @@ function resolveStorefrontProductStock(product: ProductWithVariantsListItem): nu
   return Math.max(0, Math.trunc(product.legacy_stock ?? 0))
 }
 
+function resolveStorefrontProductPriceRange(product: ProductWithVariantsListItem, salePrice: number | null): VariantPriceRange {
+  const basePrice = salePrice ?? product.legacy_sale_price ?? product.legacy_price ?? 0
+  const legacyVariantPriceRange = resolveLegacyVariantPriceRange({
+    variants: product.legacy_variants,
+    basePrice,
+  })
+
+  if (product.price_range.has_range) {
+    return product.price_range
+  }
+
+  if (legacyVariantPriceRange?.has_range) {
+    return legacyVariantPriceRange
+  }
+
+  if (product.variants.length > 0 || product.default_variant) {
+    return product.price_range
+  }
+
+  return legacyVariantPriceRange ?? emptyPriceRange(basePrice)
+}
+
 export function mapProductListItemToStorefrontProduct(
   product: ProductWithVariantsListItem,
 ): StorefrontProduct {
   const pricing = resolveStorefrontProductPricing(product)
+  const priceRange = resolveStorefrontProductPriceRange(product, pricing.sale_price)
 
   return {
     id: product.id,
@@ -194,6 +230,7 @@ export function mapProductListItemToStorefrontProduct(
     categories: product.categories,
     price: pricing.price,
     sale_price: pricing.sale_price,
+    price_range: priceRange,
     stock: resolveStorefrontProductStock(product),
     badge_id: product.badge_id,
   }

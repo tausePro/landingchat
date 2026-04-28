@@ -2,17 +2,33 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { CheckCircle2, ShoppingBag, Plus, Check } from "lucide-react"
+import { CheckCircle2, ShoppingBag, Check } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useCartStore } from "@/store/cart-store"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { toast } from "sonner"
+import type { StorefrontProduct } from "@/lib/commerce/storefrontProduct"
+
+interface ProductCardBadge {
+    id: string
+    type?: string | null
+    badge_id?: string | null
+    background_color: string
+    text_color: string
+    display_text: string
+    icon?: string | null
+    rules?: {
+        discount_greater_than?: number
+        category?: string
+        stock_status?: "low" | "out" | string
+    } | null
+}
 
 interface ProductCardProps {
-    product: any
+    product: StorefrontProduct
     productUrl: string
     primaryColor: string
-    badges?: any[]
+    badges?: ProductCardBadge[]
     showDescription?: boolean
     showPrices?: boolean
     showAddToCart?: boolean
@@ -64,8 +80,12 @@ export function ProductCard({
     const [isAdding, setIsAdding] = useState(false)
     const [justAdded, setJustAdded] = useState(false)
     const [hasMounted, setHasMounted] = useState(false)
+    const hasVariablePrice = product.price_range.has_range
 
-    useEffect(() => { setHasMounted(true) }, [])
+    useEffect(() => {
+        const frameId = window.requestAnimationFrame(() => setHasMounted(true))
+        return () => window.cancelAnimationFrame(frameId)
+    }, [])
 
     // Check if product is already in cart
     const inCart = items.find(i => i.id === product.id)
@@ -74,6 +94,11 @@ export function ProductCard({
     const handleQuickAdd = (e: React.MouseEvent) => {
         e.preventDefault() // Prevent navigation to product page
         e.stopPropagation()
+
+        if (hasVariablePrice) {
+            toast.info("Elige la variante para confirmar precio y disponibilidad")
+            return
+        }
 
         setIsAdding(true)
 
@@ -103,6 +128,10 @@ export function ProductCard({
     const secondaryImage = product.images && product.images.length > 0
         ? product.images.find((img: string) => img !== product.image_url)
         : null
+    const currencyFormatter = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })
+    const priceLabel = hasVariablePrice
+        ? `${currencyFormatter.format(product.price_range.min_price)} - ${currencyFormatter.format(product.price_range.max_price)}`
+        : currencyFormatter.format(product.sale_price || product.price)
 
     return (
         <div className="group relative bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full">
@@ -143,6 +172,7 @@ export function ProductCard({
                 {showAddToCart && (
                     <button
                         onClick={handleQuickAdd}
+                        disabled={isAdding}
                         className="absolute top-2 right-2 px-3 py-1.5 rounded-full shadow-md transition-all duration-200 z-10 flex items-center gap-1 font-bold text-xs
                                  opacity-100 sm:opacity-0 sm:group-hover:opacity-100 translate-y-0 sm:translate-y-2 sm:group-hover:translate-y-0"
                         style={{
@@ -160,7 +190,7 @@ export function ProductCard({
                         ) : (
                             <>
                                 <ShoppingBag className="w-4 h-4" />
-                                <span>Agregar</span>
+                                <span>{hasVariablePrice ? "Opciones" : "Agregar"}</span>
                             </>
                         )}
                     </button>
@@ -216,7 +246,7 @@ export function ProductCard({
 
                 {showDescription && (
                     <p className="text-sm text-slate-500 mb-4 line-clamp-2 flex-1">
-                        {stripHtml(product.description) || "Sin descripción"}
+                        {createExcerpt(stripHtml(product.description)) || "Sin descripción"}
                     </p>
                 )}
 
@@ -224,11 +254,11 @@ export function ProductCard({
                     {showPrices ? (
                         <div className="flex items-baseline gap-2">
                             <span className="font-bold text-lg" style={{ color: primaryColor }}>
-                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.sale_price || product.price)}
+                                {priceLabel}
                             </span>
-                            {product.sale_price && product.sale_price < product.price && (
+                            {!hasVariablePrice && product.sale_price && product.sale_price < product.price && (
                                 <span className="text-sm text-slate-400 line-through">
-                                    {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.price)}
+                                    {currencyFormatter.format(product.price)}
                                 </span>
                             )}
                         </div>
