@@ -6,6 +6,7 @@ import { isSubdomain, getStoreLink } from "@/lib/utils/store-urls"
 import { ProductCard } from "@/components/store/product-card"
 import { CategoryTracker } from "@/components/analytics/category-tracker"
 import { CategoryFilter } from "./category-filter"
+import type { StorefrontProduct } from "@/lib/commerce/storefrontProduct"
 
 interface ProductsPageProps {
     params: Promise<{ slug: string }>
@@ -30,22 +31,19 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
 
     // Obtener categorías únicas de los productos (categories es text[] en la BD)
     const categoriesSet = new Set<string>()
-    products.forEach((p: any) => {
+    products.forEach((p) => {
         if (Array.isArray(p.categories)) {
-            p.categories.forEach((c: string) => {
+            p.categories.forEach((c) => {
                 if (c && c.trim()) categoriesSet.add(c.trim())
             })
-        } else if (p.categories && typeof p.categories === 'string') {
-            if (p.categories.trim()) categoriesSet.add(p.categories.trim())
         }
     })
     const categories = Array.from(categoriesSet).sort()
 
     // Filtrar por categoría si se especifica (case-insensitive)
     const filteredProducts = categoria
-        ? products.filter((p: any) => {
-            const pCats = Array.isArray(p.categories) ? p.categories : [p.categories].filter(Boolean)
-            return pCats.some((c: string) => c.toLowerCase() === categoria.toLowerCase())
+        ? products.filter((p: StorefrontProduct) => {
+            return p.categories.some((c) => c.toLowerCase() === categoria.toLowerCase())
         })
         : products
 
@@ -100,7 +98,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {filteredProducts.map((product: any) => {
+                        {filteredProducts.map((product) => {
                             const productUrl = getStoreLink(`/producto/${product.slug || product.id}`, isSub, slug)
 
                             return (

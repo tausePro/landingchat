@@ -332,6 +332,7 @@ export interface ProductWithVariantsListItem extends ProductWithVariantsReadMode
   legacy_price: number | null
   legacy_sale_price: number | null
   legacy_stock: number | null
+  legacy_variants: ProductVariant[] | null
   badge_id: string | null
 }
 
