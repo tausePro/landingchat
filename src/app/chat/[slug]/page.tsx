@@ -8,6 +8,8 @@ import { ChatLayout } from "@/components/layout/chat-layout"
 import { useState, useEffect, use, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useCartStore } from "@/store/cart-store"
+import { getTrackingParams, useTrackingParams } from "@/hooks/use-tracking-params"
+import { useTracking } from "@/components/analytics/tracking-provider"
 import { getStoreProducts } from "./actions"
 import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
@@ -136,6 +138,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const { slug } = use(params)
     const isSubdomain = useIsSubdomain()
     const router = useRouter()
+    const tracking = useTracking()
 
     const [customerId, setCustomerId] = useState<string | null>(null)
     const [customerName, setCustomerName] = useState<string | null>(null)
@@ -156,6 +159,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
     const processedProductIdRef = useRef<string | null>(null)
+    const trackedProactiveNudgeChatRef = useRef<string | null>(null)
+
+    useTrackingParams(slug)
 
     const resetStorefrontState = useCallback(() => {
         try {
@@ -284,6 +290,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 const urlParams = new URLSearchParams(window.location.search)
                 const productId = urlParams.get('product')
                 const context = urlParams.get('context')
+                const trackingParams = getTrackingParams(slug)
+                const isProactiveNudgeEntry = trackingParams.entry_point === "proactive_nudge" && Boolean(trackingParams.proactive_nudge_id)
+
+                if (isProactiveNudgeEntry && trackedProactiveNudgeChatRef.current !== currentChatId) {
+                    trackedProactiveNudgeChatRef.current = currentChatId
+                    tracking.trackEvent("proactive_nudge_chat_started", {
+                        sourceChannel: "chat",
+                        contentIds: trackingParams.proactive_nudge_product_id ? [trackingParams.proactive_nudge_product_id] : productId ? [productId] : [],
+                        properties: {
+                            chatId: currentChatId,
+                            entryPoint: "proactive_nudge",
+                            proactiveNudgeId: trackingParams.proactive_nudge_id,
+                            proactiveNudgeProductId: trackingParams.proactive_nudge_product_id,
+                            proactiveNudgeProductName: trackingParams.proactive_nudge_product_name,
+                            contentName: trackingParams.proactive_nudge_product_name,
+                            destination: trackingParams.proactive_nudge_destination,
+                        },
+                    })
+                }
 
                 if (productId) {
                     // Evitar procesar el mismo producto dos veces en la misma sesión
@@ -311,7 +336,12 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             slug,
                             customerId: custId,
                             currentProductId: productId,
-                            context: context ? decodeURIComponent(context) : undefined
+                            context: context ? decodeURIComponent(context) : undefined,
+                            entryPoint: isProactiveNudgeEntry ? "proactive_nudge" : undefined,
+                            proactiveNudgeId: trackingParams.proactive_nudge_id,
+                            proactiveNudgeProductId: trackingParams.proactive_nudge_product_id,
+                            proactiveNudgeProductName: trackingParams.proactive_nudge_product_name,
+                            proactiveNudgeDestination: trackingParams.proactive_nudge_destination,
                         })
                     }).then(async (aiResponse) => {
                         if (aiResponse.status === 401 || aiResponse.status === 403) {
@@ -376,7 +406,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             setError("Error al conectar con el chat.")
             setIsInitializing(false)
         }
-    }, [fetchHistory, redirectToChatGate, slug])
+    }, [fetchHistory, redirectToChatGate, slug, tracking])
 
     useEffect(() => {
         if (initializationRef.current) return

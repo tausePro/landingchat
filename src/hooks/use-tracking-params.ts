@@ -20,6 +20,11 @@ export interface TrackingParams {
     fbc?: string
     fbp?: string
     referrer?: string
+    entry_point?: "proactive_nudge"
+    proactive_nudge_id?: string
+    proactive_nudge_product_id?: string
+    proactive_nudge_product_name?: string
+    proactive_nudge_destination?: "web_chat" | "whatsapp_fallback"
 }
 
 const STORAGE_KEY = "landingchat_tracking"
@@ -64,6 +69,11 @@ function getRuntimeTrackingParams(current?: TrackingParams): Partial<TrackingPar
         fbc,
         fbp,
         referrer: (typeof document !== "undefined" ? document.referrer : undefined) || current?.referrer,
+        entry_point: searchParams.get("entry_point") === "proactive_nudge" ? "proactive_nudge" : current?.entry_point,
+        proactive_nudge_id: searchParams.get("proactive_nudge_id") || current?.proactive_nudge_id,
+        proactive_nudge_product_id: searchParams.get("proactive_nudge_product_id") || current?.proactive_nudge_product_id,
+        proactive_nudge_product_name: searchParams.get("proactive_nudge_product_name") || current?.proactive_nudge_product_name,
+        proactive_nudge_destination: searchParams.get("proactive_nudge_destination") === "whatsapp_fallback" ? "whatsapp_fallback" : searchParams.get("proactive_nudge_destination") === "web_chat" ? "web_chat" : current?.proactive_nudge_destination,
     }
 }
 
@@ -89,7 +99,9 @@ export function useTrackingParams(slug: string) {
             runtime.ad_id ||
             runtime.fbclid ||
             runtime.fbc ||
-            runtime.fbp
+            runtime.fbp ||
+            runtime.entry_point ||
+            runtime.proactive_nudge_id
         ) {
             const trackingData: TrackingParams = {
                 ...current,
@@ -135,6 +147,31 @@ export function setSourceChannel(slug: string, channel: "web" | "chat" | "whatsa
         const current = getTrackingParams(slug)
         current.source_channel = channel
         sessionStorage.setItem(`${STORAGE_KEY}_${slug}`, JSON.stringify(current))
+    } catch {
+        // Ignore errors
+    }
+}
+
+export function setProactiveNudgeAttribution(slug: string, params: {
+    proactiveNudgeId: string
+    productId: string
+    productName?: string
+    destination: "web_chat" | "whatsapp_fallback"
+}) {
+    if (typeof window === "undefined") return
+
+    try {
+        const current = getTrackingParams(slug)
+        const next: TrackingParams = {
+            ...current,
+            captured_at: current.captured_at || new Date().toISOString(),
+            entry_point: "proactive_nudge",
+            proactive_nudge_id: params.proactiveNudgeId,
+            proactive_nudge_product_id: params.productId,
+            proactive_nudge_product_name: params.productName,
+            proactive_nudge_destination: params.destination,
+        }
+        sessionStorage.setItem(`${STORAGE_KEY}_${slug}`, JSON.stringify(next))
     } catch {
         // Ignore errors
     }

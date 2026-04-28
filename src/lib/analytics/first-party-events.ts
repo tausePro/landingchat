@@ -27,6 +27,7 @@ export type AnalyticsEventName =
     | "proactive_nudge_shown"
     | "proactive_nudge_clicked"
     | "proactive_nudge_dismissed"
+    | "proactive_nudge_chat_started"
     | "purchase"
 
 export type AnalyticsEventAttribution = {
@@ -45,6 +46,11 @@ export type AnalyticsEventAttribution = {
     fbc?: string
     fbp?: string
     referrer?: string
+    entryPoint?: "proactive_nudge"
+    proactiveNudgeId?: string
+    proactiveNudgeProductId?: string
+    proactiveNudgeProductName?: string
+    proactiveNudgeDestination?: "web_chat" | "whatsapp_fallback"
 }
 
 export type AnalyticsEventProperties = {
@@ -63,7 +69,11 @@ export type AnalyticsEventProperties = {
     previousQuantity?: number
     newQuantity?: number
     hasCoupon?: boolean
+    chatId?: string
+    entryPoint?: "proactive_nudge"
     proactiveNudgeId?: string
+    proactiveNudgeProductId?: string
+    proactiveNudgeProductName?: string
     placement?: "pdp" | "storefront"
     trigger?: "time_on_page"
     destination?: "web_chat" | "whatsapp_fallback"
@@ -134,6 +144,11 @@ function buildAttribution(slug: string): AnalyticsEventAttribution | undefined {
         fbc: trackingParams.fbc,
         fbp: trackingParams.fbp,
         referrer: trackingParams.referrer,
+        entryPoint: trackingParams.entry_point,
+        proactiveNudgeId: trackingParams.proactive_nudge_id,
+        proactiveNudgeProductId: trackingParams.proactive_nudge_product_id,
+        proactiveNudgeProductName: trackingParams.proactive_nudge_product_name,
+        proactiveNudgeDestination: trackingParams.proactive_nudge_destination,
     }
 
     const hasAttribution = Object.values(attribution).some(Boolean)

@@ -393,6 +393,11 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
                     fbc: trackingParams.fbc,
                     fbp: trackingParams.fbp,
                     referrer: trackingParams.referrer,
+                    entry_point: trackingParams.entry_point,
+                    proactive_nudge_id: trackingParams.proactive_nudge_id,
+                    proactive_nudge_product_id: trackingParams.proactive_nudge_product_id,
+                    proactive_nudge_product_name: trackingParams.proactive_nudge_product_name,
+                    proactive_nudge_destination: trackingParams.proactive_nudge_destination,
                 }
             })
 
