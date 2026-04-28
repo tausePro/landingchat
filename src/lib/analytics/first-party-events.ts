@@ -24,6 +24,9 @@ export type AnalyticsEventName =
     | "payment_pending"
     | "payment_failed"
     | "payment_retry_clicked"
+    | "proactive_nudge_shown"
+    | "proactive_nudge_clicked"
+    | "proactive_nudge_dismissed"
     | "purchase"
 
 export type AnalyticsEventAttribution = {
@@ -60,6 +63,10 @@ export type AnalyticsEventProperties = {
     previousQuantity?: number
     newQuantity?: number
     hasCoupon?: boolean
+    proactiveNudgeId?: string
+    placement?: "pdp" | "storefront"
+    trigger?: "time_on_page"
+    destination?: "web_chat" | "whatsapp_fallback"
     attribution?: AnalyticsEventAttribution
 }
 
