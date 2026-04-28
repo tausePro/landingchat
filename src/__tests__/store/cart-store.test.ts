@@ -141,4 +141,49 @@ describe("cart-store contract", () => {
     ])
     expect(useCartStore.getState().total()).toBe(108000)
   })
+
+  it("preserva imágenes distintas para variantes agregadas desde el agente", () => {
+    useCartStore.setState({ items: [], organizationSlug: null, isOpen: false, appliedCoupon: null })
+
+    useCartStore.getState().addItem({
+      id: "variant-durazno",
+      product_id: "product-1",
+      variant_id: "variant-durazno",
+      variant_title: "Durazno / 2.7 Kg",
+      name: "Arena ecológica gato tofu",
+      product_name: "Arena ecológica gato tofu",
+      unit_price: 29900,
+      image_url: "https://example.com/durazno.jpg",
+    })
+    useCartStore.getState().addItem({
+      id: "variant-lavanda",
+      product_id: "product-1",
+      variant_id: "variant-lavanda",
+      variant_title: "Lavanda / 2.7 Kg",
+      name: "Arena ecológica gato tofu",
+      product_name: "Arena ecológica gato tofu",
+      unit_price: 29900,
+      image_url: "https://example.com/lavanda.jpg",
+    })
+
+    expect(useCartStore.getState().items.map((item) => ({
+      lineId: getCartItemLineId(item),
+      product_id: item.product_id,
+      variant_title: item.variant_title,
+      image_url: item.image_url,
+    }))).toEqual([
+      {
+        lineId: "variant-durazno",
+        product_id: "product-1",
+        variant_title: "Durazno / 2.7 Kg",
+        image_url: "https://example.com/durazno.jpg",
+      },
+      {
+        lineId: "variant-lavanda",
+        product_id: "product-1",
+        variant_title: "Lavanda / 2.7 Kg",
+        image_url: "https://example.com/lavanda.jpg",
+      },
+    ])
+  })
 })

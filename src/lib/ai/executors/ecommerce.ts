@@ -7,6 +7,7 @@ import {
     findVariantBySelectedOptions,
     selectDefaultVariant,
 } from "@/lib/commerce/productWithVariants"
+import { getVariantPriceRange } from "@/lib/commerce/variantPricing"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import {
     ApplyDiscountSchema,
@@ -22,6 +23,276 @@ import {
 } from "@/lib/storefrontAccess"
 
 const log = logger("ai/tool-executor")
+
+interface ProductSearchRow {
+    id: string
+    name: string
+    description: string | null
+    price: number
+    sale_price: number | null
+    image_url: string | null
+    images: string[]
+    stock: number
+    categories: string[]
+    variants: unknown[]
+}
+
+interface AiCartLineItem {
+    id: string
+    product_id: string
+    variant_id: string | null
+    variant_title: string | null
+    name: string
+    product_name: string
+    price: number
+    unit_price: number
+    compare_at_price: number | null
+    image_url: string | null
+    quantity: number
+    categories?: string[]
+}
+
+interface AgentVariantSummary {
+    variant_id: string
+    title: string
+    sku: string | null
+    price: number
+    compare_at_price: number | null
+    stock: number
+    available: boolean
+    option_values: ProductVariantRow["option_values"]
+}
+
+interface AgentVariantOptionSummary {
+    name: string
+    values: string[]
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null
+    }
+
+    return value as Record<string, unknown>
+}
+
+function parseFiniteNumber(value: unknown): number | null {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null
+    }
+
+    if (typeof value === "string" && value.trim().length > 0) {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+
+    return null
+}
+
+function parseStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        return []
+    }
+
+    return value.filter((item): item is string => typeof item === "string")
+}
+
+function normalizeProductSearchRow(value: unknown): ProductSearchRow | null {
+    const record = asRecord(value)
+
+    if (!record) {
+        return null
+    }
+
+    const id = typeof record.id === "string" ? record.id : null
+    const name = typeof record.name === "string" ? record.name : null
+    const price = parseFiniteNumber(record.price)
+    const stock = parseFiniteNumber(record.stock)
+
+    if (!id || !name || price == null || stock == null) {
+        return null
+    }
+
+    return {
+        id,
+        name,
+        description: typeof record.description === "string" ? record.description : null,
+        price,
+        sale_price: parseFiniteNumber(record.sale_price),
+        image_url: typeof record.image_url === "string" ? record.image_url : null,
+        images: parseStringArray(record.images),
+        stock,
+        categories: parseStringArray(record.categories),
+        variants: Array.isArray(record.variants) ? record.variants : [],
+    }
+}
+
+function groupVariantsByProductId(variants: ProductVariantRow[]): Map<string, ProductVariantRow[]> {
+    return variants.reduce((groups, variant) => {
+        const productVariants = groups.get(variant.product_id) ?? []
+        productVariants.push(variant)
+        groups.set(variant.product_id, productVariants)
+        return groups
+    }, new Map<string, ProductVariantRow[]>())
+}
+
+function buildAgentAvailableVariants(variants: ProductVariantRow[]): AgentVariantSummary[] {
+    return variants.map((variant) => ({
+        variant_id: variant.id,
+        title: variant.title,
+        sku: variant.sku,
+        price: variant.price,
+        compare_at_price: variant.compare_at_price,
+        stock: Math.max(0, variant.stock_quantity),
+        available: variant.stock_quantity > 0,
+        option_values: variant.option_values,
+    }))
+}
+
+function buildAgentVariantOptions(variants: ProductVariantRow[]): AgentVariantOptionSummary[] {
+    const optionValues = new Map<string, Set<string>>()
+
+    for (const variant of variants) {
+        for (const optionValue of variant.option_values) {
+            const values = optionValues.get(optionValue.option_name) ?? new Set<string>()
+            values.add(optionValue.value)
+            optionValues.set(optionValue.option_name, values)
+        }
+    }
+
+    if (optionValues.size === 0) {
+        const titles = variants
+            .map((variant) => variant.title.trim())
+            .filter((title) => title.length > 0 && removeAccents(title) !== "default")
+
+        if (titles.length === 0) {
+            return []
+        }
+
+        return [{ name: "Variante", values: Array.from(new Set(titles)) }]
+    }
+
+    return Array.from(optionValues.entries()).map(([name, values]) => ({
+        name,
+        values: Array.from(values),
+    }))
+}
+
+async function getSellableVariantsForProducts(
+    supabase: Parameters<ToolHandler>[0],
+    organizationId: string,
+    productIds: string[],
+): Promise<Map<string, ProductVariantRow[]>> {
+    if (productIds.length === 0) {
+        return new Map()
+    }
+
+    const { data, error } = await supabase
+        .from("product_variants")
+        .select(PRODUCT_WITH_VARIANTS_VARIANT_SELECT)
+        .eq("organization_id", organizationId)
+        .eq("is_active", true)
+        .in("product_id", productIds)
+
+    if (error) {
+        log.warn("Error fetching product variants for search", { organizationId, error: error.message })
+        return new Map()
+    }
+
+    return groupVariantsByProductId(
+        (data || []).map((variant) => normalizeVariantRow(variant)).filter((variant) => variant.is_active),
+    )
+}
+
+export function resolveAgentSearchProduct(product: ProductSearchRow, variants: ProductVariantRow[]) {
+    const defaultVariant = selectDefaultVariant(variants)
+    const priceRange = getVariantPriceRange(variants)
+    const unitPrice = defaultVariant?.price ?? product.sale_price ?? product.price
+    const compareAtPrice = defaultVariant?.compare_at_price ?? (product.sale_price ? product.price : null)
+    const stock = variants.length > 0
+        ? variants.reduce((sum, variant) => sum + Math.max(0, variant.stock_quantity), 0)
+        : product.stock
+
+    return {
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: unitPrice,
+        originalPrice: compareAtPrice && compareAtPrice > unitPrice ? compareAtPrice : undefined,
+        onSale: Boolean(compareAtPrice && compareAtPrice > unitPrice),
+        price_range: priceRange,
+        image_url: defaultVariant?.image_url || product.image_url || product.images[0],
+        stock,
+        available: stock > 0,
+        hasVariants: variants.length > 1 || product.variants.length > 0,
+        default_variant_id: defaultVariant?.id ?? null,
+        default_variant_title: defaultVariant?.title ?? null,
+        variant_options: buildAgentVariantOptions(variants),
+        available_variants: buildAgentAvailableVariants(variants),
+    }
+}
+
+export function normalizeAiCartLineItem(value: unknown): AiCartLineItem | null {
+    const record = asRecord(value)
+
+    if (!record) {
+        return null
+    }
+
+    const productId = typeof record.product_id === "string"
+        ? record.product_id
+        : typeof record.id === "string"
+            ? record.id
+            : null
+    const name = typeof record.product_name === "string"
+        ? record.product_name
+        : typeof record.name === "string"
+            ? record.name
+            : null
+    const unitPrice = parseFiniteNumber(record.unit_price) ?? parseFiniteNumber(record.price)
+    const quantity = parseFiniteNumber(record.quantity)
+
+    if (!productId || !name || unitPrice == null || quantity == null) {
+        return null
+    }
+
+    const variantId = typeof record.variant_id === "string" ? record.variant_id : null
+    const id = variantId ?? (typeof record.id === "string" ? record.id : productId)
+
+    return {
+        id,
+        product_id: productId,
+        variant_id: variantId,
+        variant_title: typeof record.variant_title === "string" ? record.variant_title : null,
+        name,
+        product_name: name,
+        price: unitPrice,
+        unit_price: unitPrice,
+        compare_at_price: parseFiniteNumber(record.compare_at_price),
+        image_url: typeof record.image_url === "string" ? record.image_url : null,
+        quantity: Math.max(1, Math.trunc(quantity)),
+        categories: parseStringArray(record.categories),
+    }
+}
+
+function normalizeAiCartLineItems(value: unknown): AiCartLineItem[] {
+    if (!Array.isArray(value)) {
+        return []
+    }
+
+    return value.flatMap((item) => {
+        const normalizedItem = normalizeAiCartLineItem(item)
+        return normalizedItem ? [normalizedItem] : []
+    })
+}
+
+function calculateCartSubtotal(items: AiCartLineItem[]): number {
+    return items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0)
+}
+
+function calculateCartQuantity(items: AiCartLineItem[]): number {
+    return items.reduce((sum, item) => sum + item.quantity, 0)
+}
 
 function removeAccents(str: string): string {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
@@ -107,6 +378,68 @@ function resolveVariantFromInput(
     return selectDefaultVariant(variants)
 }
 
+function resolveLegacyVariantImage(
+    legacyVariants: unknown,
+    selectedVariant: ProductVariantRow | null,
+    variantInput: unknown,
+): string | null {
+    if (!Array.isArray(legacyVariants)) {
+        return null
+    }
+
+    const candidateValues = new Set<string>()
+
+    if (selectedVariant) {
+        candidateValues.add(selectedVariant.title)
+        for (const optionValue of selectedVariant.option_values) {
+            candidateValues.add(optionValue.value)
+        }
+    }
+
+    if (typeof variantInput === "string") {
+        candidateValues.add(variantInput)
+    } else {
+        const variantInputRecord = asRecord(variantInput)
+        if (variantInputRecord) {
+            for (const value of Object.values(variantInputRecord)) {
+                if (typeof value === "string") {
+                    candidateValues.add(value)
+                }
+            }
+        }
+    }
+
+    const normalizedCandidateValues = Array.from(candidateValues).map((value) => removeAccents(value))
+
+    for (const legacyVariant of legacyVariants) {
+        const variantRecord = asRecord(legacyVariant)
+        const imagesRecord = asRecord(variantRecord?.images)
+
+        if (!imagesRecord) {
+            continue
+        }
+
+        for (const [value, imageValue] of Object.entries(imagesRecord)) {
+            if (!normalizedCandidateValues.includes(removeAccents(value))) {
+                continue
+            }
+
+            if (typeof imageValue === "string" && imageValue.length > 0) {
+                return imageValue
+            }
+
+            if (Array.isArray(imageValue)) {
+                const firstImage = imageValue.find((item): item is string => typeof item === "string" && item.length > 0)
+                if (firstImage) {
+                    return firstImage
+                }
+            }
+        }
+    }
+
+    return null
+}
+
 function resolveCatalogPricing(input: {
     price: number
     sale_price: number | null
@@ -146,6 +479,7 @@ function resolveCatalogPricing(input: {
 
 const searchProducts: ToolHandler = async (supabase, input, context) => {
     const { query, category, max_price, limit = 15 } = input
+    const maxPrice = parseFiniteNumber(max_price)
 
     let dbQuery = supabase
         .from("products")
@@ -153,10 +487,6 @@ const searchProducts: ToolHandler = async (supabase, input, context) => {
         .eq("organization_id", context.organizationId)
         .eq("is_active", true)
         .order("stock", { ascending: false })
-
-    if (max_price) {
-        dbQuery = dbQuery.lte("price", max_price)
-    }
 
     if (query) {
         const words = removeAccents(query)
@@ -178,22 +508,34 @@ const searchProducts: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: error.message }
     }
 
+    const productRows = (products || []).flatMap((product) => {
+        const normalizedProduct = normalizeProductSearchRow(product)
+        return normalizedProduct ? [normalizedProduct] : []
+    })
+    const variantsByProductId = await getSellableVariantsForProducts(
+        supabase,
+        context.organizationId,
+        productRows.map((product) => product.id),
+    )
+    const resolvedProducts = productRows
+        .map((product) => resolveAgentSearchProduct(product, variantsByProductId.get(product.id) ?? []))
+        .filter((product) => {
+            if (maxPrice == null) {
+                return true
+            }
+
+            if (product.price_range.has_range) {
+                return product.price_range.min_price <= maxPrice
+            }
+
+            return product.price <= maxPrice
+        })
+
     return {
         success: true,
         data: {
-            products: products.map((p: any) => ({
-                id: p.id,
-                name: p.name,
-                description: p.description,
-                price: p.sale_price || p.price,
-                originalPrice: p.sale_price ? p.price : undefined,
-                onSale: !!p.sale_price,
-                image_url: p.image_url || p.images?.[0],
-                stock: p.stock,
-                available: p.stock > 0,
-                hasVariants: p.variants?.length > 0
-            })),
-            totalFound: products.length
+            products: resolvedProducts,
+            totalFound: resolvedProducts.length
         }
     }
 }
@@ -214,6 +556,9 @@ const showProduct: ToolHandler = async (supabase, input, context) => {
 
     const variants = await getSellableVariants(supabase, context.organizationId, product.id)
     const defaultVariant = selectDefaultVariant(variants)
+    const resolvedStock = variants.length > 0
+        ? variants.reduce((sum, variant) => sum + Math.max(0, variant.stock_quantity), 0)
+        : product.stock
     const pricing = resolveCatalogPricing({
         price: product.price,
         sale_price: product.sale_price,
@@ -231,14 +576,16 @@ const showProduct: ToolHandler = async (supabase, input, context) => {
                 sale_price: pricing.sale_price,
                 image_url: defaultVariant?.image_url || product.image_url || product.images?.[0] || "",
                 images: product.images || [],
-                stock: product.stock,
-                available: product.stock > 0,
+                stock: resolvedStock,
+                available: resolvedStock > 0,
                 categories: product.categories || [],
                 variants: variants,
                 default_variant_id: defaultVariant?.id ?? null,
                 default_variant_title: defaultVariant?.title ?? null,
                 default_variant_compare_at_price: defaultVariant?.compare_at_price ?? null,
                 default_variant_stock: defaultVariant?.stock_quantity ?? null,
+                variant_options: buildAgentVariantOptions(variants),
+                available_variants: buildAgentAvailableVariants(variants),
             }
         }
     }
@@ -258,17 +605,30 @@ const getProductAvailability: ToolHandler = async (supabase, input, context) => 
         return { success: false, error: "Producto no encontrado" }
     }
 
-    const variantStock: Record<string, Record<string, number>> = {}
-    let hasVariantStock = false
+    const variants = await getSellableVariants(supabase, context.organizationId, product_id)
 
-    if (product.variants && Array.isArray(product.variants)) {
-        for (const v of product.variants) {
-            if (v.hasStockByVariant && v.stockByVariant) {
-                hasVariantStock = true
-                variantStock[v.type] = {}
-                for (const [val, qty] of Object.entries(v.stockByVariant)) {
-                    variantStock[v.type][val] = qty as number
-                }
+    if (variants.length > 0) {
+        const quantity = variants.reduce((sum, variant) => sum + Math.max(0, variant.stock_quantity), 0)
+
+        return {
+            success: true,
+            data: {
+                available: quantity > 0,
+                quantity,
+                productName: product.name,
+                variants: variants.map((variant) => ({
+                    variant_id: variant.id,
+                    title: variant.title,
+                    sku: variant.sku,
+                    quantity: Math.max(0, variant.stock_quantity),
+                    available: variant.stock_quantity > 0,
+                    option_values: variant.option_values,
+                    price: variant.price,
+                    compare_at_price: variant.compare_at_price,
+                })),
+                variant_options: buildAgentVariantOptions(variants),
+                available_variants: buildAgentAvailableVariants(variants),
+                note: "Este producto tiene inventario por variante. Verifica disponibilidad de la variante específica antes de agregar al carrito."
             }
         }
     }
@@ -279,10 +639,6 @@ const getProductAvailability: ToolHandler = async (supabase, input, context) => 
             available: product.stock > 0,
             quantity: product.stock,
             productName: product.name,
-            ...(hasVariantStock && {
-                stockByVariant: variantStock,
-                note: "Este producto tiene inventario por variante. Verifica disponibilidad de la variante específica antes de agregar al carrito."
-            })
         }
     }
 }
@@ -320,7 +676,7 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         }
     }
 
-    if (!selectedVariant && variant && product.variants && Array.isArray(product.variants)) {
+    if (sellableVariants.length === 0 && variant && product.variants && Array.isArray(product.variants)) {
         for (const v of product.variants) {
             if (v.hasStockByVariant && v.stockByVariant) {
                 const variantValue = typeof variant === "string" ? variant : variant[v.type]
@@ -339,7 +695,7 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         }
     }
 
-    if (product.stock < quantity) {
+    if (sellableVariants.length === 0 && product.stock < quantity) {
         return {
             success: false,
             error: `Solo hay ${product.stock} unidades disponibles de ${product.name}`
@@ -372,42 +728,28 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         cart = newCart
     }
 
-    const items = Array.isArray(cart.items) ? [...cart.items] : []
+    const items = normalizeAiCartLineItems(cart.items)
     const lineId = selectedVariant?.id ?? product.id
     const unitPrice = selectedVariant?.price ?? (product.sale_price || product.price)
     const compareAtPrice = selectedVariant?.compare_at_price ?? (product.sale_price ? product.price : null)
-    const imageUrl = selectedVariant?.image_url || product.image_url
-    const existingIndex = items.findIndex((item) => {
-        if (!item || typeof item !== "object" || Array.isArray(item)) {
-            return false
-        }
-
-        const record = item as Record<string, unknown>
-        const recordLineId = typeof record.variant_id === "string"
-            ? record.variant_id
-            : typeof record.product_id === "string"
-                ? record.product_id
-                : null
-
-        return recordLineId === lineId
-    })
+    const imageUrl = resolveLegacyVariantImage(product.variants, selectedVariant, variant) || selectedVariant?.image_url || product.image_url
+    const existingIndex = items.findIndex((item) => item.id === lineId)
 
     if (existingIndex >= 0) {
-        const currentItem = items[existingIndex] as Record<string, unknown>
-        const currentQuantity = typeof currentItem.quantity === "number" ? currentItem.quantity : 0
+        const currentItem = items[existingIndex]
         items[existingIndex] = {
             ...currentItem,
             id: lineId,
             product_id: product.id,
             product_name: product.name,
+            name: product.name,
             variant_id: selectedVariant?.id ?? null,
             variant_title: selectedVariant?.title ?? null,
             price: unitPrice,
             unit_price: unitPrice,
             compare_at_price: compareAtPrice,
             image_url: imageUrl,
-            quantity: currentQuantity + quantity,
-            variant: variant || null,
+            quantity: currentItem.quantity + quantity,
         }
     } else {
         items.push({
@@ -422,7 +764,6 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
             compare_at_price: compareAtPrice,
             image_url: imageUrl,
             quantity,
-            variant: variant || null
         })
     }
 
@@ -438,7 +779,7 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "Error actualizando carrito" }
     }
 
-    const total = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const total = calculateCartSubtotal(items)
 
     return {
         success: true,
@@ -456,7 +797,7 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
             },
             cart: {
                 itemCount: items.length,
-                totalItems: items.reduce((sum: number, i: any) => sum + i.quantity, 0),
+                totalItems: calculateCartQuantity(items),
                 total
             }
         }
@@ -471,7 +812,9 @@ const getCart: ToolHandler = async (supabase, _input, context) => {
         .eq("status", "active")
         .single()
 
-    if (!cart || !cart.items?.length) {
+    const items = normalizeAiCartLineItems(cart?.items)
+
+    if (!cart || items.length === 0) {
         return {
             success: true,
             data: {
@@ -482,15 +825,15 @@ const getCart: ToolHandler = async (supabase, _input, context) => {
         }
     }
 
-    const total = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const total = calculateCartSubtotal(items)
 
     return {
         success: true,
         data: {
             isEmpty: false,
-            items: cart.items,
-            itemCount: cart.items.length,
-            totalItems: cart.items.reduce((sum: number, i: any) => sum + i.quantity, 0),
+            items,
+            itemCount: items.length,
+            totalItems: calculateCartQuantity(items),
             total
         }
     }
@@ -510,8 +853,9 @@ const removeFromCart: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "No hay carrito activo" }
     }
 
-    const items = cart.items.filter((i: any) => i.product_id !== product_id)
-    const removedItem = cart.items.find((i: any) => i.product_id === product_id)
+    const currentItems = normalizeAiCartLineItems(cart.items)
+    const items = currentItems.filter((item) => item.product_id !== product_id)
+    const removedItem = currentItems.find((item) => item.product_id === product_id)
 
     await supabase
         .from("carts")
@@ -541,19 +885,19 @@ const updateCartQuantity: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "No hay carrito activo" }
     }
 
-    const items = cart.items.map((i: any) => {
-        if (i.product_id === product_id) {
-            return { ...i, quantity }
+    const items = normalizeAiCartLineItems(cart.items).map((item) => {
+        if (item.product_id === product_id) {
+            return { ...item, quantity }
         }
-        return i
-    }).filter((i: any) => i.quantity > 0)
+        return item
+    }).filter((item) => item.quantity > 0)
 
     await supabase
         .from("carts")
         .update({ items, updated_at: new Date().toISOString() })
         .eq("id", cart.id)
 
-    const total = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const total = calculateCartSubtotal(items)
 
     return {
         success: true,
@@ -571,21 +915,23 @@ const startCheckout: ToolHandler = async (supabase, _input, context) => {
         .eq("status", "active")
         .single()
 
-    if (!cart || !cart.items?.length) {
+    const items = normalizeAiCartLineItems(cart?.items)
+
+    if (!cart || items.length === 0) {
         return {
             success: false,
             error: "El carrito está vacío"
         }
     }
 
-    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const subtotal = calculateCartSubtotal(items)
 
     return {
         success: true,
         data: {
             readyForCheckout: true,
             summary: {
-                items: cart.items,
+                items,
                 subtotal,
                 shipping: "Por calcular",
                 total: subtotal
@@ -710,11 +1056,13 @@ const applyDiscount: ToolHandler = async (supabase, input, context) => {
         .eq("status", "active")
         .single()
 
-    if (!cart?.items?.length) {
+    const items = normalizeAiCartLineItems(cart?.items)
+
+    if (items.length === 0) {
         return { success: false, error: "El carrito está vacío. Agrega productos antes de aplicar un cupón." }
     }
 
-    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const subtotal = calculateCartSubtotal(items)
 
     if (coupon.min_purchase_amount && subtotal < Number(coupon.min_purchase_amount)) {
         return {
@@ -723,11 +1071,11 @@ const applyDiscount: ToolHandler = async (supabase, input, context) => {
         }
     }
 
-    let cartItems: CartItemForCoupon[] = cart.items.map((item: any) => ({
+    let cartItems: CartItemForCoupon[] = items.map((item) => ({
         id: item.product_id,
-        price: item.price,
+        price: item.unit_price,
         quantity: item.quantity,
-        categories: [] as string[]
+        categories: item.categories ?? []
     }))
 
     if (coupon.applies_to === "categories" && coupon.target_ids?.length) {
@@ -738,7 +1086,17 @@ const applyDiscount: ToolHandler = async (supabase, input, context) => {
             .in("id", productIds)
 
         if (products) {
-            const catMap = new Map<string, string[]>(products.map((p: any) => [p.id, p.categories || []]))
+            const catMap = new Map<string, string[]>(
+                products.flatMap((product) => {
+                    const record = asRecord(product)
+
+                    if (!record || typeof record.id !== "string") {
+                        return []
+                    }
+
+                    return [[record.id, parseStringArray(record.categories)]]
+                }),
+            )
             cartItems = cartItems.map((item: CartItemForCoupon) => ({
                 ...item,
                 categories: catMap.get(item.id) || []
@@ -807,7 +1165,9 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
         .eq("status", "active")
         .single()
 
-    if (!cart || !cart.items?.length) {
+    const items = normalizeAiCartLineItems(cart?.items)
+
+    if (!cart || items.length === 0) {
         return {
             success: true,
             data: {
@@ -818,8 +1178,8 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
         }
     }
 
-    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
-    const itemCount = cart.items.reduce((sum: number, item: any) => sum + item.quantity, 0)
+    const subtotal = calculateCartSubtotal(items)
+    const itemCount = calculateCartQuantity(items)
 
     const { data: shippingSettings } = await supabase
         .from("shipping_settings")
@@ -838,17 +1198,17 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
             ui_component: "checkout_summary",
             message: message || "¡Excelente elección! Aquí tienes el resumen de tu pedido:",
             cart: {
-                items: cart.items.map((item: any) => ({
-                    id: item.variant_id || item.product_id,
+                items: items.map((item) => ({
+                    id: item.id,
                     product_id: item.product_id,
-                    variant_id: item.variant_id || null,
-                    variant_title: item.variant_title || null,
+                    variant_id: item.variant_id,
+                    variant_title: item.variant_title,
                     name: item.name,
-                    price: item.unit_price || item.price,
-                    compare_at_price: item.compare_at_price ?? null,
+                    price: item.unit_price,
+                    compare_at_price: item.compare_at_price,
                     quantity: item.quantity,
                     image_url: item.image_url,
-                    subtotal: (item.unit_price || item.price) * item.quantity
+                    subtotal: item.unit_price * item.quantity
                 })),
                 itemCount,
                 subtotal,
@@ -878,7 +1238,9 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
 
     payLog.debug("Cart query result", { cartId: cart?.id, items: cart?.items?.length, error: cartError?.message })
 
-    if (!cart || !cart.items?.length) {
+    const items = normalizeAiCartLineItems(cart?.items)
+
+    if (!cart || items.length === 0) {
         payLog.warn("No cart or empty items")
         return {
             success: false,
@@ -904,7 +1266,7 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         }
     }
 
-    const subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+    const subtotal = calculateCartSubtotal(items)
 
     const { data: shippingSettings } = await supabase
         .from("shipping_settings")
@@ -933,13 +1295,13 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
             customer_id: chat?.customer_id || null,
             chat_id: context.chatId,
             order_number: orderNumber,
-            items: cart.items.map((item: any) => ({
+            items: items.map((item) => ({
                 product_id: item.product_id,
-                product_name: item.product_name || item.name,
+                product_name: item.product_name,
                 name: item.name,
-                unit_price: item.unit_price || item.price,
-                total_price: (item.unit_price || item.price) * item.quantity,
-                price: item.unit_price || item.price,
+                unit_price: item.unit_price,
+                total_price: item.unit_price * item.quantity,
+                price: item.unit_price,
                 quantity: item.quantity,
                 variant_info: item.variant_title
                     ? {
@@ -1027,7 +1389,7 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
                 total,
                 subtotal,
                 shippingCost,
-                itemCount: cart.items.length
+                itemCount: items.length
             },
             paymentMethod: payment_method || "epayco",
             paymentUrl,
