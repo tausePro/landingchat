@@ -74,9 +74,12 @@ export interface DecrementOrderStockResult {
      */
     items: Array<{
         productId: string
+        variantId: string | null
         quantity: number
         previousStock: number | null
         newStock: number | null
+        previousVariantStock: number | null
+        newVariantStock: number | null
         /**
          * True si el stock disponible era suficiente antes del decremento.
          * False si hubo que clampar a 0 (caso de sobreventa detectada).
@@ -93,7 +96,7 @@ export interface DecrementOrderStockResult {
  */
 function parseItem(
     raw: unknown,
-): { productId: string; quantity: number } | null {
+): { productId: string; variantId: string | null; quantity: number } | null {
     if (!raw || typeof raw !== "object") return null
     const item = raw as OrderItemFromJsonb
 
@@ -106,7 +109,12 @@ function parseItem(
         return null
     }
 
-    return { productId, quantity: Math.floor(quantityRaw) }
+    const variantIdRaw = item.variant_info?.variant_id
+    const variantId = typeof variantIdRaw === "string" && variantIdRaw.trim().length > 0
+        ? variantIdRaw.trim()
+        : null
+
+    return { productId, variantId, quantity: Math.floor(quantityRaw) }
 }
 
 /**
@@ -231,7 +239,7 @@ export async function decrementOrderStock(
             continue
         }
 
-        const { productId, quantity } = parsed
+        const { productId, variantId, quantity } = parsed
 
         const { data: rpcResult, error: rpcError } = await supabase.rpc(
             "decrement_product_stock",
@@ -239,6 +247,7 @@ export async function decrementOrderStock(
                 p_product_id: productId,
                 p_organization_id: organizationId,
                 p_quantity: quantity,
+                p_variant_id: variantId,
             },
         )
 
@@ -247,14 +256,18 @@ export async function decrementOrderStock(
                 orderId,
                 organizationId,
                 productId,
+                variantId,
                 quantity,
                 error: rpcError.message,
             })
             results.push({
                 productId,
+                variantId,
                 quantity,
                 previousStock: null,
                 newStock: null,
+                previousVariantStock: null,
+                newVariantStock: null,
                 wasSufficient: false,
                 variantUpdated: false,
                 error: rpcError.message,
@@ -264,16 +277,22 @@ export async function decrementOrderStock(
 
         // La RPC (RETURNS TABLE) retorna un array con una fila.
         const row = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult
+        const resolvedVariantId = typeof row?.variant_id === "string" ? row.variant_id : variantId
         const previousStock = typeof row?.previous_stock === "number" ? row.previous_stock : null
         const newStock = typeof row?.new_stock === "number" ? row.new_stock : null
+        const previousVariantStock = typeof row?.previous_variant_stock === "number" ? row.previous_variant_stock : null
+        const newVariantStock = typeof row?.new_variant_stock === "number" ? row.new_variant_stock : null
         const wasSufficient = Boolean(row?.was_sufficient)
         const variantUpdated = Boolean(row?.variant_updated)
 
         results.push({
             productId,
+            variantId: resolvedVariantId,
             quantity,
             previousStock,
             newStock,
+            previousVariantStock,
+            newVariantStock,
             wasSufficient,
             variantUpdated,
         })
@@ -283,18 +302,24 @@ export async function decrementOrderStock(
                 orderId,
                 organizationId,
                 productId,
+                variantId: resolvedVariantId,
                 quantity,
                 previousStock,
                 newStock,
+                previousVariantStock,
+                newVariantStock,
             })
         } else {
             log.info("Stock decremented", {
                 orderId,
                 organizationId,
                 productId,
+                variantId: resolvedVariantId,
                 quantity,
                 previousStock,
                 newStock,
+                previousVariantStock,
+                newVariantStock,
                 variantUpdated,
             })
         }
