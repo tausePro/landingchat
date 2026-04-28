@@ -93,9 +93,15 @@ interface ShippingConfig {
 
 interface AddedToCartActionData {
     product_id?: string
+    variant_id?: string | null
+    variant_title?: string | null
     name: string
     price: number
+    unit_price?: number
+    compare_at_price?: number | null
     quantity?: number
+    image_url?: string | null
+    categories?: string[]
 }
 
 interface ChatAction {
@@ -457,6 +463,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         setIsLoading(true)
 
         try {
+            const currentProductId = new URLSearchParams(window.location.search).get('product') || undefined
             const response = await fetch('/api/ai-chat', {
                 method: 'POST',
                 headers: {
@@ -467,16 +474,23 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     chatId,
                     slug,
                     customerId,
+                    currentProductId,
                     // Sync frontend cart with backend
                     cartItems: items.map(item => ({
                         id: item.id,
+                        product_id: item.product_id,
+                        variant_id: item.variant_id,
+                        variant_title: item.variant_title,
                         name: item.name,
+                        product_name: item.product_name,
                         price: item.price,
+                        unit_price: item.unit_price,
+                        compare_at_price: item.compare_at_price,
                         quantity: item.quantity,
-                        image_url: item.image_url
-                    }))
-                    // Note: NOT passing currentProductId here - that context is only for initial message
-                    // The AI should use search_products tool to find products for user queries
+                        image_url: item.image_url,
+                        categories: item.categories,
+                    })),
+                    // Si el chat viene desde una PDP, mantener ese producto como contexto activo
                 })
             })
 
@@ -513,10 +527,17 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         }
 
                         addItem({
-                            id: productId,
+                            id: addedProduct.variant_id ?? productId,
+                            product_id: productId,
+                            variant_id: addedProduct.variant_id ?? null,
+                            variant_title: addedProduct.variant_title ?? null,
                             name: addedProduct.name,
+                            product_name: addedProduct.name,
                             price: addedProduct.price,
-                            image_url: matchedProduct?.image_url
+                            unit_price: addedProduct.unit_price ?? addedProduct.price,
+                            compare_at_price: addedProduct.compare_at_price ?? null,
+                            image_url: addedProduct.image_url ?? matchedProduct?.image_url,
+                            categories: addedProduct.categories,
                         }, addedProduct.quantity || 1)
                     } else if (action.type === 'send_media' && action.data?.media) {
                         collectedMedia.push(action.data.media as MediaAttachment)

@@ -6,8 +6,48 @@ import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { formatBogotaDate } from "@/lib/utils/date"
+import {
+    PRODUCT_WITH_VARIANTS_VARIANT_SELECT,
+    normalizeVariantRow,
+} from "@/lib/commerce/getProductWithVariants"
+import type { ProductVariantRow } from "@/types/product"
 
 const AI_MODEL = "claude-haiku-4-5-20251001"
+
+function buildVariantOptionsForPrompt(variants: ProductVariantRow[]) {
+    const optionValues = new Map<string, Set<string>>()
+
+    for (const variant of variants) {
+        for (const optionValue of variant.option_values) {
+            const values = optionValues.get(optionValue.option_name) ?? new Set<string>()
+            values.add(optionValue.value)
+            optionValues.set(optionValue.option_name, values)
+        }
+    }
+
+    if (optionValues.size === 0) {
+        const titles = variants
+            .map((variant) => variant.title.trim())
+            .filter((title) => title.length > 0 && title.toLowerCase() !== "default")
+
+        return titles.length > 0 ? [{ name: "Variante", values: Array.from(new Set(titles)) }] : []
+    }
+
+    return Array.from(optionValues.entries()).map(([name, values]) => ({
+        name,
+        values: Array.from(values),
+    }))
+}
+
+function buildAvailableVariantsForPrompt(variants: ProductVariantRow[]) {
+    return variants.map((variant) => ({
+        title: variant.title,
+        price: variant.price,
+        compare_at_price: variant.compare_at_price,
+        stock: Math.max(0, variant.stock_quantity),
+        available: variant.stock_quantity > 0,
+    }))
+}
 
  interface OrgMediaPromptFile {
      id: string
@@ -203,7 +243,27 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
                 log.warn("Error loading current product", { error: productError.message })
             } else {
                 log.debug("Current product loaded", { name: product?.name, price: product?.price })
-                currentProduct = product
+                const { data: variantRows, error: variantsError } = await supabase
+                    .from("product_variants")
+                    .select(PRODUCT_WITH_VARIANTS_VARIANT_SELECT)
+                    .eq("product_id", input.currentProductId)
+                    .eq("organization_id", input.organizationId)
+                    .eq("is_active", true)
+
+                if (variantsError) {
+                    log.warn("Error loading current product variants", { error: variantsError.message })
+                    currentProduct = product
+                } else {
+                    const variants = (variantRows || [])
+                        .map((variant) => normalizeVariantRow(variant))
+                        .filter((variant) => variant.is_active)
+
+                    currentProduct = {
+                        ...product,
+                        variant_options: buildVariantOptionsForPrompt(variants),
+                        available_variants: buildAvailableVariantsForPrompt(variants),
+                    }
+                }
             }
         } else {
             log.debug("No currentProductId provided")

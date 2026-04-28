@@ -12,10 +12,17 @@ const log = logger("api/ai-chat")
 
 const cartItemSchema = z.object({
     id: z.string(),
+    product_id: z.string().optional(),
+    variant_id: z.string().nullable().optional(),
+    variant_title: z.string().nullable().optional(),
     name: z.string(),
+    product_name: z.string().optional(),
     price: z.number(),
+    unit_price: z.number().optional(),
+    compare_at_price: z.number().nullable().optional(),
     quantity: z.number(),
-    image_url: z.string().optional()
+    image_url: z.string().nullable().optional(),
+    categories: z.array(z.string()).optional()
 })
 
 const aiChatSchema = z.object({
@@ -191,11 +198,18 @@ export async function POST(request: NextRequest) {
         if (cartItems && cartItems.length > 0 && currentChatId) {
             // Transform frontend cart items to DB format
             const dbCartItems = cartItems.map(item => ({
-                product_id: item.id,
-                name: item.name,
-                price: item.price,
+                id: item.variant_id ?? item.id,
+                product_id: item.product_id ?? item.id,
+                variant_id: item.variant_id ?? null,
+                variant_title: item.variant_title ?? null,
+                name: item.product_name ?? item.name,
+                product_name: item.product_name ?? item.name,
+                price: item.unit_price ?? item.price,
+                unit_price: item.unit_price ?? item.price,
+                compare_at_price: item.compare_at_price ?? null,
                 quantity: item.quantity,
-                image_url: item.image_url || null
+                image_url: item.image_url || null,
+                categories: item.categories || [],
             }))
 
             // Upsert cart in database

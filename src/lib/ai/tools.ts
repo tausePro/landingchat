@@ -29,7 +29,7 @@ export const tools: Anthropic.Tool[] = [
     // ==================== PRODUCTOS ====================
     {
         name: "search_products",
-        description: "Busca productos en el catálogo basándose en lo que el cliente describe. Usa esto cuando el cliente dice qué tipo de producto busca.",
+        description: "Busca productos en el catálogo basándose en lo que el cliente describe. Usa esto cuando el cliente dice qué tipo de producto busca. Si el resultado trae variant_options o available_variants, esas son las opciones reales disponibles (aromas, sabores, tallas, colores, etc.); al responder sobre opciones lista TODAS, no solo la variante default.",
         input_schema: {
             type: "object" as const,
             properties: {
@@ -55,7 +55,7 @@ export const tools: Anthropic.Tool[] = [
     },
     {
         name: "show_product",
-        description: "Muestra los detalles completos de un producto específico. Usar cuando el cliente quiere ver más info de un producto.",
+        description: "Muestra los detalles completos de un producto específico. Usar cuando el cliente quiere ver más info de un producto o pregunta por aromas, sabores, tallas, colores u opciones. Si devuelve variant_options o available_variants, lista TODAS las opciones reales disponibles.",
         input_schema: {
             type: "object" as const,
             properties: {
@@ -69,7 +69,7 @@ export const tools: Anthropic.Tool[] = [
     },
     {
         name: "get_product_availability",
-        description: "Verifica el stock disponible de un producto.",
+        description: "Verifica el stock disponible de un producto. Para productos con variantes, devuelve disponibilidad por variante y opciones reales (aromas, sabores, tallas, colores, etc.).",
         input_schema: {
             type: "object" as const,
             properties: {
