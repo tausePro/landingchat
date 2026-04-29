@@ -25,10 +25,21 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
         }
     }
 
-    const { product, organization } = data
+    const { product, organization, productWithVariants } = data
+    const defaultVariant = productWithVariants?.default_variant
+    const priceRange = productWithVariants?.price_range
+    const priceLabel = priceRange?.has_range
+        ? `$${priceRange.min_price.toLocaleString('es-CO')} - $${priceRange.max_price.toLocaleString('es-CO')} COP`
+        : `$${(defaultVariant?.price ?? (product.sale_price || product.price)).toLocaleString('es-CO')} COP`
     const title = product.meta_title || `${product.name} | ${organization.name}`
-    const description = product.meta_description || product.description || `Compra ${product.name} en ${organization.name}. Precio: $${product.price.toLocaleString('es-CO')} COP`
-    const images = product.images?.length ? product.images : product.image_url ? [product.image_url] : []
+    const description = product.meta_description || product.description || `Compra ${product.name} en ${organization.name}. Precio: ${priceLabel}`
+    const images = product.images?.length
+        ? product.images
+        : defaultVariant?.image_url
+            ? [defaultVariant.image_url]
+            : product.image_url
+                ? [product.image_url]
+                : []
 
     // Construir URL canónica del producto
     const baseUrl = organization.custom_domain
@@ -61,7 +72,10 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
         robots: {
             index: true,
             follow: true,
-        }
+        },
+        alternates: {
+            canonical: productUrl,
+        },
     }
 }
 

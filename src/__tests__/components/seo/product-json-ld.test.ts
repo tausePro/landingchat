@@ -162,4 +162,133 @@ describe("buildProductJsonLdData", () => {
       availability: "https://schema.org/InStock",
     })
   })
+
+  it("expone variantes activas como ProductGroup con ofertas por variante", () => {
+    const productWithVariants = makeProductWithVariants({
+      variants: [
+        {
+          id: "variant-1",
+          product_id: "product-1",
+          organization_id: "org-1",
+          title: "Talla S / Negro",
+          sku: "SKU-S-NEGRO",
+          position: 0,
+          is_default: true,
+          is_active: true,
+          price: 50000,
+          compare_at_price: null,
+          stock_quantity: 2,
+          image_url: "https://example.com/s-negro.jpg",
+          option_values: [
+            { option_name: "Talla", value: "S" },
+            { option_name: "Color", value: "Negro" },
+          ],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "variant-2",
+          product_id: "product-1",
+          organization_id: "org-1",
+          title: "Talla M / Negro",
+          sku: "SKU-M-NEGRO",
+          position: 1,
+          is_default: false,
+          is_active: false,
+          price: 64000,
+          compare_at_price: null,
+          stock_quantity: 10,
+          image_url: null,
+          option_values: [
+            { option_name: "Talla", value: "M" },
+            { option_name: "Color", value: "Negro" },
+          ],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "variant-3",
+          product_id: "product-1",
+          organization_id: "org-1",
+          title: "Talla XL / Blanco",
+          sku: "SKU-XL-BLANCO",
+          position: 2,
+          is_default: false,
+          is_active: true,
+          price: 78000,
+          compare_at_price: null,
+          stock_quantity: 0,
+          image_url: null,
+          option_values: [
+            { option_name: "Talla", value: "XL" },
+            { option_name: "Color", value: "Blanco" },
+          ],
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+      price_range: {
+        has_range: true,
+        min_price: 50000,
+        max_price: 78000,
+        min_compare_at: null,
+        max_compare_at: null,
+      },
+    })
+
+    const { productSchema } = buildProductJsonLdData({
+      product: baseProduct,
+      organization: baseOrganization,
+      url: "https://example.com/producto/camiseta-premium",
+      productWithVariants,
+    })
+
+    expect(productSchema).toMatchObject({
+      "@type": "ProductGroup",
+      "@id": "https://example.com/producto/camiseta-premium#product-group",
+      productGroupID: "product-1",
+      variesBy: ["Talla", "Color"],
+      hasVariant: [
+        {
+          "@type": "Product",
+          "@id": "https://example.com/producto/camiseta-premium#variant-variant-1",
+          name: "Camiseta Premium - Talla S / Negro",
+          productID: "variant-1",
+          sku: "SKU-S-NEGRO",
+          image: ["https://example.com/s-negro.jpg"],
+          offers: {
+            "@type": "Offer",
+            price: 50000,
+            availability: "https://schema.org/InStock",
+          },
+          additionalProperty: [
+            {
+              "@type": "PropertyValue",
+              name: "Talla",
+              value: "S",
+            },
+            {
+              "@type": "PropertyValue",
+              name: "Color",
+              value: "Negro",
+            },
+          ],
+        },
+        {
+          "@type": "Product",
+          "@id": "https://example.com/producto/camiseta-premium#variant-variant-3",
+          name: "Camiseta Premium - Talla XL / Blanco",
+          productID: "variant-3",
+          sku: "SKU-XL-BLANCO",
+          image: ["https://example.com/legacy.jpg"],
+          offers: {
+            "@type": "Offer",
+            price: 78000,
+            availability: "https://schema.org/OutOfStock",
+          },
+        },
+      ],
+    })
+    expect(JSON.stringify(productSchema)).not.toContain("variant-2")
+  })
 })
