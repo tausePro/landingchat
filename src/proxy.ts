@@ -20,6 +20,25 @@ const CIRCUIT_BREAKER_TIMEOUT_MS = 3000 // 3 segundos máximo para queries del m
 // Cache genérico con TTL y limpieza automática
 const middlewareCache = new Map<string, { value: unknown; timestamp: number }>()
 
+interface CustomDomainLookupResult {
+    data: { slug: string } | null
+    error: unknown
+}
+
+interface MaintenanceLookupResult {
+    data: { maintenance_mode: boolean; maintenance_message: string | null; id: string; maintenance_bypass_token: string | null } | null
+    error: unknown
+}
+
+interface AuthUserLookupResult {
+    data: { user: { id: string } | null }
+}
+
+interface ProfileLookupResult {
+    data: { organization_id: string | null; is_superadmin: boolean | null } | null
+    error: unknown
+}
+
 function getCache<T>(key: string): T | undefined {
     const cached = middlewareCache.get(key)
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -40,10 +59,10 @@ function setCache(key: string, value: unknown) {
 
 // Circuit breaker: ejecuta una promesa con timeout
 // Si Supabase no responde en CIRCUIT_BREAKER_TIMEOUT_MS, retorna fallback
-async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+async function withTimeout<T, F>(promise: Promise<T>, fallback: F): Promise<T | F> {
     return Promise.race([
         promise,
-        new Promise<T>((resolve) =>
+        new Promise<F>((resolve) =>
             setTimeout(() => resolve(fallback), CIRCUIT_BREAKER_TIMEOUT_MS)
         )
     ])
@@ -52,6 +71,11 @@ async function withTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 export async function proxy(request: NextRequest) {
     const hostname = request.headers.get('host') || ''
     const pathname = request.nextUrl.pathname
+    const isDiscoveryRoute =
+        pathname === '/robots.txt' ||
+        pathname === '/sitemap.xml' ||
+        pathname === '/llms.txt' ||
+        pathname.startsWith('/.well-known/')
 
     // ============================================
     // MODO EMERGENCIA: Cortar TODO el tráfico a Supabase
@@ -63,6 +87,10 @@ export async function proxy(request: NextRequest) {
             `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LandingChat - Mantenimiento</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;color:#334155}.c{text-align:center;padding:2rem;max-width:500px}h1{font-size:1.5rem;margin-bottom:1rem;color:#0f172a}p{color:#64748b;line-height:1.6;margin-bottom:.5rem}.icon{font-size:3rem;margin-bottom:1rem}</style></head><body><div class="c"><div class="icon">🔧</div><h1>Estamos en mantenimiento</h1><p>Estamos mejorando nuestros servidores para brindarte un mejor servicio.</p><p>Volveremos en unos minutos.</p></div></body></html>`,
             { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Retry-After': '300' } }
         )
+    }
+
+    if (isDiscoveryRoute) {
+        return NextResponse.next()
     }
 
     // ============================================
@@ -155,7 +183,7 @@ export async function proxy(request: NextRequest) {
 
                     const result = await withTimeout(
                         Promise.resolve(supabase.from("organizations").select("slug").eq("custom_domain", hostname).single()),
-                        { data: null, error: null } as any
+                        { data: null, error: null } satisfies CustomDomainLookupResult
                     )
 
                     slug = result.data?.slug || null
@@ -244,10 +272,10 @@ export async function proxy(request: NextRequest) {
                         .select("maintenance_mode, maintenance_message, id, maintenance_bypass_token")
                         .eq("slug", slug)
                         .single()),
-                    { data: null, error: null } as any
+                    { data: null, error: null } satisfies MaintenanceLookupResult
                 )
 
-                orgData = result.data
+                orgData = result.data ?? undefined
                 setCache(maintenanceCacheKey, orgData)
             }
 
@@ -275,7 +303,7 @@ export async function proxy(request: NextRequest) {
 
                     const { data: { user } } = await withTimeout(
                         supabaseAuth.auth.getUser(),
-                        { data: { user: null } } as any
+                        { data: { user: null } } satisfies AuthUserLookupResult
                     )
 
                     if (user) {
@@ -295,7 +323,7 @@ export async function proxy(request: NextRequest) {
                                 .select("organization_id, is_superadmin")
                                 .eq("id", user.id)
                                 .single()),
-                            { data: null, error: null } as any
+                            { data: null, error: null } satisfies ProfileLookupResult
                         )
 
                         canAccess = profile?.is_superadmin || profile?.organization_id === orgData.id
@@ -418,7 +446,7 @@ async function handleAuth(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Definir rutas públicas (no requieren autenticación)
-    const publicRoutes = ['/', '/store', '/chat', '/api', '/auth', '/login', '/registro', '/recuperar', '/checkout', '/order', '/founding', '/privacidad', '/terminos', '/seguridad']
+    const publicRoutes = ['/', '/store', '/chat', '/api', '/auth', '/login', '/registro', '/recuperar', '/checkout', '/order', '/founding', '/privacidad', '/terminos', '/seguridad', '/robots.txt', '/sitemap.xml', '/llms.txt', '/.well-known']
     const isPublicRoute = publicRoutes.some(route =>
         request.nextUrl.pathname === route ||
         request.nextUrl.pathname.startsWith(route + '/')
