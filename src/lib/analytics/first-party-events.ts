@@ -1,34 +1,9 @@
 "use client"
 
 import { getTrackingParams } from "@/hooks/use-tracking-params"
+import type { AnalyticsEventName } from "@/lib/analytics/event-names"
 
-export type AnalyticsEventName =
-    | "page_view"
-    | "view_content"
-    | "add_to_cart"
-    | "cart_opened"
-    | "cart_item_removed"
-    | "cart_quantity_changed"
-    | "cart_coupon_applied"
-    | "cart_coupon_failed"
-    | "checkout_started"
-    | "checkout_contact_submitted"
-    | "checkout_contact_validation_failed"
-    | "checkout_shipping_unavailable"
-    | "checkout_payment_method_selected"
-    | "checkout_order_created"
-    | "checkout_order_create_failed"
-    | "checkout_payment_redirect_started"
-    | "checkout_payment_instructions_shown"
-    | "checkout_gateway_load_failed"
-    | "payment_pending"
-    | "payment_failed"
-    | "payment_retry_clicked"
-    | "proactive_nudge_shown"
-    | "proactive_nudge_clicked"
-    | "proactive_nudge_dismissed"
-    | "proactive_nudge_chat_started"
-    | "purchase"
+export type { AnalyticsEventName }
 
 export type AnalyticsEventAttribution = {
     capturedAt?: string
@@ -185,5 +160,12 @@ export function trackFirstPartyAnalyticsEvent(slug: string | undefined, input: T
             properties,
             occurredAt: new Date().toISOString(),
         }),
+    }).then((response) => {
+        if (!response.ok && process.env.NODE_ENV !== "production") {
+            console.warn("First-party analytics event was rejected", {
+                eventName: input.eventName,
+                status: response.status,
+            })
+        }
     }).catch(() => undefined)
 }

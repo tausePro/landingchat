@@ -1,36 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { getClientIdentifier, getRateLimitHeaders, storeApiRateLimit } from "@/lib/rate-limit"
+import { ANALYTICS_EVENT_NAMES } from "@/lib/analytics/event-names"
+import { logger } from "@/lib/logger"
 import { createServiceClient } from "@/lib/supabase/server"
 
-const analyticsEventNameSchema = z.enum([
-    "page_view",
-    "view_content",
-    "add_to_cart",
-    "cart_opened",
-    "cart_item_removed",
-    "cart_quantity_changed",
-    "cart_coupon_applied",
-    "cart_coupon_failed",
-    "checkout_started",
-    "checkout_contact_submitted",
-    "checkout_contact_validation_failed",
-    "checkout_shipping_unavailable",
-    "checkout_payment_method_selected",
-    "checkout_order_created",
-    "checkout_order_create_failed",
-    "checkout_payment_redirect_started",
-    "checkout_payment_instructions_shown",
-    "checkout_gateway_load_failed",
-    "payment_pending",
-    "payment_failed",
-    "payment_retry_clicked",
-    "proactive_nudge_shown",
-    "proactive_nudge_clicked",
-    "proactive_nudge_dismissed",
-    "proactive_nudge_chat_started",
-    "purchase",
-])
+const log = logger("api/store/analytics-events")
+
+const analyticsEventNameSchema = z.enum(ANALYTICS_EVENT_NAMES)
 
 const analyticsAttributionSchema = z.object({
     capturedAt: z.string().datetime().optional(),
@@ -170,6 +147,13 @@ export async function POST(
         })
 
     if (error) {
+        log.error("Failed to persist analytics event", {
+            slug,
+            orgId: org.id,
+            eventName: event.eventName,
+            code: error.code,
+            message: error.message,
+        })
         return NextResponse.json({ error: "No se pudo registrar el evento" }, { status: 500, headers })
     }
 
