@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 const BUCKET_NAME = "product-images"
 
@@ -75,10 +75,15 @@ export async function POST(request: NextRequest) {
         const fileName = `${timestamp}-${safeName}`
         const filePath = `${orgId}/${fileName}`
 
-        // Upload to Supabase Storage
-        const { data, error } = await supabase.storage
+        // Convertir archivo a Buffer para procesar en Node.js runtime
+        const arrayBuffer = await file.arrayBuffer()
+        const buffer = Buffer.from(arrayBuffer)
+
+        // Upload to Supabase Storage usando service client (bypasea RLS)
+        const serviceClient = createServiceClient()
+        const { data, error } = await serviceClient.storage
             .from(BUCKET_NAME)
-            .upload(filePath, file, {
+            .upload(filePath, buffer, {
                 contentType: file.type,
                 upsert: false,
             })

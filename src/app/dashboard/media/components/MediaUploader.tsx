@@ -2,7 +2,8 @@
 
 import { useState, useRef, useCallback } from "react"
 import { Upload, X, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
-import { uploadMediaFile, type MediaFile } from "../actions"
+import { createSignedUploadUrl, type MediaFile } from "../actions"
+import { createClient } from "@/lib/supabase/client"
 
 interface MediaUploaderProps {
   onUploadComplete: (file: MediaFile) => void
@@ -38,35 +39,58 @@ export function MediaUploader({ onUploadComplete }: MediaUploaderProps) {
         )
       )
 
-      // Usar API route para soportar archivos grandes (server actions truncan > ~4MB)
+      // Upload directo a Supabase para evitar límite de body de Next.js
       try {
-        const formData = new FormData()
-        formData.append("file", item.file)
-
-        const response = await fetch("/api/media/upload", {
-          method: "POST",
-          body: formData,
-        })
-        const result = await response.json()
-
-        if (result.success && result.data) {
+        const urlResult = await createSignedUploadUrl(item.file.name, item.file.type)
+        if (!urlResult.success) {
           setUploads((prev) =>
             prev.map((u) =>
               u.file === item.file
-                ? { ...u, status: "success", result: result.data }
+                ? { ...u, status: "error", error: urlResult.error }
                 : u
             )
           )
-          onUploadComplete(result.data)
-        } else {
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.file === item.file
-                ? { ...u, status: "error", error: result.error || "Error al subir" }
-                : u
-            )
-          )
+          continue
         }
+
+        const { token, path, publicUrl, fileName } = urlResult.data
+        const supabase = createClient()
+        const { error: uploadError } = await supabase.storage
+          .from("product-images")
+          .uploadToSignedUrl(path, token, item.file, { contentType: item.file.type })
+
+        if (uploadError) {
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.file === item.file
+                ? { ...u, status: "error", error: uploadError.message }
+                : u
+            )
+          )
+          continue
+        }
+
+        const ext = item.file.name.split(".").pop()?.toLowerCase() || ""
+        const isVideo = ["mp4", "mov", "webm", "avi"].includes(ext)
+        const mediaFile: MediaFile = {
+          id: path,
+          name: fileName,
+          fullPath: path,
+          publicUrl,
+          type: isVideo ? "video" : "image",
+          size: item.file.size,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.file === item.file
+              ? { ...u, status: "success", result: mediaFile }
+              : u
+          )
+        )
+        onUploadComplete(mediaFile)
       } catch (err) {
         setUploads((prev) =>
           prev.map((u) =>
