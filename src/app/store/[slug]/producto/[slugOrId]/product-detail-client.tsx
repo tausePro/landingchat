@@ -1239,7 +1239,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[200px]">{product.name}</span>
                 </nav>
 
-                <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_minmax(0,0.95fr)] lg:items-start lg:gap-14">
+                <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start lg:gap-12">
 
                     {/* Left Column: Gallery */}
                     <div className="self-start lg:sticky lg:top-[76px]">
@@ -1533,7 +1533,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                     )}
                                                 </label>
                                                 {isColorVariant ? (
-                                                    <div className={`flex gap-2 flex-wrap ${hasMany ? '' : 'gap-3'}`}>
+                                                    <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))' }}>
                                                         {variant.values.map((value: string, vIdx: number) => {
                                                             const isSelected = selectedVariants[variant.type] === value
                                                             const isOutOfStock = Boolean(hasVariantStock && stockByVariant && (stockByVariant[value] ?? 0) === 0)
@@ -1543,7 +1543,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                                     onClick={() => !isOutOfStock && handleVariantChange(variant.type, value)}
                                                                     disabled={isOutOfStock}
                                                                     className={`
-                                                                        flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200 relative
+                                                                        flex flex-col items-center gap-1 p-1.5 rounded-lg transition-all duration-200 relative w-full
                                                                         ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}
                                                                         ${isSelected && !isOutOfStock ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : isOutOfStock ? '' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
                                                                     `}
