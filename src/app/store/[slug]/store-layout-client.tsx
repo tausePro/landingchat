@@ -19,6 +19,7 @@ import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
 import { ProactiveChatBubble } from "@/components/store/proactive-chat-bubble"
 import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
+import { StoreFooter } from "@/components/store/store-footer"
 
 // ... (in render)
 
@@ -326,6 +327,15 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     />
                 )}
             </main>
+
+            {/* Footer — solo cuando hay children (páginas internas); las templates incluyen el suyo propio */}
+            {children && !isRealEstate && (
+                <StoreFooter
+                    organization={organization}
+                    pages={pages}
+                    isSubdomain={isSubdomain}
+                />
+            )}
 
             {/* Customer Gate Modal */}
             <CustomerGateModal
