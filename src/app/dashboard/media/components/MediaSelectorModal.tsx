@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { X, Search, Image, Film, Upload, Check, Loader2 } from "lucide-react"
 import { listMediaFiles, uploadMediaFile, type MediaFile } from "../actions"
 import { MediaGrid } from "./MediaGrid"
+import { toast } from "sonner"
 
 interface MediaSelectorModalProps {
   open: boolean
@@ -66,8 +67,18 @@ export function MediaSelectorModal({
     setUploading(true)
 
     const uploadedUrls: string[] = []
+    const errors: string[] = []
     for (const file of Array.from(e.target.files)) {
-      // Usar API route para archivos grandes (server actions truncan FormData > ~4MB)
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || ""
+      const isVideo = ["mp4", "mov", "webm", "avi"].includes(fileExt)
+      const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg", "avif"].includes(fileExt)
+      const fileType = isVideo ? "video" : isImage ? "image" : null
+
+      if (!fileType || !acceptTypes.includes(fileType)) {
+        errors.push(`${file.name} no es un tipo válido`)
+        continue
+      }
+
       const formData = new FormData()
       formData.append("file", file)
 
@@ -81,17 +92,23 @@ export function MediaSelectorModal({
         if (result.success && result.data) {
           setFiles((prev) => [result.data as MediaFile, ...prev])
           uploadedUrls.push(result.data.publicUrl)
+        } else {
+          errors.push(`${file.name}: ${result.error || "Error desconocido"}`)
         }
       } catch (err) {
-        console.error("Error uploading file:", err)
+        errors.push(`${file.name}: Error de red`)
       }
     }
 
-    // Auto-seleccionar los archivos recién subidos
     if (uploadedUrls.length > 0) {
       setSelectedUrls((prev) =>
         multiple ? [...prev, ...uploadedUrls] : [uploadedUrls[0]]
       )
+      toast.success(`${uploadedUrls.length} archivo(s) subido(s) correctamente`)
+    }
+
+    if (errors.length > 0) {
+      toast.error(errors[0])
     }
 
     setUploading(false)
@@ -201,7 +218,7 @@ export function MediaSelectorModal({
             {uploading ? "Subiendo..." : "Subir"}
             <input
               type="file"
-              multiple
+              multiple={multiple}
               accept={acceptTypes.map((t) => t === "image" ? "image/*" : "video/*").join(",")}
               onChange={handleUpload}
               className="hidden"
