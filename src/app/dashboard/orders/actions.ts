@@ -2,6 +2,37 @@
 
 import { createClient } from "@/lib/supabase/server"
 
+const ALL_STATUSES = new Set(["", "all", "Todos los estados"])
+
+const STATUS_ALIASES: Record<string, string> = {
+    pendiente: "pending",
+    confirmado: "confirmed",
+    confirmada: "confirmed",
+    procesando: "processing",
+    enviado: "shipped",
+    enviada: "shipped",
+    entregado: "delivered",
+    entregada: "delivered",
+    cancelado: "cancelled",
+    cancelada: "cancelled",
+    reembolsado: "refunded",
+    reembolsada: "refunded",
+}
+
+interface OrderRow {
+    id: string
+    created_at: string
+    status: string
+    total: number | string | null
+    order_number: string | null
+    customer_info: {
+        name?: string
+        full_name?: string
+        email?: string
+    } | null
+    items: unknown
+}
+
 export interface Order {
     id: string
     created_at: string
@@ -20,9 +51,33 @@ export interface GetOrdersParams {
     limit?: number
     status?: string
     search?: string
+    from?: string
+    to?: string
 }
 
-export async function getOrders({ page = 1, limit = 10, status, search }: GetOrdersParams) {
+function normalizeStatusFilter(status?: string) {
+    if (!status || ALL_STATUSES.has(status)) return null
+    const normalized = status.trim().toLowerCase()
+    return STATUS_ALIASES[normalized] || normalized
+}
+
+function toBogotaStartOfDay(date: string) {
+    return new Date(`${date}T00:00:00.000-05:00`).toISOString()
+}
+
+function toBogotaEndOfDay(date: string) {
+    return new Date(`${date}T23:59:59.999-05:00`).toISOString()
+}
+
+function isValidDateInput(value?: string): value is string {
+    return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+function sanitizeSearchTerm(value?: string) {
+    return value?.trim().replace(/[%,()]/g, "") || ""
+}
+
+export async function getOrders({ page = 1, limit = 10, status, search, from, to }: GetOrdersParams) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -44,6 +99,7 @@ export async function getOrders({ page = 1, limit = 10, status, search }: GetOrd
             id,
             created_at,
             status,
+            order_number,
             total,
             customer_info,
             items
@@ -51,24 +107,39 @@ export async function getOrders({ page = 1, limit = 10, status, search }: GetOrd
         .eq("organization_id", profile.organization_id)
         .order("created_at", { ascending: false })
 
-    // Apply filters
-    if (status && status !== "Todos los estados") {
-        query = query.eq("status", status.toLowerCase())
+    const statusFilter = normalizeStatusFilter(status)
+    if (statusFilter) {
+        query = query.eq("status", statusFilter)
     }
 
-    if (search) {
-        // Simple ID search if it looks like a UUID or short ID
-        // Since we can't easily search joined customer name without embedding or RPC
-        // We will filter by ID if possible.
-        // For now, let's just return all and filter in memory if search is present (not ideal for large data but works for MVP)
-        // Or better, just ignore search for now if it causes issues, or try to match ID.
-        // query = query.ilike("id", `%${search}%`) // UUIDs are strict
+    if (isValidDateInput(from)) {
+        query = query.gte("created_at", toBogotaStartOfDay(from))
+    }
+
+    if (isValidDateInput(to)) {
+        query = query.lte("created_at", toBogotaEndOfDay(to))
+    }
+
+    const searchTerm = sanitizeSearchTerm(search)
+    if (searchTerm) {
+        const searchFilters = [
+            `order_number.ilike.%${searchTerm}%`,
+            `customer_info->>name.ilike.%${searchTerm}%`,
+            `customer_info->>full_name.ilike.%${searchTerm}%`,
+            `customer_info->>email.ilike.%${searchTerm}%`,
+        ]
+
+        if (/^[0-9a-f-]{36}$/i.test(searchTerm)) {
+            searchFilters.push(`id.eq.${searchTerm}`)
+        }
+
+        query = query.or(searchFilters.join(","))
     }
 
     // Pagination
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-    query = query.range(from, to)
+    const rangeFrom = (page - 1) * limit
+    const rangeTo = rangeFrom + limit - 1
+    query = query.range(rangeFrom, rangeTo)
 
     const { data, error, count } = await query
 
@@ -77,19 +148,19 @@ export async function getOrders({ page = 1, limit = 10, status, search }: GetOrd
         throw new Error("Failed to fetch orders")
     }
 
-    // Transform data to match interface
-    const orders: Order[] = data.map((order: any) => {
+    const rows = (data ?? []) as OrderRow[]
+    const orders: Order[] = rows.map((order) => {
         // Extract customer info from JSONB field
-        const customerInfo = order.customer_info as { name?: string; email?: string } | null
+        const customerInfo = order.customer_info
 
         return {
             id: order.id,
             created_at: order.created_at,
             status: order.status,
-            total_amount: order.total,
+            total_amount: typeof order.total === "number" ? order.total : Number(order.total ?? 0),
             currency: 'COP', // Default to COP as it's not in schema
             customer: customerInfo ? {
-                full_name: customerInfo.name || 'Cliente Anónimo',
+                full_name: customerInfo.name || customerInfo.full_name || 'Cliente Anónimo',
                 email: customerInfo.email || ''
             } : null,
             items_count: Array.isArray(order.items) ? order.items.length : 0

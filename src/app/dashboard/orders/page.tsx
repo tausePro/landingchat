@@ -1,40 +1,34 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { getOrders } from "./actions"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import Link from "next/link"
 import { formatBogotaDate } from "@/lib/utils/date"
+import { OrderFilters } from "./order-filters"
 
 export const dynamic = 'force-dynamic'
 
 export default async function OrdersPage({
     searchParams,
 }: {
-    searchParams: Promise<{ page?: string; status?: string; search?: string }>
+    searchParams: Promise<{ page?: string; status?: string; search?: string; from?: string; to?: string }>
 }) {
     const params = await searchParams
     const page = Number(params.page) || 1
-    const status = params.status || "Todos los estados"
+    const status = params.status || "all"
     const search = params.search || ""
+    const from = params.from || ""
+    const to = params.to || ""
 
-    const { orders, total, totalPages } = await getOrders({ page, status, search })
+    const { orders, total, totalPages } = await getOrders({ page, status, search, from, to })
+
+    const buildPageHref = (targetPage: number) => {
+        const query = new URLSearchParams()
+        query.set("page", String(targetPage))
+        if (status && status !== "all") query.set("status", status)
+        if (search) query.set("search", search)
+        if (from) query.set("from", from)
+        if (to) query.set("to", to)
+        return `/dashboard/orders?${query.toString()}`
+    }
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
@@ -132,31 +126,7 @@ export default async function OrdersPage({
                 </div>
 
                 <div className="mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-hidden">
-                    <div className="p-6 flex flex-col sm:flex-row gap-4 justify-between items-center">
-                        <div className="relative w-full sm:max-w-xs">
-                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-light-secondary dark:text-text-dark-secondary text-sm">search</span>
-                            <input
-                                className="form-input w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent h-10 placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary pl-10 text-sm font-normal"
-                                placeholder="Buscar por cliente o ID..."
-                                defaultValue={search}
-                            />
-                        </div>
-                        <div className="flex gap-2 w-full sm:w-auto">
-                            <Select defaultValue={status}>
-                                <SelectTrigger className="w-[180px] rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary border-transparent focus:outline-none focus:ring-2 focus:ring-primary text-sm h-10">
-                                    <SelectValue placeholder="Estado" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Todos los estados">Todos los estados</SelectItem>
-                                    <SelectItem value="pendiente">Pendiente</SelectItem>
-                                    <SelectItem value="procesando">Procesando</SelectItem>
-                                    <SelectItem value="enviado">Enviado</SelectItem>
-                                    <SelectItem value="entregado">Entregado</SelectItem>
-                                    <SelectItem value="cancelado">Cancelado</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
+                    <OrderFilters status={status} search={search} from={from} to={to} />
 
                     <div className="w-full overflow-x-auto">
                         <table className="w-full text-sm text-left">
@@ -222,7 +192,7 @@ export default async function OrdersPage({
                             <nav className="flex items-center gap-1">
                                 {page > 1 && (
                                     <Link
-                                        href={`/dashboard/orders?page=${page - 1}${status !== "Todos los estados" ? `&status=${status}` : ""}${search ? `&search=${search}` : ""}`}
+                                        href={buildPageHref(page - 1)}
                                         className="inline-flex items-center justify-center size-8 rounded-lg border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark"
                                     >
                                         <span className="material-symbols-outlined text-xl">chevron_left</span>
@@ -241,7 +211,7 @@ export default async function OrdersPage({
                                         ) : (
                                             <Link
                                                 key={p}
-                                                href={`/dashboard/orders?page=${p}${status !== "Todos los estados" ? `&status=${status}` : ""}${search ? `&search=${search}` : ""}`}
+                                                href={buildPageHref(Number(p))}
                                                 className={`inline-flex items-center justify-center size-8 rounded-lg text-sm ${
                                                     p === page
                                                         ? "bg-primary text-white"
@@ -254,7 +224,7 @@ export default async function OrdersPage({
                                     )}
                                 {page < totalPages && (
                                     <Link
-                                        href={`/dashboard/orders?page=${page + 1}${status !== "Todos los estados" ? `&status=${status}` : ""}${search ? `&search=${search}` : ""}`}
+                                        href={buildPageHref(page + 1)}
                                         className="inline-flex items-center justify-center size-8 rounded-lg border border-border-light dark:border-border-dark text-text-light-secondary dark:text-text-dark-secondary hover:bg-background-light dark:hover:bg-background-dark"
                                     >
                                         <span className="material-symbols-outlined text-xl">chevron_right</span>

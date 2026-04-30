@@ -37,6 +37,21 @@ function appendAccessToCheckoutUrl(checkoutUrl: string, redirectUrl: string) {
     }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getNestedValue(root: unknown, path: string) {
+    let current: unknown = root
+
+    for (const part of path.split(".")) {
+        if (!isRecord(current)) return undefined
+        current = current[part]
+    }
+
+    return current
+}
+
 export class WompiGateway implements PaymentGateway {
     readonly provider = "wompi" as const
     private config: GatewayConfig
@@ -250,18 +265,13 @@ export class WompiGateway implements PaymentGateway {
         void _timestamp
 
         if (!this.config.integritySecret) return false
-        if (!payload.signature?.properties || !payload.data) return false
+        if (!payload.signature?.properties || !payload.signature.checksum || !payload.data) return false
 
         const properties = payload.signature.properties
         const values: string[] = []
 
         for (const prop of properties) {
-            const parts = prop.split(".")
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let value: any = payload.data
-            for (const part of parts) {
-                value = value?.[part]
-            }
+            const value = getNestedValue(payload.data, prop)
             if (value !== undefined) {
                 values.push(String(value))
             }
@@ -275,7 +285,7 @@ export class WompiGateway implements PaymentGateway {
             .update(values.join(""))
             .digest("hex")
 
-        return calculatedChecksum === payload.signature.checksum
+        return calculatedChecksum.toLowerCase() === payload.signature.checksum.toLowerCase()
     }
 
     private async getAcceptanceToken(): Promise<string> {

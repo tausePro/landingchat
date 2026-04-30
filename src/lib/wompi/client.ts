@@ -16,6 +16,21 @@ const WOMPI_API_URL = {
     production: "https://production.wompi.co/v1",
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getNestedValue(root: unknown, path: string) {
+    let current: unknown = root
+
+    for (const part of path.split(".")) {
+        if (!isRecord(current)) return undefined
+        current = current[part]
+    }
+
+    return current
+}
+
 export class WompiClient {
     private config: WompiConfig
     private baseUrl: string
@@ -103,13 +118,7 @@ export class WompiClient {
         const values: string[] = []
 
         for (const prop of properties) {
-            const parts = prop.split(".")
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let value: any = data
-
-            for (const part of parts) {
-                value = value?.[part]
-            }
+            const value = getNestedValue(data, prop)
 
             if (value !== undefined) {
                 values.push(String(value))
@@ -127,7 +136,7 @@ export class WompiClient {
             .update(stringToSign)
             .digest("hex")
 
-        return calculatedChecksum === signature.checksum
+        return calculatedChecksum.toLowerCase() === signature.checksum.toLowerCase()
     }
 
     /**

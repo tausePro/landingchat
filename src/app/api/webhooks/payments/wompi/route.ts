@@ -50,6 +50,12 @@ interface WompiWebhookPayload {
     timestamp: number
 }
 
+interface OrderPaymentState {
+    id: string
+    status: string | null
+    payment_status: string | null
+}
+
 export async function POST(request: Request) {
     const supabase = createServiceClient()
     const startTime = Date.now()
@@ -140,6 +146,10 @@ export async function POST(request: Request) {
         if (existingTx) {
             // Idempotencia: si el estado ya es el mismo, no hacer nada
             if (existingTx.status === status) {
+                if (existingTx.order_id && status !== "pending") {
+                    await processOrderUpdate(supabase, existingTx.order_id, status, org.id)
+                }
+
                 log.info("Duplicate webhook ignored", {
                     transactionId: transaction.id,
                     status,
@@ -289,39 +299,67 @@ async function processOrderUpdate(
     const paymentStatus =
         status === "approved"
             ? "paid"
-            : status === "declined"
+            : status === "declined" || status === "error"
                 ? "failed"
                 : status === "voided"
                     ? "refunded"
                     : "pending"
 
-    const orderStatus = status === "approved" ? "confirmed" : status === "declined" ? "cancelled" : undefined
+    const orderStatus = status === "approved" ? "confirmed" : status === "declined" || status === "error" ? "cancelled" : undefined
+
+    const { data: orderStateData, error: orderStateError } = await supabase
+        .from("orders")
+        .select("id, status, payment_status")
+        .eq("id", orderId)
+        .eq("organization_id", organizationId)
+        .single()
+
+    if (orderStateError || !orderStateData) {
+        log.error("Order not found before payment status update", {
+            orderId,
+            organizationId,
+            error: orderStateError?.message,
+        })
+        return
+    }
+
+    const orderState = orderStateData as OrderPaymentState
+    const shouldUpdateOrder =
+        orderState.payment_status !== paymentStatus ||
+        (typeof orderStatus === "string" && orderState.status !== orderStatus)
+
+    let updateSucceeded = !shouldUpdateOrder
 
     // Fase 0.4 post-mortem (hotfix v1.10.58): removimos `confirmed_at` del
     // UPDATE porque la columna NO existe en `public.orders` y el UPDATE entero
     // fallaba silenciosamente (PostgREST retornaba error sin capturarse,
     // dejando la orden en `payment_status: pending` indefinidamente). El
     // timestamp de confirmación queda en `store_transactions` + `updated_at`.
-    const { error: updateError } = await supabase
-        .from("orders")
-        .update({
-            payment_status: paymentStatus,
-            ...(orderStatus && { status: orderStatus }),
-            updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId)
+    if (shouldUpdateOrder) {
+        const { error: updateError } = await supabase
+            .from("orders")
+            .update({
+                payment_status: paymentStatus,
+                ...(orderStatus && { status: orderStatus }),
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId)
+            .eq("organization_id", organizationId)
 
-    if (updateError) {
-        // No interrumpimos el resto del flow (notificación/stock) porque
-        // puede ser un error transitorio, pero lo dejamos visible para
-        // monitoreo. Si la orden no se actualizó, el gateway probablemente
-        // reintente y la siguiente pasada sí persistirá.
-        log.error("Failed to update order payment_status", {
-            orderId,
-            status,
-            paymentStatus,
-            error: updateError.message,
-        })
+        if (updateError) {
+            // No interrumpimos el resto del flow (notificación/stock) porque
+            // puede ser un error transitorio, pero lo dejamos visible para
+            // monitoreo. Si la orden no se actualizó, el gateway probablemente
+            // reintente y la siguiente pasada sí persistirá.
+            log.error("Failed to update order payment_status", {
+                orderId,
+                status,
+                paymentStatus,
+                error: updateError.message,
+            })
+        } else {
+            updateSucceeded = true
+        }
     }
 
     // Post-payment side effects cuando el pago se aprueba.
@@ -330,7 +368,7 @@ async function processOrderUpdate(
     // silencioso, `order` quedaba null, el `if (order)` fallaba y nada de lo
     // de abajo se ejecutaba: ni stock, ni notificación WA, ni Meta CAPI.
     // Ahora leemos items desde `orders.items` (jsonb, source of truth real).
-    if (status === "approved") {
+    if (status === "approved" && orderState.payment_status !== "paid" && updateSucceeded) {
         try {
             const { data: order } = await supabase
                 .from("orders")

@@ -76,6 +76,14 @@ describe("Transaction Status Handling - Property Tests", () => {
                             }, 
                             error: null 
                         }) // existing transaction lookup
+                        .mockResolvedValueOnce({
+                            data: {
+                                id: orderId,
+                                status: "pending",
+                                payment_status: "pending",
+                            },
+                            error: null,
+                        })
                         .mockResolvedValueOnce({ // order lookup for notification
                             data: {
                                 id: orderId,
@@ -170,6 +178,14 @@ describe("Transaction Status Handling - Property Tests", () => {
                             }, 
                             error: null 
                         }) // existing transaction lookup
+                        .mockResolvedValueOnce({
+                            data: {
+                                id: orderId,
+                                status: "pending",
+                                payment_status: "pending",
+                            },
+                            error: null,
+                        })
 
                     // Mock para los updates
                     mockSupabase.mocks.eq.mockReturnValue({
@@ -309,6 +325,14 @@ describe("Transaction Status Handling - Property Tests", () => {
                             }, 
                             error: null 
                         }) // existing transaction lookup
+                        .mockResolvedValueOnce({
+                            data: {
+                                id: orderId,
+                                status: "confirmed",
+                                payment_status: "paid",
+                            },
+                            error: null,
+                        })
 
                     // Mock para los updates
                     mockSupabase.mocks.eq.mockReturnValue({
