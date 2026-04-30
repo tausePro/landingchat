@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { type ActionResult, success, failure } from "@/types/common"
 
 const BUCKET_NAME = "product-images"
@@ -323,5 +323,63 @@ export async function deleteMediaFile(
     return success(undefined)
   } catch (err) {
     return failure(err instanceof Error ? err.message : "Error desconocido eliminando archivo")
+  }
+}
+
+export interface SignedUploadUrlData {
+  signedUrl: string
+  token: string
+  path: string
+  publicUrl: string
+  fileName: string
+}
+
+/**
+ * Genera una URL firmada para upload directo desde el browser a Supabase Storage.
+ * Evita que el archivo pase por el servidor Next.js (sin límite de tamaño).
+ */
+export async function createSignedUploadUrl(
+  originalFileName: string,
+  fileType: string
+): Promise<ActionResult<SignedUploadUrlData>> {
+  try {
+    const orgResult = await getCurrentOrg()
+    if (!orgResult.success) return failure(orgResult.error)
+    const { id: orgId } = orgResult.data
+
+    const ext = originalFileName.split(".").pop()?.toLowerCase() || ""
+    if (!ALL_EXTENSIONS.includes(ext)) {
+      return failure(`Tipo de archivo no soportado: .${ext}`)
+    }
+
+    const timestamp = Date.now()
+    const safeName = originalFileName
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .toLowerCase()
+    const fileName = `${timestamp}-${safeName}`
+    const filePath = `${orgId}/${fileName}`
+
+    const serviceClient = createServiceClient()
+    const { data, error } = await serviceClient.storage
+      .from(BUCKET_NAME)
+      .createSignedUploadUrl(filePath)
+
+    if (error || !data) {
+      return failure(`Error generando URL de upload: ${error?.message ?? "Sin datos"}`)
+    }
+
+    const { data: { publicUrl } } = serviceClient.storage
+      .from(BUCKET_NAME)
+      .getPublicUrl(filePath)
+
+    return success({
+      signedUrl: data.signedUrl,
+      token: data.token,
+      path: filePath,
+      publicUrl,
+      fileName,
+    })
+  } catch (err) {
+    return failure(err instanceof Error ? err.message : "Error desconocido generando URL")
   }
 }
