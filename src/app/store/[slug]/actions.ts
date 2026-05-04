@@ -48,6 +48,15 @@ interface BundleProductRow {
     images?: string[] | null
 }
 
+export interface ProactiveCouponOffer {
+    code: string
+    description: string | null
+    type: "percentage" | "fixed" | "free_shipping"
+    value: number
+    validUntil: string | null
+    minPurchaseAmount: number | null
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -139,6 +148,84 @@ function resolveStorefrontProductOrder(value: unknown): ProductListOrderBy {
     return value === "custom" || value === "price_asc" || value === "price_desc"
         ? value
         : "recent"
+}
+
+function isCouponType(value: unknown): value is ProactiveCouponOffer["type"] {
+    return value === "percentage" || value === "fixed" || value === "free_shipping"
+}
+
+function buildCouponDescription(params: {
+    description?: string | null
+    type: ProactiveCouponOffer["type"]
+    value: number
+}) {
+    if (params.description && params.description.trim().length > 0) return params.description.trim()
+    if (params.type === "percentage") return `${params.value}% de descuento`
+    if (params.type === "fixed") return `$${params.value.toLocaleString("es-CO")} de descuento`
+    return "Envío gratis"
+}
+
+function getProductCategoryValues(product: Record<string, unknown>): string[] {
+    const categories = getOptionalStringArray(product.categories)
+    const category = getOptionalString(product.category)
+    return Array.from(new Set([...(categories || []), ...(category ? [category] : [])]))
+}
+
+function isCouponApplicableToProduct(coupon: Record<string, unknown>, product: Record<string, unknown>) {
+    const appliesTo = getOptionalString(coupon.applies_to) || "all"
+    if (appliesTo === "all") return true
+
+    const targetIds = getOptionalStringArray(coupon.target_ids) || []
+    if (targetIds.length === 0) return false
+
+    if (appliesTo === "products") return targetIds.includes(String(product.id))
+    if (appliesTo === "categories") {
+        const productCategories = getProductCategoryValues(product)
+        return productCategories.some((category) => targetIds.includes(category))
+    }
+
+    return false
+}
+
+async function getProactiveCouponOfferForProduct(params: {
+    supabase: StorefrontSupabaseClient
+    organizationId: string
+    product: Record<string, unknown>
+}): Promise<ProactiveCouponOffer | null> {
+    const now = new Date().toISOString()
+    const { data: coupons, error } = await params.supabase
+        .from("coupons")
+        .select("code, description, type, value, valid_until, min_purchase_amount, applies_to, target_ids")
+        .eq("organization_id", params.organizationId)
+        .eq("is_active", true)
+        .or(`valid_from.is.null,valid_from.lte.${now}`)
+        .or(`valid_until.is.null,valid_until.gte.${now}`)
+        .order("valid_until", { ascending: true, nullsFirst: false })
+        .limit(10)
+
+    if (error || !coupons) {
+        console.error("[getProactiveCouponOfferForProduct] Error fetching coupons:", error)
+        return null
+    }
+
+    const coupon = coupons.find((item) => isCouponApplicableToProduct(item, params.product))
+    if (!coupon || !isCouponType(coupon.type)) return null
+
+    const value = Number(coupon.value)
+    if (!Number.isFinite(value)) return null
+
+    return {
+        code: coupon.code,
+        description: buildCouponDescription({
+            description: coupon.description,
+            type: coupon.type,
+            value,
+        }),
+        type: coupon.type,
+        value,
+        validUntil: coupon.valid_until || null,
+        minPurchaseAmount: coupon.min_purchase_amount ? Number(coupon.min_purchase_amount) : null,
+    }
 }
 
 async function resolveOrganizationWhatsAppPhone(
@@ -389,6 +476,11 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     }
 
     const { data: relatedProducts } = await relatedProductsQuery
+    const proactiveCouponOffer = await getProactiveCouponOfferForProduct({
+        supabase,
+        organizationId: org.id,
+        product: productForDetail,
+    })
     const viewModel = buildProductDetailViewModel({
         product: productForDetail as ProductData,
         productWithVariants,
@@ -402,7 +494,8 @@ export async function getProductDetails(slug: string, slugOrId: string) {
         viewModel,
         badges: badges || [],
         promotions: promotions || [],
-        relatedProducts: relatedProducts || []
+        relatedProducts: relatedProducts || [],
+        proactiveCouponOffer,
     }
 }
 
