@@ -30,12 +30,12 @@ import { TrackingProvider } from "@/components/analytics/tracking-provider"
 
 interface OrderPageProps {
     params: Promise<{ orderId: string }>
-    searchParams: Promise<{ access?: string }>
+    searchParams: Promise<{ access?: string; ref_payco?: string }>
 }
 
 export default async function OrderTrackingPage({ params, searchParams }: OrderPageProps) {
     const { orderId } = await params
-    const { access } = await searchParams
+    const { access, ref_payco: refPayco } = await searchParams
     const headersList = await headers()
     const host = headersList.get("host") || ""
     const supabase = createServiceClient()
@@ -54,6 +54,7 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
         const reconciliation = await reconcileEpaycoOrderPayment({
             organizationId: organization.id,
             orderId: order.id,
+            providerTransactionId: refPayco,
         })
 
         if (reconciliation.reconciled) {
