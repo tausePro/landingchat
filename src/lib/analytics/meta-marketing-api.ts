@@ -20,6 +20,13 @@ type MetaAction = {
     value: string
 }
 
+export interface MetaActionBreakdown {
+    purchases: number
+    leads: number
+    registrations: number
+    total: number
+}
+
 export interface MetaCampaign {
     id: string
     name: string
@@ -40,6 +47,7 @@ export interface MetaCampaignInsights {
     cpm: number
     ctr: number
     actions?: MetaAction[]
+    actionBreakdown: MetaActionBreakdown
     date_start: string
     date_stop: string
     campaign_status?: MetaCampaignStatus
@@ -58,6 +66,7 @@ export interface MetaDailyInsight {
     cpm: number
     ctr: number
     conversions: number
+    actionBreakdown: MetaActionBreakdown
 }
 
 export interface MetaAdSet {
@@ -70,6 +79,7 @@ export interface MetaAdSet {
     cpc: number
     ctr: number
     conversions: number
+    actionBreakdown: MetaActionBreakdown
 }
 
 export interface MetaAd {
@@ -83,6 +93,7 @@ export interface MetaAd {
     cpc: number
     ctr: number
     conversions: number
+    actionBreakdown: MetaActionBreakdown
     // Campos de creativo (obtenidos via Batch API)
     thumbnail_url?: string  // preview baja resolución (video)
     image_url?: string      // imagen full-res (image ads)
@@ -122,10 +133,35 @@ export function isMetaConversionAction(actionType: string): boolean {
     return normalized.includes('purchase') || normalized.includes('lead') || normalized.includes('complete_registration')
 }
 
+export function getMetaActionBreakdown(actions: MetaAction[] | undefined): MetaActionBreakdown {
+    return (actions || []).reduce<MetaActionBreakdown>((breakdown, action) => {
+        const value = parseIntegerMetric(action.value)
+        const normalized = action.action_type.toLowerCase()
+
+        if (normalized.includes('purchase')) {
+            breakdown.purchases += value
+        }
+        if (normalized.includes('lead')) {
+            breakdown.leads += value
+        }
+        if (normalized.includes('complete_registration')) {
+            breakdown.registrations += value
+        }
+        if (isMetaConversionAction(action.action_type)) {
+            breakdown.total += value
+        }
+
+        return breakdown
+    }, {
+        purchases: 0,
+        leads: 0,
+        registrations: 0,
+        total: 0,
+    })
+}
+
 function sumConversionActions(actions: MetaAction[] | undefined): number {
-    return (actions || [])
-        .filter((action) => isMetaConversionAction(action.action_type))
-        .reduce((sum, action) => sum + parseIntegerMetric(action.value), 0)
+    return getMetaActionBreakdown(actions).total
 }
 
 export function createEmptyCampaignInsight(
@@ -143,6 +179,12 @@ export function createEmptyCampaignInsight(
         cpm: 0,
         ctr: 0,
         actions: [],
+        actionBreakdown: {
+            purchases: 0,
+            leads: 0,
+            registrations: 0,
+            total: 0,
+        },
         date_start: dates.dateStart || '',
         date_stop: dates.dateEnd || '',
         campaign_status: campaign.status,
@@ -272,20 +314,24 @@ export async function getCampaignInsights(
         }
 
         // Transformar datos
-        const insights: MetaCampaignInsights[] = ((result.data || []) as MetaCampaignInsightApiItem[]).map((item) => ({
-            campaign_id: item.campaign_id || '',
-            campaign_name: item.campaign_name || '',
-            impressions: parseIntegerMetric(item.impressions),
-            clicks: parseIntegerMetric(item.clicks),
-            spend: parseDecimalMetric(item.spend),
-            reach: parseIntegerMetric(item.reach),
-            cpc: parseDecimalMetric(item.cpc),
-            cpm: parseDecimalMetric(item.cpm),
-            ctr: parseDecimalMetric(item.ctr),
-            actions: item.actions,
-            date_start: item.date_start || '',
-            date_stop: item.date_stop || '',
-        }))
+        const insights: MetaCampaignInsights[] = ((result.data || []) as MetaCampaignInsightApiItem[]).map((item) => {
+            const actionBreakdown = getMetaActionBreakdown(item.actions)
+            return {
+                campaign_id: item.campaign_id || '',
+                campaign_name: item.campaign_name || '',
+                impressions: parseIntegerMetric(item.impressions),
+                clicks: parseIntegerMetric(item.clicks),
+                spend: parseDecimalMetric(item.spend),
+                reach: parseIntegerMetric(item.reach),
+                cpc: parseDecimalMetric(item.cpc),
+                cpm: parseDecimalMetric(item.cpm),
+                ctr: parseDecimalMetric(item.ctr),
+                actions: item.actions,
+                actionBreakdown,
+                date_start: item.date_start || '',
+                date_stop: item.date_stop || '',
+            }
+        })
 
         return { success: true, data: insights }
     } catch (error) {
@@ -337,6 +383,7 @@ export async function getCampaignDailyInsights(
         const data: MetaDailyInsight[] = (result.data || []).map((item: Record<string, string | Array<{action_type: string, value: string}>>) => {
             const actions = (item.actions as Array<{action_type: string, value: string}> | undefined) || []
             const conversions = sumConversionActions(actions)
+            const actionBreakdown = getMetaActionBreakdown(actions)
             return {
                 date: item.date_start as string,
                 impressions: parseIntegerMetric(item.impressions as string | undefined),
@@ -347,6 +394,7 @@ export async function getCampaignDailyInsights(
                 cpm: parseDecimalMetric(item.cpm as string | undefined),
                 ctr: parseDecimalMetric(item.ctr as string | undefined),
                 conversions,
+                actionBreakdown,
             }
         })
 
@@ -397,6 +445,7 @@ export async function getCampaignAdSets(
         const data: MetaAdSet[] = (result.data || []).map((item: Record<string, string | Array<{action_type: string, value: string}>>) => {
             const actions = (item.actions as Array<{action_type: string, value: string}> | undefined) || []
             const conversions = sumConversionActions(actions)
+            const actionBreakdown = getMetaActionBreakdown(actions)
             return {
                 adset_id: item.adset_id as string,
                 adset_name: item.adset_name as string,
@@ -407,6 +456,7 @@ export async function getCampaignAdSets(
                 cpc: parseDecimalMetric(item.cpc as string | undefined),
                 ctr: parseDecimalMetric(item.ctr as string | undefined),
                 conversions,
+                actionBreakdown,
             }
         })
 
@@ -457,6 +507,7 @@ export async function getCampaignAds(
         const data: MetaAd[] = (result.data || []).map((item: Record<string, string | Array<{action_type: string, value: string}>>) => {
             const actions = (item.actions as Array<{action_type: string, value: string}> | undefined) || []
             const conversions = sumConversionActions(actions)
+            const actionBreakdown = getMetaActionBreakdown(actions)
             return {
                 ad_id: item.ad_id as string,
                 ad_name: item.ad_name as string,
@@ -468,6 +519,7 @@ export async function getCampaignAds(
                 cpc: parseDecimalMetric(item.cpc as string | undefined),
                 ctr: parseDecimalMetric(item.ctr as string | undefined),
                 conversions,
+                actionBreakdown,
             }
         })
 

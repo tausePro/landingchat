@@ -14,7 +14,7 @@ export interface TrackingContextType {
     trackViewContent: (contentId: string, contentName: string, value?: number, currency?: string) => void
     trackAddToCart: (contentId: string, contentName: string, value: number, currency?: string) => void
     trackInitiateCheckout: (value: number, currency?: string, contentIds?: string[]) => void
-    trackPurchase: (value: number, currency?: string, contentIds?: string[], orderId?: string) => void
+    trackPurchase: (value: number, currency?: string, contentIds?: string[], orderId?: string, numItems?: number) => void
     trackPageView: (path?: string, props?: Record<string, unknown>) => void
     trackViewCategory: (categoryId: string, categoryName: string) => void
     trackSearch: (searchQuery: string, contentIds?: string[]) => void
@@ -44,7 +44,7 @@ const noopTracking: TrackingContextType = {
 
 const TrackingContext = createContext<TrackingContextType | null>(null)
 
-type MetaFunnelEventName = "ViewContent" | "AddToCart" | "InitiateCheckout"
+type MetaFunnelEventName = "ViewContent" | "AddToCart" | "InitiateCheckout" | "Purchase"
 
 function createMetaEventId(eventName: MetaFunnelEventName): string {
     return `${eventName.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
@@ -60,6 +60,8 @@ function sendMetaCapiFunnelEvent(params: {
         contentIds?: string[]
         contents?: Array<{ id: string; quantity: number; item_price?: number }>
         contentType: string
+        orderId?: string
+        numItems?: number
     }
 }) {
     if (!params.slug || typeof window === "undefined") {
@@ -200,10 +202,24 @@ export function TrackingProvider({
                     currency: resolvedCurrency,
                 })
             },
-            trackPurchase: (value, currency, contentIds, orderId) => {
+            trackPurchase: (value, currency, contentIds, orderId, numItems) => {
                 const resolvedCurrency = currency || "COP"
+                const eventId = orderId ? `purchase_${orderId}` : createMetaEventId("Purchase")
                 if (metaPixelEnabled) {
-                    metaPixel.trackPurchase(value, currency, contentIds, orderId)
+                    metaPixel.trackPurchase(value, resolvedCurrency, contentIds, orderId, eventId)
+                    sendMetaCapiFunnelEvent({
+                        slug: organizationSlug,
+                        eventName: "Purchase",
+                        eventId,
+                        customData: {
+                            currency: resolvedCurrency,
+                            value,
+                            contentIds,
+                            contentType: "product",
+                            orderId,
+                            numItems,
+                        },
+                    })
                 }
                 posthogTracking.trackPurchase(value, currency, contentIds, orderId)
                 trackFirstPartyAnalyticsEvent(organizationSlug, {

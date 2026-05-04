@@ -24,6 +24,9 @@ import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
 import { CartCleaner } from "./components/cart-cleaner"
 import { reconcileEpaycoOrderPayment } from "@/lib/payments/epayco-reconciliation"
+import { MetaPixel } from "@/components/analytics/meta-pixel"
+import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
+import { TrackingProvider } from "@/components/analytics/tracking-provider"
 
 interface OrderPageProps {
     params: Promise<{ orderId: string }>
@@ -107,6 +110,9 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
 
     const currentStatus = getStatusConfig(order.status)
     const primaryColor = organization.settings?.branding?.primaryColor || "#3b82f6"
+    const trackingConfig = organization.tracking_config ?? {}
+    const metaPixelId = trackingConfig.meta_pixel_id as string | undefined
+    const posthogEnabled = Boolean(trackingConfig.posthog_enabled)
 
     // Construct WhatsApp link for support (using store's connected WhatsApp)
     const whatsappNumber = storeWhatsapp?.replace(/\D/g, '') || 
@@ -116,10 +122,18 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
         ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
         : null
 
-    return (
+    const content = (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8">
             {/* Limpiar el carrito al mostrar la página de orden */}
             <CartCleaner />
+            {order.payment_status === "paid" && (
+                <PurchaseTracker
+                    orderId={order.id}
+                    orderTotal={order.total}
+                    orderItems={order.items}
+                    currency="COP"
+                />
+            )}
             
             <div className="max-w-3xl mx-auto">
                 {/* Header */}
@@ -290,5 +304,20 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
                 </div>
             </div>
         </div>
+    )
+
+    return (
+        <>
+            {metaPixelId && <MetaPixel pixelId={metaPixelId} />}
+            <TrackingProvider
+                metaPixelId={metaPixelId}
+                organizationId={organization.id}
+                organizationSlug={organization.slug}
+                organizationName={organization.name}
+                posthogEnabled={posthogEnabled}
+            >
+                {content}
+            </TrackingProvider>
+        </>
     )
 }
