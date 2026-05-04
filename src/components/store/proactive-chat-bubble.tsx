@@ -16,6 +16,12 @@ interface ProactiveChatBubbleProps {
     primaryColor: string
     onStartChat: (productId: string, context: string, params?: Record<string, string>) => void
     whatsappPhone?: string | null
+    couponOffer?: {
+        code: string
+        description: string | null
+        validUntil: string | null
+        minPurchaseAmount: number | null
+    } | null
     delayMs?: number
     cooldownMs?: number
 }
@@ -64,6 +70,21 @@ function normalizeWhatsAppPhone(phone: string | null | undefined): string | null
     return normalized.length >= 8 ? normalized : null
 }
 
+function getRemainingTimeLabel(validUntil: string | null | undefined): string | null {
+    if (!validUntil) return null
+
+    const remainingMs = new Date(validUntil).getTime() - Date.now()
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) return null
+
+    const totalMinutes = Math.floor(remainingMs / 60000)
+    if (totalMinutes < 60) return `${Math.max(totalMinutes, 1)} min`
+
+    const hours = Math.floor(totalMinutes / 60)
+    if (hours < 24) return `${hours} h`
+
+    return `${Math.floor(hours / 24)} días`
+}
+
 export function ProactiveChatBubble({
     slug,
     productId,
@@ -71,15 +92,24 @@ export function ProactiveChatBubble({
     primaryColor,
     onStartChat,
     whatsappPhone,
+    couponOffer,
     delayMs = DEFAULT_DELAY_MS,
     cooldownMs = DEFAULT_COOLDOWN_MS,
 }: ProactiveChatBubbleProps) {
     const [isVisible, setIsVisible] = useState(false)
+    const [remainingTimeLabel, setRemainingTimeLabel] = useState<string | null>(() => getRemainingTimeLabel(couponOffer?.validUntil))
     const tracking = useTracking()
     const storageKey = useMemo(() => getStorageKey(slug, productId), [slug, productId])
     const normalizedWhatsAppPhone = normalizeWhatsAppPhone(whatsappPhone)
     const contentName = productName || "Producto"
-    const context = `Quiero ayuda con disponibilidad, envío o detalles de ${contentName}.`
+    const couponCode = couponOffer?.code
+    const hasCouponOffer = Boolean(couponOffer?.code)
+    const nudgeCopy = hasCouponOffer
+        ? `Tenemos una oferta disponible para este producto: ${couponOffer?.description || "descuento especial"}. Usa el cupón ${couponOffer?.code}.`
+        : SAFE_NUDGE_COPY
+    const context = hasCouponOffer
+        ? `Quiero ayuda con ${contentName} y quiero usar el cupón ${couponOffer?.code}.`
+        : `Quiero ayuda con disponibilidad, envío o detalles de ${contentName}.`
 
     useEffect(() => {
         if (!productId || isWithinCooldown(storageKey, cooldownMs)) {
@@ -94,6 +124,7 @@ export function ProactiveChatBubble({
                 contentIds: [productId],
                 properties: {
                     contentName,
+                    couponCode,
                     proactiveNudgeId: storageKey,
                     placement: "pdp",
                     trigger: "time_on_page",
@@ -102,7 +133,19 @@ export function ProactiveChatBubble({
         }, delayMs)
 
         return () => window.clearTimeout(timeoutId)
-    }, [contentName, cooldownMs, delayMs, productId, storageKey, tracking])
+    }, [contentName, cooldownMs, couponCode, delayMs, productId, storageKey, tracking])
+
+    useEffect(() => {
+        if (!couponOffer?.validUntil) return
+
+        const updateRemainingTime = () => {
+            setRemainingTimeLabel(getRemainingTimeLabel(couponOffer.validUntil))
+        }
+
+        updateRemainingTime()
+        const intervalId = window.setInterval(updateRemainingTime, 60000)
+        return () => window.clearInterval(intervalId)
+    }, [couponOffer?.validUntil])
 
     if (!isVisible) {
         return null
@@ -121,6 +164,7 @@ export function ProactiveChatBubble({
             contentIds: [productId],
             properties: {
                 contentName,
+                couponCode,
                 proactiveNudgeId: storageKey,
                 placement: "pdp",
                 trigger: "time_on_page",
@@ -133,6 +177,7 @@ export function ProactiveChatBubble({
             proactive_nudge_product_id: productId,
             proactive_nudge_product_name: contentName,
             proactive_nudge_destination: "web_chat",
+            ...(couponCode ? { coupon_code: couponCode } : {}),
         })
     }
 
@@ -144,6 +189,7 @@ export function ProactiveChatBubble({
             contentIds: [productId],
             properties: {
                 contentName,
+                couponCode,
                 proactiveNudgeId: storageKey,
                 placement: "pdp",
                 trigger: "time_on_page",
@@ -164,6 +210,7 @@ export function ProactiveChatBubble({
             contentIds: [productId],
             properties: {
                 contentName,
+                couponCode,
                 proactiveNudgeId: storageKey,
                 placement: "pdp",
                 trigger: "time_on_page",
@@ -194,7 +241,19 @@ export function ProactiveChatBubble({
                                 <X className="h-4 w-4" aria-hidden="true" />
                             </button>
                         </div>
-                        <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{SAFE_NUDGE_COPY}</p>
+                        <p className="mt-1 text-sm leading-5 text-slate-600 dark:text-slate-300">{nudgeCopy}</p>
+                        {hasCouponOffer && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                    Cupón {couponOffer?.code}
+                                </span>
+                                {remainingTimeLabel && (
+                                    <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                        Termina en {remainingTimeLabel}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         <div className="mt-3 flex flex-wrap gap-2">
                             <button
                                 type="button"
