@@ -726,6 +726,9 @@ export async function createOrder(params: CreateOrderParams) {
         // Skip for offline methods: manual (bank transfer/Nequi) and contraentrega (cash on delivery)
         const offlinePaymentMethods = ['manual', 'contraentrega', 'cash_on_delivery']
         if (!offlinePaymentMethods.includes(params.paymentMethod)) {
+            const provider = params.paymentMethod as "wompi" | "epayco"
+            const amountInCents = Math.round(finalTotal * 100)
+
             // Obtener el dominio personalizado de la organización si existe
             const { data: orgDetails } = await supabase
                 .from("organizations")
@@ -758,7 +761,7 @@ export async function createOrder(params: CreateOrderParams) {
                 customerDocumentType: params.customerInfo.document_type,
                 customerPhone: params.customerInfo.phone,
                 returnUrl: appendStorefrontAccessParam(`${baseUrl}/order/${order.id}`, orderAccessToken),
-                paymentMethod: params.paymentMethod as "wompi" | "epayco"
+                paymentMethod: provider
             })
 
             if (!paymentResult.success) {
@@ -766,6 +769,33 @@ export async function createOrder(params: CreateOrderParams) {
                 return {
                     success: false,
                     error: paymentResult.error || "Error al iniciar el pago",
+                    order
+                }
+            }
+
+            const { error: transactionError } = await supabase
+                .from("store_transactions")
+                .insert({
+                    organization_id: org.id,
+                    order_id: order.id,
+                    customer_id: order.customer_id || resolvedCustomerId,
+                    amount: amountInCents,
+                    currency: "COP",
+                    status: "pending",
+                    provider,
+                    provider_transaction_id: null,
+                    provider_reference: order.id,
+                    provider_response: {
+                        paymentUrl: paymentResult.paymentUrl,
+                    },
+                    payment_method: null,
+                })
+
+            if (transactionError) {
+                console.error("[createOrder] Error creating pending store transaction:", transactionError)
+                return {
+                    success: false,
+                    error: "Orden creada, pero no pudimos preparar la transacción de pago",
                     order
                 }
             }
