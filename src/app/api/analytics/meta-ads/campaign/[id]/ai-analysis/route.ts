@@ -14,7 +14,7 @@ Benchmarks e-commerce LATAM (referencia):
 `
 
 function buildPrompt(data: CampaignAnalysisInput): string {
-    const { campaign, summary, adSets, ads, dateRange } = data
+    const { campaign, summary, realCommerce, adSets, ads, dateRange } = data
 
     const topAds = [...(ads || [])].sort((a, b) => b.spend - a.spend).slice(0, 6)
 
@@ -35,7 +35,17 @@ MÉTRICAS GLOBALES:
 - CTR: ${summary?.ctr?.toFixed(2) || 0}%
 - CPC: $${summary?.cpc?.toLocaleString('es-CO') || 0} COP
 - CPM: $${summary?.cpm?.toFixed(0) || 0} COP
-- Conversiones: ${summary?.conversions || 0}
+- Acciones Meta reportadas: ${summary?.metaActions?.total || 0}
+- Compras reportadas por Meta: ${summary?.metaActions?.purchases || 0}
+- Leads reportados por Meta: ${summary?.metaActions?.leads || 0}
+- Registros reportados por Meta: ${summary?.metaActions?.registrations || 0}
+
+COMERCIO REAL LANDINGCHAT:
+- Órdenes pagadas atribuidas: ${realCommerce?.paidOrders || 0}
+- Ingresos pagados atribuidos: $${realCommerce?.paidRevenue?.toLocaleString('es-CO') || 0} COP
+- Órdenes pendientes atribuidas: ${realCommerce?.pendingOrders || 0}
+- Órdenes fallidas/canceladas atribuidas: ${realCommerce?.failedOrders || 0}
+- ROAS real: ${typeof realCommerce?.realRoas === 'number' ? `${realCommerce.realRoas.toFixed(2)}x` : 'No calculable'}
 
 CONJUNTOS DE ANUNCIOS (${adSets?.length || 0}):
 ${(adSets || []).map((a) =>
@@ -44,7 +54,7 @@ ${(adSets || []).map((a) =>
 
 CREATIVOS TOP (por inversión):
 ${topAds.map((ad) =>
-    `- ${ad.ad_name}: $${ad.spend?.toLocaleString('es-CO')} | ${ad.impressions?.toLocaleString()} imp | ${ad.clicks} clics | CTR ${ad.ctr?.toFixed(2)}% | CPC $${ad.cpc?.toLocaleString('es-CO')}${ad.conversions ? ` | ${ad.conversions} conv.` : ''}`
+    `- ${ad.ad_name}: $${ad.spend?.toLocaleString('es-CO')} | ${ad.impressions?.toLocaleString()} imp | ${ad.clicks} clics | CTR ${ad.ctr?.toFixed(2)}% | CPC $${ad.cpc?.toLocaleString('es-CO')}${ad.conversions ? ` | ${ad.conversions} acciones Meta` : ''}`
 ).join('\n') || 'Sin datos'}
 
 Responde con estas secciones usando markdown:
@@ -60,6 +70,8 @@ Responde con estas secciones usando markdown:
 
 ## 🚀 Próximos pasos recomendados
 (bullets accionables y específicos, máximo 4, con números concretos cuando sea posible)
+
+Regla crítica: no declares que la campaña es exitosa comercialmente si las órdenes pagadas o los ingresos pagados reales son bajos o cero. Distingue siempre entre tráfico/acciones reportadas por Meta y ventas reales pagadas en LandingChat.
 
 Sé directo, usa datos específicos de la campaña, no generes texto genérico.`
 }
@@ -91,7 +103,23 @@ interface SummaryInput {
     ctr: number
     cpc: number
     cpm: number
-    conversions: number
+    metaActions?: MetaActionBreakdown
+}
+
+interface MetaActionBreakdown {
+    purchases: number
+    leads: number
+    registrations: number
+    total: number
+}
+
+interface RealCommerceInput {
+    paidOrders: number
+    paidRevenue: number
+    pendingOrders: number
+    failedOrders: number
+    attributedOrders: number
+    realRoas: number | null
 }
 
 interface CampaignInput {
@@ -103,6 +131,7 @@ interface CampaignInput {
 interface CampaignAnalysisInput {
     campaign: CampaignInput | null
     summary: SummaryInput | null
+    realCommerce: RealCommerceInput | null
     adSets: AdSetInput[]
     ads: AdInput[]
     dateRange: string

@@ -164,12 +164,15 @@ async function getAnalyticsData() {
         redirect("/onboarding")
     }
 
+    const paidOrdersList = orders?.filter(order => order.payment_status === "paid") || []
+
     // Calculate metrics (misma lógica que dashboard-actions.ts)
     const totalOrders = orders?.length || 0
-    const totalRevenue = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0
+    const totalPaidOrders = paidOrdersList.length
+    const totalRevenue = paidOrdersList.reduce((sum, o) => sum + (o.total || 0), 0)
     const totalChats = chats?.length || 0
     // Conversión = órdenes / chats (no solo pagadas, igual que dashboard)
-    const conversionRate = totalChats > 0 ? ((totalOrders / totalChats) * 100).toFixed(1) : "0"
+    const conversionRate = totalChats > 0 ? ((totalPaidOrders / totalChats) * 100).toFixed(1) : "0"
 
     // Group orders by day for chart.
     // Sin timezone explícita las ventas hechas entre 19:00 y 23:59 hora local
@@ -180,7 +183,7 @@ async function getAnalyticsData() {
         return acc
     }, {} as Record<string, number>) || {}
 
-    const revenueByDay = orders?.reduce((acc, order) => {
+    const revenueByDay = paidOrdersList.reduce((acc, order) => {
         const date = formatBogotaDayKey(order.created_at)
         acc[date] = (acc[date] || 0) + (order.total || 0)
         return acc
@@ -194,7 +197,7 @@ async function getAnalyticsData() {
     }, {} as Record<string, number>) || {}
 
     // Origen de ventas real (basado en source_channel y utm_data)
-    const ordersBySource = orders?.reduce((acc, order) => {
+    const ordersBySource = paidOrdersList.reduce((acc, order) => {
         let source = 'direct' // Por defecto: venta directa
 
         if (order.source_channel === 'chat' || order.chat_id) {
@@ -218,7 +221,7 @@ async function getAnalyticsData() {
     }, {} as Record<string, number>) || {}
 
     // Órdenes que realmente vinieron del chat
-    const ordersFromChat = orders?.filter(o => o.source_channel === 'chat' || o.chat_id)?.length || 0
+    const ordersFromChat = paidOrdersList.filter(o => o.source_channel === 'chat' || o.chat_id).length
 
     // Conversión real del chat (solo órdenes que vinieron del chat / total chats)
     const chatConversionRate = totalChats > 0 ? ((ordersFromChat / totalChats) * 100).toFixed(1) : "0"
@@ -498,7 +501,7 @@ async function getAnalyticsData() {
             proactiveNudgeProductStats.set(productId, current)
         })
     })
-    const proactiveNudgeOrders = (orders || []).filter(order => {
+    const proactiveNudgeOrders = paidOrdersList.filter(order => {
         const utmData = isRecord(order.utm_data) ? order.utm_data : null
         const orderEntryPoint = utmData ? getStringValue(utmData, "entry_point") : undefined
 
@@ -532,8 +535,6 @@ async function getAnalyticsData() {
             .slice(0, 5),
     }
 
-    const paidOrders = orders?.filter(order => order.payment_status === "paid").length || 0
-    const fallbackPaidOrders = paidOrders || totalOrders
     const funnelStages: FunnelStage[] = [
         {
             label: "Visitas tienda",
@@ -578,7 +579,7 @@ async function getAnalyticsData() {
         },
         {
             label: "Compra pagada",
-            value: uniqueEventCount(["purchase"]) || fallbackPaidOrders,
+            value: totalPaidOrders,
             icon: "payments",
             color: "bg-green-500",
             products: getFunnelProducts(["purchase"]),
@@ -611,7 +612,7 @@ async function getAnalyticsData() {
     // Top Products (de items JSONB en orders)
     // ============================================================
     const productStats: Record<string, { productName: string; totalRevenue: number; totalUnits: number }> = {}
-    orders?.forEach(order => {
+    paidOrdersList.forEach(order => {
         const items = order.items as Array<{
             product_id?: string
             product_name?: string
@@ -646,7 +647,7 @@ async function getAnalyticsData() {
     // Revenue por canal (no solo conteo, sino $ por fuente)
     // ============================================================
     const revenueBySource: Record<string, { revenue: number; orders: number }> = {}
-    orders?.forEach(order => {
+    paidOrdersList.forEach(order => {
         let source = 'direct'
         if (order.source_channel === 'chat' || order.chat_id) {
             source = 'chat'
@@ -698,7 +699,7 @@ async function getAnalyticsData() {
     const avgMessagesPerChat = totalChats > 0 ? Math.round(totalMessages / totalChats) : 0
 
     // Chats que generaron orden
-    const chatIdsWithOrder = new Set(orders?.filter(o => o.chat_id).map(o => o.chat_id) || [])
+    const chatIdsWithOrder = new Set(paidOrdersList.filter(o => o.chat_id).map(o => o.chat_id))
     const chatsWithOrder = chatIdsWithOrder.size
 
     // Top herramientas usadas (extraer de metadata.tools_used en mensajes del bot)
@@ -725,17 +726,18 @@ async function getAnalyticsData() {
     const waChats = chats?.filter(c => c.channel === 'whatsapp') || []
     const webChatIds = new Set(webChats.map(c => c.id))
     const waChatIds = new Set(waChats.map(c => c.id))
-    const webOrders = orders?.filter(o => o.chat_id && webChatIds.has(o.chat_id)).length || 0
-    const waOrders = orders?.filter(o => o.chat_id && waChatIds.has(o.chat_id)).length || 0
+    const webOrders = paidOrdersList.filter(o => o.chat_id && webChatIds.has(o.chat_id)).length
+    const waOrders = paidOrdersList.filter(o => o.chat_id && waChatIds.has(o.chat_id)).length
 
     return {
         organization: org,
         metrics: {
             totalOrders,
+            totalPaidOrders,
             totalRevenue,
             totalChats,
             conversionRate,
-            averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+            averageOrderValue: totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0,
             ordersFromChat,
             chatConversionRate,
         },
@@ -833,13 +835,13 @@ export default async function AnalyticsPage() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Ingresos (30d)</CardTitle>
+                            <CardTitle className="text-sm font-medium">Ingresos pagados (30d)</CardTitle>
                             <span className="material-symbols-outlined text-green-500">payments</span>
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">{formatCurrency(data.metrics.totalRevenue)}</div>
                             <p className="text-xs text-muted-foreground">
-                                {data.metrics.totalOrders} órdenes
+                                {data.metrics.totalPaidOrders} pagadas · {data.metrics.totalOrders} creadas
                             </p>
                         </CardContent>
                     </Card>
@@ -865,7 +867,7 @@ export default async function AnalyticsPage() {
                         <CardContent>
                             <div className="text-2xl font-bold">{data.metrics.conversionRate}%</div>
                             <p className="text-xs text-muted-foreground">
-                                Chat → Compra
+                                Chat → Compra pagada
                             </p>
                         </CardContent>
                     </Card>
@@ -878,7 +880,7 @@ export default async function AnalyticsPage() {
                         <CardContent>
                             <div className="text-2xl font-bold">{formatCurrency(data.metrics.averageOrderValue)}</div>
                             <p className="text-xs text-muted-foreground">
-                                Por orden
+                                Por orden pagada
                             </p>
                         </CardContent>
                     </Card>

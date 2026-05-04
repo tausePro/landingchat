@@ -31,16 +31,23 @@ export function PurchaseTracker({
     useEffect(() => {
         // Evitar tracking duplicado
         if (hasTracked.current) return
+        const storageKey = `landingchat_purchase_tracked_${orderId}`
+        if (typeof window !== "undefined" && window.localStorage.getItem(storageKey)) {
+            hasTracked.current = true
+            return
+        }
         
         const contentIds = orderItems
             .map(item => item.product_id || item.productId || item.id)
             .filter((id): id is string => typeof id === "string" && id.length > 0)
+        const numItems = orderItems.reduce((sum, item) => sum + (typeof item.quantity === "number" ? item.quantity : 1), 0)
         
         // Función para intentar trackear
         const attemptTrack = () => {
             // Verificar si fbq está disponible (Meta Pixel cargado)
             if (typeof window !== "undefined" && window.fbq) {
-                trackPurchase(orderTotal, currency, contentIds, orderId)
+                trackPurchase(orderTotal, currency, contentIds, orderId, numItems)
+                window.localStorage.setItem(storageKey, new Date().toISOString())
                 hasTracked.current = true
                 return true
             }
@@ -57,10 +64,13 @@ export function PurchaseTracker({
             attempts++
             if (attemptTrack() || attempts >= maxAttempts) {
                 clearInterval(interval)
-                // Si después de todos los intentos fbq no está disponible,
-                // trackear de todos modos (para PostHog u otros)
                 if (!hasTracked.current) {
-                    trackPurchase(orderTotal, currency, contentIds, orderId)
+                    // Si después de todos los intentos fbq no está disponible,
+                    // trackear de todos modos (para PostHog, first-party y CAPI si está configurado)
+                    trackPurchase(orderTotal, currency, contentIds, orderId, numItems)
+                    if (typeof window !== "undefined") {
+                        window.localStorage.setItem(storageKey, new Date().toISOString())
+                    }
                     hasTracked.current = true
                 }
             }
