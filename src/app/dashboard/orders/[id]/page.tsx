@@ -65,7 +65,13 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                             Creado el {formatBogotaDateTime(order.created_at)}
                         </p>
                     </div>
-                    <OrderActions orderId={order.id} orderNumber={order.order_number} currentStatus={order.status} />
+                    <OrderActions
+                        orderId={order.id}
+                        orderNumber={order.order_number}
+                        currentStatus={order.status}
+                        paymentStatus={order.payment_status}
+                        paymentMethod={order.payment_method}
+                    />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
