@@ -1,20 +1,24 @@
-import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
 import { logger } from "@/lib/logger"
+import { applyPaymentStatusToOrder } from "@/lib/payments/payment-confirmation"
 import { createPaymentGateway } from "@/lib/payments/factory"
 import { createServiceClient } from "@/lib/supabase/server"
-import type { PaymentGatewayConfig, PaymentStatus, TransactionStatus } from "@/types/payment"
+import type { TransactionDetails } from "@/lib/payments/types"
+import type { PaymentGatewayConfig, PaymentProvider, TransactionStatus } from "@/types/payment"
 
-const log = logger("payments/epayco-reconciliation")
+const log = logger("payments/reconciliation")
 
-interface ReconcileEpaycoOrderPaymentParams {
+interface ReconcileOrderPaymentParams {
     organizationId: string
     orderId: string
+    expectedProvider?: PaymentProvider
 }
 
-interface ReconcileEpaycoOrderPaymentResult {
+interface ReconcileOrderPaymentResult {
     reconciled: boolean
     orderUpdated: boolean
     transactionUpdated: boolean
+    sideEffectsRan?: boolean
+    provider?: PaymentProvider
     status?: TransactionStatus
     reason?: string
     error?: string
@@ -25,265 +29,96 @@ interface OrderForReconciliation {
     organization_id: string
     order_number?: string | null
     total: number
-    status?: string | null
-    payment_status?: PaymentStatus | null
+    payment_status?: string | null
     payment_method?: string | null
+    customer_id?: string | null
 }
 
 interface StoreTransactionRow {
     id: string
     order_id: string | null
     status: TransactionStatus
-}
-
-interface OrderItemJsonb {
-    product_id?: string | null
-    product_name?: string | null
-    quantity?: number | null
-    unit_price?: number | null
-}
-
-interface CustomerInfoJsonb {
-    name?: string | null
-    email?: string | null
-    phone?: string | null
-    city?: string | null
-    state?: string | null
-}
-
-interface CustomerRow {
-    name?: string | null
-    email?: string | null
-    phone?: string | null
-}
-
-interface OrderForPostPayment {
-    id: string
-    order_number?: string | null
-    total: number
-    items: unknown
-    customer_info: unknown
-    utm_data: unknown
-    customers: CustomerRow | null
-}
-
-interface AttributionData {
-    fbc?: string
-    fbp?: string
-}
-
-function mapStatusToPaymentStatus(status: TransactionStatus): PaymentStatus {
-    if (status === "approved") return "paid"
-    if (status === "declined" || status === "error") return "failed"
-    if (status === "voided") return "refunded"
-    return "pending"
-}
-
-function mapStatusToOrderStatus(status: TransactionStatus): string | undefined {
-    if (status === "approved") return "confirmed"
-    if (status === "declined" || status === "error") return "cancelled"
-    return undefined
+    provider_transaction_id: string | null
+    provider_reference: string | null
 }
 
 function normalizeCurrency(value: string | null | undefined) {
     return (value || "").trim().toUpperCase()
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function getOptionalString(value: unknown): string | undefined {
-    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
-}
-
-function getAttributionData(value: unknown): AttributionData {
-    if (!isRecord(value)) return {}
-
-    return {
-        fbc: getOptionalString(value.fbc) || getOptionalString(value._fbc),
-        fbp: getOptionalString(value.fbp) || getOptionalString(value._fbp),
-    }
-}
-
-function getOrderItems(value: unknown): OrderItemJsonb[] {
-    if (!Array.isArray(value)) return []
-    return value.filter((item): item is OrderItemJsonb => isRecord(item))
-}
-
-async function getExistingTransaction(params: {
+async function getExistingOrderTransaction(params: {
     organizationId: string
-    providerTransactionId?: string
-    providerReference: string
+    orderId: string
+    provider: PaymentProvider
 }): Promise<StoreTransactionRow | null> {
     const supabase = createServiceClient()
-
-    if (params.providerTransactionId) {
-        const { data } = await supabase
-            .from("store_transactions")
-            .select("id, order_id, status")
-            .eq("organization_id", params.organizationId)
-            .eq("provider", "epayco")
-            .eq("provider_transaction_id", params.providerTransactionId)
-            .maybeSingle()
-
-        if (data) return data as StoreTransactionRow
-    }
-
     const { data } = await supabase
         .from("store_transactions")
-        .select("id, order_id, status")
+        .select("id, order_id, status, provider_transaction_id, provider_reference")
         .eq("organization_id", params.organizationId)
-        .eq("provider", "epayco")
-        .eq("provider_reference", params.providerReference)
+        .eq("provider", params.provider)
+        .eq("order_id", params.orderId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle()
 
     return data ? data as StoreTransactionRow : null
 }
 
-async function applyOrderPaymentStatus(params: {
+async function getExistingProviderTransaction(params: {
     organizationId: string
-    order: OrderForReconciliation
-    status: TransactionStatus
-}): Promise<boolean> {
-    const paymentStatus = mapStatusToPaymentStatus(params.status)
-    const orderStatus = mapStatusToOrderStatus(params.status)
-
-    if (params.status === "pending") return false
-    if (params.order.payment_status === paymentStatus && (!orderStatus || params.order.status === orderStatus)) {
-        return false
-    }
-
+    provider: PaymentProvider
+    providerTransactionId: string
+    providerReference: string
+}): Promise<StoreTransactionRow | null> {
     const supabase = createServiceClient()
-    const { error } = await supabase
-        .from("orders")
-        .update({
-            payment_status: paymentStatus,
-            ...(orderStatus && { status: orderStatus }),
-            updated_at: new Date().toISOString(),
-        })
-        .eq("id", params.order.id)
+
+    const { data: transactionById } = await supabase
+        .from("store_transactions")
+        .select("id, order_id, status, provider_transaction_id, provider_reference")
         .eq("organization_id", params.organizationId)
+        .eq("provider", params.provider)
+        .eq("provider_transaction_id", params.providerTransactionId)
+        .maybeSingle()
 
-    if (error) {
-        log.error("Failed to update order payment status", {
-            orderId: params.order.id,
-            organizationId: params.organizationId,
-            status: params.status,
-            error: error.message,
-        })
-        return false
-    }
+    if (transactionById) return transactionById as StoreTransactionRow
 
-    return true
+    const { data: transactionByReference } = await supabase
+        .from("store_transactions")
+        .select("id, order_id, status, provider_transaction_id, provider_reference")
+        .eq("organization_id", params.organizationId)
+        .eq("provider", params.provider)
+        .eq("provider_reference", params.providerReference)
+        .maybeSingle()
+
+    return transactionByReference ? transactionByReference as StoreTransactionRow : null
 }
 
-async function runApprovedOrderSideEffects(params: {
-    organizationId: string
+async function getProviderTransaction(params: {
+    gateway: ReturnType<typeof createPaymentGateway>
     orderId: string
-}): Promise<void> {
-    const supabase = createServiceClient()
-    const { data: order } = await supabase
-        .from("orders")
-        .select(`
-            id,
-            order_number,
-            total,
-            items,
-            customer_info,
-            utm_data,
-            customers(name, email, phone)
-        `)
-        .eq("id", params.orderId)
-        .eq("organization_id", params.organizationId)
-        .single()
-
-    if (!order) {
-        log.error("Order not found for approved payment side effects", params)
-        return
-    }
-
-    const typedOrder = order as OrderForPostPayment
-    const customer = typedOrder.customers
-    const customerInfo = isRecord(typedOrder.customer_info) ? typedOrder.customer_info as CustomerInfoJsonb : null
-    const itemsJsonb = getOrderItems(typedOrder.items)
-    const attribution = getAttributionData(typedOrder.utm_data)
-
-    const decrementResult = await decrementOrderStock(supabase, params.orderId, params.organizationId)
-    log.info("Stock decrement result", {
-        orderId: params.orderId,
-        skipped: decrementResult.skipped,
-        reason: decrementResult.reason,
-        itemsProcessed: decrementResult.items.length,
-        oversaleDetected: decrementResult.items.some((item) => !item.wasSufficient),
-    })
-
+    providerTransactionId?: string | null
+}): Promise<TransactionDetails> {
     try {
-        const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-        await sendSaleNotification(
-            { organizationId: params.organizationId },
-            {
-                id: typedOrder.order_number || typedOrder.id,
-                total: typedOrder.total,
-                customerName: customer?.name || customerInfo?.name || "Cliente",
-                items: itemsJsonb
-                    .filter((item) => typeof item.quantity === "number" && item.quantity > 0)
-                    .map((item) => ({
-                        name: item.product_name || "Producto",
-                        quantity: item.quantity as number,
-                    })),
-            }
-        )
-    } catch (error) {
-        log.error("Error sending sale notification", {
-            orderId: params.orderId,
-            error: error instanceof Error ? error.message : String(error),
-        })
-    }
+        return await params.gateway.getTransactionByReference(params.orderId)
+    } catch (referenceError) {
+        if (!params.providerTransactionId || params.providerTransactionId === params.orderId) {
+            throw referenceError
+        }
 
-    try {
-        const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
-        await trackServerPurchase(
-            params.organizationId,
-            {
-                id: typedOrder.id,
-                orderNumber: typedOrder.order_number || undefined,
-                total: typedOrder.total,
-                currency: "COP",
-                items: itemsJsonb
-                    .filter((item) => typeof item.product_id === "string" && typeof item.quantity === "number" && item.quantity > 0)
-                    .map((item) => ({
-                        productId: item.product_id as string,
-                        quantity: item.quantity as number,
-                        unitPrice: typeof item.unit_price === "number" ? item.unit_price : undefined,
-                    })),
-                customerEmail: customer?.email || customerInfo?.email || undefined,
-                customerPhone: customer?.phone || customerInfo?.phone || undefined,
-                customerName: customer?.name || customerInfo?.name || undefined,
-                customerCity: customerInfo?.city || undefined,
-                customerState: customerInfo?.state || undefined,
-                fbc: attribution.fbc,
-                fbp: attribution.fbp,
-            },
-            supabase
-        )
-    } catch (error) {
-        log.error("Error sending Meta CAPI event", {
-            orderId: params.orderId,
-            error: error instanceof Error ? error.message : String(error),
-        })
+        return params.gateway.getTransaction(params.providerTransactionId)
     }
 }
 
-export async function reconcileEpaycoOrderPayment(
-    params: ReconcileEpaycoOrderPaymentParams
-): Promise<ReconcileEpaycoOrderPaymentResult> {
+export async function reconcileOrderPayment(
+    params: ReconcileOrderPaymentParams
+): Promise<ReconcileOrderPaymentResult> {
     const supabase = createServiceClient()
 
     try {
         const { data: orderData } = await supabase
             .from("orders")
-            .select("id, organization_id, order_number, total, status, payment_status, payment_method")
+            .select("id, organization_id, order_number, total, payment_status, payment_method, customer_id")
             .eq("id", params.orderId)
             .eq("organization_id", params.organizationId)
             .maybeSingle()
@@ -293,60 +128,101 @@ export async function reconcileEpaycoOrderPayment(
         }
 
         const order = orderData as OrderForReconciliation
-        if (order.payment_method !== "epayco") {
-            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "not_epayco_order" }
+        const provider = order.payment_method === "wompi" || order.payment_method === "epayco"
+            ? order.payment_method
+            : null
+
+        if (!provider) {
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "unsupported_provider" }
+        }
+
+        if (params.expectedProvider && provider !== params.expectedProvider) {
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "provider_mismatch", provider }
         }
 
         if (order.payment_status === "paid") {
-            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "order_already_paid" }
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "order_already_paid", provider }
+        }
+
+        const existingOrderTransaction = await getExistingOrderTransaction({
+            organizationId: params.organizationId,
+            orderId: params.orderId,
+            provider,
+        })
+
+        if (existingOrderTransaction?.status === "approved") {
+            const result = await applyPaymentStatusToOrder({
+                supabase,
+                organizationId: params.organizationId,
+                orderId: params.orderId,
+                transactionStatus: "approved",
+                source: "payment_reconciliation",
+            })
+
+            return {
+                reconciled: true,
+                orderUpdated: result.orderUpdated,
+                transactionUpdated: false,
+                sideEffectsRan: result.sideEffectsRan,
+                provider,
+                status: "approved",
+            }
         }
 
         const { data: configData } = await supabase
             .from("payment_gateway_configs")
             .select("*")
             .eq("organization_id", params.organizationId)
-            .eq("provider", "epayco")
+            .eq("provider", provider)
             .eq("is_active", true)
             .maybeSingle()
 
         if (!configData) {
-            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "gateway_not_configured" }
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "gateway_not_configured", provider }
         }
 
         const gateway = createPaymentGateway(configData as PaymentGatewayConfig)
-        const transaction = await gateway.getTransactionByReference(params.orderId)
+        const transaction = await getProviderTransaction({
+            gateway,
+            orderId: params.orderId,
+            providerTransactionId: existingOrderTransaction?.provider_transaction_id,
+        })
         const expectedAmountInCents = Math.round(order.total * 100)
 
         if (transaction.reference !== params.orderId) {
             log.error("Provider transaction reference mismatch", {
                 orderId: params.orderId,
+                provider,
                 providerReference: transaction.reference,
             })
-            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "reference_mismatch" }
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "reference_mismatch", provider }
         }
 
         if (normalizeCurrency(transaction.currency) !== "COP") {
             log.error("Provider transaction currency mismatch", {
                 orderId: params.orderId,
+                provider,
                 providerCurrency: transaction.currency,
             })
-            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "currency_mismatch" }
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "currency_mismatch", provider }
         }
 
         if (Math.abs(transaction.amount - expectedAmountInCents) > 1) {
             log.error("Provider transaction amount mismatch", {
                 orderId: params.orderId,
+                provider,
                 providerAmount: transaction.amount,
                 expectedAmount: expectedAmountInCents,
             })
-            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "amount_mismatch" }
+            return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "amount_mismatch", provider }
         }
 
-        const existingTransaction = await getExistingTransaction({
+        const existingTransaction = await getExistingProviderTransaction({
             organizationId: params.organizationId,
+            provider,
             providerTransactionId: transaction.providerTransactionId,
             providerReference: transaction.reference,
-        })
+        }) || existingOrderTransaction
 
         let transactionUpdated = false
         const completedAt = transaction.status === "approved"
@@ -354,12 +230,18 @@ export async function reconcileEpaycoOrderPayment(
             : null
 
         if (existingTransaction) {
-            if (existingTransaction.status !== transaction.status) {
+            const shouldUpdateTransaction =
+                existingTransaction.status !== transaction.status ||
+                existingTransaction.provider_transaction_id !== transaction.providerTransactionId ||
+                existingTransaction.provider_reference !== transaction.reference
+
+            if (shouldUpdateTransaction) {
                 const { error } = await supabase
                     .from("store_transactions")
                     .update({
                         status: transaction.status,
                         provider_transaction_id: transaction.providerTransactionId,
+                        provider_reference: transaction.reference,
                         provider_response: transaction.rawResponse || {},
                         payment_method: transaction.paymentMethod?.toLowerCase() || null,
                         completed_at: completedAt,
@@ -375,10 +257,11 @@ export async function reconcileEpaycoOrderPayment(
                 .insert({
                     organization_id: params.organizationId,
                     order_id: params.orderId,
+                    customer_id: order.customer_id || null,
                     amount: transaction.amount,
                     currency: normalizeCurrency(transaction.currency),
                     status: transaction.status,
-                    provider: "epayco",
+                    provider,
                     provider_transaction_id: transaction.providerTransactionId,
                     provider_reference: transaction.reference,
                     provider_response: transaction.rawResponse || {},
@@ -389,36 +272,40 @@ export async function reconcileEpaycoOrderPayment(
             transactionUpdated = !error
         }
 
-        const orderUpdated = await applyOrderPaymentStatus({
+        const orderResult = await applyPaymentStatusToOrder({
+            supabase,
             organizationId: params.organizationId,
-            order,
-            status: transaction.status,
+            orderId: params.orderId,
+            transactionStatus: transaction.status,
+            source: "payment_reconciliation",
         })
 
-        const shouldRunApprovedSideEffects = transaction.status === "approved" && (
-            !existingTransaction ||
-            existingTransaction.status !== "approved" ||
-            orderUpdated
-        )
-
-        if (shouldRunApprovedSideEffects) {
-            await runApprovedOrderSideEffects({
-                organizationId: params.organizationId,
-                orderId: params.orderId,
-            })
+        if (!orderResult.success) {
+            return {
+                reconciled: false,
+                orderUpdated: false,
+                transactionUpdated,
+                provider,
+                status: transaction.status,
+                reason: orderResult.reason,
+                error: orderResult.error,
+            }
         }
 
         return {
             reconciled: true,
-            orderUpdated,
+            orderUpdated: orderResult.orderUpdated,
             transactionUpdated,
+            sideEffectsRan: orderResult.sideEffectsRan,
+            provider,
             status: transaction.status,
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error"
-        log.warn("Unable to reconcile ePayco payment", {
+        log.warn("Unable to reconcile payment", {
             orderId: params.orderId,
             organizationId: params.organizationId,
+            provider: params.expectedProvider,
             error: message,
         })
         return {
@@ -429,4 +316,13 @@ export async function reconcileEpaycoOrderPayment(
             error: message,
         }
     }
+}
+
+export async function reconcileEpaycoOrderPayment(
+    params: Omit<ReconcileOrderPaymentParams, "expectedProvider">
+): Promise<ReconcileOrderPaymentResult> {
+    return reconcileOrderPayment({
+        ...params,
+        expectedProvider: "epayco",
+    })
 }

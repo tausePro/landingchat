@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { confirmOrderPayment, updateOrderStatus } from "./actions"
+import { confirmOrderPayment, reconcileOrderPaymentFromGateway, updateOrderStatus } from "./actions"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { DeleteOrderModal } from "./delete-order-modal"
@@ -18,8 +18,10 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
     const router = useRouter()
     const [isUpdating, setIsUpdating] = useState(false)
     const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
+    const [isReconcilingPayment, setIsReconcilingPayment] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const canConfirmPayment = paymentStatus !== "paid"
+    const canReconcilePayment = paymentStatus !== "paid" && (paymentMethod === "wompi" || paymentMethod === "epayco")
 
     const handleStatusChange = async (newStatus: string) => {
         if (newStatus === currentStatus) return
@@ -51,6 +53,26 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
             console.error(error)
         } finally {
             setIsConfirmingPayment(false)
+        }
+    }
+
+    const handleReconcilePayment = async () => {
+        setIsReconcilingPayment(true)
+        try {
+            const result = await reconcileOrderPaymentFromGateway(orderId)
+            if (!result.success) {
+                toast.warning(result.error || `No se pudo conciliar el pago (${result.reason})`)
+                return
+            }
+
+            const provider = result.provider === "wompi" ? "Wompi" : "ePayco"
+            toast.success(result.sideEffectsRan ? `Pago conciliado con ${provider} y eventos procesados` : `Pago conciliado con ${provider}: ${result.status}`)
+            router.refresh()
+        } catch (error) {
+            toast.error("Error al consultar la pasarela")
+            console.error(error)
+        } finally {
+            setIsReconcilingPayment(false)
         }
     }
 
@@ -97,6 +119,18 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
                     >
                         <span className="material-symbols-outlined text-lg">task_alt</span>
                         <span className="hidden sm:inline">{isConfirmingPayment ? "Confirmando..." : "Confirmar pago"}</span>
+                    </button>
+                )}
+
+                {canReconcilePayment && (
+                    <button
+                        onClick={handleReconcilePayment}
+                        disabled={isReconcilingPayment}
+                        title={`Consultar estado en ${paymentMethod}`}
+                        className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-4 text-blue-700 dark:text-blue-300 text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-lg">sync</span>
+                        <span className="hidden sm:inline">{isReconcilingPayment ? "Consultando..." : "Consultar pasarela"}</span>
                     </button>
                 )}
 
