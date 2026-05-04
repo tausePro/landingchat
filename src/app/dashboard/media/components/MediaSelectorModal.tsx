@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { X, Search, Image, Film, Upload, Check, Loader2 } from "lucide-react"
-import { listMediaFiles, uploadMediaFile, type MediaFile } from "../actions"
+import { listMediaFiles, createSignedUploadUrl, type MediaFile } from "../actions"
+import { createClient } from "@/lib/supabase/client"
 import { MediaGrid } from "./MediaGrid"
 import { toast } from "sonner"
 
@@ -79,22 +80,36 @@ export function MediaSelectorModal({
         continue
       }
 
-      const formData = new FormData()
-      formData.append("file", file)
-
       try {
-        const response = await fetch("/api/media/upload", {
-          method: "POST",
-          body: formData,
-        })
-        const result = await response.json()
-
-        if (result.success && result.data) {
-          setFiles((prev) => [result.data as MediaFile, ...prev])
-          uploadedUrls.push(result.data.publicUrl)
-        } else {
-          errors.push(`${file.name}: ${result.error || "Error desconocido"}`)
+        const urlResult = await createSignedUploadUrl(file.name, file.type)
+        if (!urlResult.success) {
+          errors.push(`${file.name}: ${urlResult.error}`)
+          continue
         }
+
+        const { token, path, publicUrl, fileName } = urlResult.data
+        const supabase = createClient()
+        const { error: uploadError } = await supabase.storage
+          .from("product-images")
+          .uploadToSignedUrl(path, token, file, { contentType: file.type })
+
+        if (uploadError) {
+          errors.push(`${file.name}: ${uploadError.message}`)
+          continue
+        }
+
+        const mediaFile: MediaFile = {
+          id: path,
+          name: fileName,
+          fullPath: path,
+          publicUrl,
+          type: fileType as "image" | "video",
+          size: file.size,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        setFiles((prev) => [mediaFile, ...prev])
+        uploadedUrls.push(publicUrl)
       } catch (err) {
         errors.push(`${file.name}: Error de red`)
       }
