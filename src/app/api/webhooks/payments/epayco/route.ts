@@ -8,27 +8,11 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import crypto from "crypto"
 import { logger } from "@/lib/logger"
-import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
+import { applyPaymentStatusToOrder } from "@/lib/payments/payment-confirmation"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import type { TransactionStatus } from "@/types/payment"
 
 const log = logger("webhooks/payments-epayco")
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function getOptionalString(value: unknown): string | undefined {
-    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
-}
-
-function getEpaycoOrderAttribution(value: unknown): { fbc?: string; fbp?: string } {
-    if (!isRecord(value)) return {}
-
-    return {
-        fbc: getOptionalString(value.fbc) || getOptionalString(value._fbc),
-        fbp: getOptionalString(value.fbp) || getOptionalString(value._fbp),
-    }
-}
 
 interface EpaycoWebhookPayload {
     x_ref_payco: string
@@ -358,167 +342,25 @@ async function handleEpaycoWebhook(orgSlug: string | null, payload: EpaycoWebhoo
 async function processOrderUpdate(
     supabase: SupabaseClient,
     orderId: string,
-    status: "pending" | "approved" | "declined" | "voided" | "error",
+    status: TransactionStatus,
     organizationId: string
 ) {
-    const paymentStatus =
-        status === "approved"
-            ? "paid"
-            : status === "declined" || status === "error"
-                ? "failed"
-                : status === "voided"
-                    ? "refunded"
-                    : "pending"
+    const result = await applyPaymentStatusToOrder({
+        supabase,
+        organizationId,
+        orderId,
+        transactionStatus: status,
+        source: "webhook_epayco",
+    })
 
-    const orderStatus = status === "approved" ? "confirmed" : status === "declined" || status === "error" ? "cancelled" : undefined
-
-    // Fase 0.4 post-mortem (hotfix v1.10.58): removimos `confirmed_at` del
-    // UPDATE porque la columna NO existe en `public.orders` y el UPDATE entero
-    // fallaba silenciosamente (PostgREST retornaba error sin capturarse,
-    // dejando la orden en `payment_status: pending` indefinidamente). El
-    // timestamp de confirmación queda en `store_transactions` + `updated_at`.
-    const { error: updateError } = await supabase
-        .from("orders")
-        .update({
-            payment_status: paymentStatus,
-            ...(orderStatus && { status: orderStatus }),
-            updated_at: new Date().toISOString(),
-        })
-        .eq("id", orderId)
-
-    if (updateError) {
-        log.error("Failed to update order payment_status", {
+    if (!result.success) {
+        log.error("Failed to apply ePayco payment status to order", {
             orderId,
+            organizationId,
             status,
-            paymentStatus,
-            error: updateError.message,
+            reason: result.reason,
+            error: result.error,
         })
-    }
-
-    // Post-payment side effects cuando el pago se aprueba.
-    // Fase 0.4 (Bug H): antes este bloque hacía un SELECT con JOIN a la
-    // tabla `order_items` que NO existe en la base. PostgREST devolvía error
-    // silencioso, `order` quedaba null, el `if (order)` fallaba y nada de lo
-    // de abajo se ejecutaba: ni stock, ni notificación WA, ni Meta CAPI.
-    // Ahora leemos items desde `orders.items` (jsonb, source of truth real).
-    if (status === "approved") {
-        try {
-            const { data: order } = await supabase
-                .from("orders")
-                .select(`
-                    id,
-                    order_number,
-                    total,
-                    items,
-                    customer_info,
-                    utm_data,
-                    customers(name, email, phone)
-                `)
-                .eq("id", orderId)
-                .eq("organization_id", organizationId)
-                .single()
-
-            if (order) {
-                const customer = order.customers as { name?: string; email?: string; phone?: string } | null
-                const customerInfo = order.customer_info as {
-                    name?: string
-                    email?: string
-                    phone?: string
-                    city?: string
-                    state?: string
-                } | null
-                const attribution = getEpaycoOrderAttribution(order.utm_data)
-
-                // Items del jsonb (formato de transformCartItemsToOrderItems)
-                const itemsJsonb = Array.isArray(order.items)
-                    ? (order.items as Array<{
-                        product_id?: string | null
-                        product_name?: string | null
-                        quantity?: number | null
-                        unit_price?: number | null
-                    }>)
-                    : []
-
-                // 1. Decrementar stock atómicamente con la RPC (Bugs A+B+H)
-                const decrementResult = await decrementOrderStock(
-                    supabase,
-                    orderId,
-                    organizationId,
-                )
-                log.info("Stock decrement result", {
-                    orderId,
-                    skipped: decrementResult.skipped,
-                    reason: decrementResult.reason,
-                    itemsProcessed: decrementResult.items.length,
-                    oversaleDetected: decrementResult.items.some((item) => !item.wasSufficient),
-                })
-
-                // 2. Enviar notificación de venta por WhatsApp
-                try {
-                    const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                    await sendSaleNotification(
-                        { organizationId },
-                        {
-                            id: order.order_number || order.id,
-                            total: order.total,
-                            customerName: customer?.name || customerInfo?.name || "Cliente",
-                            items: itemsJsonb
-                                .filter((item) => typeof item.quantity === "number" && item.quantity > 0)
-                                .map((item) => ({
-                                    name: item.product_name || "Producto",
-                                    quantity: item.quantity as number,
-                                })),
-                        }
-                    )
-                    log.info("Sale notification sent", { orderNumber: order.order_number })
-                } catch (notifError) {
-                    log.error("Error sending sale notification", {
-                        error: notifError instanceof Error ? notifError.message : String(notifError),
-                    })
-                }
-
-                // 3. Enviar evento Purchase a Meta Conversions API (server-side tracking)
-                try {
-                    const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
-                    await trackServerPurchase(
-                        organizationId,
-                        {
-                            id: order.id,
-                            orderNumber: order.order_number,
-                            total: order.total,
-                            currency: "COP",
-                            items: itemsJsonb
-                                .filter((item) => typeof item.product_id === "string" && typeof item.quantity === "number" && item.quantity > 0)
-                                .map((item) => ({
-                                    productId: item.product_id as string,
-                                    quantity: item.quantity as number,
-                                    unitPrice: typeof item.unit_price === "number" ? item.unit_price : undefined,
-                                })),
-                            customerEmail: customer?.email || customerInfo?.email,
-                            customerPhone: customer?.phone || customerInfo?.phone,
-                            customerName: customer?.name || customerInfo?.name,
-                            customerCity: customerInfo?.city,
-                            customerState: customerInfo?.state,
-                            fbc: attribution.fbc,
-                            fbp: attribution.fbp,
-                        },
-                        supabase
-                    )
-                    log.info("Meta CAPI Purchase event sent", { orderNumber: order.order_number })
-                } catch (capiError) {
-                    log.error("Error sending Meta CAPI event", {
-                        error: capiError instanceof Error ? capiError.message : String(capiError),
-                    })
-                }
-            } else {
-                log.error("Order not found for post-payment processing", { orderId, organizationId })
-            }
-        } catch (err) {
-            log.error("Error in post-payment processing", {
-                orderId,
-                message: err instanceof Error ? err.message : "Unknown error",
-            })
-        }
     }
 }
 
