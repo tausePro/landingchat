@@ -2,6 +2,7 @@
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { applyPaymentStatusToOrder } from "@/lib/payments/payment-confirmation"
+import { reconcileOrderPayment } from "@/lib/payments/epayco-reconciliation"
 import { revalidatePath } from "next/cache"
 
 interface DashboardCustomerInfo {
@@ -329,6 +330,48 @@ export async function confirmOrderPayment(orderId: string) {
     revalidatePath(`/dashboard/orders/${orderId}`)
 
     return { success: true, sideEffectsRan: result.sideEffectsRan }
+}
+
+export async function reconcileOrderPaymentFromGateway(orderId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.organization_id) throw new Error("No organization found")
+
+    const result = await reconcileOrderPayment({
+        organizationId: profile.organization_id,
+        orderId,
+    })
+
+    revalidatePath("/dashboard/orders")
+    revalidatePath(`/dashboard/orders/${orderId}`)
+
+    if (!result.reconciled) {
+        return {
+            success: false,
+            provider: result.provider,
+            status: result.status,
+            reason: result.reason || "not_reconciled",
+            error: result.error,
+        }
+    }
+
+    return {
+        success: true,
+        provider: result.provider,
+        status: result.status,
+        orderUpdated: result.orderUpdated,
+        transactionUpdated: result.transactionUpdated,
+        sideEffectsRan: result.sideEffectsRan,
+    }
 }
 
 export async function deleteOrder(orderId: string) {
