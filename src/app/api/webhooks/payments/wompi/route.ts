@@ -8,26 +8,10 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import { WompiGateway } from "@/lib/payments/wompi-gateway"
 import { logger } from "@/lib/logger"
-import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
+import { applyPaymentStatusToOrder } from "@/lib/payments/payment-confirmation"
+import type { TransactionStatus } from "@/types/payment"
 
 const log = logger("webhooks/payments/wompi")
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function getOptionalString(value: unknown): string | undefined {
-    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
-}
-
-function getWompiOrderAttribution(value: unknown): { fbc?: string; fbp?: string } {
-    if (!isRecord(value)) return {}
-
-    return {
-        fbc: getOptionalString(value.fbc) || getOptionalString(value._fbc),
-        fbp: getOptionalString(value.fbp) || getOptionalString(value._fbp),
-    }
-}
 
 interface WompiWebhookPayload {
     event: string
@@ -48,12 +32,6 @@ interface WompiWebhookPayload {
         properties: string[]
     }
     timestamp: number
-}
-
-interface OrderPaymentState {
-    id: string
-    status: string | null
-    payment_status: string | null
 }
 
 export async function POST(request: Request) {
@@ -293,207 +271,25 @@ export async function POST(request: Request) {
 async function processOrderUpdate(
     supabase: ReturnType<typeof createServiceClient>,
     orderId: string,
-    status: "pending" | "approved" | "declined" | "voided" | "error",
+    status: TransactionStatus,
     organizationId: string
 ) {
-    const paymentStatus =
-        status === "approved"
-            ? "paid"
-            : status === "declined" || status === "error"
-                ? "failed"
-                : status === "voided"
-                    ? "refunded"
-                    : "pending"
+    const result = await applyPaymentStatusToOrder({
+        supabase,
+        organizationId,
+        orderId,
+        transactionStatus: status,
+        source: "webhook_wompi",
+    })
 
-    const orderStatus = status === "approved" ? "confirmed" : status === "declined" || status === "error" ? "cancelled" : undefined
-
-    const { data: orderStateData, error: orderStateError } = await supabase
-        .from("orders")
-        .select("id, status, payment_status")
-        .eq("id", orderId)
-        .eq("organization_id", organizationId)
-        .single()
-
-    if (orderStateError || !orderStateData) {
-        log.error("Order not found before payment status update", {
+    if (!result.success) {
+        log.error("Failed to apply Wompi payment status to order", {
             orderId,
             organizationId,
-            error: orderStateError?.message,
+            status,
+            reason: result.reason,
+            error: result.error,
         })
-        return
-    }
-
-    const orderState = orderStateData as OrderPaymentState
-    const shouldUpdateOrder =
-        orderState.payment_status !== paymentStatus ||
-        (typeof orderStatus === "string" && orderState.status !== orderStatus)
-
-    let updateSucceeded = !shouldUpdateOrder
-
-    // Fase 0.4 post-mortem (hotfix v1.10.58): removimos `confirmed_at` del
-    // UPDATE porque la columna NO existe en `public.orders` y el UPDATE entero
-    // fallaba silenciosamente (PostgREST retornaba error sin capturarse,
-    // dejando la orden en `payment_status: pending` indefinidamente). El
-    // timestamp de confirmación queda en `store_transactions` + `updated_at`.
-    if (shouldUpdateOrder) {
-        const { error: updateError } = await supabase
-            .from("orders")
-            .update({
-                payment_status: paymentStatus,
-                ...(orderStatus && { status: orderStatus }),
-                updated_at: new Date().toISOString(),
-            })
-            .eq("id", orderId)
-            .eq("organization_id", organizationId)
-
-        if (updateError) {
-            // No interrumpimos el resto del flow (notificación/stock) porque
-            // puede ser un error transitorio, pero lo dejamos visible para
-            // monitoreo. Si la orden no se actualizó, el gateway probablemente
-            // reintente y la siguiente pasada sí persistirá.
-            log.error("Failed to update order payment_status", {
-                orderId,
-                status,
-                paymentStatus,
-                error: updateError.message,
-            })
-        } else {
-            updateSucceeded = true
-        }
-    }
-
-    // Post-payment side effects cuando el pago se aprueba.
-    // Fase 0.4 (Bug H): antes este bloque hacía un SELECT con JOIN a la
-    // tabla `order_items` que NO existe en la base. PostgREST devolvía error
-    // silencioso, `order` quedaba null, el `if (order)` fallaba y nada de lo
-    // de abajo se ejecutaba: ni stock, ni notificación WA, ni Meta CAPI.
-    // Ahora leemos items desde `orders.items` (jsonb, source of truth real).
-    if (status === "approved" && orderState.payment_status !== "paid" && updateSucceeded) {
-        try {
-            const { data: order } = await supabase
-                .from("orders")
-                .select(`
-                    id,
-                    order_number,
-                    total,
-                    items,
-                    customer_info,
-                    utm_data,
-                    customers(name, email, phone)
-                `)
-                .eq("id", orderId)
-                .eq("organization_id", organizationId)
-                .single()
-
-            if (order) {
-                const customer = order.customers as { name?: string; email?: string; phone?: string } | null
-                const customerInfo = order.customer_info as {
-                    name?: string
-                    email?: string
-                    phone?: string
-                    city?: string
-                    state?: string
-                } | null
-                const attribution = getWompiOrderAttribution(order.utm_data)
-
-                // Items del jsonb (formato de transformCartItemsToOrderItems)
-                const itemsJsonb = Array.isArray(order.items)
-                    ? (order.items as Array<{
-                        product_id?: string | null
-                        product_name?: string | null
-                        quantity?: number | null
-                        unit_price?: number | null
-                    }>)
-                    : []
-
-                // 1. Decrementar stock atómicamente con la RPC (Bugs A+B+H)
-                const decrementResult = await decrementOrderStock(
-                    supabase,
-                    orderId,
-                    organizationId,
-                )
-                log.info("Stock decrement result", {
-                    orderId,
-                    skipped: decrementResult.skipped,
-                    reason: decrementResult.reason,
-                    itemsProcessed: decrementResult.items.length,
-                    oversaleDetected: decrementResult.items.some((item) => !item.wasSufficient),
-                })
-
-                // 2. Enviar notificación de venta por WhatsApp
-                try {
-                    const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
-                    await sendSaleNotification(
-                        { organizationId },
-                        {
-                            id: order.order_number || order.id,
-                            total: order.total,
-                            customerName: customer?.name || customerInfo?.name || "Cliente",
-                            items: itemsJsonb
-                                .filter((item) => typeof item.quantity === "number" && item.quantity > 0)
-                                .map((item) => ({
-                                    name: item.product_name || "Producto",
-                                    quantity: item.quantity as number,
-                                })),
-                        }
-                    )
-                    log.info("Sale notification sent", {
-                        orderId,
-                        orderNumber: order.order_number,
-                    })
-                } catch (notifError) {
-                    log.error("Error sending sale notification", {
-                        orderId,
-                        message: notifError instanceof Error ? notifError.message : "Unknown error",
-                    })
-                }
-
-                // 3. Enviar evento Purchase a Meta Conversions API (server-side tracking)
-                try {
-                    const { trackServerPurchase } = await import("@/lib/analytics/meta-conversions-api")
-                    await trackServerPurchase(
-                        organizationId,
-                        {
-                            id: order.id,
-                            orderNumber: order.order_number,
-                            total: order.total,
-                            currency: "COP",
-                            items: itemsJsonb
-                                .filter((item) => typeof item.product_id === "string" && typeof item.quantity === "number" && item.quantity > 0)
-                                .map((item) => ({
-                                    productId: item.product_id as string,
-                                    quantity: item.quantity as number,
-                                    unitPrice: typeof item.unit_price === "number" ? item.unit_price : undefined,
-                                })),
-                            customerEmail: customer?.email || customerInfo?.email,
-                            customerPhone: customer?.phone || customerInfo?.phone,
-                            customerName: customer?.name || customerInfo?.name,
-                            customerCity: customerInfo?.city,
-                            customerState: customerInfo?.state,
-                            fbc: attribution.fbc,
-                            fbp: attribution.fbp,
-                        },
-                        supabase
-                    )
-                    log.info("Meta CAPI Purchase event sent", {
-                        orderId,
-                        orderNumber: order.order_number,
-                    })
-                } catch (capiError) {
-                    log.error("Error sending Meta CAPI event", {
-                        orderId,
-                        message: capiError instanceof Error ? capiError.message : "Unknown error",
-                    })
-                }
-            } else {
-                log.error("Order not found for post-payment processing", { orderId, organizationId })
-            }
-        } catch (err) {
-            log.error("Error in post-payment processing", {
-                orderId,
-                message: err instanceof Error ? err.message : "Unknown error",
-            })
-        }
     }
 }
 
