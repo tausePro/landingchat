@@ -20,7 +20,7 @@ import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 
 interface OrderPageProps {
     params: Promise<{ slug: string; orderId: string }>
-    searchParams: Promise<{ access?: string }>
+    searchParams: Promise<{ access?: string; ref_payco?: string }>
 }
 
 interface OrderItem {
@@ -33,7 +33,7 @@ interface OrderItem {
 
 export default async function OrderTrackingPage({ params, searchParams }: OrderPageProps) {
     const { slug, orderId } = await params
-    const { access } = await searchParams
+    const { access, ref_payco: refPayco } = await searchParams
     const result = await getOrderDetails(slug, orderId, access)
 
     if (!result) return notFound()
@@ -44,6 +44,7 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
         const reconciliation = await reconcileEpaycoOrderPayment({
             organizationId: organization.id,
             orderId: order.id,
+            providerTransactionId: refPayco,
         })
 
         if (reconciliation.reconciled) {

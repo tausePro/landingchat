@@ -11,6 +11,7 @@ interface ReconcileOrderPaymentParams {
     organizationId: string
     orderId: string
     expectedProvider?: PaymentProvider
+    providerTransactionId?: string | null
 }
 
 interface ReconcileOrderPaymentResult {
@@ -44,6 +45,18 @@ interface StoreTransactionRow {
 
 function normalizeCurrency(value: string | null | undefined) {
     return (value || "").trim().toUpperCase()
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getOptionalString(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function isUsableProviderTransactionId(value: string | null | undefined, orderId: string): value is string {
+    return typeof value === "string" && value.trim().length > 0 && value.trim() !== orderId
 }
 
 async function getExistingOrderTransaction(params: {
@@ -96,18 +109,48 @@ async function getExistingProviderTransaction(params: {
 
 async function getProviderTransaction(params: {
     gateway: ReturnType<typeof createPaymentGateway>
+    provider: PaymentProvider
     orderId: string
     providerTransactionId?: string | null
 }): Promise<TransactionDetails> {
+    if (params.provider === "epayco" && isUsableProviderTransactionId(params.providerTransactionId, params.orderId)) {
+        return params.gateway.getTransaction(params.providerTransactionId)
+    }
+
     try {
         return await params.gateway.getTransactionByReference(params.orderId)
     } catch (referenceError) {
-        if (!params.providerTransactionId || params.providerTransactionId === params.orderId) {
+        if (!isUsableProviderTransactionId(params.providerTransactionId, params.orderId)) {
             throw referenceError
         }
 
         return params.gateway.getTransaction(params.providerTransactionId)
     }
+}
+
+async function findEpaycoProviderTransactionIdFromWebhookLogs(orderId: string): Promise<string | null> {
+    const supabase = createServiceClient()
+    const payloadFilters = [
+        { x_id_invoice: orderId },
+        { x_extra1: orderId },
+    ]
+
+    for (const payloadFilter of payloadFilters) {
+        const { data } = await supabase
+            .from("webhook_logs")
+            .select("payload")
+            .eq("webhook_type", "epayco")
+            .contains("payload", payloadFilter)
+            .limit(1)
+            .maybeSingle()
+
+        if (isRecord(data?.payload)) {
+            const providerTransactionId = getOptionalString(data.payload.x_ref_payco)
+            if (providerTransactionId) return providerTransactionId
+        }
+    }
+
+    return null
 }
 
 export async function reconcileOrderPayment(
@@ -182,10 +225,20 @@ export async function reconcileOrderPayment(
         }
 
         const gateway = createPaymentGateway(configData as PaymentGatewayConfig)
+        const explicitProviderTransactionId = isUsableProviderTransactionId(params.providerTransactionId, params.orderId)
+            ? params.providerTransactionId
+            : null
+        const existingProviderTransactionId = isUsableProviderTransactionId(existingOrderTransaction?.provider_transaction_id, params.orderId)
+            ? existingOrderTransaction.provider_transaction_id
+            : null
+        const providerTransactionId = explicitProviderTransactionId ||
+            existingProviderTransactionId ||
+            (provider === "epayco" ? await findEpaycoProviderTransactionIdFromWebhookLogs(params.orderId) : null)
         const transaction = await getProviderTransaction({
             gateway,
+            provider,
             orderId: params.orderId,
-            providerTransactionId: existingOrderTransaction?.provider_transaction_id,
+            providerTransactionId,
         })
         const expectedAmountInCents = Math.round(order.total * 100)
 
