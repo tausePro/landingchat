@@ -20,6 +20,7 @@ import { ProductStoryTray } from "@/components/store/product-story-tray"
 import { ProactiveChatBubble } from "@/components/store/proactive-chat-bubble"
 import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
 import { StoreFooter } from "@/components/store/store-footer"
+import type { ProactiveCouponOffer } from "./actions"
 
 // ... (in render)
 
@@ -104,9 +105,10 @@ interface StoreLayoutClientProps {
     initialIsSubdomain?: boolean
     defaultChatProductId?: string
     defaultChatProductName?: string | null
+    proactiveCouponOffer?: ProactiveCouponOffer | null
 }
 
-export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId, defaultChatProductName }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId, defaultChatProductName, proactiveCouponOffer }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientIsSubdomain = useIsSubdomain()
@@ -408,6 +410,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     primaryColor={primaryColor}
                     onStartChat={handleStartChat}
                     whatsappPhone={organization.settings?.whatsapp?.phone}
+                    couponOffer={proactiveCouponOffer}
                 />
             )}
         </div>

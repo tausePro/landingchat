@@ -127,7 +127,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     if (!data) notFound()
 
-    const { organization, product, productWithVariants, viewModel, badges, promotions, relatedProducts } = data
+    const { organization, product, productWithVariants, viewModel, badges, promotions, relatedProducts, proactiveCouponOffer } = data
 
     // Cargar reseñas publicadas del producto en paralelo (no bloquea si falla)
     const [{ reviews, summary: reviewSummary }, shippingConfig] = await Promise.all([
@@ -159,6 +159,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 initialIsSubdomain={initialIsSubdomain}
                 defaultChatProductId={product.id}
                 defaultChatProductName={product.name}
+                proactiveCouponOffer={proactiveCouponOffer}
             >
                 <ProductDetailClient
                     product={product}
