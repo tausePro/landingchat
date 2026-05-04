@@ -111,7 +111,7 @@ export function useMetaPixel() {
                 content_type: "product",
             }, eventId)
         },
-        trackPurchase: (value: number, currency = "COP", contentIds?: string[], orderId?: string) => {
+        trackPurchase: (value: number, currency = "COP", contentIds?: string[], orderId?: string, eventId?: string) => {
             if (typeof window !== "undefined" && window.fbq) {
                 window.fbq("track", "Purchase", {
                     value: value,
@@ -119,7 +119,7 @@ export function useMetaPixel() {
                     content_ids: contentIds,
                     content_type: "product",
                     order_id: orderId,
-                }, { eventID: orderId ? `purchase_${orderId}` : undefined })
+                }, { eventID: eventId || (orderId ? `purchase_${orderId}` : undefined) })
             }
         },
         trackViewCategory: (categoryId: string, categoryName: string) => {

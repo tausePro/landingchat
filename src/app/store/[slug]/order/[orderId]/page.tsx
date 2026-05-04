@@ -16,6 +16,7 @@ import { CartCleaner } from "./components/cart-cleaner"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
 import { reconcileEpaycoOrderPayment } from "@/lib/payments/epayco-reconciliation"
+import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 
 interface OrderPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -103,6 +104,14 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-12 px-4 sm:px-6 lg:px-8">
             {/* Limpiar el carrito al mostrar la página de orden */}
             <CartCleaner />
+            {order.payment_status === "paid" && (
+                <PurchaseTracker
+                    orderId={order.id}
+                    orderTotal={order.total}
+                    orderItems={orderItems}
+                    currency="COP"
+                />
+            )}
             
             <div className="max-w-3xl mx-auto">
                 {/* Header */}

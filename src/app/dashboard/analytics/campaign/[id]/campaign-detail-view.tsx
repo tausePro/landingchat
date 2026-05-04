@@ -27,6 +27,14 @@ interface DailyInsight {
     cpm: number
     ctr: number
     conversions: number
+    actionBreakdown: MetaActionBreakdown
+}
+
+interface MetaActionBreakdown {
+    purchases: number
+    leads: number
+    registrations: number
+    total: number
 }
 
 interface AdSet {
@@ -39,6 +47,7 @@ interface AdSet {
     cpc: number
     ctr: number
     conversions: number
+    actionBreakdown: MetaActionBreakdown
 }
 
 interface Ad {
@@ -52,6 +61,7 @@ interface Ad {
     cpc: number
     ctr: number
     conversions: number
+    actionBreakdown: MetaActionBreakdown
     thumbnail_url?: string
     image_url?: string
     creative_title?: string
@@ -70,6 +80,7 @@ interface CampaignSummary {
     cpm: number
     ctr: number
     actions?: Array<{ action_type: string; value: string }>
+    actionBreakdown: MetaActionBreakdown
 }
 
 interface Campaign {
@@ -87,6 +98,14 @@ interface CampaignDetailData {
     daily: DailyInsight[]
     adSets: AdSet[]
     ads: Ad[]
+    realCommerce: {
+        paidOrders: number
+        paidRevenue: number
+        pendingOrders: number
+        failedOrders: number
+        attributedOrders: number
+        realRoas: number | null
+    }
 }
 
 type DatePreset = "last_7d" | "last_14d" | "last_30d" | "last_month" | "last_90d" | "this_month" | "custom"
@@ -124,11 +143,6 @@ const objectiveLabels: Record<string, string> = {
     VIDEO_VIEWS: "Vistas de video",
 }
 
-function isMetaConversionAction(actionType: string): boolean {
-    const normalized = actionType.toLowerCase()
-    return normalized.includes("purchase") || normalized.includes("lead") || normalized.includes("complete_registration")
-}
-
 export function CampaignDetailView({ campaignId }: { campaignId: string }) {
     const router = useRouter()
     const [data, setData] = useState<CampaignDetailData | null>(null)
@@ -157,9 +171,12 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                 ? `${customStart} al ${customEnd}`
                 : `Últimos ${datePreset.replace("last_", "").replace("d", " días").replace("_month", " mes")}`
 
-        const conversions = data.summary?.actions
-            ?.filter((a) => isMetaConversionAction(a.action_type))
-            .reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0
+        const metaActionBreakdown = data.summary?.actionBreakdown || {
+            purchases: 0,
+            leads: 0,
+            registrations: 0,
+            total: 0,
+        }
 
         try {
             const res = await fetch(`/api/analytics/meta-ads/campaign/${campaignId}/ai-analysis?date_preset=${datePreset}`, {
@@ -167,7 +184,12 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     campaign: data.campaign,
-                    summary: { ...data.summary, cpm: data.summary?.cpm || 0, conversions },
+                    summary: {
+                        ...data.summary,
+                        cpm: data.summary?.cpm || 0,
+                        metaActions: metaActionBreakdown,
+                    },
+                    realCommerce: data.realCommerce,
                     adSets: data.adSets,
                     ads: data.ads,
                     dateRange,
@@ -255,9 +277,21 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
     // formatBogotaDayKey ya formatea en hora Colombia.
     const formatDate = (dateStr: string) => formatBogotaDayKey(dateStr + "T00:00:00")
 
-    const totalConversions = data?.summary?.actions
-        ?.filter((a) => isMetaConversionAction(a.action_type))
-        .reduce((sum, a) => sum + parseInt(a.value || "0"), 0) || 0
+    const metaActionBreakdown = data?.summary?.actionBreakdown || {
+        purchases: 0,
+        leads: 0,
+        registrations: 0,
+        total: 0,
+    }
+    const realCommerce = data?.realCommerce || {
+        paidOrders: 0,
+        paidRevenue: 0,
+        pendingOrders: 0,
+        failedOrders: 0,
+        attributedOrders: 0,
+        realRoas: null,
+    }
+    const hasTrafficButNoPaidSales = (data?.summary?.clicks || 0) > 0 && realCommerce.paidOrders === 0
 
     const chartData = data?.daily.map((d) => ({
         date: formatDate(d.date),
@@ -304,7 +338,10 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
         { label: "CPC", value: formatCurrency(summary?.cpc || 0), icon: "touch_app", color: "text-orange-500", bg: "bg-orange-50 dark:bg-orange-950/20" },
         { label: "CTR", value: `${(summary?.ctr || 0).toFixed(2)}%`, icon: "percent", color: "text-teal-500", bg: "bg-teal-50 dark:bg-teal-950/20" },
         { label: "CPM", value: formatCurrency(summary?.cpm || 0), icon: "bar_chart", color: "text-indigo-500", bg: "bg-indigo-50 dark:bg-indigo-950/20" },
-        { label: "Conversiones", value: formatNumber(totalConversions), icon: "check_circle", color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-950/20" },
+        { label: "Acciones Meta", value: formatNumber(metaActionBreakdown.total), icon: "fact_check", color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-950/20" },
+        { label: "Compras Meta", value: formatNumber(metaActionBreakdown.purchases), icon: "shopping_bag", color: "text-green-500", bg: "bg-green-50 dark:bg-green-950/20" },
+        { label: "Ventas reales", value: formatNumber(realCommerce.paidOrders), icon: "payments", color: "text-lime-600", bg: "bg-lime-50 dark:bg-lime-950/20" },
+        { label: "ROAS real", value: realCommerce.realRoas === null ? "—" : `${realCommerce.realRoas.toFixed(1)}x`, icon: "trending_up", color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-950/20" },
     ]
 
     const metricConfig = {
@@ -424,6 +461,24 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                     </Card>
                 ))}
             </div>
+
+            {hasTrafficButNoPaidSales && (
+                <Card className="border-amber-200 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/20">
+                    <CardContent className="p-4">
+                        <div className="flex gap-3">
+                            <span className="material-symbols-outlined text-amber-600">warning</span>
+                            <div>
+                                <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                    Tráfico sin ventas pagadas atribuidas
+                                </p>
+                                <p className="text-sm text-amber-800/80 dark:text-amber-200/80 mt-1">
+                                    Meta reporta clics y acciones, pero LandingChat no encuentra órdenes pagadas atribuidas a esta campaña en el período seleccionado.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Análisis IA */}
             {(aiAnalysis || aiLoading || aiError) && (
@@ -586,7 +641,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                                         <th className="text-right py-2 pr-4 font-medium">Clics</th>
                                         <th className="text-right py-2 pr-4 font-medium">CTR</th>
                                         <th className="text-right py-2 pr-4 font-medium">CPC</th>
-                                        <th className="text-right py-2 font-medium">Conversiones</th>
+                                        <th className="text-right py-2 font-medium">Acciones Meta</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
@@ -747,7 +802,7 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
                                                 ) : <span />}
                                                 {ad.conversions > 0 && (
                                                     <span className="text-xs text-emerald-600 font-semibold">
-                                                        ✓ {ad.conversions} conv.
+                                                        ✓ {ad.conversions} acciones
                                                     </span>
                                                 )}
                                             </div>

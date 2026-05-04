@@ -33,13 +33,14 @@ export default async function OrderSuccessPage({ params, searchParams }: Success
 
     return (
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center p-4">
-            {/* Track Purchase Event */}
-            <PurchaseTracker
-                orderId={order.id}
-                orderTotal={order.total}
-                orderItems={order.items || []}
-                currency="COP"
-            />
+            {order.payment_status === "paid" && (
+                <PurchaseTracker
+                    orderId={order.id}
+                    orderTotal={order.total}
+                    orderItems={order.items || []}
+                    currency="COP"
+                />
+            )}
             
             <div className="max-w-2xl w-full">
                 <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-8 text-center">

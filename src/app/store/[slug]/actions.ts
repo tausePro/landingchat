@@ -411,7 +411,7 @@ async function getStorefrontOrganizationForOrder(slug: string) {
 
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain, tracking_config")
         .eq("slug", slug)
         .single()
 

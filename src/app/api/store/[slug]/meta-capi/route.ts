@@ -8,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 const log = logger("api/store/meta-capi")
 
 const metaCapiEventSchema = z.object({
-    eventName: z.enum(["ViewContent", "AddToCart", "InitiateCheckout"]),
+    eventName: z.enum(["ViewContent", "AddToCart", "InitiateCheckout", "Purchase"]),
     eventId: z.string().min(8).max(160),
     eventSourceUrl: z.string().url().optional(),
     fbc: z.string().min(1).max(500).optional(),
@@ -23,6 +23,8 @@ const metaCapiEventSchema = z.object({
             item_price: z.number().nonnegative().optional(),
         })).max(100).optional(),
         contentType: z.string().min(1).max(50).default("product"),
+        orderId: z.string().min(1).max(200).optional(),
+        numItems: z.number().int().nonnegative().optional(),
     }),
 })
 
