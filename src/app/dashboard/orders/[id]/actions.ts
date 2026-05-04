@@ -1,7 +1,26 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { applyPaymentStatusToOrder } from "@/lib/payments/payment-confirmation"
 import { revalidatePath } from "next/cache"
+
+interface DashboardCustomerInfo {
+    name?: string | null
+    full_name?: string | null
+    email?: string | null
+    phone?: string | null
+    address?: string | null
+    city?: string | null
+    state?: string | null
+    payment_method_fee?: number | null
+    discount_amount?: number | null
+    coupon_code?: string | null
+    document_type?: string | null
+    document_number?: string | null
+    person_type?: string | null
+    business_name?: string | null
+    [key: string]: unknown
+}
 
 export interface OrderDetail {
     id: string
@@ -27,12 +46,12 @@ export interface OrderDetail {
         quantity: number
         unit_price: number
         total_price: number
-        variant_info: any
+        variant_info: unknown
         image_url?: string
     }>
-    shipping_address: any
-    billing_address: any
-    customer_info: any
+    shipping_address: Record<string, unknown> | null
+    billing_address: Record<string, unknown> | null
+    customer_info: DashboardCustomerInfo | null
     // Payment fields
     payment_method: string
     payment_status: string
@@ -107,9 +126,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
             hasCustomerInfo: !!order.customer_info
         })
 
-        // Extract customer info from JSONB field
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const customerInfo = order.customer_info as any
+        const customerInfo = order.customer_info as DashboardCustomerInfo | null
 
         return {
             id: order.id,
@@ -206,6 +223,112 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
     console.log("[updateOrderStatus] Successfully updated:", data[0])
 
     return { success: true }
+}
+
+export async function confirmOrderPayment(orderId: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) throw new Error("Unauthorized")
+
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+
+    if (!profile?.organization_id) throw new Error("No organization found")
+
+    const serviceSupabase = createServiceClient()
+    const { data: order, error: orderError } = await serviceSupabase
+        .from("orders")
+        .select("id, organization_id, total, payment_method, payment_status, customer_id")
+        .eq("id", orderId)
+        .eq("organization_id", profile.organization_id)
+        .maybeSingle()
+
+    if (orderError || !order) {
+        throw new Error("Orden no encontrada o no tienes permisos para actualizarla")
+    }
+
+    const paymentMethod = typeof order.payment_method === "string" ? order.payment_method : "manual"
+    const provider = paymentMethod === "wompi" || paymentMethod === "epayco"
+        ? paymentMethod
+        : paymentMethod === "contraentrega" || paymentMethod === "cash_on_delivery"
+            ? "cash_on_delivery"
+            : "manual"
+
+    const { data: existingTransaction } = await serviceSupabase
+        .from("store_transactions")
+        .select("id, status")
+        .eq("organization_id", profile.organization_id)
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+    const completedAt = new Date().toISOString()
+
+    if (existingTransaction) {
+        const { error: transactionUpdateError } = await serviceSupabase
+            .from("store_transactions")
+            .update({
+                status: "approved",
+                completed_at: completedAt,
+                updated_at: completedAt,
+                provider_response: {
+                    source: "dashboard_manual_confirmation",
+                    confirmed_by: user.id,
+                    previous_status: existingTransaction.status,
+                },
+            })
+            .eq("id", existingTransaction.id)
+
+        if (transactionUpdateError) {
+            throw new Error("No se pudo actualizar la transacción de pago")
+        }
+    } else {
+        const { error: transactionInsertError } = await serviceSupabase
+            .from("store_transactions")
+            .insert({
+                organization_id: profile.organization_id,
+                order_id: orderId,
+                customer_id: order.customer_id || null,
+                amount: Math.round(Number(order.total || 0) * 100),
+                currency: "COP",
+                status: "approved",
+                provider,
+                provider_transaction_id: null,
+                provider_reference: orderId,
+                provider_response: {
+                    source: "dashboard_manual_confirmation",
+                    confirmed_by: user.id,
+                },
+                payment_method: paymentMethod,
+                completed_at: completedAt,
+            })
+
+        if (transactionInsertError) {
+            throw new Error("No se pudo crear la transacción de pago")
+        }
+    }
+
+    const result = await applyPaymentStatusToOrder({
+        supabase: serviceSupabase,
+        organizationId: profile.organization_id,
+        orderId,
+        transactionStatus: "approved",
+        source: "dashboard_manual_confirmation",
+    })
+
+    if (!result.success) {
+        throw new Error(result.error || "No se pudo confirmar el pago")
+    }
+
+    revalidatePath("/dashboard/orders")
+    revalidatePath(`/dashboard/orders/${orderId}`)
+
+    return { success: true, sideEffectsRan: result.sideEffectsRan }
 }
 
 export async function deleteOrder(orderId: string) {

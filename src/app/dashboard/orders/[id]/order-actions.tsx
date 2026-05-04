@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { updateOrderStatus } from "./actions"
+import { confirmOrderPayment, updateOrderStatus } from "./actions"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { DeleteOrderModal } from "./delete-order-modal"
@@ -10,12 +10,16 @@ interface OrderActionsProps {
     orderId: string
     orderNumber: string
     currentStatus: string
+    paymentStatus: string
+    paymentMethod: string
 }
 
-export function OrderActions({ orderId, orderNumber, currentStatus }: OrderActionsProps) {
+export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatus, paymentMethod }: OrderActionsProps) {
     const router = useRouter()
     const [isUpdating, setIsUpdating] = useState(false)
+    const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const canConfirmPayment = paymentStatus !== "paid"
 
     const handleStatusChange = async (newStatus: string) => {
         if (newStatus === currentStatus) return
@@ -30,6 +34,23 @@ export function OrderActions({ orderId, orderNumber, currentStatus }: OrderActio
             console.error(error)
         } finally {
             setIsUpdating(false)
+        }
+    }
+
+    const handleConfirmPayment = async () => {
+        const confirmed = window.confirm(`¿Confirmas que el pago del pedido ${orderNumber} ya fue verificado?`)
+        if (!confirmed) return
+
+        setIsConfirmingPayment(true)
+        try {
+            const result = await confirmOrderPayment(orderId)
+            toast.success(result.sideEffectsRan ? "Pago confirmado y eventos procesados" : "Pago confirmado")
+            router.refresh()
+        } catch (error) {
+            toast.error("Error al confirmar el pago")
+            console.error(error)
+        } finally {
+            setIsConfirmingPayment(false)
         }
     }
 
@@ -66,6 +87,18 @@ export function OrderActions({ orderId, orderNumber, currentStatus }: OrderActio
                     <span className="material-symbols-outlined text-lg">print</span>
                     <span className="hidden sm:inline">Imprimir</span>
                 </button>
+
+                {canConfirmPayment && (
+                    <button
+                        onClick={handleConfirmPayment}
+                        disabled={isConfirmingPayment}
+                        title={`Confirmar pago ${paymentMethod}`}
+                        className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-4 text-green-700 dark:text-green-300 text-sm font-medium hover:bg-green-100 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-lg">task_alt</span>
+                        <span className="hidden sm:inline">{isConfirmingPayment ? "Confirmando..." : "Confirmar pago"}</span>
+                    </button>
+                )}
 
                 <button
                     onClick={() => setShowDeleteModal(true)}
