@@ -163,11 +163,8 @@ export class EpaycoGateway implements PaymentGateway {
     }
 
     async getTransaction(transactionId: string): Promise<TransactionDetails> {
-        const headers = await this.getHeaders()
-
         const response = await fetch(
-            `${this.baseUrl}/transaction/detail?ref_payco=${transactionId}`,
-            { headers }
+            `${this.secureUrl}/validation/v1/reference/${encodeURIComponent(transactionId)}`
         )
 
         if (!response.ok) {
@@ -175,18 +172,22 @@ export class EpaycoGateway implements PaymentGateway {
         }
 
         const data = await response.json()
+        if (!data.success || !data.data) {
+            throw new Error("Transacción no encontrada")
+        }
+
         const tx = data.data
 
         return {
-            id: tx.ref_payco,
-            providerTransactionId: tx.ref_payco,
-            reference: tx.factura,
-            amount: Math.round(parseFloat(tx.valor) * 100), // Convertir a centavos
-            currency: tx.moneda,
-            status: this.mapStatus(tx.estado),
-            paymentMethod: tx.metodo,
-            createdAt: tx.fecha,
-            completedAt: tx.estado === "Aceptada" ? tx.fecha : undefined,
+            id: tx.x_ref_payco,
+            providerTransactionId: tx.x_ref_payco,
+            reference: tx.x_id_invoice || tx.x_extra1,
+            amount: Math.round(parseFloat(tx.x_amount) * 100),
+            currency: tx.x_currency_code,
+            status: this.mapValidationStatus(tx.x_cod_response),
+            paymentMethod: tx.x_franchise || tx.x_bank_name,
+            createdAt: tx.x_transaction_date || tx.x_fecha_transaccion,
+            completedAt: String(tx.x_cod_response) === "1" ? tx.x_transaction_date || tx.x_fecha_transaccion : undefined,
             rawResponse: data,
         }
     }
@@ -320,5 +321,21 @@ export class EpaycoGateway implements PaymentGateway {
             Reversada: "voided",
         }
         return statusMap[epaycoStatus] || "pending"
+    }
+
+    private mapValidationStatus(epaycoStatus: string | number): TransactionDetails["status"] {
+        const statusMap: Record<string, TransactionDetails["status"]> = {
+            "1": "approved",
+            "2": "declined",
+            "3": "pending",
+            "4": "error",
+            "6": "voided",
+            Aceptada: "approved",
+            Rechazada: "declined",
+            Pendiente: "pending",
+            Fallida: "error",
+            Reversada: "voided",
+        }
+        return statusMap[String(epaycoStatus)] || "pending"
     }
 }
