@@ -76,7 +76,16 @@ export async function POST(
     const capiAccessToken = trackingConfig?.meta_capi_access_token || trackingConfig?.meta_access_token
 
     if (!trackingConfig?.meta_pixel_id || !capiAccessToken) {
-        return NextResponse.json({ success: true, skipped: true }, { headers })
+        log.warn("Meta CAPI funnel event skipped: missing tracking config", {
+            slug,
+            eventName: validation.data.eventName,
+            hasPixelId: Boolean(trackingConfig?.meta_pixel_id),
+            hasAccessToken: Boolean(capiAccessToken),
+        })
+        return NextResponse.json(
+            { success: true, skipped: true, reason: "config_missing" },
+            { headers }
+        )
     }
 
     const eventSourceUrl = validation.data.eventSourceUrl || request.headers.get("referer") || undefined

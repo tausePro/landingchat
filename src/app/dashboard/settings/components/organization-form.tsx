@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { updateOrganization } from "../actions"
 import { LogoUploader } from "@/components/onboarding/logo-uploader"
+import { MetaTrackingHealthCard } from "./meta-tracking-health-card"
 import type { OrganizationSettingsOverrides, OrganizationTrackingConfig } from "@/types"
 
 interface OrganizationFormProps {
@@ -295,6 +296,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         <p className="text-sm text-muted-foreground">
                                             Controla los píxeles por dominio. PostHog permite análisis multi-tenant y métricas en tiempo real sin exponer PII.
                                         </p>
+                                        <MetaTrackingHealthCard />
                                         <div className="flex items-center justify-between rounded-md border border-border-light dark:border-border-dark px-4 py-3">
                                             <div className="space-y-1">
                                                 <Label htmlFor="posthogEnabled">PostHog Analytics</Label>

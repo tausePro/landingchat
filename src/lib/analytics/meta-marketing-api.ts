@@ -128,36 +128,93 @@ interface MetaCampaignInsightApiItem {
 const parseIntegerMetric = (value: string | undefined) => parseInt(value || '0')
 const parseDecimalMetric = (value: string | undefined) => parseFloat(value || '0')
 
+/**
+ * Lista cerrada de action_type que Meta reporta para conversiones.
+ * Meta devuelve cada conversión bajo MÚLTIPLES action_type a la vez (es la
+ * representación canónica), p.ej. una compra aparece como `purchase`,
+ * `omni_purchase`, `offsite_conversion.fb_pixel_purchase` y
+ * `onsite_web_purchase`. Sumarlos todos infla el conteo 5-10x.
+ *
+ * La estrategia es: para cada categoría, escoger UN solo action_type según
+ * orden de preferencia (omni > nativo > pixel offsite > onsite). El primero
+ * que tenga valor manda y el resto se ignora para evitar overlap.
+ */
+const PURCHASE_PREFERENCE: readonly string[] = [
+    'omni_purchase',
+    'purchase',
+    'offsite_conversion.fb_pixel_purchase',
+    'onsite_web_purchase',
+    'web_in_store_purchase',
+]
+const LEAD_PREFERENCE: readonly string[] = [
+    'lead',
+    'offsite_conversion.fb_pixel_lead',
+    'onsite_web_lead',
+]
+const REGISTRATION_PREFERENCE: readonly string[] = [
+    'complete_registration',
+    'offsite_conversion.fb_pixel_complete_registration',
+]
+
+const ALL_CONVERSION_ACTION_TYPES: ReadonlySet<string> = new Set([
+    ...PURCHASE_PREFERENCE,
+    ...LEAD_PREFERENCE,
+    ...REGISTRATION_PREFERENCE,
+])
+
+/**
+ * Indica si un action_type cuenta como conversión para el dashboard.
+ * Lista cerrada para evitar matchear strings inesperados de Meta.
+ */
 export function isMetaConversionAction(actionType: string): boolean {
-    const normalized = actionType.toLowerCase()
-    return normalized.includes('purchase') || normalized.includes('lead') || normalized.includes('complete_registration')
+    return ALL_CONVERSION_ACTION_TYPES.has(actionType.toLowerCase())
 }
 
+/**
+ * Toma el primer action_type con valor > 0 según orden de preferencia.
+ * Devuelve 0 si ninguno de los preferidos aparece o todos son 0.
+ */
+function pickPreferredAction(
+    actions: MetaAction[],
+    preferenceList: readonly string[]
+): number {
+    for (const preferred of preferenceList) {
+        const found = actions.find(
+            (action) => action.action_type.toLowerCase() === preferred
+        )
+        if (!found) continue
+        const value = parseIntegerMetric(found.value)
+        if (value > 0) return value
+    }
+    return 0
+}
+
+/**
+ * Devuelve un breakdown de conversiones SIN doble conteo.
+ *
+ * - `purchases`: una sola compra por compra real (de-duplicada entre
+ *   `omni_purchase`, `purchase`, `offsite_conversion.fb_pixel_purchase`, etc.).
+ * - `leads`: idem, deduplicado.
+ * - `registrations`: idem.
+ * - `total`: suma de las 3 categorías (sin overlap entre ellas).
+ *
+ * Si Meta no devuelve ningún action_type conocido, todos los valores son 0.
+ */
 export function getMetaActionBreakdown(actions: MetaAction[] | undefined): MetaActionBreakdown {
-    return (actions || []).reduce<MetaActionBreakdown>((breakdown, action) => {
-        const value = parseIntegerMetric(action.value)
-        const normalized = action.action_type.toLowerCase()
+    if (!actions || actions.length === 0) {
+        return { purchases: 0, leads: 0, registrations: 0, total: 0 }
+    }
 
-        if (normalized.includes('purchase')) {
-            breakdown.purchases += value
-        }
-        if (normalized.includes('lead')) {
-            breakdown.leads += value
-        }
-        if (normalized.includes('complete_registration')) {
-            breakdown.registrations += value
-        }
-        if (isMetaConversionAction(action.action_type)) {
-            breakdown.total += value
-        }
+    const purchases = pickPreferredAction(actions, PURCHASE_PREFERENCE)
+    const leads = pickPreferredAction(actions, LEAD_PREFERENCE)
+    const registrations = pickPreferredAction(actions, REGISTRATION_PREFERENCE)
 
-        return breakdown
-    }, {
-        purchases: 0,
-        leads: 0,
-        registrations: 0,
-        total: 0,
-    })
+    return {
+        purchases,
+        leads,
+        registrations,
+        total: purchases + leads + registrations,
+    }
 }
 
 function sumConversionActions(actions: MetaAction[] | undefined): number {
