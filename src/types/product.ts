@@ -89,6 +89,7 @@ export const createProductSchema = z.object({
   price: z.number().positive("Price must be positive"),
   sale_price: z.number().positive("Sale price must be positive").optional().nullable(),
   image_url: z.string().url("Invalid image URL").optional().nullable(),
+  video_url: z.string().url("Invalid video URL").optional().nullable(),
   stock: z.number().int().min(0, "Stock cannot be negative").default(0),
   sku: z.string().max(100).optional().nullable(),
   categories: z.array(z.string()).default([]),
@@ -163,6 +164,7 @@ export interface ProductData {
   price: number
   sale_price?: number | null
   image_url?: string | null
+  video_url?: string | null
   stock: number
   sku?: string | null
   categories?: string[]
