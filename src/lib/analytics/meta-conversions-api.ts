@@ -246,7 +246,13 @@ export async function trackServerPurchase(
         const capiAccessToken = trackingConfig?.meta_capi_access_token || trackingConfig?.meta_access_token
 
         if (!org || !trackingConfig?.meta_pixel_id || !capiAccessToken) {
-            console.log("[Meta CAPI] Organization does not have Meta CAPI configured, skipping")
+            console.warn("[Meta CAPI] Purchase event skipped: missing tracking config", {
+                organizationId,
+                orderId: order.id,
+                hasOrg: Boolean(org),
+                hasPixelId: Boolean(trackingConfig?.meta_pixel_id),
+                hasAccessToken: Boolean(capiAccessToken),
+            })
             return
         }
 
