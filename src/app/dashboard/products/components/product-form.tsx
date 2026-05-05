@@ -14,6 +14,7 @@ import { ConfigurableOptionsEditor } from "./configurable-options-editor"
 import { BundleEditor } from "./bundle-editor"
 import { PriceTiersEditor } from "./price-tiers-editor"
 import { ProductStructuredContentEditor } from "./ProductStructuredContentEditor"
+import { MediaSelectorModal } from "../../media/components/MediaSelectorModal"
 import { BundleItem } from "@/types/product"
 import { enhanceProductDescription } from "../ai-actions"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
@@ -45,6 +46,25 @@ function toNullableIsoDateTime(value: string): string | null {
     return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
+function getYouTubeEmbedUrl(value: string): string | null {
+    try {
+        const url = new URL(value)
+        if (url.hostname.includes("youtu.be")) {
+            const id = url.pathname.replace("/", "")
+            return id ? `https://www.youtube.com/embed/${id}` : null
+        }
+
+        if (url.hostname.includes("youtube.com")) {
+            const id = url.searchParams.get("v")
+            return id ? `https://www.youtube.com/embed/${id}` : value.replace("/watch", "/embed")
+        }
+
+        return null
+    } catch {
+        return null
+    }
+}
+
 export function ProductForm({ organizationId, storeSlug = "", initialData, isEditing = false }: ProductFormProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
@@ -60,6 +80,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
     const [price, setPrice] = useState(initialData?.price?.toString() || "")
     const [salePrice, setSalePrice] = useState(initialData?.sale_price?.toString() || "")
     const [images, setImages] = useState<string[]>(initialData?.images || [])
+    const [videoUrl, setVideoUrl] = useState(initialData?.video_url || "")
     const [categories, setCategories] = useState<string[]>(initialData?.categories || [])
     const [variants, setVariants] = useState<ProductVariant[]>(initialData?.variants || [])
 
@@ -113,6 +134,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
     const [metaDescription, setMetaDescription] = useState(initialData?.meta_description || "")
     const [keywords, setKeywords] = useState<string[]>(initialData?.keywords || [])
     const [showSeoSection, setShowSeoSection] = useState(false)
+    const [videoModalOpen, setVideoModalOpen] = useState(false)
 
     // Load badges
     useEffect(() => {
@@ -154,6 +176,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                 sku: sku.trim() || undefined,
                 images,
                 image_url: images[0], // Primary image
+                video_url: videoUrl.trim() || null,
                 categories,
                 variants: variants.filter(v => v.type && v.values.length > 0),
                 options: [], // Required by schema
@@ -806,6 +829,56 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                         </div>
                     </div>
 
+                    <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                        <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Video del Producto</h2>
+                        <p className="mt-1 text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                            Agrega un video corto de uso, demostración o prueba social para reforzar la intención de compra.
+                        </p>
+                        <div className="mt-6 flex flex-col gap-3">
+                            <div className="flex gap-2">
+                                <input
+                                    className="form-input w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent placeholder:text-text-light-secondary dark:placeholder:text-text-dark-secondary"
+                                    placeholder="URL del video o selecciónalo desde Media"
+                                    type="url"
+                                    value={videoUrl}
+                                    onChange={e => setVideoUrl(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setVideoModalOpen(true)}
+                                    className="shrink-0 rounded-lg border border-border-light dark:border-border-dark px-4 text-sm font-medium text-text-light-primary dark:text-text-dark-primary hover:bg-background-light dark:hover:bg-background-dark"
+                                >
+                                    Elegir
+                                </button>
+                            </div>
+                            {videoUrl && (
+                                <div className="overflow-hidden rounded-lg border border-border-light dark:border-border-dark">
+                                    {getYouTubeEmbedUrl(videoUrl) ? (
+                                        <iframe
+                                            src={getYouTubeEmbedUrl(videoUrl) || ""}
+                                            className="aspect-video w-full"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <video
+                                            src={videoUrl}
+                                            className="aspect-video w-full bg-black object-cover"
+                                            controls
+                                            playsInline
+                                        />
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setVideoUrl("")}
+                                        className="w-full border-t border-border-light px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 dark:border-border-dark dark:hover:bg-red-950/20"
+                                    >
+                                        Quitar video
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Organization */}
                     <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Organización</h2>
@@ -940,6 +1013,17 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                     )}
                 </div>
             </div>
+            <MediaSelectorModal
+                open={videoModalOpen}
+                onClose={() => setVideoModalOpen(false)}
+                onSelect={(urls) => {
+                    setVideoUrl(urls[0] || "")
+                    setVideoModalOpen(false)
+                }}
+                multiple={false}
+                selectedUrls={videoUrl ? [videoUrl] : []}
+                acceptTypes={["video"]}
+            />
         </form>
     )
 }

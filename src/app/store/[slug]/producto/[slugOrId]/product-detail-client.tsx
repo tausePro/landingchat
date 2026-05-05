@@ -127,6 +127,7 @@ interface ProductDetailProduct {
     price: number
     sale_price?: number | null
     image_url?: string | null
+    video_url?: string | null
     images?: string[] | null
     minimum_quantity?: number | null
     has_quantity_pricing?: boolean
@@ -257,6 +258,60 @@ function ReviewAvatar({ review, accentColor, size = 44 }: { review: ProductRevie
                 getReviewInitials(review.author_name)
             )}
         </div>
+    )
+}
+
+function getYouTubeEmbedUrl(value: string): string | null {
+    try {
+        const url = new URL(value)
+        if (url.hostname.includes("youtu.be")) {
+            const id = url.pathname.replace("/", "")
+            return id ? `https://www.youtube.com/embed/${id}` : null
+        }
+
+        if (url.hostname.includes("youtube.com")) {
+            const id = url.searchParams.get("v")
+            return id ? `https://www.youtube.com/embed/${id}` : value.replace("/watch", "/embed")
+        }
+
+        return null
+    } catch {
+        return null
+    }
+}
+
+function ProductVideoBlock({ videoUrl, productName, primaryColor }: { videoUrl: string; productName: string; primaryColor: string }) {
+    const youtubeEmbedUrl = getYouTubeEmbedUrl(videoUrl)
+
+    return (
+        <section id="product-video" className="mt-8 scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/50">
+            <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Míralo en acción</p>
+                <h3 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">Cómo se ve y cómo se usa</h3>
+            </div>
+            <div className="bg-black">
+                {youtubeEmbedUrl ? (
+                    <iframe
+                        src={youtubeEmbedUrl}
+                        title={`Video de ${productName}`}
+                        className="aspect-video w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    />
+                ) : (
+                    <video
+                        src={videoUrl}
+                        className="aspect-video w-full object-cover"
+                        controls
+                        playsInline
+                    />
+                )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm text-slate-600 dark:text-slate-300 sm:px-5">
+                <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>play_circle</span>
+                <span>Resuelve dudas visuales antes de comprar y confirma si es lo que necesitas.</span>
+            </div>
+        </section>
     )
 }
 
@@ -1166,6 +1221,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     if (productReviews.length > 0) {
         sectionLinks.push({ id: "product-reviews", label: "Reseñas" })
     }
+    if (product.video_url) {
+        sectionLinks.push({ id: "product-video", label: "Video" })
+    }
 
     const featuredReview = productReviews[0] ?? null
     const heroValueRows: HeroValueRow[] = product.is_bundle && product.bundle_items?.length
@@ -1771,6 +1829,14 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             </p>
                         )}
 
+                        {product.video_url && (
+                            <ProductVideoBlock
+                                videoUrl={product.video_url}
+                                productName={product.name}
+                                primaryColor={primaryColor}
+                            />
+                        )}
+
                         {/* Reseñas reales del producto (con fallback a testimonios de la organización) */}
                         {productReviews.length > 0 && (
                             <div id="product-reviews" className="mt-8 scroll-mt-28 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
@@ -2011,6 +2077,38 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     >
                         <span className="material-symbols-outlined text-lg">chat</span>
                         <span>Chat</span>
+                    </button>
+                </div>
+            </div>
+
+            <div className="fixed bottom-5 left-1/2 z-40 hidden w-[min(960px,calc(100vw-48px))] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl shadow-slate-900/15 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 md:block">
+                <div className="flex items-center gap-4">
+                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-950 dark:text-white">{product.name}</p>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            <span className="font-semibold text-slate-950 dark:text-white">{formatCurrency(totalPrice)}</span>
+                            {compareAtPrice && (
+                                <span className="line-through">{formatCurrency(compareAtPrice)}</span>
+                            )}
+                            <span>{inventoryTrustLabel}</span>
+                            {hasFreeShipping && <span>Envío gratis</span>}
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => handleChat(product.id)}
+                        className="flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                    >
+                        <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>chat_bubble</span>
+                        Chat
+                    </button>
+                    <button
+                        onClick={handleBuyNow}
+                        disabled={!canPurchase}
+                        className={`flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-bold text-white shadow-lg transition ${canPurchase ? "hover:-translate-y-0.5" : "cursor-not-allowed opacity-60"}`}
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
+                        {canPurchase ? "Comprar ahora" : "No disponible"}
                     </button>
                 </div>
             </div>
