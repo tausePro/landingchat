@@ -12,6 +12,7 @@ const reviewIdSchema = z.string().uuid("ID de reseña inválido")
 const createProductReviewSchema = z.object({
   author_name: z.string().min(1, "El nombre es obligatorio").max(120, "El nombre es demasiado largo"),
   author_role: z.string().max(120, "El rol es demasiado largo").optional().nullable(),
+  author_image_url: z.string().url("La URL de la foto no es válida").max(1000, "La URL de la foto es demasiado larga").optional().nullable(),
   title: z.string().max(160, "El título es demasiado largo").optional().nullable(),
   content: z.string().min(1, "El contenido es obligatorio").max(5000, "La reseña es demasiado larga"),
   rating: z.number().int().min(1, "La calificación mínima es 1").max(5, "La calificación máxima es 5"),
@@ -20,6 +21,7 @@ const createProductReviewSchema = z.object({
 })
 
 const updateProductReviewSchema = createProductReviewSchema.partial()
+const productReviewSelect = "id, product_id, organization_id, customer_id, order_id, author_name, author_role, author_image_url, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at"
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -127,7 +129,7 @@ export async function getProductReviewsForDashboard(productId: string): Promise<
 
   const { data, error } = await authContext.supabase
     .from("product_reviews")
-    .select("id, product_id, organization_id, customer_id, order_id, author_name, author_role, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at")
+    .select(productReviewSelect)
     .eq("organization_id", authContext.organizationId)
     .eq("product_id", productContext.id)
     .order("created_at", { ascending: false })
@@ -222,6 +224,7 @@ export async function createProductReview(
       product_id: productContext.id,
       author_name: parsed.data.author_name,
       author_role: parsed.data.author_role?.trim() || null,
+      author_image_url: parsed.data.author_image_url?.trim() || null,
       title: parsed.data.title?.trim() || null,
       content: parsed.data.content,
       rating: parsed.data.rating,
@@ -230,7 +233,7 @@ export async function createProductReview(
       published_at: parsed.data.is_published ? new Date().toISOString() : null,
       source: "manual",
     })
-    .select("id, product_id, organization_id, customer_id, order_id, author_name, author_role, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at")
+    .select(productReviewSelect)
     .single()
 
   if (error) {
@@ -288,6 +291,7 @@ export async function updateProductReview(
   const updatePayload: {
     author_name?: string
     author_role?: string | null
+    author_image_url?: string | null
     title?: string | null
     content?: string
     rating?: number
@@ -298,6 +302,7 @@ export async function updateProductReview(
 
   if (parsed.data.author_name !== undefined) updatePayload.author_name = parsed.data.author_name
   if (parsed.data.author_role !== undefined) updatePayload.author_role = parsed.data.author_role?.trim() || null
+  if (parsed.data.author_image_url !== undefined) updatePayload.author_image_url = parsed.data.author_image_url?.trim() || null
   if (parsed.data.title !== undefined) updatePayload.title = parsed.data.title?.trim() || null
   if (parsed.data.content !== undefined) updatePayload.content = parsed.data.content
   if (parsed.data.rating !== undefined) updatePayload.rating = parsed.data.rating
@@ -316,7 +321,7 @@ export async function updateProductReview(
     .update(updatePayload)
     .eq("id", parsedId.data)
     .eq("organization_id", authContext.organizationId)
-    .select("id, product_id, organization_id, customer_id, order_id, author_name, author_role, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at")
+    .select(productReviewSelect)
     .single()
 
   if (error) {
