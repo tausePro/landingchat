@@ -62,6 +62,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
                 isEditing
             />
             <ProductReviewsManager
+                organizationId={product.organization_id}
                 productId={id}
                 initialReviews={initialReviews}
                 initialEngagementSummary={initialEngagementSummary}

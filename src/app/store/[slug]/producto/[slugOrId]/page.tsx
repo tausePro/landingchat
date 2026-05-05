@@ -87,7 +87,7 @@ async function getPublishedProductReviews(productId: string): Promise<{
         const supabase = createServiceClient()
         const { data, error } = await supabase
             .from("product_reviews")
-            .select("id, product_id, organization_id, customer_id, order_id, author_name, author_role, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at")
+            .select("id, product_id, organization_id, customer_id, order_id, author_name, author_role, author_image_url, title, content, rating, verified_purchase, is_published, published_at, created_at, updated_at")
             .eq("product_id", productId)
             .eq("is_published", true)
             .order("created_at", { ascending: false })

@@ -1,11 +1,13 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { uploadProductImage } from "../actions"
 import type { ProductEngagementSummary, ProductReview } from "@/types/product"
 import {
   createProductReview,
@@ -18,6 +20,7 @@ import {
 type ReviewDraft = {
   author_name: string
   author_role: string
+  author_image_url: string
   title: string
   content: string
   rating: number
@@ -28,6 +31,7 @@ type ReviewDraft = {
 const emptyDraft: ReviewDraft = {
   author_name: "",
   author_role: "",
+  author_image_url: "",
   title: "",
   content: "",
   rating: 5,
@@ -36,18 +40,66 @@ const emptyDraft: ReviewDraft = {
 }
 
 interface ProductReviewsManagerProps {
+  organizationId: string
   productId: string
   initialError?: string
   initialEngagementSummary: ProductEngagementSummary
   initialReviews: ProductReview[]
 }
 
-export function ProductReviewsManager({ productId, initialError, initialEngagementSummary, initialReviews }: ProductReviewsManagerProps) {
+function getReviewInitials(name: string): string {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("")
+
+  return initials || "•"
+}
+
+function isValidImageUrl(value: string | null | undefined): value is string {
+  if (!value) return false
+
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+function ReviewAvatar({ name, imageUrl, size = 48 }: { name: string; imageUrl?: string | null; size?: number }) {
+  const validImageUrl = isValidImageUrl(imageUrl) ? imageUrl : null
+
+  return (
+    <div
+      className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-bold text-primary"
+      style={{ width: size, height: size }}
+    >
+      {validImageUrl ? (
+        <Image
+          src={validImageUrl}
+          alt={`Foto de ${name || "cliente"}`}
+          fill
+          className="object-cover"
+          sizes={`${size}px`}
+        />
+      ) : (
+        getReviewInitials(name)
+      )}
+    </div>
+  )
+}
+
+export function ProductReviewsManager({ organizationId, productId, initialError, initialEngagementSummary, initialReviews }: ProductReviewsManagerProps) {
   const [reviews, setReviews] = useState<ProductReview[]>(initialReviews)
   const [engagementSummary, setEngagementSummary] = useState<ProductEngagementSummary>(initialEngagementSummary)
   const [error, setError] = useState(initialError || "")
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [uploadingAuthorImage, setUploadingAuthorImage] = useState(false)
   const [draft, setDraft] = useState<ReviewDraft>(emptyDraft)
 
   const stats = useMemo(() => {
@@ -94,6 +146,7 @@ export function ProductReviewsManager({ productId, initialError, initialEngageme
     const result = await createProductReview(productId, {
       author_name: draft.author_name.trim(),
       author_role: draft.author_role.trim() || null,
+      author_image_url: draft.author_image_url.trim() || null,
       title: draft.title.trim() || null,
       content: draft.content.trim(),
       rating: draft.rating,
@@ -110,6 +163,29 @@ export function ProductReviewsManager({ productId, initialError, initialEngageme
     setReviews((current) => [result.data, ...current])
     setDraft(emptyDraft)
     setCreating(false)
+  }
+
+  const handleAuthorImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+
+    setUploadingAuthorImage(true)
+    setError("")
+
+    try {
+      const result = await uploadProductImage(file, organizationId)
+      if (!result.success) {
+        setError(result.error)
+        return
+      }
+
+      setDraft((current) => ({ ...current, author_image_url: result.data.url }))
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Error al subir la foto")
+    } finally {
+      setUploadingAuthorImage(false)
+    }
   }
 
   const handleToggle = async (
@@ -171,6 +247,18 @@ export function ProductReviewsManager({ productId, initialError, initialEngageme
             <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Promedio</p>
             <p className="mt-1 text-2xl font-bold">{stats.average > 0 ? stats.average.toFixed(1) : "-"}</p>
           </div>
+          <div className="rounded-lg border border-border-light dark:border-border-dark p-4">
+            <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Vistas</p>
+            <p className="mt-1 text-2xl font-bold">{engagementSummary.pageViews}</p>
+          </div>
+          <div className="rounded-lg border border-border-light dark:border-border-dark p-4">
+            <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Carritos</p>
+            <p className="mt-1 text-2xl font-bold">{engagementSummary.addToCartCount}</p>
+          </div>
+          <div className="rounded-lg border border-border-light dark:border-border-dark p-4">
+            <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary">Visitantes</p>
+            <p className="mt-1 text-2xl font-bold">{engagementSummary.uniqueVisitors}</p>
+          </div>
         </div>
 
         {error && (
@@ -203,6 +291,32 @@ export function ProductReviewsManager({ productId, initialError, initialEngageme
                 onChange={(event) => setDraft((current) => ({ ...current, author_role: event.target.value }))}
                 placeholder="Ej: Cliente frecuente"
               />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium">Foto del cliente</label>
+              <div className="flex items-center gap-3">
+                <ReviewAvatar name={draft.author_name || "Cliente"} imageUrl={draft.author_image_url || null} />
+                <div className="flex flex-col gap-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAuthorImageChange}
+                    disabled={uploadingAuthorImage}
+                  />
+                  {draft.author_image_url && (
+                    <button
+                      type="button"
+                      onClick={() => setDraft((current) => ({ ...current, author_image_url: "" }))}
+                      className="text-left text-xs font-medium text-red-600 hover:text-red-700"
+                    >
+                      Quitar foto
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-text-light-secondary dark:text-text-dark-secondary">
+                Sube una foto real con autorización del cliente.
+              </p>
             </div>
             <div>
               <label className="mb-2 block text-sm font-medium">Título</label>
@@ -272,19 +386,22 @@ export function ProductReviewsManager({ productId, initialError, initialEngageme
           ) : reviews.map((review) => (
             <div key={review.id} className="rounded-xl border border-border-light dark:border-border-dark p-5 space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold">{review.author_name}</h3>
-                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                      {review.rating}/5
-                    </span>
-                    {review.title && (
-                      <span className="text-sm text-text-light-secondary dark:text-text-dark-secondary">{review.title}</span>
-                    )}
+                <div className="flex items-start gap-3">
+                  <ReviewAvatar name={review.author_name} imageUrl={review.author_image_url} />
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold">{review.author_name}</h3>
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        {review.rating}/5
+                      </span>
+                      {review.title && (
+                        <span className="text-sm text-text-light-secondary dark:text-text-dark-secondary">{review.title}</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-text-light-secondary dark:text-text-dark-secondary">
+                      {review.author_role || "Sin rol"}
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                    {review.author_role || "Sin rol"}
-                  </p>
                 </div>
                 <Button variant="destructive" size="sm" onClick={() => handleDelete(review.id)}>
                   Eliminar
