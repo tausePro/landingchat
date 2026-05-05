@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, ReactNode, useMemo } from "react"
-import { useMetaPixel } from "./meta-pixel"
+import { useMetaPixel, setMetaPixelAdvancedMatching, type MetaPixelAdvancedMatchingData } from "./meta-pixel"
 import { usePosthogTracking } from "./use-posthog-tracking"
 import { getTrackingParams } from "@/hooks/use-tracking-params"
 import {
@@ -18,6 +18,12 @@ export interface TrackingContextType {
     trackPageView: (path?: string, props?: Record<string, unknown>) => void
     trackViewCategory: (categoryId: string, categoryName: string) => void
     trackSearch: (searchQuery: string, contentIds?: string[]) => void
+    /**
+     * Identifica al usuario para Manual Advanced Matching del Pixel.
+     * Llamar antes de eventos como InitiateCheckout/Purchase cuando ya tenemos email/phone/etc.
+     * Meta hashea SHA256 client-side automáticamente; no pre-hashear.
+     */
+    identifyUser: (data: MetaPixelAdvancedMatchingData) => void
     trackEvent: (
         eventName: AnalyticsEventName,
         params?: {
@@ -39,6 +45,7 @@ const noopTracking: TrackingContextType = {
     trackPageView: () => {},
     trackViewCategory: () => {},
     trackSearch: () => {},
+    identifyUser: () => {},
     trackEvent: () => {},
 }
 
@@ -247,6 +254,11 @@ export function TrackingProvider({
                     metaPixel.trackSearch(searchQuery, contentIds)
                 }
             },
+            identifyUser: (data) => {
+                if (metaPixelEnabled && metaPixelId) {
+                    setMetaPixelAdvancedMatching(metaPixelId, data)
+                }
+            },
             trackEvent: (eventName, params) => {
                 trackFirstPartyAnalyticsEvent(organizationSlug, {
                     eventName,
@@ -259,7 +271,7 @@ export function TrackingProvider({
                 })
             },
         }
-    }, [metaPixelEnabled, metaPixel, posthogTracking, organizationSlug, posthogEnabled])
+    }, [metaPixelEnabled, metaPixelId, metaPixel, posthogTracking, organizationSlug, posthogEnabled])
 
 
     return (

@@ -45,6 +45,8 @@ interface OrderItemJsonb {
 interface AttributionData {
     fbc?: string
     fbp?: string
+    clientIpAddress?: string
+    clientUserAgent?: string
 }
 
 export interface ApplyPaymentStatusParams {
@@ -105,6 +107,8 @@ function getAttributionData(value: unknown): AttributionData {
     return {
         fbc: optionalString(value.fbc) || optionalString(value._fbc),
         fbp: optionalString(value.fbp) || optionalString(value._fbp),
+        clientIpAddress: optionalString(value.client_ip) || optionalString(value.client_ip_address),
+        clientUserAgent: optionalString(value.client_user_agent) || optionalString(value.user_agent),
     }
 }
 
@@ -177,6 +181,8 @@ async function runPaidOrderSideEffects(params: {
                 customerState: customerInfo?.state || undefined,
                 fbc: attribution.fbc,
                 fbp: attribution.fbp,
+                clientIpAddress: attribution.clientIpAddress,
+                clientUserAgent: attribution.clientUserAgent,
             },
             params.supabase,
         )

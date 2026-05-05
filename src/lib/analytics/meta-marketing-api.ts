@@ -107,7 +107,7 @@ export interface MetaAdsConfig {
     adAccountId: string // Format: act_XXXXXXXXX
 }
 
-const META_API_VERSION = 'v22.0'
+const META_API_VERSION = 'v24.0'
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 
 interface MetaCampaignInsightApiItem {

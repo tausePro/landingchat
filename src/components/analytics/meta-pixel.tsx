@@ -63,6 +63,48 @@ export function MetaPixel({ pixelId }: MetaPixelProps) {
     )
 }
 
+/**
+ * Manual Advanced Matching para Meta Pixel.
+ * Re-inicializa el Pixel pasando datos del cliente (email, teléfono, nombre, etc.)
+ * para que Meta los hashee client-side y mejore Event Match Quality.
+ *
+ * Llamar cuando el usuario se identifica (login, checkout) y antes de eventos clave.
+ * Meta hashea automáticamente los valores en plano; no enviarlos pre-hasheados.
+ *
+ * https://developers.facebook.com/docs/meta-pixel/advanced/advanced-matching
+ */
+export interface MetaPixelAdvancedMatchingData {
+    em?: string // email en plano
+    ph?: string // teléfono en plano (E.164 sin "+")
+    fn?: string // first name en plano
+    ln?: string // last name en plano
+    ct?: string // city en plano
+    st?: string // state/region en plano
+    zp?: string // postal code en plano
+    country?: string // ISO-2 lowercase ("co")
+    external_id?: string
+}
+
+export function setMetaPixelAdvancedMatching(
+    pixelId: string,
+    data: MetaPixelAdvancedMatchingData
+): void {
+    if (typeof window === "undefined" || !window.fbq || !pixelId) return
+
+    // Filtrar campos vacíos para no contaminar el matching.
+    const sanitized: Record<string, string> = {}
+    for (const [key, value] of Object.entries(data)) {
+        if (typeof value === "string" && value.trim().length > 0) {
+            sanitized[key] = value.trim()
+        }
+    }
+
+    if (Object.keys(sanitized).length === 0) return
+
+    // Re-init con datos. Meta hashea SHA256 client-side automáticamente.
+    window.fbq("init", pixelId, sanitized)
+}
+
 // Hook para trackear eventos de Meta Pixel
 export function useMetaPixel() {
     const trackEvent = (eventName: string, parameters?: Record<string, unknown>, eventId?: string) => {
