@@ -46,7 +46,7 @@ function getPaymentGatewayLogoUrl(gateway: PaymentGatewayOption) {
 
 export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: CheckoutModalProps) {
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
-    const { trackInitiateCheckout, trackEvent } = useTracking()
+    const { trackInitiateCheckout, trackEvent, identifyUser } = useTracking()
     const [step, setStep] = useState<'contact' | 'payment' | 'success'>('contact')
     const [loading, setLoading] = useState(false)
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
@@ -363,6 +363,24 @@ export function CheckoutModal({ isOpen, onClose, slug, sourceChannel, chatId }: 
         try {
             // Obtener tracking params (UTM, referrer, etc.)
             const trackingParams = getTrackingParams(slug)
+
+            // Manual Advanced Matching del Pixel: re-init con datos del cliente
+            // antes de eventos clave (InitiateCheckout/Purchase). Mejora EMQ.
+            // Meta hashea SHA256 client-side automáticamente.
+            // Ver docs-private/META_PURCHASE_EMQ_FIX_2026-05-05.md
+            const trimmedName = formData.name.trim()
+            const firstSpace = trimmedName.indexOf(" ")
+            const firstName = firstSpace > 0 ? trimmedName.slice(0, firstSpace) : trimmedName
+            const lastName = firstSpace > 0 ? trimmedName.slice(firstSpace + 1) : ""
+            identifyUser({
+                em: formData.email || undefined,
+                ph: formData.phone || undefined,
+                fn: firstName || undefined,
+                ln: lastName || undefined,
+                ct: formData.city || undefined,
+                st: formData.state || undefined,
+                country: "co",
+            })
 
             const result = await createOrder({
                 slug,

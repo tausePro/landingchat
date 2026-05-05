@@ -1,5 +1,6 @@
 "use server"
 
+import { headers } from "next/headers"
 import { createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
@@ -649,6 +650,18 @@ export async function createOrder(params: CreateOrderParams) {
         // Or just trust backend calc is safer. 
         // For now, let's use our calculated finalTotal.
 
+        // Capturar IP y User-Agent reales del comprador para Meta CAPI EMQ.
+        // Se persiste server-side porque el cliente puede falsificarlos.
+        // Ver docs-private/META_PURCHASE_EMQ_FIX_2026-05-05.md
+        const requestHeaders = await headers()
+        const forwardedFor = requestHeaders.get("x-forwarded-for")
+        const buyerIp =
+            forwardedFor?.split(",")[0]?.trim() ||
+            requestHeaders.get("x-real-ip") ||
+            requestHeaders.get("cf-connecting-ip") ||
+            undefined
+        const buyerUserAgent = requestHeaders.get("user-agent") || undefined
+
         const { data: order, error: orderError } = await supabase
             .from("orders")
             .insert({
@@ -675,7 +688,12 @@ export async function createOrder(params: CreateOrderParams) {
                 // Tracking fields
                 source_channel: params.sourceChannel || 'web',
                 chat_id: params.chatId || null,
-                utm_data: params.utmData || {},
+                utm_data: {
+                    ...(params.utmData || {}),
+                    // IP/UA reales del comprador para CAPI Purchase server-side
+                    ...(buyerIp ? { client_ip: buyerIp } : {}),
+                    ...(buyerUserAgent ? { client_user_agent: buyerUserAgent } : {}),
+                },
             })
             .select()
             .single()

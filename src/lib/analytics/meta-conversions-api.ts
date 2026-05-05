@@ -51,16 +51,21 @@ export interface MetaCapiEventData {
 type PurchaseEventData = Omit<MetaCapiEventData, "eventName">
 
 /**
- * Hash de datos para Meta (SHA256)
+ * Hash de datos para Meta (SHA256).
+ * Exportado para tests; no usar fuera del módulo.
  */
-function hashData(data: string): string {
+export function hashData(data: string): string {
     return crypto
         .createHash("sha256")
         .update(data.toLowerCase().trim())
         .digest("hex")
 }
 
-function normalizeMetaPhone(phone: string): string {
+/**
+ * Normalización de teléfono para Meta (solo Colombia hoy).
+ * Exportado para tests; no usar fuera del módulo.
+ */
+export function normalizeMetaPhone(phone: string): string {
     const digits = phone.replace(/\D/g, "")
     if (digits.length === 10 && digits.startsWith("3")) {
         return `57${digits}`
@@ -69,9 +74,10 @@ function normalizeMetaPhone(phone: string): string {
 }
 
 /**
- * Prepara los datos del usuario hasheados para Meta
+ * Prepara los datos del usuario hasheados para Meta CAPI.
+ * Exportado para tests unitarios.
  */
-function prepareUserData(userData: UserData): Record<string, string> {
+export function prepareUserData(userData: UserData): Record<string, string> {
     const prepared: Record<string, string> = {}
 
     if (userData.email) {
@@ -93,7 +99,10 @@ function prepareUserData(userData: UserData): Record<string, string> {
         prepared.st = hashData(userData.state)
     }
     if (userData.country) {
-        prepared.country = hashData(userData.country)
+        // Meta exige ISO-2 lowercase antes de hashear (ej: "co", "mx", "us").
+        // Si llega el nombre completo ("Colombia"), tomamos las primeras 2 letras.
+        const iso2 = userData.country.trim().toLowerCase().slice(0, 2)
+        prepared.country = hashData(iso2)
     }
     if (userData.clientIpAddress) {
         prepared.client_ip_address = userData.clientIpAddress
@@ -128,7 +137,7 @@ export async function sendMetaCapiEvent(
         return { success: false, error: "Missing configuration" }
     }
 
-    const url = `https://graph.facebook.com/v22.0/${pixelId}/events`
+    const url = `https://graph.facebook.com/v24.0/${pixelId}/events`
 
     const payload = {
         data: [
@@ -216,6 +225,8 @@ export async function trackServerPurchase(
         customerState?: string
         fbc?: string
         fbp?: string
+        clientIpAddress?: string
+        clientUserAgent?: string
     },
     supabase: SupabaseClient
 ): Promise<void> {
@@ -265,10 +276,12 @@ export async function trackServerPurchase(
                 lastName,
                 city: order.customerCity,
                 state: order.customerState,
-                country: "CO", // Default Colombia
+                country: "co", // ISO-2 lowercase (Colombia)
                 externalId: order.id,
                 fbc: order.fbc,
                 fbp: order.fbp,
+                clientIpAddress: order.clientIpAddress,
+                clientUserAgent: order.clientUserAgent,
             },
             customData: {
                 currency: order.currency || "COP",
