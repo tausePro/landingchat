@@ -348,6 +348,7 @@ export interface ProductReview {
   order_id: string | null
   author_name: string
   author_role: string | null
+  author_image_url: string | null
   title: string | null
   content: string
   rating: number

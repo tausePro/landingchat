@@ -226,6 +226,40 @@ function getReviewInitials(name: string): string {
     return initials || "•"
 }
 
+function isValidReviewImageUrl(value: string | null | undefined): value is string {
+    if (!value) return false
+
+    try {
+        const url = new URL(value)
+        return url.protocol === "https:"
+    } catch {
+        return false
+    }
+}
+
+function ReviewAvatar({ review, accentColor, size = 44 }: { review: ProductReview; accentColor: string; size?: number }) {
+    const validImageUrl = isValidReviewImageUrl(review.author_image_url) ? review.author_image_url : null
+
+    return (
+        <div
+            className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white"
+            style={{ width: size, height: size, backgroundColor: accentColor }}
+        >
+            {validImageUrl ? (
+                <Image
+                    src={validImageUrl}
+                    alt={`Foto de ${review.author_name}`}
+                    fill
+                    className="object-cover"
+                    sizes={`${size}px`}
+                />
+            ) : (
+                getReviewInitials(review.author_name)
+            )}
+        </div>
+    )
+}
+
 function buildWhatsAppLink(phone: string | null | undefined, message: string): string | null {
     if (!phone) {
         return null
@@ -1519,7 +1553,6 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <div className="mb-5 space-y-6">
                                     {productVariants.map((variant, idx: number) => {
                                         const isColorVariant = variant.type.toLowerCase().includes('color')
-                                        const hasMany = variant.values.length > 8
                                         const hasVariantStock = variant.hasStockByVariant && variant.stockByVariant
                                         const stockByVariant = variant.stockByVariant
                                         return (
@@ -1708,9 +1741,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             {featuredReview && (
                                 <div className="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
                                     <div className="flex items-start gap-4">
-                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: accentColor }}>
-                                            {getReviewInitials(featuredReview.author_name)}
-                                        </div>
+                                        <ReviewAvatar review={featuredReview} accentColor={accentColor} />
                                         <div className="min-w-0 flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold text-slate-900 dark:text-white">{featuredReview.author_name}</p>
@@ -1761,8 +1792,10 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     {productReviews.slice(0, 3).map((review) => (
                                         <article key={review.id} className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/40 p-4">
                                             <div className="flex items-start justify-between gap-4">
-                                                <div>
-                                                    <p className="font-semibold text-slate-900 dark:text-white">{review.author_name}</p>
+                                                <div className="flex min-w-0 items-start gap-3">
+                                                    <ReviewAvatar review={review} accentColor={accentColor} size={40} />
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-slate-900 dark:text-white">{review.author_name}</p>
                                                     <div className="mt-1 flex items-center gap-2">
                                                         <div className="flex items-center gap-0.5 text-amber-500">
                                                             {Array.from({ length: 5 }).map((_, index) => (
@@ -1780,6 +1813,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                     {review.author_role && (
                                                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{review.author_role}</p>
                                                     )}
+                                                    </div>
                                                 </div>
                                                 <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                                     {new Date(review.published_at || review.created_at).toLocaleDateString("es-CO")}
