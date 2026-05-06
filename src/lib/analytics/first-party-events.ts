@@ -69,6 +69,7 @@ export interface TrackAnalyticsEventInput {
 
 const SESSION_STORAGE_KEY = "landingchat_analytics_session_id"
 const SENSITIVE_QUERY_KEYS = new Set(["access", "token", "auth", "code", "state", "session", "password", "secret", "key"])
+const SKIP_FIRST_PARTY_EVENT_NAMES = new Set<AnalyticsEventName>(["page_view", "view_content"])
 
 export function getFirstPartyAnalyticsSessionId(): string | undefined {
     if (typeof window === "undefined") return undefined
@@ -132,6 +133,7 @@ function buildAttribution(slug: string): AnalyticsEventAttribution | undefined {
 
 export function trackFirstPartyAnalyticsEvent(slug: string | undefined, input: TrackAnalyticsEventInput) {
     if (!slug || typeof window === "undefined") return
+    if (SKIP_FIRST_PARTY_EVENT_NAMES.has(input.eventName)) return
 
     const defaultPath = `${window.location.pathname}${window.location.search}`
     const trackingParams = getTrackingParams(slug)
