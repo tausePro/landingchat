@@ -4,14 +4,6 @@ import { useMemo } from "react"
 import { ensurePosthog } from "@/lib/analytics/posthog-client"
 import { useScrollDepthTracking } from "./use-scroll-depth"
 
-type TrackFn = (
-    contentId: string,
-    contentName: string,
-    value?: number,
-    currency?: string,
-    extra?: Record<string, unknown>
-) => void
-
 interface UsePosthogTrackingOptions {
     enabled?: boolean
     organizationId: string
@@ -25,6 +17,7 @@ interface PosthogTracking {
     trackInitiateCheckout: (value: number, currency?: string, contentIds?: string[]) => void
     trackPurchase: (value: number, currency?: string, contentIds?: string[], orderId?: string) => void
     trackPageView: (path?: string, props?: Record<string, unknown>) => void
+    trackEvent: (eventName: string, props?: Record<string, unknown>) => void
 }
 
 const noopTracking: PosthogTracking = {
@@ -33,6 +26,7 @@ const noopTracking: PosthogTracking = {
     trackInitiateCheckout: () => {},
     trackPurchase: () => {},
     trackPageView: () => {},
+    trackEvent: () => {},
 }
 
 export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogTracking {
@@ -76,16 +70,6 @@ export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogT
             return noopTracking
         }
 
-        const trackContentEvent: TrackFn = (contentId, contentName, value, currency = "COP", extra = {}) => {
-            capture("content_event", {
-                ...extra,
-                contentId,
-                contentName,
-                value,
-                currency,
-            })
-        }
-
         const trackPageView = (path?: string, props?: Record<string, unknown>) => {
             const defaultPath = typeof window !== "undefined"
                 ? `${window.location.pathname}${window.location.search}`
@@ -126,6 +110,7 @@ export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogT
                     order_id: orderId,
                 }),
             trackPageView,
+            trackEvent: (eventName: string, props?: Record<string, unknown>) => capture(eventName, props),
         }
     }, [capture])
 }

@@ -260,6 +260,14 @@ export function TrackingProvider({
                 }
             },
             trackEvent: (eventName, params) => {
+                posthogTracking.trackEvent(eventName, {
+                    sourceChannel: params?.sourceChannel,
+                    contentIds: params?.contentIds,
+                    orderId: params?.orderId,
+                    value: params?.value,
+                    currency: params?.currency,
+                    ...params?.properties,
+                })
                 trackFirstPartyAnalyticsEvent(organizationSlug, {
                     eventName,
                     sourceChannel: params?.sourceChannel,
