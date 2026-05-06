@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { z } from "zod"
 import { normalizePhone, getPhoneVariants } from "@/lib/utils/phone"
-import { storeApiRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { storeApiRateLimit, getClientIdentifier, getRateLimitHeaders, limitOrAllowOnProviderError } from "@/lib/rate-limit"
 import {
     createStorefrontCustomerSessionToken,
     getStorefrontCustomerSessionCookieName,
@@ -32,7 +32,7 @@ export async function POST(
 
     // Rate limiting: 30 req/min por IP
     const clientId = getClientIdentifier(request)
-    const rateLimitResult = await storeApiRateLimit.limit(clientId)
+    const rateLimitResult = await limitOrAllowOnProviderError(storeApiRateLimit, clientId, "store-identify")
     const headers = getRateLimitHeaders(rateLimitResult)
 
     if (!rateLimitResult.success) {

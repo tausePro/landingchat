@@ -75,6 +75,37 @@ const mockRateLimit = {
   }
 }
 
+type RateLimitCheckResult = {
+  success: boolean
+  limit: number
+  remaining: number
+  reset: number
+  pending?: Promise<unknown>
+}
+
+type RateLimiterLike = {
+  limit: (identifier: string) => Promise<RateLimitCheckResult>
+}
+
+export async function limitOrAllowOnProviderError(rateLimiter: RateLimiterLike, identifier: string, scope: string): Promise<RateLimitCheckResult> {
+  try {
+    return await rateLimiter.limit(identifier)
+  } catch (error) {
+    log.error("Rate limit provider error; allowing request to preserve critical storefront availability", {
+      scope,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    return {
+      success: true,
+      limit: 1,
+      remaining: 1,
+      reset: Date.now() + 60000,
+      pending: Promise.resolve(),
+    }
+  }
+}
+
 // AI Chat rate limiter: 10 requests per minute per IP
 export const aiChatRateLimit = redis ? new Ratelimit({
   redis: redis,

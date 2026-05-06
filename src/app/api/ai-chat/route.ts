@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
-import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { aiChatRateLimit, getClientIdentifier, getRateLimitHeaders, limitOrAllowOnProviderError } from "@/lib/rate-limit"
 import { canCreateResource } from "@/lib/utils/subscription"
 import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
@@ -43,7 +43,7 @@ const aiChatSchema = z.object({
 export async function POST(request: NextRequest) {
     // Apply rate limiting
     const clientId = getClientIdentifier(request)
-    const rateLimitResult = await aiChatRateLimit.limit(clientId)
+    const rateLimitResult = await limitOrAllowOnProviderError(aiChatRateLimit, clientId, "ai-chat")
 
     // Add rate limit headers to all responses
     const headers = getRateLimitHeaders(rateLimitResult)
