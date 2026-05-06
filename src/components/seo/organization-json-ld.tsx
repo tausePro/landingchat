@@ -72,11 +72,15 @@ export function OrganizationJsonLd({ organization, url }: OrganizationJsonLdProp
     return (
         <>
             <script
+                id="organization-json-ld"
                 type="application/ld+json"
+                suppressHydrationWarning
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
             />
             <script
+                id="website-json-ld"
                 type="application/ld+json"
+                suppressHydrationWarning
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
             />
         </>

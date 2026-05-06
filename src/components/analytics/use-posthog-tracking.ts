@@ -29,10 +29,17 @@ const noopTracking: PosthogTracking = {
     trackEvent: () => {},
 }
 
+function resolveCurrentUrl(path?: string): string | undefined {
+    if (typeof window === "undefined") return path
+    if (!path) return window.location.href
+    if (/^https?:\/\//i.test(path)) return path
+    return `${window.location.origin}${path.startsWith("/") ? path : `/${path}`}`
+}
+
 export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogTracking {
     const { enabled, organizationId, organizationSlug, organizationName } = options
-    const posthog = ensurePosthog()
     const canTrack = Boolean(enabled && organizationId && organizationSlug)
+    const posthog = canTrack ? ensurePosthog() : null
 
     const capture = useMemo(() => {
         if (!canTrack || !posthog) {
@@ -71,12 +78,15 @@ export function usePosthogTracking(options: UsePosthogTrackingOptions): PosthogT
         }
 
         const trackPageView = (path?: string, props?: Record<string, unknown>) => {
-            const defaultPath = typeof window !== "undefined"
+            const pathname = typeof window !== "undefined"
                 ? `${window.location.pathname}${window.location.search}`
                 : undefined
+            const currentUrl = resolveCurrentUrl(path)
 
             capture("$pageview", {
-                $current_url: path ?? defaultPath,
+                $current_url: currentUrl,
+                $pathname: pathname,
+                path: path ?? pathname,
                 ...props,
             })
         }
