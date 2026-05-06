@@ -3,7 +3,7 @@
 import posthog from "posthog-js"
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_TOKEN || process.env.NEXT_PUBLIC_POSTHOG_KEY
-const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST
+const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com"
 
 let initialized = false
 
@@ -20,11 +20,12 @@ export function ensurePosthog() {
     if (initialized) return posthog
 
     posthog.init(POSTHOG_KEY, {
-        api_host: POSTHOG_HOST ? `${typeof window !== 'undefined' ? window.location.origin : ''}/ingest` : "https://us.i.posthog.com",
+        api_host: POSTHOG_HOST,
         ui_host: 'https://us.posthog.com',
+        defaults: '2025-11-30',
         capture_pageview: false,
         capture_pageleave: true,
-        autocapture: false,
+        autocapture: true,
         scroll_root_selector: ['#main-content', 'main', 'body'],
         session_recording: {
             maskAllInputs: true,
