@@ -21,6 +21,7 @@ import { ProactiveChatBubble } from "@/components/store/proactive-chat-bubble"
 import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
 import { StoreFooter } from "@/components/store/store-footer"
 import type { ProactiveCouponOffer } from "./actions"
+import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
 
 // ... (in render)
 
@@ -111,9 +112,10 @@ interface StoreLayoutClientProps {
     defaultChatProductId?: string
     defaultChatProductName?: string | null
     proactiveCouponOffer?: ProactiveCouponOffer | null
+    productDetailCRO?: ProductDetailCROConfig | null
 }
 
-export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId, defaultChatProductName, proactiveCouponOffer }: StoreLayoutClientProps) {
+export function StoreLayoutClient({ slug, organization, products, properties = [], badges = [], pages = [], children, hideNavigation = false, hideHeaderOnMobile = false, initialIsSubdomain = false, defaultChatProductId, defaultChatProductName, proactiveCouponOffer, productDetailCRO }: StoreLayoutClientProps) {
     const router = useRouter()
     const searchParams = useSearchParams()
     const clientIsSubdomain = useIsSubdomain()
@@ -315,6 +317,10 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     hideOnMobile={hideHeaderOnMobile}
                     shippingConfig={headerShippingConfig}
                     isRealEstate={isRealEstate}
+                    hideMenu={productDetailCRO?.landingMode?.hideMenu}
+                    hideSearch={productDetailCRO?.landingMode?.hideSearch}
+                    hideProfile={productDetailCRO?.landingMode?.hideProfile}
+                    hideAnnouncementBar={productDetailCRO?.landingMode?.hideAnnouncementBar}
                 />
             )}
 

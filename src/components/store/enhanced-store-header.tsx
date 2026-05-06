@@ -20,9 +20,14 @@ interface MenuItem {
     children?: MenuItem[]
 }
 
+interface HeaderOrganization {
+    name: string
+    logo_url?: string | null
+}
+
 interface EnhancedStoreHeaderProps {
     slug: string
-    organization: any
+    organization: HeaderOrganization
     onStartChat: (query?: string) => void
     hideOnMobile?: boolean
     primaryColor: string
@@ -30,6 +35,10 @@ interface EnhancedStoreHeaderProps {
     menuItems?: MenuItem[]
     className?: string
     hideChatButton?: boolean
+    hideMenu?: boolean
+    hideSearch?: boolean
+    hideProfile?: boolean
+    hideAnnouncementBar?: boolean
     isRealEstate?: boolean
     shippingConfig?: {
         free_shipping_enabled: boolean
@@ -48,6 +57,10 @@ export function EnhancedStoreHeader({
     menuItems = [],
     className = "",
     hideChatButton = false,
+    hideMenu = false,
+    hideSearch = false,
+    hideProfile = false,
+    hideAnnouncementBar = false,
     isRealEstate = false,
     shippingConfig
 }: EnhancedStoreHeaderProps) {
@@ -59,7 +72,10 @@ export function EnhancedStoreHeader({
     // Prevent hydration mismatch for cart count
     const [mounted, setMounted] = useState(false)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-    useEffect(() => setMounted(true), [])
+    useEffect(() => {
+        const frameId = window.requestAnimationFrame(() => setMounted(true))
+        return () => window.cancelAnimationFrame(frameId)
+    }, [])
 
     const cartCount = items.reduce((acc, item) => acc + item.quantity, 0)
 
@@ -85,12 +101,12 @@ export function EnhancedStoreHeader({
         setMobileMenuOpen(false)
     }
 
-    const hasMenuItems = menuItems.length > 0
+    const hasMenuItems = !hideMenu && menuItems.length > 0
 
     return (
         <div className={`sticky top-0 z-50 w-full ${hideOnMobile ? 'hidden md:block' : ''} ${className}`}>
             {/* Barra superior de anuncios (solo e-commerce, no inmobiliarias) */}
-            {!isRealEstate && (
+            {!isRealEstate && !hideAnnouncementBar && (
                 <AnnouncementBar
                     shippingConfig={shippingConfig}
                     primaryColor={primaryColor}
@@ -159,16 +175,18 @@ export function EnhancedStoreHeader({
                     )}
 
                     {/* Buscador inteligente - Solo en desktop */}
-                    <div className={cn(
-                        "hidden md:flex flex-1 justify-center",
-                        hasMenuItems ? "max-w-sm" : ""
-                    )}>
-                        <SmartSearch
-                            slug={slug}
-                            onStartChat={onStartChat}
-                            primaryColor={primaryColor}
-                        />
-                    </div>
+                    {!hideSearch && (
+                        <div className={cn(
+                            "hidden md:flex flex-1 justify-center",
+                            hasMenuItems ? "max-w-sm" : ""
+                        )}>
+                            <SmartSearch
+                                slug={slug}
+                                onStartChat={onStartChat}
+                                primaryColor={primaryColor}
+                            />
+                        </div>
+                    )}
 
                     {/* Acciones del usuario */}
                     <div className="flex items-center gap-2 md:gap-3">
@@ -196,13 +214,15 @@ export function EnhancedStoreHeader({
                         )}
 
                         {/* Profile Button */}
-                        <a
-                            href={profileLink}
-                            className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
-                            aria-label="Mi perfil"
-                        >
-                            <User className="w-5 h-5" />
-                        </a>
+                        {!hideProfile && (
+                            <a
+                                href={profileLink}
+                                className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                                aria-label="Mi perfil"
+                            >
+                                <User className="w-5 h-5" />
+                            </a>
+                        )}
 
                         {/* Cart Button (oculto para inmobiliarias) */}
                         {!isRealEstate && (
@@ -246,13 +266,15 @@ export function EnhancedStoreHeader({
                 )}
 
                 {/* Buscador móvil */}
-                <div className="md:hidden px-4 pb-3">
-                    <SmartSearch
-                        slug={slug}
-                        onStartChat={onStartChat}
-                        primaryColor={primaryColor}
-                    />
-                </div>
+                {!hideSearch && (
+                    <div className="md:hidden px-4 pb-3">
+                        <SmartSearch
+                            slug={slug}
+                            onStartChat={onStartChat}
+                            primaryColor={primaryColor}
+                        />
+                    </div>
+                )}
             </header>
         </div>
     )

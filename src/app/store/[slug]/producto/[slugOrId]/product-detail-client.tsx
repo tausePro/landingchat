@@ -17,6 +17,7 @@ import { useCartStore } from "@/store/cart-store"
 import { getColorHex } from "@/lib/constants/colors"
 import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/utils/shipping"
 import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel } from "@/types/product"
+import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
 
 interface ProductDetailClientProps {
     product: ProductDetailProduct
@@ -31,6 +32,7 @@ interface ProductDetailClientProps {
     reviews?: ProductReview[]
     reviewSummary?: ProductReviewSummary | null
     shippingConfig?: StorefrontShippingConfig | null
+    productDetailCRO?: ProductDetailCROConfig | null
 }
 
 interface ProductPriceTier {
@@ -376,6 +378,33 @@ function OfferCountdown({ endsAt, accentColor }: { endsAt: string; accentColor: 
                 {remaining.days > 0 ? `${remaining.days}d ` : ""}
                 {formatCountdownPart(remaining.hours)}:{formatCountdownPart(remaining.minutes)}:{formatCountdownPart(remaining.seconds)}
             </span>
+        </div>
+    )
+}
+
+function formatConfiguredCtaText(text: string | undefined, totalPrice: number): string | null {
+    if (!text?.trim()) return null
+
+    return text.replaceAll("{price}", formatCurrency(totalPrice)).trim()
+}
+
+function ProductCROTrustBlock({ trust, primaryColor }: { trust: NonNullable<ProductDetailCROConfig["trust"]>; primaryColor: string }) {
+    const items = [
+        trust.guaranteeText ? { id: "guarantee", icon: "verified_user", text: trust.guaranteeText } : null,
+        trust.paymentMethodsText ? { id: "payments", icon: "payments", text: trust.paymentMethodsText } : null,
+        trust.securePaymentText ? { id: "secure-payment", icon: "lock", text: trust.securePaymentText } : null,
+    ].filter((item): item is { id: string; icon: string; text: string } => Boolean(item))
+
+    if (items.length === 0) return null
+
+    return (
+        <div className="mt-3 grid gap-2">
+            {items.map((item) => (
+                <div key={item.id} className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[12.5px] font-semibold leading-5 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300">
+                    <span className="material-symbols-outlined mt-0.5 text-[18px]" style={{ color: primaryColor }}>{item.icon}</span>
+                    <span>{item.text}</span>
+                </div>
+            ))}
         </div>
     )
 }
@@ -798,7 +827,7 @@ function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeS
     )
 }
 
-export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -1038,6 +1067,18 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const unitPrice = resolvedQuantityPricing?.final_price ?? (hasQuantityPricing ? getUnitPriceForQuantity(effectiveQuantity) : legacyPricing.currentPrice)
     const totalPrice = unitPrice * effectiveQuantity
     const currentPrice = resolvedHeadlinePricing?.final_price ?? legacyPricing.currentPrice
+    const configuredPrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.primaryText, totalPrice)
+    const configuredMobilePrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobilePrimaryText ?? productDetailCRO?.cta?.primaryText, totalPrice)
+    const configuredStickyPrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickyPrimaryText ?? productDetailCRO?.cta?.primaryText, totalPrice)
+    const configuredSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.secondaryText, totalPrice)
+    const configuredMobileSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobileSecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice)
+    const configuredStickySecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickySecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice)
+    const primaryCtaText = configuredPrimaryCtaText ?? `Comprar Ya — ${formatCurrency(totalPrice)}`
+    const mobilePrimaryCtaText = configuredMobilePrimaryCtaText ?? "Comprar Ya"
+    const stickyPrimaryCtaText = configuredStickyPrimaryCtaText ?? "Comprar ahora"
+    const secondaryCtaText = configuredSecondaryCtaText ?? (product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar")
+    const mobileSecondaryCtaText = configuredMobileSecondaryCtaText ?? "Chat"
+    const stickySecondaryCtaText = configuredStickySecondaryCtaText ?? "Chat"
     const priceRangeLabel = displayPriceRange
         ? `${formatCurrency(displayPriceRange.min_price)} - ${formatCurrency(displayPriceRange.max_price)}`
         : null
@@ -1062,6 +1103,15 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                 badge: `Solo ${availableQuantity}`,
                 title: "El inventario actual no alcanza el mínimo de compra",
                 description: `Hay ${availableQuantity} unidade${availableQuantity === 1 ? "d" : "s"} disponible${availableQuantity === 1 ? "" : "s"} y el mínimo actual es ${minimumQuantity}.`,
+            }
+        }
+
+        if (productDetailCRO?.inventory?.title || productDetailCRO?.inventory?.description || productDetailCRO?.inventory?.badge) {
+            return {
+                tone: "warning",
+                badge: productDetailCRO.inventory.badge || resolvedInventory.lowStockLabel || "Entrega confirmada",
+                title: productDetailCRO.inventory.title || "Disponibilidad con fecha límite",
+                description: productDetailCRO.inventory.description || "Confirma tu compra hoy para asegurar disponibilidad y entrega.",
             }
         }
 
@@ -1095,7 +1145,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             title: "Disponible para compra",
             description: "Disponibilidad confirmada para compra.",
         }
-    }, [availableQuantity, hasInsufficientStockForMinimum, minimumQuantity, resolvedInventory, selectedVariantTitle])
+    }, [availableQuantity, hasInsufficientStockForMinimum, minimumQuantity, productDetailCRO?.inventory, resolvedInventory, selectedVariantTitle])
     const inventoryBadgeClass = inventoryMessage.tone === "critical"
         ? "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400"
         : inventoryMessage.tone === "warning"
@@ -1269,10 +1319,14 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     if (soldCount) {
         heroSignalItems.push({ id: "sold", icon: "trending_up", label: `${soldCount} vendidos`, tone: "success" })
     }
-    const inventoryTrustLabel = resolvedInventory.source === "variant"
+    const inventoryTrustLabel = productDetailCRO?.inventory?.trustLabel
+        ? productDetailCRO.inventory.trustLabel
+        : resolvedInventory.source === "variant"
         ? (selectedVariantTitle ?? "Disponibilidad por variante")
         : inventoryMessage.badge
-    const priceSupportLabel = shouldShowPriceRange && priceRangeLabel
+    const priceSupportLabel = productDetailCRO?.priceContext?.text
+        ? productDetailCRO.priceContext.text
+        : shouldShowPriceRange && priceRangeLabel
         ? "Selecciona una variante para confirmar el precio final."
         : hasQuantityPricing
         ? `Total actual ${formatCurrency(totalPrice)} · ${formatCurrency(unitPrice)} por unidad.`
@@ -1580,7 +1634,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <div className="mb-1.5 flex justify-between text-[12px] text-slate-500 dark:text-slate-400">
                                 <span>Disponibilidad</span>
                                 <strong className={`rounded-full px-2 py-0.5 text-[11px] ${inventoryBadgeClass}`}>
-                                    {resolvedInventory.inStock && hasKnownAvailableQuantity && availableQuantity <= 10
+                                    {productDetailCRO?.inventory?.badge
+                                        ? inventoryMessage.badge
+                                        : resolvedInventory.inStock && hasKnownAvailableQuantity && availableQuantity <= 10
                                         ? `¡Quedan solo ${availableQuantity}!`
                                         : resolvedInventory.inStock ? "Disponible hoy" : "Agotado"}
                                 </strong>
@@ -1594,6 +1650,12 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     }}
                                 />
                             </div>
+                            {productDetailCRO?.inventory && (
+                                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] leading-5 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                                    <strong className="block">{inventoryMessage.title}</strong>
+                                    <span>{inventoryMessage.description}</span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Shipping Progress */}
@@ -1770,7 +1832,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     style={{ backgroundColor: primaryColor }}
                                 >
                                 <span className="material-symbols-outlined text-[22px] [font-variation-settings:'FILL'_1,'wght'_500,'GRAD'_0,'opsz'_24]">shopping_cart</span>
-                                <span>{canPurchase ? `Comprar Ya — ${formatCurrency(totalPrice)}` : "No disponible"}</span>
+                                <span>{canPurchase ? primaryCtaText : "No disponible"}</span>
                                 </button>
                                 <button
                                     onClick={() => handleChat(product.id)}
@@ -1779,9 +1841,12 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 >
                                 <span className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>chat_bubble</span>
-                                    {product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar"}
+                                    {secondaryCtaText}
                                 </span>
                                 </button>
+                                {productDetailCRO?.trust && (
+                                    <ProductCROTrustBlock trust={productDetailCRO.trust} primaryColor={primaryColor} />
+                                )}
                             </div>
 
                             <div className="mb-5">
@@ -2069,14 +2134,14 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         style={{ backgroundColor: primaryColor }}
                     >
                         <span className="material-symbols-outlined text-lg">shopping_cart</span>
-                        <span>{canPurchase ? "Comprar Ya" : "No disponible"}</span>
+                        <span>{canPurchase ? mobilePrimaryCtaText : "No disponible"}</span>
                     </button>
                     <button
                         onClick={() => handleChat(product.id)}
                         className="flex flex-1 items-center justify-center gap-2 text-slate-700 dark:text-slate-300 text-sm font-bold h-12 rounded-lg border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
                     >
                         <span className="material-symbols-outlined text-lg">chat</span>
-                        <span>Chat</span>
+                        <span>{mobileSecondaryCtaText}</span>
                     </button>
                 </div>
             </div>
@@ -2099,7 +2164,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         className="flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
                     >
                         <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>chat_bubble</span>
-                        Chat
+                        {stickySecondaryCtaText}
                     </button>
                     <button
                         onClick={handleBuyNow}
@@ -2108,7 +2173,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         style={{ backgroundColor: primaryColor }}
                     >
                         <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
-                        {canPurchase ? "Comprar ahora" : "No disponible"}
+                        {canPurchase ? stickyPrimaryCtaText : "No disponible"}
                     </button>
                 </div>
             </div>
