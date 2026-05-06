@@ -7,10 +7,13 @@ import { ProductJsonLd } from "@/components/seo/product-json-ld"
 import { headers } from "next/headers"
 import { isSubdomain } from "@/lib/utils/store-urls"
 import { createServiceClient } from "@/lib/supabase/server"
+import { ProductUrgencyBanner } from "@/components/store/product-urgency-banner"
+import { resolveProductDetailCROConfig, type ProductDetailCROSearchParams } from "@/lib/storefront/product-detail-cro"
 import type { ProductReview, ProductReviewSummary } from "@/types/product"
 
 interface ProductDetailPageProps {
     params: Promise<{ slug: string; slugOrId: string }>
+    searchParams?: Promise<ProductDetailCROSearchParams>
 }
 
 // Genera metadata dinámica para SEO
@@ -115,8 +118,9 @@ async function getPublishedProductReviews(productId: string): Promise<{
     }
 }
 
-export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
+export default async function ProductDetailPage({ params, searchParams }: ProductDetailPageProps) {
     const { slug, slugOrId } = await params
+    const resolvedSearchParams = searchParams ? await searchParams : undefined
 
     const headersList = await headers()
     const host = headersList.get("host") || ""
@@ -128,6 +132,17 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     if (!data) notFound()
 
     const { organization, product, productWithVariants, viewModel, badges, promotions, relatedProducts, proactiveCouponOffer } = data
+    const generatedAt = new Date().toISOString()
+    const productDetailCRO = resolveProductDetailCROConfig({
+        settings: organization.settings,
+        product: {
+            id: product.id,
+            slug: product.slug,
+            categories: product.categories,
+        },
+        searchParams: resolvedSearchParams,
+        now: new Date(generatedAt),
+    })
 
     // Cargar reseñas publicadas del producto en paralelo (no bloquea si falla)
     const [{ reviews, summary: reviewSummary }, shippingConfig] = await Promise.all([
@@ -150,6 +165,16 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 reviews={reviews}
                 reviewSummary={reviewSummary}
             />
+            {productDetailCRO?.urgencyBanner && (
+                <ProductUrgencyBanner
+                    desktopText={productDetailCRO.urgencyBanner.desktopText}
+                    mobileText={productDetailCRO.urgencyBanner.mobileText}
+                    countdownEndsAt={productDetailCRO.urgencyBanner.countdownEndsAt}
+                    backgroundColor={productDetailCRO.urgencyBanner.backgroundColor}
+                    textColor={productDetailCRO.urgencyBanner.textColor}
+                    generatedAt={generatedAt}
+                />
+            )}
             <StoreLayoutClient
                 slug={organization.slug}
                 organization={organization}
@@ -160,6 +185,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 defaultChatProductId={product.id}
                 defaultChatProductName={product.name}
                 proactiveCouponOffer={proactiveCouponOffer}
+                productDetailCRO={productDetailCRO}
             >
                 <ProductDetailClient
                     product={product}
@@ -174,6 +200,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                     reviews={reviews}
                     reviewSummary={reviewSummary}
                     shippingConfig={shippingConfig}
+                    productDetailCRO={productDetailCRO}
                 />
             </StoreLayoutClient>
         </>
