@@ -55,8 +55,8 @@ interface OrganizationSettings {
         [key: string]: unknown
     }
     agent?: {
-        name?: string | null
-        avatar?: string | null
+        name?: unknown
+        avatar?: unknown
         [key: string]: unknown
     }
     [key: string]: unknown

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { chatInitRateLimit, getClientIdentifier, getRateLimitHeaders } from "@/lib/rate-limit"
+import { chatInitRateLimit, getClientIdentifier, getRateLimitHeaders, limitOrAllowOnProviderError } from "@/lib/rate-limit"
 import { createServiceClient } from "@/lib/supabase/server"
 import { resolvePublicOrganization } from "@/lib/storefront/resolvePublicOrganization"
 import { getValidatedStorefrontCustomerSession } from "@/lib/storefrontAccess"
@@ -17,7 +17,7 @@ export async function POST(
 
     // Rate limiting: 5 sesiones por minuto por IP
     const clientId = getClientIdentifier(request)
-    const rateLimitResult = await chatInitRateLimit.limit(clientId)
+    const rateLimitResult = await limitOrAllowOnProviderError(chatInitRateLimit, clientId, "chat-init")
     const headers = getRateLimitHeaders(rateLimitResult)
 
     if (!rateLimitResult.success) {
