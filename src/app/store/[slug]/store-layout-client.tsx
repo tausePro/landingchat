@@ -54,6 +54,11 @@ interface OrganizationSettings {
         phone?: string
         [key: string]: unknown
     }
+    agent?: {
+        name?: unknown
+        avatar?: unknown
+        [key: string]: unknown
+    }
     [key: string]: unknown
 }
 
@@ -410,6 +415,8 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     primaryColor={primaryColor}
                     onStartChat={handleStartChat}
                     whatsappPhone={organization.settings?.whatsapp?.phone}
+                    agentName={organization.settings?.agent?.name}
+                    agentAvatar={organization.settings?.agent?.avatar}
                     couponOffer={proactiveCouponOffer}
                 />
             )}

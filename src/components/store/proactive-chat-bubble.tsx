@@ -16,6 +16,8 @@ interface ProactiveChatBubbleProps {
     primaryColor: string
     onStartChat: (productId: string, context: string, params?: Record<string, string>) => void
     whatsappPhone?: string | null
+    agentName?: unknown
+    agentAvatar?: unknown
     couponOffer?: {
         code: string
         description: string | null
@@ -70,6 +72,10 @@ function normalizeWhatsAppPhone(phone: string | null | undefined): string | null
     return normalized.length >= 8 ? normalized : null
 }
 
+function getNonEmptyString(value: unknown): string | null {
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
+}
+
 function getRemainingTimeLabel(validUntil: string | null | undefined): string | null {
     if (!validUntil) return null
 
@@ -92,6 +98,8 @@ export function ProactiveChatBubble({
     primaryColor,
     onStartChat,
     whatsappPhone,
+    agentName,
+    agentAvatar,
     couponOffer,
     delayMs = DEFAULT_DELAY_MS,
     cooldownMs = DEFAULT_COOLDOWN_MS,
@@ -102,6 +110,8 @@ export function ProactiveChatBubble({
     const storageKey = useMemo(() => getStorageKey(slug, productId), [slug, productId])
     const normalizedWhatsAppPhone = normalizeWhatsAppPhone(whatsappPhone)
     const contentName = productName || "Producto"
+    const displayAgentName = getNonEmptyString(agentName) || "Asesor"
+    const displayAgentAvatar = getNonEmptyString(agentAvatar)
     const couponCode = couponOffer?.code
     const hasCouponOffer = Boolean(couponOffer?.code)
     const nudgeCopy = hasCouponOffer
@@ -223,15 +233,24 @@ export function ProactiveChatBubble({
         <div className="fixed bottom-24 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm sm:right-6">
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-800 dark:bg-slate-950">
                 <div className="flex gap-3 p-4">
-                    <div
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
-                        style={{ backgroundColor: primaryColor }}
-                    >
-                        <MessageCircle className="h-5 w-5" aria-hidden="true" />
-                    </div>
+                    {displayAgentAvatar ? (
+                        <div
+                            className="h-11 w-11 shrink-0 rounded-full bg-cover bg-center shadow-lg ring-2 ring-white dark:ring-slate-800"
+                            style={{ backgroundImage: `url("${displayAgentAvatar}")` }}
+                            aria-label={displayAgentName}
+                            role="img"
+                        />
+                    ) : (
+                        <div
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white shadow-lg"
+                            style={{ backgroundColor: primaryColor }}
+                        >
+                            <MessageCircle className="h-5 w-5" aria-hidden="true" />
+                        </div>
+                    )}
                     <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Asesor AI</p>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{displayAgentName}</p>
                             <button
                                 type="button"
                                 onClick={handleDismiss}

@@ -25,7 +25,17 @@ interface StoreOrganizationSettings {
     contact?: {
         phone?: string | null
     }
+    agent?: {
+        name?: unknown
+        avatar?: unknown
+        [key: string]: unknown
+    }
     [key: string]: unknown
+}
+
+interface StorefrontAgentIdentity {
+    name: string | null
+    avatar: string | null
 }
 
 interface StorefrontBundleItem {
@@ -249,10 +259,48 @@ async function resolveOrganizationWhatsAppPhone(
     return whatsappInstance?.phone_number || null
 }
 
-function enrichOrganizationWithWhatsAppPhone<T extends { id: string; settings?: StoreOrganizationSettings | null }>(
+async function resolveOrganizationAgentIdentity(
+    supabase: StorefrontSupabaseClient,
+    organizationId: string,
+    settings?: StoreOrganizationSettings | null,
+): Promise<StorefrontAgentIdentity | null> {
+    const configuredAgent = isRecord(settings?.agent) ? settings.agent : null
+    const configuredName = getOptionalString(configuredAgent?.name)
+    const configuredAvatar = getOptionalString(configuredAgent?.avatar)
+
+    if (configuredName || configuredAvatar) {
+        return {
+            name: configuredName,
+            avatar: configuredAvatar,
+        }
+    }
+
+    const { data: agent } = await supabase
+        .from("agents")
+        .select("name, avatar_url")
+        .eq("organization_id", organizationId)
+        .eq("type", "bot")
+        .eq("status", "available")
+        .limit(1)
+        .maybeSingle()
+
+    if (!agent) {
+        return null
+    }
+
+    return {
+        name: getOptionalString(agent.name),
+        avatar: getOptionalString(agent.avatar_url),
+    }
+}
+
+function enrichOrganizationWithStorefrontContact<T extends { id: string; settings?: StoreOrganizationSettings | null }>(
     organization: T,
     whatsappPhone: string | null,
+    agentIdentity: StorefrontAgentIdentity | null,
 ): T {
+    const configuredAgent = isRecord(organization.settings?.agent) ? organization.settings.agent : {}
+
     return {
         ...organization,
         settings: {
@@ -260,6 +308,11 @@ function enrichOrganizationWithWhatsAppPhone<T extends { id: string; settings?: 
             whatsapp: {
                 ...organization.settings?.whatsapp,
                 phone: whatsappPhone,
+            },
+            agent: {
+                ...configuredAgent,
+                ...(agentIdentity?.name ? { name: agentIdentity.name } : {}),
+                ...(agentIdentity?.avatar ? { avatar: agentIdentity.avatar } : {}),
             },
         },
     }
@@ -376,7 +429,8 @@ export async function getStoreData(slug: string, limit?: number) {
         .eq("organization_id", org.id)
 
     const whatsappPhone = await resolveOrganizationWhatsAppPhone(supabase, org.id, org.settings)
-    const enrichedOrg = enrichOrganizationWithWhatsAppPhone(org, whatsappPhone)
+    const agentIdentity = await resolveOrganizationAgentIdentity(supabase, org.id, org.settings)
+    const enrichedOrg = enrichOrganizationWithStorefrontContact(org, whatsappPhone, agentIdentity)
 
     return {
         organization: enrichedOrg,
@@ -400,7 +454,8 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     if (orgError || !org) return null
 
     const whatsappPhone = await resolveOrganizationWhatsAppPhone(supabase, org.id, org.settings)
-    const enrichedOrg = enrichOrganizationWithWhatsAppPhone(org, whatsappPhone)
+    const agentIdentity = await resolveOrganizationAgentIdentity(supabase, org.id, org.settings)
+    const enrichedOrg = enrichOrganizationWithStorefrontContact(org, whatsappPhone, agentIdentity)
 
     // 2. Fetch Product - support both UUID and slug
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slugOrId)
