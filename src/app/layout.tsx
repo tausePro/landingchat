@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { PosthogInit } from "@/components/analytics/posthog-init";
 import { Toaster } from "sonner";
 import { validateEnv } from "@/lib/env-validation";
 
@@ -64,7 +63,6 @@ export default function RootLayout({
         >
           {children}
           <Toaster richColors position="top-right" />
-          <PosthogInit />
         </ThemeProvider>
       </body>
     </html>
