@@ -376,6 +376,7 @@ export async function reconcileOrderPaymentFromGateway(orderId: string) {
 
 export async function deleteOrder(orderId: string) {
     const supabase = await createClient()
+    const serviceSupabase = createServiceClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     console.log("[deleteOrder] Auth check:", {
@@ -418,8 +419,22 @@ export async function deleteOrder(orderId: string) {
         throw new Error("Orden no encontrada o no tienes permisos para eliminarla")
     }
 
+    const { error: transactionUnlinkError } = await serviceSupabase
+        .from("store_transactions")
+        .update({
+            order_id: null,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("order_id", orderId)
+        .eq("organization_id", profile.organization_id)
+
+    if (transactionUnlinkError) {
+        console.error("[deleteOrder] Error unlinking transactions:", transactionUnlinkError)
+        throw new Error("Error al preparar la eliminación del pedido: " + transactionUnlinkError.message)
+    }
+
     // Eliminar la orden
-    const { data: deletedData, error: deleteError, count } = await supabase
+    const { data: deletedData, error: deleteError, count } = await serviceSupabase
         .from("orders")
         .delete()
         .eq("id", orderId)
