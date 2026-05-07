@@ -3,7 +3,6 @@
 import { createContext, useContext, ReactNode, useMemo } from "react"
 import { useMetaPixel, setMetaPixelAdvancedMatching, type MetaPixelAdvancedMatchingData } from "./meta-pixel"
 import { usePosthogTracking } from "./use-posthog-tracking"
-import { getTrackingParams } from "@/hooks/use-tracking-params"
 import {
     trackFirstPartyAnalyticsEvent,
     type AnalyticsEventProperties,
@@ -57,40 +56,11 @@ function createMetaEventId(eventName: MetaFunnelEventName): string {
     return `${eventName.toLowerCase()}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-function sendMetaCapiFunnelEvent(params: {
-    slug?: string
-    eventName: MetaFunnelEventName
-    eventId: string
-    customData: {
-        currency: string
-        value: number
-        contentIds?: string[]
-        contents?: Array<{ id: string; quantity: number; item_price?: number }>
-        contentType: string
-        orderId?: string
-        numItems?: number
-    }
-}) {
-    if (!params.slug || typeof window === "undefined") {
-        return
-    }
-
-    const trackingParams = getTrackingParams(params.slug)
-
-    void fetch(`/api/store/${encodeURIComponent(params.slug)}/meta-capi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        keepalive: true,
-        body: JSON.stringify({
-            eventName: params.eventName,
-            eventId: params.eventId,
-            eventSourceUrl: window.location.href,
-            fbc: trackingParams.fbc,
-            fbp: trackingParams.fbp,
-            customData: params.customData,
-        }),
-    }).catch(() => undefined)
-}
+// Meta Conversions API (server-side) deshabilitado a nivel cliente.
+// Razón: la mayoría de tenants no tiene meta_capi_access_token configurado y el
+// endpoint silenciaba con 200 + skipped. Reactivar cuando: (1) el dashboard
+// valide configuración real y (2) tengamos pruebas de match quality contra Pixel.
+// Mientras tanto, las funciones trackXxx solo emiten Meta Pixel + PostHog + first-party.
 
 interface TrackingProviderProps {
     children: ReactNode
@@ -131,18 +101,6 @@ export function TrackingProvider({
                 const resolvedValue = value || 0
                 if (metaPixelEnabled) {
                     metaPixel.trackViewContent(contentId, contentName, value, currency, eventId)
-                    sendMetaCapiFunnelEvent({
-                        slug: organizationSlug,
-                        eventName: "ViewContent",
-                        eventId,
-                        customData: {
-                            currency: resolvedCurrency,
-                            value: resolvedValue,
-                            contentIds: [contentId],
-                            contents: [{ id: contentId, quantity: 1, item_price: resolvedValue }],
-                            contentType: "product",
-                        },
-                    })
                 }
                 posthogTracking.trackViewContent(contentId, contentName, value, currency)
                 trackFirstPartyAnalyticsEvent(organizationSlug, {
@@ -160,18 +118,6 @@ export function TrackingProvider({
                 const resolvedCurrency = currency || "COP"
                 if (metaPixelEnabled) {
                     metaPixel.trackAddToCart(contentId, contentName, value, currency, eventId)
-                    sendMetaCapiFunnelEvent({
-                        slug: organizationSlug,
-                        eventName: "AddToCart",
-                        eventId,
-                        customData: {
-                            currency: resolvedCurrency,
-                            value,
-                            contentIds: [contentId],
-                            contents: [{ id: contentId, quantity: 1, item_price: value }],
-                            contentType: "product",
-                        },
-                    })
                 }
                 posthogTracking.trackAddToCart(contentId, contentName, value, currency)
                 trackFirstPartyAnalyticsEvent(organizationSlug, {
@@ -189,17 +135,6 @@ export function TrackingProvider({
                 const resolvedCurrency = currency || "COP"
                 if (metaPixelEnabled) {
                     metaPixel.trackInitiateCheckout(value, currency, contentIds, eventId)
-                    sendMetaCapiFunnelEvent({
-                        slug: organizationSlug,
-                        eventName: "InitiateCheckout",
-                        eventId,
-                        customData: {
-                            currency: resolvedCurrency,
-                            value,
-                            contentIds,
-                            contentType: "product",
-                        },
-                    })
                 }
                 posthogTracking.trackInitiateCheckout(value, currency, contentIds)
                 trackFirstPartyAnalyticsEvent(organizationSlug, {
@@ -209,24 +144,11 @@ export function TrackingProvider({
                     currency: resolvedCurrency,
                 })
             },
-            trackPurchase: (value, currency, contentIds, orderId, numItems) => {
+            trackPurchase: (value, currency, contentIds, orderId) => {
                 const resolvedCurrency = currency || "COP"
                 const eventId = orderId ? `purchase_${orderId}` : createMetaEventId("Purchase")
                 if (metaPixelEnabled) {
                     metaPixel.trackPurchase(value, resolvedCurrency, contentIds, orderId, eventId)
-                    sendMetaCapiFunnelEvent({
-                        slug: organizationSlug,
-                        eventName: "Purchase",
-                        eventId,
-                        customData: {
-                            currency: resolvedCurrency,
-                            value,
-                            contentIds,
-                            contentType: "product",
-                            orderId,
-                            numItems,
-                        },
-                    })
                 }
                 posthogTracking.trackPurchase(value, currency, contentIds, orderId)
                 trackFirstPartyAnalyticsEvent(organizationSlug, {
