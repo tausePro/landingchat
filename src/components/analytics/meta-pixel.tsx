@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect } from "react"
 import Image from "next/image"
 import Script from "next/script"
 
@@ -17,14 +16,8 @@ declare global {
 }
 
 export function MetaPixel({ pixelId }: MetaPixelProps) {
-    useEffect(() => {
-        // Inicializar Meta Pixel cuando el componente se monta
-        if (typeof window !== "undefined" && window.fbq) {
-            window.fbq("init", pixelId)
-            window.fbq("track", "PageView")
-        }
-    }, [pixelId])
-
+    // Init y PageView se disparan exactamente una vez desde el <Script> inline.
+    // No re-inicializar en un useEffect: causaba doble init y doble PageView.
     if (!pixelId) return null
 
     return (
