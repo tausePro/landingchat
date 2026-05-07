@@ -257,5 +257,24 @@ describe('Middleware Routing Tests', () => {
         }
       }
     })
+
+    it('should rewrite public order status pages for store subdomains', async () => {
+      const url = new URL('https://qp.landingchat.co/order/order-uuid/success?access=signed-token')
+      const request = new NextRequest(url, {
+        headers: {
+          host: 'qp.landingchat.co'
+        }
+      })
+      const response = await middleware(request)
+
+      if (response instanceof NextResponse) {
+        const rewrittenUrl = response.headers.get('x-middleware-rewrite')
+        expect(rewrittenUrl).toBeTruthy()
+
+        const parsedUrl = new URL(rewrittenUrl!)
+        expect(parsedUrl.pathname).toBe('/store/qp/order/order-uuid/success')
+        expect(parsedUrl.searchParams.get('access')).toBe('signed-token')
+      }
+    })
   })
 })
