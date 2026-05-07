@@ -68,6 +68,66 @@ async function withTimeout<T, F>(promise: Promise<T>, fallback: F): Promise<T | 
     ])
 }
 
+const ORDER_STATUS_PATH_PATTERN = /^\/order\/[^/]+\/(success|pending|error)(\/)?$/
+const RESERVED_SUBDOMAINS = ['www', 'app', 'api', 'dashboard', 'wa']
+
+async function resolveStoreSlugFromHost(hostname: string, request: NextRequest): Promise<string | null> {
+    if (!hostname) return null
+
+    if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
+        const slug = request.nextUrl.searchParams.get('store')
+        if (slug) return slug
+
+        const hostPart = hostname.split(':')[0]
+        const parts = hostPart.split('.')
+        if (parts.length > 1 && parts[0] !== 'localhost' && parts[0] !== '127') {
+            return parts[0]
+        }
+
+        return null
+    }
+
+    if (!hostname.includes('landingchat.co')) {
+        const cacheKey = `domain:${hostname}`
+        const cachedSlug = getCache<string | null>(cacheKey)
+        if (cachedSlug !== undefined) {
+            return cachedSlug
+        }
+
+        try {
+            const supabase = createServerClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                {
+                    cookies: {
+                        getAll() { return [] },
+                        setAll() { }
+                    }
+                }
+            )
+
+            const result = await withTimeout(
+                Promise.resolve(supabase.from("organizations").select("slug").eq("custom_domain", hostname).single()),
+                { data: null, error: null } satisfies CustomDomainLookupResult
+            )
+
+            const slug = result.data?.slug ?? null
+            setCache(cacheKey, slug)
+            return slug
+        } catch (error) {
+            console.error("[MIDDLEWARE] Error checking custom domain:", error)
+            setCache(cacheKey, null)
+            return null
+        }
+    }
+
+    const parts = hostname.split('.')
+    if (parts.length < 3) return null
+
+    const subdomain = parts[0]
+    return RESERVED_SUBDOMAINS.includes(subdomain) ? null : subdomain
+}
+
 export async function proxy(request: NextRequest) {
     const hostname = request.headers.get('host') || ''
     const pathname = request.nextUrl.pathname
@@ -91,6 +151,17 @@ export async function proxy(request: NextRequest) {
 
     if (isDiscoveryRoute) {
         return NextResponse.next()
+    }
+
+    if (ORDER_STATUS_PATH_PATTERN.test(pathname)) {
+        const statusSlug = await resolveStoreSlugFromHost(hostname, request)
+        if (statusSlug) {
+            const url = new URL(`/store/${statusSlug}${pathname}`, request.url)
+            request.nextUrl.searchParams.forEach((value, key) => {
+                if (key !== 'store') url.searchParams.set(key, value)
+            })
+            return NextResponse.rewrite(url)
+        }
     }
 
     // ============================================
@@ -202,8 +273,7 @@ export async function proxy(request: NextRequest) {
                 const subdomain = parts[0]
 
                 // Ignorar subdominios reservados del sistema
-                const reserved = ['www', 'app', 'api', 'dashboard', 'wa']
-                if (!reserved.includes(subdomain)) {
+                if (!RESERVED_SUBDOMAINS.includes(subdomain)) {
                     slug = subdomain
                 }
             }

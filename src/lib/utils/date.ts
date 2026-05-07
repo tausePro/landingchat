@@ -163,3 +163,84 @@ export function formatBogotaMonthShort(value: DateLike): string {
         timeZone: LANDINGCHAT_TIME_ZONE,
     })
 }
+
+type BogotaDateRange = {
+    start: string
+    end: string
+}
+
+type BogotaLabeledDateRange = BogotaDateRange & {
+    label: string
+}
+
+const BOGOTA_UTC_OFFSET_HOURS = 5
+const DAY_IN_MS = 24 * 60 * 60 * 1000
+const DAY_LABELS = ["D", "L", "M", "X", "J", "V", "S"]
+
+function getBogotaDateParts(value: DateLike): { year: number; month: number; day: number } | null {
+    const date = toDateOrNull(value)
+    if (!date) return null
+
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: LANDINGCHAT_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(date)
+
+    const year = Number(parts.find((part) => part.type === "year")?.value)
+    const month = Number(parts.find((part) => part.type === "month")?.value)
+    const day = Number(parts.find((part) => part.type === "day")?.value)
+
+    if (!year || !month || !day) return null
+
+    return { year, month, day }
+}
+
+function buildBogotaDayStartUtc(year: number, month: number, day: number): Date {
+    return new Date(Date.UTC(year, month - 1, day, BOGOTA_UTC_OFFSET_HOURS, 0, 0, 0))
+}
+
+export function getBogotaDayRange(value: DateLike = new Date()): BogotaDateRange {
+    const parts = getBogotaDateParts(value)
+    const fallback = new Date()
+    const resolvedParts = parts ?? {
+        year: fallback.getUTCFullYear(),
+        month: fallback.getUTCMonth() + 1,
+        day: fallback.getUTCDate(),
+    }
+
+    const start = buildBogotaDayStartUtc(resolvedParts.year, resolvedParts.month, resolvedParts.day)
+    const end = new Date(start.getTime() + DAY_IN_MS)
+
+    return {
+        start: start.toISOString(),
+        end: end.toISOString(),
+    }
+}
+
+export function getBogotaRecentDayRanges(count: number, reference: DateLike = new Date()): BogotaLabeledDateRange[] {
+    const parts = getBogotaDateParts(reference)
+    const fallback = new Date()
+    const resolvedParts = parts ?? {
+        year: fallback.getUTCFullYear(),
+        month: fallback.getUTCMonth() + 1,
+        day: fallback.getUTCDate(),
+    }
+
+    return Array.from({ length: count }, (_, index) => {
+        const daysAgo = count - 1 - index
+        const start = buildBogotaDayStartUtc(
+            resolvedParts.year,
+            resolvedParts.month,
+            resolvedParts.day - daysAgo
+        )
+        const end = new Date(start.getTime() + DAY_IN_MS)
+
+        return {
+            label: DAY_LABELS[start.getUTCDay()],
+            start: start.toISOString(),
+            end: end.toISOString(),
+        }
+    })
+}

@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { formatBogotaDayKey } from "@/lib/utils/date"
+import { formatBogotaDayKey, getBogotaDayRange, getBogotaRecentDayRanges } from "@/lib/utils/date"
 
 export interface RealEstateStats {
     activeProperties: number
@@ -231,25 +231,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const isRealEstate = industry === "real_estate" || enabledModules.includes("properties")
 
     // Revenue Today
-    const todayStart = new Date()
-    todayStart.setHours(0, 0, 0, 0)
+    const todayRange = getBogotaDayRange()
     const revenueToday = validOrders
-        .filter(o => o.created_at >= todayStart.toISOString())
+        .filter(o => o.created_at >= todayRange.start && o.created_at < todayRange.end)
         .reduce((sum, o) => sum + (o.total || 0), 0)
 
     // Weekly Revenue History (L M X J V S D)
-    const dayLabels = ['D', 'L', 'M', 'X', 'J', 'V', 'S']
-    const weeklyHistory: { day: string; value: number }[] = []
-    for (let i = 6; i >= 0; i--) {
-        const d = new Date()
-        d.setDate(d.getDate() - i)
-        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).toISOString()
-        const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).toISOString()
+    const weeklyHistory = getBogotaRecentDayRanges(7).map(({ label, start, end }) => {
         const dayRevenue = validOrders
-            .filter(o => o.created_at >= dayStart && o.created_at < dayEnd)
+            .filter(o => o.created_at >= start && o.created_at < end)
             .reduce((sum, o) => sum + (o.total || 0), 0)
-        weeklyHistory.push({ day: dayLabels[d.getDay()], value: dayRevenue })
-    }
+        return { day: label, value: dayRevenue }
+    })
 
     // Recent Activity (últimos 5 eventos)
     const recentActivity: RecentActivity[] = []
