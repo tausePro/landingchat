@@ -15,7 +15,6 @@ import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
-import { CheckoutModal } from "../components/checkout-modal"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
@@ -153,7 +152,6 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [customerChats, setCustomerChats] = useState<Array<{ id: string; title: string; created_at: string; updated_at?: string }>>([])
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
     const [isLoading, setIsLoading] = useState(false)
-    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const { addItem, items, toggleCart, setIsOpen: setCartOpen } = useCartStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -782,7 +780,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     slug={slug}
                     primaryColor={primaryColor}
                     recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
-                    onCheckout={() => setIsCheckoutOpen(true)}
+                    onCheckout={() => {
+                        const params = new URLSearchParams({ from: 'chat' })
+                        if (chatId) params.set('chatId', chatId)
+                        router.push(`${getStoreLink('/checkout', isSubdomain, slug)}?${params.toString()}`)
+                    }}
                     shippingConfig={shippingConfig}
                 />
             }
@@ -1100,16 +1102,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 shippingConfig={shippingConfig}
                 onCheckout={() => {
                     setCartOpen(false)
-                    setIsCheckoutOpen(true)
+                    const params = new URLSearchParams({ from: 'chat' })
+                    if (chatId) params.set('chatId', chatId)
+                    router.push(`${getStoreLink('/checkout', isSubdomain, slug)}?${params.toString()}`)
                 }}
-            />
-
-            <CheckoutModal
-                isOpen={isCheckoutOpen}
-                onClose={() => setIsCheckoutOpen(false)}
-                slug={slug}
-                sourceChannel="chat"
-                chatId={chatId || undefined}
             />
         </ChatLayout>
     )

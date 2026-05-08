@@ -176,7 +176,8 @@ export async function proxy(request: NextRequest) {
         pathname.startsWith('/admin') ||      // Panel de superadmin
         pathname.startsWith('/auth') ||       // Callbacks de autenticación
         pathname.startsWith('/onboarding') || // Flujo de onboarding
-        pathname.startsWith('/checkout') ||   // Checkout de pagos (ePayco, Wompi)
+        pathname.startsWith('/checkout/wompi') ||   // Return URL de Wompi (lee host)
+        pathname.startsWith('/checkout/epayco') || // Return URL de ePayco (lee host)
         pathname.startsWith('/order') ||      // Página de orden (para dominios personalizados)
         pathname.includes('.')                // Archivos estáticos (favicon, imágenes, etc.)
     ) {
@@ -419,8 +420,9 @@ export async function proxy(request: NextRequest) {
     // Estas rutas tienen sus propias páginas que manejan dominios personalizados
     // y obtienen la organización del header host
     if (
-        pathname.startsWith('/order') ||     // Página de orden (usa custom_domain del host)
-        pathname.startsWith('/checkout')     // Checkout de pagos (usa custom_domain del host)
+        pathname.startsWith('/order') ||           // Página de orden (usa custom_domain del host)
+        pathname.startsWith('/checkout/wompi') ||  // Return URL de Wompi (lee host)
+        pathname.startsWith('/checkout/epayco')    // Return URL de ePayco (lee host)
     ) {
         console.log(`[MIDDLEWARE] Custom domain route bypass: ${pathname} - not rewriting`)
         return handleAuth(request)

@@ -1,0 +1,266 @@
+"use client"
+
+import type { ChangeEvent, FormEvent } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { COLOMBIA_DEPARTMENTS } from "@/lib/constants/colombia-departments"
+import { cn } from "@/lib/utils"
+import type { CheckoutFormData } from "../types"
+
+interface ShippingAvailability {
+    available: boolean
+    cost: number
+    message?: string
+}
+
+interface ContactStepProps {
+    formData: CheckoutFormData
+    shippingAvailability: ShippingAvailability
+    onInputChange: (e: ChangeEvent<HTMLInputElement>) => void
+    onSelectChange: (name: string, value: string) => void
+    onSubmit: (e: FormEvent) => void
+}
+
+/**
+ * Step 1 del checkout: datos personales, facturación y dirección de envío.
+ *
+ * Componente "controlado" — todos los handlers vienen del parent
+ * (checkout-flow.tsx). Esto permite mantener el state en un sólo lugar
+ * y validar/persistir desde el orquestador.
+ */
+export function ContactStep({
+    formData,
+    shippingAvailability,
+    onInputChange,
+    onSelectChange,
+    onSubmit,
+}: ContactStepProps) {
+    return (
+        <form onSubmit={onSubmit} className="grid gap-4 py-4 lg:grid-cols-2 lg:items-start">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-sm text-blue-800 dark:border-blue-900/60 dark:bg-blue-900/20 dark:text-blue-200 lg:col-span-2">
+                Usaremos estos datos solo para coordinar el envío, enviarte actualizaciones por WhatsApp y generar tu comprobante.
+            </div>
+
+            <div className="space-y-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Nombre completo
+                    </Label>
+                    <Input
+                        id="name"
+                        name="name"
+                        required
+                        autoComplete="name"
+                        value={formData.name}
+                        onChange={onInputChange}
+                        placeholder="Ej. Juan Pérez"
+                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Email <span className="text-gray-400 text-xs font-normal">(Opcional)</span>
+                    </Label>
+                    <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        value={formData.email}
+                        onChange={onInputChange}
+                        placeholder="juan@ejemplo.com"
+                        className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                    />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Teléfono (WhatsApp)
+                    </Label>
+                    <div className="flex">
+                        <div className="inline-flex items-center justify-center px-4 rounded-l-xl border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-medium">
+                            🇨🇴 +57
+                        </div>
+                        <Input
+                            id="phone"
+                            name="phone"
+                            type="tel"
+                            required
+                            autoComplete="tel-national"
+                            inputMode="tel"
+                            value={formData.phone}
+                            onChange={onInputChange}
+                            placeholder="300 123 4567"
+                            className="flex-1 h-12 rounded-l-none rounded-r-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Tax/Invoicing Fields */}
+            <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary dark:text-primary-dark mb-2 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg">receipt_long</span> Información de Facturación
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Estos datos permiten emitir el comprobante de compra y evitar retrasos al crear la orden.
+                </p>
+
+                <div>
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                        Documento de Identidad
+                    </Label>
+                    <div className="flex gap-2">
+                        <Select value={formData.document_type} onValueChange={(value) => onSelectChange("document_type", value)}>
+                            <SelectTrigger className="w-28 h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg z-50">
+                                <SelectItem value="CC" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">C.C.</SelectItem>
+                                <SelectItem value="NIT" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">NIT</SelectItem>
+                                <SelectItem value="CE" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">C.E.</SelectItem>
+                                <SelectItem value="Passport" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Pas.</SelectItem>
+                                <SelectItem value="TI" className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">T.I.</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input
+                            id="document_number"
+                            name="document_number"
+                            required
+                            autoComplete="off"
+                            inputMode="numeric"
+                            value={formData.document_number}
+                            onChange={onInputChange}
+                            placeholder="Número"
+                            className="flex-1 h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <label
+                        className={cn(
+                            "relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary",
+                            formData.person_type === "Natural"
+                                ? "border-primary bg-blue-50 dark:bg-blue-900/20"
+                                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50",
+                        )}
+                        onClick={() => onSelectChange("person_type", "Natural")}
+                    >
+                        <input
+                            type="radio"
+                            name="person_type"
+                            checked={formData.person_type === "Natural"}
+                            onChange={() => { }}
+                            className="form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300"
+                        />
+                        <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">
+                            Natural (Persona)
+                        </span>
+                    </label>
+                    <label
+                        className={cn(
+                            "relative flex items-center p-3 rounded-xl border cursor-pointer transition-all shadow-sm hover:border-primary dark:hover:border-primary",
+                            formData.person_type === "Jurídica"
+                                ? "border-primary bg-blue-50 dark:bg-blue-900/20"
+                                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50",
+                        )}
+                        onClick={() => onSelectChange("person_type", "Jurídica")}
+                    >
+                        <input
+                            type="radio"
+                            name="person_type"
+                            checked={formData.person_type === "Jurídica"}
+                            onChange={() => { }}
+                            className="form-radio text-primary focus:ring-primary h-5 w-5 border-gray-300"
+                        />
+                        <span className="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300 group-hover:text-primary">
+                            Jurídica (Empresa)
+                        </span>
+                    </label>
+                </div>
+
+                {formData.person_type === "Jurídica" && (
+                    <div className="grid gap-2">
+                        <Label htmlFor="business_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Nombre de la Empresa
+                        </Label>
+                        <Input
+                            id="business_name"
+                            name="business_name"
+                            value={formData.business_name}
+                            onChange={onInputChange}
+                            placeholder="Mi Empresa S.A.S."
+                            className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                        />
+                    </div>
+                )}
+            </div>
+
+            <div className="rounded-xl border border-gray-100 dark:border-gray-800 p-4">
+                <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Ubicación</Label>
+                <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+                    Confirmamos la cobertura de envío con tu ciudad antes de pasar al pago.
+                </p>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                    <Select value={formData.state} onValueChange={(value) => onSelectChange("state", value)}>
+                        <SelectTrigger className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm">
+                            <SelectValue placeholder="Departamento" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 shadow-lg z-50">
+                            {COLOMBIA_DEPARTMENTS.map((dept) => (
+                                <SelectItem
+                                    key={dept}
+                                    value={dept}
+                                    className="text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:bg-gray-100 dark:focus:bg-gray-800 cursor-pointer px-3 py-2"
+                                >
+                                    {dept}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Input
+                        id="city"
+                        name="city"
+                        required
+                        autoComplete="address-level2"
+                        value={formData.city}
+                        onChange={onInputChange}
+                        placeholder="Ciudad"
+                        className={cn(
+                            "h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm",
+                            !shippingAvailability.available && formData.city && "border-red-400 dark:border-red-500",
+                        )}
+                    />
+                </div>
+                {!shippingAvailability.available && formData.city && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+                        <span className="material-symbols-outlined text-amber-500 text-lg mt-0.5">local_shipping</span>
+                        <p className="text-sm text-amber-700 dark:text-amber-300">{shippingAvailability.message}</p>
+                    </div>
+                )}
+                <Input
+                    id="address"
+                    name="address"
+                    required
+                    autoComplete="street-address"
+                    value={formData.address}
+                    onChange={onInputChange}
+                    placeholder="Dirección completa"
+                    className="h-12 rounded-xl border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-primary focus:border-primary shadow-sm"
+                />
+            </div>
+
+            <div className="pt-4 space-y-3 lg:col-span-2">
+                <Button type="submit" className="w-full h-12 rounded-xl bg-primary text-white hover:bg-primary/90 font-bold">
+                    Confirmar envío y continuar
+                </Button>
+                <div className="flex items-center justify-center gap-2 text-slate-400 opacity-80">
+                    <span className="material-symbols-outlined text-base text-green-500">lock</span>
+                    <span className="text-xs font-medium">Tus datos se usan únicamente para procesar esta compra.</span>
+                </div>
+            </div>
+        </form>
+    )
+}
