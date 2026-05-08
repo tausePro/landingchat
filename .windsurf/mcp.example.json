@@ -1,0 +1,39 @@
+{
+  "_comment": "Plantilla MCP servers para LandingChat. Copiar a mcp.json y rellenar con claves reales. NO commitear mcp.json.",
+  "mcpServers": {
+    "supabase": {
+      "_comment": "Acceso de solo lectura a la DB de Supabase. Ideal para auditar RLS, schema y datos sin riesgo.",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest", "--read-only", "--project-ref=PROJECT_REF"],
+      "env": {
+        "SUPABASE_ACCESS_TOKEN": "REEMPLAZAR_CON_PERSONAL_ACCESS_TOKEN_DE_SUPABASE"
+      }
+    },
+    "github": {
+      "_comment": "Operaciones git/PRs sin salir del IDE. Token con scope: repo, workflow.",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "REEMPLAZAR_CON_GITHUB_PAT"
+      }
+    },
+    "vercel": {
+      "_comment": "Inspección y operación de deploys, logs, env vars de Vercel.",
+      "command": "npx",
+      "args": ["-y", "vercel-mcp@latest"],
+      "env": {
+        "VERCEL_API_TOKEN": "REEMPLAZAR_CON_VERCEL_TOKEN",
+        "VERCEL_TEAM_ID": "REEMPLAZAR_SI_APLICA"
+      }
+    },
+    "meta-ads": {
+      "_comment": "Acceso a Meta Ads API para análisis de campañas y attribution. Requiere business_management permission.",
+      "command": "npx",
+      "args": ["-y", "meta-ads-mcp@latest"],
+      "env": {
+        "META_ACCESS_TOKEN": "REEMPLAZAR_CON_META_ACCESS_TOKEN",
+        "META_AD_ACCOUNT_ID": "REEMPLAZAR_CON_AD_ACCOUNT_ID"
+      }
+    }
+  }
+}
