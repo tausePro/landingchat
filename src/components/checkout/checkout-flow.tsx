@@ -16,7 +16,6 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { getTrackingParams } from "@/hooks/use-tracking-params"
 import { calculateCouponDiscount } from "@/lib/utils/coupon"
 import { getShippingAvailability } from "@/lib/utils/shipping"
-import { cn } from "@/lib/utils"
 import {
     getCartItemProductId,
     toCouponCartItem,
@@ -31,7 +30,6 @@ import { SuccessStep } from "./steps/success-step"
 import type {
     CheckoutFormData,
     CheckoutStepKey,
-    CheckoutVariant,
     ManualPaymentInfo,
     OrderSummaryAmounts,
     PaymentGatewayOption,
@@ -43,18 +41,6 @@ export interface CheckoutFlowProps {
     slug: string
     sourceChannel?: "web" | "chat" | "whatsapp"
     chatId?: string
-    /**
-     * Callback cuando el usuario cancela o cierra el checkout.
-     * - En `variant="modal"`: cierra el modal.
-     * - En `variant="page"`: típicamente `router.back()`.
-     */
-    onCancel: () => void
-    /**
-     * Variante visual.
-     * - `modal`: usa max-height + overflow interno (para shadcn Dialog).
-     * - `page`: ocupa el alto natural; el scroll lo maneja el viewport.
-     */
-    variant?: CheckoutVariant
 }
 
 const CHECKOUT_STEPS: ReadonlyArray<{ key: CheckoutStepKey; label: string }> = [
@@ -94,12 +80,10 @@ const INITIAL_FORM_DATA: CheckoutFormData = {
  * Mantiene todo el state, llamadas a server actions y eventos de tracking.
  * Delega el render de cada step a componentes presentacionales en `./steps/`.
  *
- * El componente acepta dos variantes visuales (`modal` y `page`) que afectan
- * sólo el wrapping/scroll. El comportamiento del flujo es idéntico.
- *
- * Tras M4 el caso `modal` desaparecerá y este componente se simplificará.
+ * Vive en una ruta dedicada (`/store/[slug]/checkout`). El layout y el back
+ * button los maneja el page-client; este componente solo se ocupa del flujo.
  */
-export function CheckoutFlow({ slug, sourceChannel, chatId, onCancel, variant = "page" }: CheckoutFlowProps) {
+export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps) {
     const router = useRouter()
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackInitiateCheckout, trackEvent, identifyUser } = useTracking()
@@ -373,8 +357,8 @@ export function CheckoutFlow({ slug, sourceChannel, chatId, onCancel, variant = 
             properties: { paymentMethod },
         })
         setStep("payment")
-        // Auto-scroll al top en variant="page" para que el usuario vea el siguiente paso completo.
-        if (variant === "page" && typeof window !== "undefined") {
+        // Auto-scroll al top para que el usuario vea el siguiente paso completo.
+        if (typeof window !== "undefined") {
             window.scrollTo({ top: 0, behavior: "smooth" })
         }
     }
@@ -508,7 +492,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId, onCancel, variant = 
                 })
                 setStep("success")
                 clearCart()
-                if (variant === "page" && typeof window !== "undefined") {
+                if (typeof window !== "undefined") {
                     window.scrollTo({ top: 0, behavior: "smooth" })
                 }
             } else {
@@ -562,22 +546,12 @@ export function CheckoutFlow({ slug, sourceChannel, chatId, onCancel, variant = 
             window.location.href = `/store/${slug}/order/${createdOrderId}`
             return
         }
-        if (variant === "page") {
-            router.push(`/store/${slug}`)
-        } else {
-            onCancel()
-        }
+        router.push(`/store/${slug}`)
     }
 
     return (
-        <div
-            className={cn(
-                "flex flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-white",
-                variant === "modal" && "max-h-[90vh] overflow-hidden",
-                variant === "page" && "min-h-full",
-            )}
-        >
-            <div className={cn("flex-shrink-0 space-y-4", variant === "modal" ? "p-6 pb-0" : "px-1 pb-2")}>
+        <div className="flex min-h-full flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+            <div className="flex-shrink-0 space-y-4 px-1 pb-2">
                 <CheckoutStepper
                     steps={CHECKOUT_STEPS}
                     currentStep={step}
@@ -586,7 +560,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId, onCancel, variant = 
                 />
             </div>
 
-            <div className={cn("flex-1", variant === "modal" ? "overflow-y-auto px-6 pb-6 pr-4 -mr-2" : "px-1")}>
+            <div className="flex-1 px-1">
                 {step === "contact" && (
                     <ContactStep
                         formData={formData}

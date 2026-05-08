@@ -59,5 +59,3 @@ export interface OrderSummaryAmounts {
     total: number
     pricesIncludeTax: boolean
 }
-
-export type CheckoutVariant = "modal" | "page"

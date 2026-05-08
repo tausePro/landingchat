@@ -112,8 +112,6 @@ export function CheckoutPageClient({ slug, sourceChannel, chatId, organizationNa
                         slug={slug}
                         sourceChannel={sourceChannel}
                         chatId={chatId}
-                        onCancel={handleBack}
-                        variant="page"
                     />
                 ) : (
                     <div className="flex flex-col items-center justify-center py-16 text-center">
