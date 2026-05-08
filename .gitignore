@@ -53,3 +53,6 @@ next-env.d.ts
 
 # private docs (not for GitHub)
 /docs-private/
+
+# Claude Code local worktrees (no commitear)
+.claude/worktrees/
