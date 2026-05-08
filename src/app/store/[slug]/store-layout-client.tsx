@@ -6,12 +6,11 @@ import { CustomerGateModal } from "@/components/store/customer-gate-modal"
 import { TemplateRenderer } from "@/components/store/templates/template-renderer"
 import { EnhancedStoreHeader } from "@/components/store/enhanced-store-header"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
-import { getChatUrl } from "@/lib/utils/store-urls"
+import { getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { getStoredUUID, setStoredUUID, setStoredString } from "@/lib/utils/storage"
 import { StorePresence } from "@/components/store/store-presence"
 import { CartDrawer } from "@/app/chat/components/cart-drawer"
 import { ensurePosthog } from "@/lib/analytics/posthog-client"
-import { CheckoutModal } from "@/app/chat/components/checkout-modal"
 import { useCartStore } from "@/store/cart-store"
 import { useTrackingParams } from "@/hooks/use-tracking-params"
 import { ConversationalLayout } from "@/components/store/layouts/conversational-layout"
@@ -126,7 +125,6 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const productsToUse = products
     // --------------------------------------------------------
 
-    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
     const [pendingProductId, setPendingProductId] = useState<string | null>(null)
     const [pendingContext, setPendingContext] = useState<string | null>(null)
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | undefined>(undefined)
@@ -367,17 +365,9 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                         shippingConfig={shippingConfig}
                         onCheckout={() => {
                             setCartOpen(false)
-                            setIsCheckoutOpen(true)
+                            router.push(getStoreLink('/checkout', isSubdomain, slug))
                         }}
                     />
-
-                    {isCheckoutOpen && (
-                        <CheckoutModal
-                            isOpen={isCheckoutOpen}
-                            onClose={() => setIsCheckoutOpen(false)}
-                            slug={slug}
-                        />
-                    )}
                 </>
             )}
 
@@ -413,7 +403,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                 </div>
             )}
 
-            {!USE_CONVERSATIONAL_LAYOUT && !isRealEstate && defaultChatProductId && !showGateModal && !isCheckoutOpen && (
+            {!USE_CONVERSATIONAL_LAYOUT && !isRealEstate && defaultChatProductId && !showGateModal && (
                 <ProactiveChatBubble
                     slug={slug}
                     productId={defaultChatProductId}
