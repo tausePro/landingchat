@@ -209,10 +209,44 @@ export async function updateSubscriptionStatus(
 }
 
 /**
+ * Snapshot de campos del plan que se copian a la suscripción
+ *
+ * Las columnas `max_products`, `max_agents`, `max_monthly_conversations`,
+ * `price`, `currency` y `features` viven duplicadas en `subscriptions` para
+ * evitar reads cruzados al chequear límites. `getOrganizationLimits` prioriza
+ * el snapshot de la sub sobre el plan, por lo que SIEMPRE deben quedar
+ * sincronizados al cambiar `plan_id`.
+ */
+type PlanSnapshot = {
+    plan_id: string
+    max_products: number | null
+    max_agents: number | null
+    max_monthly_conversations: number | null
+    price: number | null
+    currency: string | null
+    features: Record<string, boolean>
+    updated_at: string
+}
+
+function buildPlanSnapshot(plan: Record<string, unknown>): PlanSnapshot {
+    return {
+        plan_id: plan.id as string,
+        max_products: (plan.max_products as number | null) ?? null,
+        max_agents: (plan.max_agents as number | null) ?? null,
+        max_monthly_conversations: (plan.max_monthly_conversations as number | null) ?? null,
+        price: (plan.price as number | null) ?? null,
+        currency: (plan.currency as string | null) ?? "COP",
+        features: (plan.features as Record<string, boolean> | null) ?? {},
+        updated_at: new Date().toISOString(),
+    }
+}
+
+/**
  * Actualiza el plan de una suscripción existente
  *
- * Cambia el `plan_id` de una sub por otro. No crea sub nueva — para eso usar
- * `assignPlanToOrganization`. Retorna la sub actualizada con join a plan.
+ * Cambia el `plan_id` de una sub por otro y sincroniza el snapshot de límites
+ * y features (clave para que el chequeo de `canCreateResource` use los valores
+ * del nuevo plan). No crea sub nueva — para eso usar `assignPlanToOrganization`.
  */
 export async function updateSubscriptionPlan(
     id: string,
@@ -226,10 +260,10 @@ export async function updateSubscriptionPlan(
 
         const supabase = await createServiceClient()
 
-        // Verificar que el plan existe antes de actualizar (evita FK error)
+        // Traer todos los campos del plan para snapshot completo
         const { data: plan, error: planError } = await supabase
             .from("plans")
-            .select("id, name")
+            .select("id, name, max_products, max_agents, max_monthly_conversations, price, currency, features")
             .eq("id", planId)
             .single()
 
@@ -239,7 +273,7 @@ export async function updateSubscriptionPlan(
 
         const { data, error } = await supabase
             .from("subscriptions")
-            .update({ plan_id: planId, updated_at: new Date().toISOString() })
+            .update(buildPlanSnapshot(plan))
             .eq("id", id)
             .select()
             .single()
@@ -282,10 +316,15 @@ export async function assignPlanToOrganization(
 
         const supabase = await createServiceClient()
 
-        // Validar que org y plan existen
+        // Validar que org y plan existen — traemos todos los campos del plan
+        // para sincronizar el snapshot en la sub
         const [{ data: org, error: orgError }, { data: plan, error: planError }] = await Promise.all([
             supabase.from("organizations").select("id, name").eq("id", orgId).single(),
-            supabase.from("plans").select("id, name").eq("id", planId).single(),
+            supabase
+                .from("plans")
+                .select("id, name, max_products, max_agents, max_monthly_conversations, price, currency, features")
+                .eq("id", planId)
+                .single(),
         ])
 
         if (orgError || !org) {
@@ -306,10 +345,10 @@ export async function assignPlanToOrganization(
             .maybeSingle()
 
         if (existingActive) {
-            // Ya tiene sub activa/trial → actualizar plan
+            // Ya tiene sub activa/trial → actualizar plan + snapshot completo
             const { data, error } = await supabase
                 .from("subscriptions")
-                .update({ plan_id: planId, updated_at: new Date().toISOString() })
+                .update(buildPlanSnapshot(plan))
                 .eq("id", existingActive.id)
                 .select()
                 .single()
@@ -324,7 +363,7 @@ export async function assignPlanToOrganization(
             return success(data as Subscription)
         }
 
-        // No hay sub activa → crear una nueva con período de 1 mes
+        // No hay sub activa → crear una nueva con período de 1 mes + snapshot completo
         const now = new Date()
         const periodEnd = new Date(now)
         periodEnd.setMonth(periodEnd.getMonth() + 1)
@@ -333,11 +372,11 @@ export async function assignPlanToOrganization(
             .from("subscriptions")
             .insert({
                 organization_id: orgId,
-                plan_id: planId,
                 status: "active",
                 current_period_start: now.toISOString(),
                 current_period_end: periodEnd.toISOString(),
                 cancel_at_period_end: false,
+                ...buildPlanSnapshot(plan),
             })
             .select()
             .single()
