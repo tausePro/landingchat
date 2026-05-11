@@ -1,8 +1,10 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { type SubscriptionWithOrg, type SubscriptionStatus } from "@/types"
 import { updateSubscriptionStatus } from "../actions"
+import { AssignPlanDialog } from "./assign-plan-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -51,7 +53,9 @@ export function SubscriptionList({
     onFilterChange,
     currentFilter,
 }: SubscriptionListProps) {
+    const router = useRouter()
     const [loading, setLoading] = useState<string | null>(null)
+    const [editingSub, setEditingSub] = useState<SubscriptionWithOrg | null>(null)
 
     const formatDate = (dateStr: string) => {
         return format(new Date(dateStr), "d MMM yyyy", { locale: es })
@@ -154,22 +158,32 @@ export function SubscriptionList({
                                     </p>
                                 </TableCell>
                                 <TableCell>
-                                    <Select
-                                        value={sub.status}
-                                        onValueChange={(value) =>
-                                            handleStatusChange(sub.id, value as SubscriptionStatus)
-                                        }
-                                        disabled={loading === sub.id}
-                                    >
-                                        <SelectTrigger className="h-8">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="active">Activar</SelectItem>
-                                            <SelectItem value="past_due">Marcar vencida</SelectItem>
-                                            <SelectItem value="cancelled">Cancelar</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="flex items-center gap-2">
+                                        <Select
+                                            value={sub.status}
+                                            onValueChange={(value) =>
+                                                handleStatusChange(sub.id, value as SubscriptionStatus)
+                                            }
+                                            disabled={loading === sub.id}
+                                        >
+                                            <SelectTrigger className="h-8">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="active">Activar</SelectItem>
+                                                <SelectItem value="past_due">Marcar vencida</SelectItem>
+                                                <SelectItem value="cancelled">Cancelar</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 whitespace-nowrap"
+                                            onClick={() => setEditingSub(sub)}
+                                        >
+                                            Cambiar plan
+                                        </Button>
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -183,6 +197,20 @@ export function SubscriptionList({
                     </TableBody>
                 </Table>
             </div>
+
+            {editingSub && (
+                <AssignPlanDialog
+                    organizationId={editingSub.organization?.id || editingSub.organization_id}
+                    organizationName={editingSub.organization?.name || "Organización"}
+                    subscriptionId={editingSub.id}
+                    currentPlanId={editingSub.plan_id}
+                    open={!!editingSub}
+                    onOpenChange={(open) => {
+                        if (!open) setEditingSub(null)
+                    }}
+                    onSuccess={() => router.refresh()}
+                />
+            )}
         </div>
     )
 }
