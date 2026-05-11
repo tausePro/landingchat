@@ -25,6 +25,8 @@ import type { PaymentGateway, GatewayConfig, CheckoutMode } from "./types"
 export interface ProviderInfo {
     id: PaymentProvider
     displayName: string
+    /** Descripción corta usada en el hub de medios de pago. */
+    description: string
     checkoutMode: CheckoutMode
     /** Constructor de la clase que implementa PaymentGateway */
     create: (config: GatewayConfig) => PaymentGateway
@@ -34,36 +36,50 @@ export interface ProviderInfo {
      * desde el UI hasta que estén implementados.
      */
     enabled: boolean
+    /**
+     * Indica si existe una pantalla de configuración propia en
+     * `app/dashboard/settings/{provider}`. Si es false, la card del hub se
+     * muestra como "Próximamente" sin posibilidad de abrir el detalle.
+     */
+    hasUiConfig: boolean
 }
 
 export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
     wompi: {
         id: "wompi",
-        displayName: "Wompi (Bancolombia)",
+        displayName: "Wompi",
+        description: "Tarjetas, PSE, Nequi — Bancolombia",
         checkoutMode: "embedded_widget",
         create: (config) => new WompiGateway(config),
         enabled: true,
+        hasUiConfig: true,
     },
     epayco: {
         id: "epayco",
         displayName: "ePayco",
+        description: "Tarjetas, PSE, Nequi, Daviplata",
         checkoutMode: "embedded_widget",
         create: (config) => new EpaycoGateway(config),
         enabled: true,
+        hasUiConfig: true,
     },
     bold: {
         id: "bold",
         displayName: "Bold",
+        description: "Tarjetas y PSE — checkout hospedado",
         checkoutMode: "hosted_redirect",
         create: (config) => new BoldGateway(config),
         enabled: false, // pendiente de credenciales y prueba en producción
+        hasUiConfig: true,
     },
     addi: {
         id: "addi",
-        displayName: "Addi (BNPL)",
+        displayName: "Addi",
+        description: "Compra ahora, paga después (BNPL)",
         checkoutMode: "hosted_redirect",
         create: (config) => new AddiGateway(config),
         enabled: false, // requiere onboarding directo con Addi
+        hasUiConfig: false,
     },
 }
 
@@ -73,4 +89,14 @@ export function getProviderInfo(provider: string): ProviderInfo | null {
 
 export function listEnabledProviders(): ProviderInfo[] {
     return Object.values(PROVIDER_REGISTRY).filter((p) => p.enabled)
+}
+
+/**
+ * Lista los providers que el dashboard debe mostrar en el hub de medios de
+ * pago. Incluye los activados en producción y también los `enabled: false`
+ * que ya tienen pantalla de configuración (para permitir precargar credenciales
+ * antes del go-live).
+ */
+export function listHubProviders(): ProviderInfo[] {
+    return Object.values(PROVIDER_REGISTRY).filter((p) => p.hasUiConfig || p.enabled)
 }

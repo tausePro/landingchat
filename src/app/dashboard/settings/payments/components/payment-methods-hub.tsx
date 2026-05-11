@@ -14,10 +14,16 @@ import {
     Loader2,
     Banknote,
     Truck,
+    Sparkles,
+    Clock,
 } from "lucide-react"
 import { getAllPaymentConfigs, toggleGateway } from "../actions"
+import { listHubProviders } from "@/lib/payments/registry"
+import type { PaymentProvider } from "@/types/payment"
 
-export type PaymentView = "hub" | "wompi" | "epayco" | "manual"
+export type PaymentView = "hub" | PaymentProvider | "manual"
+
+type CardKind = "gateway" | "manual"
 
 interface PaymentMethodCard {
     key: string
@@ -27,30 +33,56 @@ interface PaymentMethodCard {
     icon: React.ReactNode
     provider: string
     color: string
-    isGateway: boolean
+    kind: CardKind
+    enabled: boolean
+    canConfigure: boolean
 }
 
-const PAYMENT_METHODS: PaymentMethodCard[] = [
-    {
-        key: "wompi",
-        view: "wompi",
-        name: "Wompi",
-        description: "Tarjetas, PSE, Nequi — Bancolombia",
+/**
+ * Metadata visual por provider. Los ids que no estén acá caen a un default.
+ * Mantener sincronizado con `PROVIDER_REGISTRY` en `src/lib/payments/registry.ts`.
+ */
+const GATEWAY_VISUALS: Record<string, { icon: React.ReactNode; color: string }> = {
+    wompi: {
         icon: <CreditCard className="h-5 w-5" />,
-        provider: "wompi",
         color: "from-emerald-500 to-green-600",
-        isGateway: true,
     },
-    {
-        key: "epayco",
-        view: "epayco",
-        name: "ePayco",
-        description: "Tarjetas, PSE, Nequi, Daviplata",
+    epayco: {
         icon: <CreditCard className="h-5 w-5" />,
-        provider: "epayco",
         color: "from-blue-500 to-indigo-600",
-        isGateway: true,
     },
+    bold: {
+        icon: <Sparkles className="h-5 w-5" />,
+        color: "from-fuchsia-500 to-pink-600",
+    },
+    addi: {
+        icon: <Clock className="h-5 w-5" />,
+        color: "from-slate-500 to-slate-700",
+    },
+}
+
+function buildGatewayCards(): PaymentMethodCard[] {
+    return listHubProviders().map((info) => {
+        const visual = GATEWAY_VISUALS[info.id] ?? {
+            icon: <CreditCard className="h-5 w-5" />,
+            color: "from-slate-500 to-slate-700",
+        }
+        return {
+            key: info.id,
+            view: info.id,
+            name: info.displayName,
+            description: info.description,
+            icon: visual.icon,
+            provider: info.id,
+            color: visual.color,
+            kind: "gateway" as const,
+            enabled: info.enabled,
+            canConfigure: info.hasUiConfig,
+        }
+    })
+}
+
+const MANUAL_CARDS: PaymentMethodCard[] = [
     {
         key: "bank_transfer",
         view: "manual",
@@ -59,7 +91,9 @@ const PAYMENT_METHODS: PaymentMethodCard[] = [
         icon: <Banknote className="h-5 w-5" />,
         provider: "bank_transfer",
         color: "from-amber-500 to-orange-600",
-        isGateway: false,
+        kind: "manual",
+        enabled: true,
+        canConfigure: true,
     },
     {
         key: "cod",
@@ -69,7 +103,9 @@ const PAYMENT_METHODS: PaymentMethodCard[] = [
         icon: <Truck className="h-5 w-5" />,
         provider: "cod",
         color: "from-purple-500 to-violet-600",
-        isGateway: false,
+        kind: "manual",
+        enabled: true,
+        canConfigure: true,
     },
 ]
 
@@ -93,13 +129,15 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
         cod_enabled: boolean
     }>({ bank_transfer_enabled: false, cod_enabled: false })
 
+    // Construimos las cards una sola vez por render; el registry no cambia en runtime.
+    const cards: PaymentMethodCard[] = [...buildGatewayCards(), ...MANUAL_CARDS]
+
     useEffect(() => {
         loadStatuses()
     }, [])
 
     const loadStatuses = async () => {
         try {
-            // Cargar pasarelas de pago
             const result = await getAllPaymentConfigs()
             if (result.success && result.data) {
                 const statuses = new Map<string, GatewayStatus>()
@@ -114,7 +152,6 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                 setGatewayStatuses(statuses)
             }
 
-            // Cargar métodos manuales
             const { getManualPaymentMethods } = await import("../actions")
             const manualResult = await getManualPaymentMethods()
             if (manualResult.success && manualResult.data) {
@@ -131,7 +168,14 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
     }
 
     const handleToggle = async (method: PaymentMethodCard, newValue: boolean) => {
-        if (!method.isGateway) return
+        if (method.kind !== "gateway") return
+
+        if (!method.enabled) {
+            toast.info(`${method.name} aún está en preview`, {
+                description: "Podrás activarlo cuando el equipo de LandingChat lo habilite en producción.",
+            })
+            return
+        }
 
         const status = gatewayStatuses.get(method.provider)
         if (!status?.has_credentials) {
@@ -165,7 +209,7 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
     }
 
     const isActive = (method: PaymentMethodCard): boolean => {
-        if (method.isGateway) {
+        if (method.kind === "gateway") {
             return gatewayStatuses.get(method.provider)?.is_active ?? false
         }
         if (method.provider === "bank_transfer") return manualMethods.bank_transfer_enabled
@@ -174,14 +218,14 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
     }
 
     const isConfigured = (method: PaymentMethodCard): boolean => {
-        if (method.isGateway) {
+        if (method.kind === "gateway") {
             return gatewayStatuses.get(method.provider)?.has_credentials ?? false
         }
         return true
     }
 
     const isTestMode = (method: PaymentMethodCard): boolean => {
-        if (method.isGateway) {
+        if (method.kind === "gateway") {
             return gatewayStatuses.get(method.provider)?.is_test_mode ?? true
         }
         return false
@@ -202,11 +246,12 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
 
     return (
         <div className="grid gap-4 sm:grid-cols-2">
-            {PAYMENT_METHODS.map((method) => {
+            {cards.map((method) => {
                 const active = isActive(method)
                 const configured = isConfigured(method)
                 const testMode = isTestMode(method)
                 const isTogglingThis = toggling === method.provider
+                const isPreview = method.kind === "gateway" && !method.enabled
 
                 return (
                     <div
@@ -214,14 +259,18 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                         className={`relative rounded-xl border bg-white p-5 shadow-sm transition-all dark:bg-slate-900 ${
                             active
                                 ? "border-green-200 dark:border-green-800 ring-1 ring-green-200 dark:ring-green-800"
-                                : "border-slate-200 dark:border-slate-700"
+                                : isPreview
+                                    ? "border-dashed border-slate-300 dark:border-slate-700"
+                                    : "border-slate-200 dark:border-slate-700"
                         }`}
                     >
                         {/* Header: icon + name + toggle */}
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
                                 <div
-                                    className={`rounded-lg bg-gradient-to-br p-2.5 text-white ${method.color}`}
+                                    className={`rounded-lg bg-gradient-to-br p-2.5 text-white ${method.color} ${
+                                        isPreview ? "opacity-70" : ""
+                                    }`}
                                 >
                                     {method.icon}
                                 </div>
@@ -234,7 +283,7 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                                     </p>
                                 </div>
                             </div>
-                            {method.isGateway && (
+                            {method.kind === "gateway" && (
                                 <div className="flex items-center">
                                     {isTogglingThis ? (
                                         <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
@@ -242,7 +291,7 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                                         <Switch
                                             checked={active}
                                             onCheckedChange={(val) => handleToggle(method, val)}
-                                            disabled={!configured}
+                                            disabled={!configured || isPreview}
                                         />
                                     )}
                                 </div>
@@ -250,8 +299,16 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                         </div>
 
                         {/* Status badges */}
-                        <div className="mt-3 flex items-center gap-2">
-                            {active ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                            {isPreview ? (
+                                <Badge
+                                    variant="outline"
+                                    className="border-fuchsia-300 text-fuchsia-600 dark:border-fuchsia-800 dark:text-fuchsia-400"
+                                >
+                                    <Sparkles className="mr-1 h-3 w-3" />
+                                    Próximamente
+                                </Badge>
+                            ) : active ? (
                                 <Badge
                                     variant="default"
                                     className="bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
@@ -263,13 +320,13 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                                 <Badge variant="secondary">Inactivo</Badge>
                             )}
 
-                            {method.isGateway && configured && (
+                            {method.kind === "gateway" && !isPreview && configured && (
                                 <Badge variant={testMode ? "outline" : "default"}>
                                     {testMode ? "Sandbox" : "Producción"}
                                 </Badge>
                             )}
 
-                            {method.isGateway && !configured && (
+                            {method.kind === "gateway" && !isPreview && !configured && (
                                 <Badge
                                     variant="outline"
                                     className="border-amber-300 text-amber-600 dark:border-amber-700 dark:text-amber-400"
@@ -287,10 +344,11 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                                 size="sm"
                                 className="w-full justify-between"
                                 onClick={() => onConfigure(method.view)}
+                                disabled={!method.canConfigure}
                             >
                                 <span className="flex items-center gap-2">
                                     <Settings2 className="h-4 w-4" />
-                                    Configurar
+                                    {method.canConfigure ? "Configurar" : "Próximamente"}
                                 </span>
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
