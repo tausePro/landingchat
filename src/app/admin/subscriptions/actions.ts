@@ -209,6 +209,154 @@ export async function updateSubscriptionStatus(
 }
 
 /**
+ * Actualiza el plan de una suscripción existente
+ *
+ * Cambia el `plan_id` de una sub por otro. No crea sub nueva — para eso usar
+ * `assignPlanToOrganization`. Retorna la sub actualizada con join a plan.
+ */
+export async function updateSubscriptionPlan(
+    id: string,
+    planId: string
+): Promise<ActionResult<Subscription>> {
+    try {
+        const validation = UpdateSubscriptionInputSchema.safeParse({ plan_id: planId })
+        if (!validation.success) {
+            return failure(validation.error.issues[0]?.message || "Plan inválido")
+        }
+
+        const supabase = await createServiceClient()
+
+        // Verificar que el plan existe antes de actualizar (evita FK error)
+        const { data: plan, error: planError } = await supabase
+            .from("plans")
+            .select("id, name")
+            .eq("id", planId)
+            .single()
+
+        if (planError || !plan) {
+            return failure("El plan seleccionado no existe")
+        }
+
+        const { data, error } = await supabase
+            .from("subscriptions")
+            .update({ plan_id: planId, updated_at: new Date().toISOString() })
+            .eq("id", id)
+            .select()
+            .single()
+
+        if (error) {
+            console.error("Error updating subscription plan:", error)
+            return failure("Error al cambiar el plan de la suscripción")
+        }
+
+        revalidatePath("/admin/subscriptions")
+        revalidatePath("/admin/organizations")
+        return success(data as Subscription)
+    } catch (error) {
+        console.error("Error in updateSubscriptionPlan:", error)
+        return failure("Error inesperado al cambiar el plan")
+    }
+}
+
+/**
+ * Asigna un plan a una organización (upsert)
+ *
+ * - Si la organización NO tiene suscripción activa: crea una nueva `active` con período
+ *   de 1 mes desde hoy.
+ * - Si ya tiene una sub activa: actualiza su `plan_id` (equivalente a `updateSubscriptionPlan`).
+ * - Si solo tiene subs canceladas/past_due: crea una nueva activa.
+ *
+ * Pensado para el flujo del superadmin que quiere "poner a la org X en el plan beta".
+ */
+export async function assignPlanToOrganization(
+    orgId: string,
+    planId: string
+): Promise<ActionResult<Subscription>> {
+    try {
+        if (!orgId || typeof orgId !== "string") {
+            return failure("organization_id requerido")
+        }
+        if (!planId || typeof planId !== "string") {
+            return failure("plan_id requerido")
+        }
+
+        const supabase = await createServiceClient()
+
+        // Validar que org y plan existen
+        const [{ data: org, error: orgError }, { data: plan, error: planError }] = await Promise.all([
+            supabase.from("organizations").select("id, name").eq("id", orgId).single(),
+            supabase.from("plans").select("id, name").eq("id", planId).single(),
+        ])
+
+        if (orgError || !org) {
+            return failure("La organización no existe")
+        }
+        if (planError || !plan) {
+            return failure("El plan no existe")
+        }
+
+        // Buscar sub activa (o trialing) de esta org
+        const { data: existingActive } = await supabase
+            .from("subscriptions")
+            .select("id, plan_id, status")
+            .eq("organization_id", orgId)
+            .in("status", ["active", "trialing"])
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (existingActive) {
+            // Ya tiene sub activa/trial → actualizar plan
+            const { data, error } = await supabase
+                .from("subscriptions")
+                .update({ plan_id: planId, updated_at: new Date().toISOString() })
+                .eq("id", existingActive.id)
+                .select()
+                .single()
+
+            if (error) {
+                console.error("Error updating existing subscription plan:", error)
+                return failure("Error al cambiar el plan de la suscripción existente")
+            }
+
+            revalidatePath("/admin/subscriptions")
+            revalidatePath("/admin/organizations")
+            return success(data as Subscription)
+        }
+
+        // No hay sub activa → crear una nueva con período de 1 mes
+        const now = new Date()
+        const periodEnd = new Date(now)
+        periodEnd.setMonth(periodEnd.getMonth() + 1)
+
+        const { data, error } = await supabase
+            .from("subscriptions")
+            .insert({
+                organization_id: orgId,
+                plan_id: planId,
+                status: "active",
+                current_period_start: now.toISOString(),
+                current_period_end: periodEnd.toISOString(),
+                cancel_at_period_end: false,
+            })
+            .select()
+            .single()
+
+        if (error) {
+            console.error("Error creating subscription:", error)
+            return failure("Error al crear la suscripción")
+        }
+
+        revalidatePath("/admin/subscriptions")
+        revalidatePath("/admin/organizations")
+        return success(data as Subscription)
+    } catch (error) {
+        console.error("Error in assignPlanToOrganization:", error)
+        return failure("Error inesperado al asignar el plan")
+    }
+}
+
+/**
  * Obtiene la suscripción de una organización específica
  */
 export async function getOrganizationSubscription(

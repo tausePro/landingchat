@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { OrganizationData, updateOrganizationStatus, deleteOrganization } from "../actions"
+import { AssignPlanDialog } from "../../subscriptions/components/assign-plan-dialog"
 import { toast } from "sonner"
 import { formatBogotaDate } from "@/lib/utils/date"
 // import { useDebounce } from "@/hooks/use-debounce" // We might need to create this hook or implement debounce manually
@@ -54,6 +55,7 @@ export function OrgList({ initialData }: OrgListProps) {
     const [searchTerm, setSearchTerm] = useState("")
     const debouncedSearch = useDebounceValue(searchTerm, 500)
     const [loading, setLoading] = useState(false)
+    const [assigningPlanFor, setAssigningPlanFor] = useState<OrganizationData | null>(null)
 
     // Effect to trigger search on debounce
     useEffect(() => {
@@ -159,6 +161,10 @@ export function OrgList({ initialData }: OrgListProps) {
                                             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(org.id)}>
                                                 Copiar ID
                                             </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setAssigningPlanFor(org)}>
+                                                Asignar plan
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={() => handleStatusChange(org.id, 'active')}>
                                                 Marcar Activo
                                             </DropdownMenuItem>
@@ -188,6 +194,18 @@ export function OrgList({ initialData }: OrgListProps) {
                     </TableBody>
                 </Table>
             </div>
+
+            {assigningPlanFor && (
+                <AssignPlanDialog
+                    organizationId={assigningPlanFor.id}
+                    organizationName={assigningPlanFor.name}
+                    open={!!assigningPlanFor}
+                    onOpenChange={(open) => {
+                        if (!open) setAssigningPlanFor(null)
+                    }}
+                    onSuccess={() => router.refresh()}
+                />
+            )}
         </div>
     )
 }
