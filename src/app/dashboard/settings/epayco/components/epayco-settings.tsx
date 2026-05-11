@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, ExternalLink } from "lucide-react"
+import { Loader2, Eye, EyeOff, CheckCircle, XCircle, AlertCircle, ExternalLink, Copy } from "lucide-react"
 import { saveEpaycoConfig, getEpaycoConfig, testEpaycoConnection } from "@/app/dashboard/settings/epayco/actions"
 import { PaymentBrandingSelector } from "@/app/dashboard/settings/payments/components/payment-branding-selector"
 
@@ -40,7 +40,8 @@ export function EpaycoSettings() {
     const [showCustomerId, setShowCustomerId] = useState(false)
     const [showEncryptionKey, setShowEncryptionKey] = useState(false)
     const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'success' | 'error'>('unknown')
-    
+    const [webhookUrl, setWebhookUrl] = useState<string | null>(null)
+
     const [config, setConfig] = useState<EpaycoConfig>({
         isActive: false,
         isTestMode: true,
@@ -70,9 +71,19 @@ export function EpaycoSettings() {
                     encryptionKey: "",
                     logoUrl: getGatewayLogoUrl(data),
                 })
+                setWebhookUrl((data.webhook_url as string) || null)
             }
         } catch (error) {
             console.error("Error loading config:", error)
+        }
+    }
+
+    const handleCopy = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text)
+            toast.success("Copiado al portapapeles")
+        } catch {
+            toast.error("No se pudo copiar")
         }
     }
 
@@ -349,25 +360,31 @@ export function EpaycoSettings() {
             </Card>
 
             {/* URLs de Webhook */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>URLs de Configuración</CardTitle>
-                    <CardDescription>
-                        Configura estas URLs en tu panel de ePayco
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label className="text-sm font-medium">URL de Confirmación (Webhook)</Label>
-                        <div className="mt-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-md font-mono text-sm">
-                            {process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payments/epayco
+            {webhookUrl && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>URL de Confirmación (Webhook)</CardTitle>
+                        <CardDescription>
+                            Configura esta URL en tu panel de ePayco para recibir notificaciones de pago
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center gap-2 rounded-lg bg-slate-50 dark:bg-slate-800 p-3">
+                            <code className="flex-1 truncate text-sm">{webhookUrl}</code>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopy(webhookUrl)}
+                            >
+                                <Copy className="h-4 w-4" />
+                            </Button>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">
-                            Configura esta URL en ePayco → Configuración → URL Respuesta y Confirmación
+                        <p className="text-xs text-slate-500 mt-2">
+                            ePayco → Configuración → URL Respuesta y Confirmación. Incluye el parámetro <code>?org=</code> que identifica tu tienda.
                         </p>
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

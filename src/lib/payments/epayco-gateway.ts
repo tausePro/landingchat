@@ -13,7 +13,9 @@ import type {
     TransactionDetails,
     TokenResult,
     CardData,
+    WebhookParseResult,
 } from "./types"
+import type { TransactionStatus } from "@/types/payment"
 
 const EPAYCO_API_URL = {
     sandbox: "https://apify.epayco.co",
@@ -192,36 +194,26 @@ export class EpaycoGateway implements PaymentGateway {
         }
     }
 
-    async getTransactionByReference(reference: string): Promise<TransactionDetails> {
-        const headers = await this.getHeaders()
-
-        const response = await fetch(
-            `${this.baseUrl}/transaction/detail?factura=${encodeURIComponent(reference)}`,
-            { headers }
+    /**
+     * Consulta una transacción por la referencia/factura del comerciante.
+     *
+     * ⚠️ ePayco no expone un endpoint público para consultar por
+     * `x_id_invoice` (factura). El único endpoint válido es
+     * `secure.epayco.co/validation/v1/reference/{x_ref_payco}` que requiere
+     * el `x_ref_payco` interno generado por ePayco al iniciar la transacción.
+     *
+     * Por eso, este método lanza un error informativo cuando no hay
+     * `x_ref_payco` disponible. La capa superior (`reconcileOrderPayment`)
+     * busca el `x_ref_payco` en `webhook_logs` (eventos previamente recibidos)
+     * antes de llamar a este método. Si tampoco lo encuentra, la única forma
+     * de validar es esperar al webhook automático o ingresar manualmente la
+     * referencia desde el dashboard ePayco.
+     */
+    async getTransactionByReference(_reference: string): Promise<TransactionDetails> {
+        void _reference
+        throw new Error(
+            "ePayco no permite consultar transacciones por factura. Necesita el x_ref_payco interno (lo entrega el webhook autom\u00e1tico o el dashboard ePayco)"
         )
-
-        if (!response.ok) {
-            throw new Error("Error al obtener transacción")
-        }
-
-        const data = await response.json()
-        if (!data.success || !data.data) {
-            throw new Error("Transacción no encontrada")
-        }
-
-        const tx = data.data
-        return {
-            id: tx.ref_payco,
-            providerTransactionId: tx.ref_payco,
-            reference: tx.factura,
-            amount: Math.round(parseFloat(tx.valor) * 100),
-            currency: tx.moneda,
-            status: this.mapStatus(tx.estado),
-            paymentMethod: tx.metodo,
-            createdAt: tx.fecha,
-            completedAt: tx.estado === "Aceptada" ? tx.fecha : undefined,
-            rawResponse: data,
-        }
     }
 
     async tokenizeCard(card: CardData): Promise<TokenResult> {
@@ -337,5 +329,75 @@ export class EpaycoGateway implements PaymentGateway {
             Reversada: "voided",
         }
         return statusMap[String(epaycoStatus)] || "pending"
+    }
+
+    /**
+     * Parsea webhook de ePayco. Soporta:
+     *   - GET con `x_*` en query string (cuando method_confirmation=GET)
+     *   - POST con `application/x-www-form-urlencoded`
+     *   - POST con `application/json`
+     *
+     * Valida firma SHA256(p_cust_id^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
+     * y mapea `x_cod_response` (1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida, 6=Reversada)
+     * a `TransactionStatus`.
+     */
+    async parseWebhook(request: Request): Promise<WebhookParseResult> {
+        try {
+            const method = request.method.toUpperCase()
+            let payload: Record<string, string> = {}
+
+            if (method === "GET") {
+                const url = new URL(request.url)
+                payload = Object.fromEntries(url.searchParams.entries())
+            } else {
+                const contentType = request.headers.get("content-type") || ""
+                if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+                    const formData = await request.formData()
+                    payload = Object.fromEntries(
+                        Array.from(formData.entries()).map(([k, v]) => [k, typeof v === "string" ? v : String(v)]),
+                    )
+                } else {
+                    payload = (await request.json()) as Record<string, string>
+                }
+            }
+
+            // Validar firma (si tenemos p_cust_id_cliente y p_key)
+            if (this.pKey && this.customerId) {
+                const isValid = this.validateWebhookSignature(payload, payload.x_signature || "")
+                if (!isValid) {
+                    return { isValid: false, event: null, error: "Invalid signature", httpStatus: 401 }
+                }
+            }
+
+            const orderRef = payload.x_id_invoice || payload.x_extra1 || ""
+            if (!orderRef) {
+                return { isValid: false, event: null, error: "Missing x_id_invoice / x_extra1", httpStatus: 400 }
+            }
+
+            const status = this.mapValidationStatus(payload.x_cod_response) as TransactionStatus
+            const amountInCents = Math.round(parseFloat(payload.x_amount || "0") * 100)
+
+            return {
+                isValid: true,
+                event: {
+                    provider: "epayco",
+                    eventType: "transaction.updated",
+                    transactionId: payload.x_ref_payco || payload.x_transaction_id || orderRef,
+                    reference: orderRef,
+                    status,
+                    amount: amountInCents,
+                    currency: payload.x_currency_code || "COP",
+                    paymentMethod: payload.x_franchise || payload.x_bank_name,
+                    rawPayload: payload as unknown as Record<string, unknown>,
+                },
+            }
+        } catch (error) {
+            return {
+                isValid: false,
+                event: null,
+                error: error instanceof Error ? error.message : "ePayco webhook parse error",
+                httpStatus: 400,
+            }
+        }
     }
 }

@@ -30,10 +30,40 @@ vi.mock("@/lib/utils/encryption", () => ({
     }),
 }))
 
+const STATUS_MAP: Record<string, string> = {
+    APPROVED: "approved",
+    DECLINED: "declined",
+    VOIDED: "voided",
+    ERROR: "error",
+    PENDING: "pending",
+}
 vi.mock("@/lib/payments/wompi-gateway", () => ({
     WompiGateway: class {
         validateWebhookSignature() {
             return true
+        }
+        async parseWebhook(request: Request) {
+            const payload = await request.json()
+            const transaction = payload?.data?.transaction
+            if (!transaction) {
+                return { isValid: false, event: null, error: "Missing transaction", httpStatus: 400 }
+            }
+            return {
+                isValid: true,
+                event: {
+                    provider: "wompi",
+                    eventType: "transaction.updated",
+                    transactionId: String(transaction.id),
+                    reference: String(transaction.reference),
+                    status: STATUS_MAP[String(transaction.status)] || "pending",
+                    amount: Number(transaction.amount_in_cents) || 0,
+                    currency: String(transaction.currency || "COP"),
+                    paymentMethod: transaction.payment_method_type
+                        ? String(transaction.payment_method_type).toLowerCase()
+                        : undefined,
+                    rawPayload: payload,
+                },
+            }
         }
     },
 }))

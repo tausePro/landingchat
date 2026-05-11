@@ -8,12 +8,6 @@ import { WompiSettings } from "@/app/dashboard/settings/wompi/components/wompi-s
 import { EpaycoSettings } from "@/app/dashboard/settings/epayco/components/epayco-settings"
 import { ManualPaymentForm } from "./manual-payment-form"
 
-const VIEW_TITLES: Record<Exclude<PaymentView, "hub">, string> = {
-    wompi: "Configuración de Wompi",
-    epayco: "Configuración de ePayco",
-    manual: "Pagos Manuales",
-}
-
 export function PaymentSettingsPanel() {
     const [activeView, setActiveView] = useState<PaymentView>("hub")
 

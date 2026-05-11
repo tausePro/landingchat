@@ -1,15 +1,21 @@
 /**
- * Factory para crear instancias de pasarelas de pago
+ * Factory para crear instancias de pasarelas de pago.
+ *
+ * Single source of truth: `PROVIDER_REGISTRY`. Para añadir un proveedor
+ * nuevo basta con registrarlo allí; este archivo no necesita cambios.
  */
 
 import type { PaymentGatewayConfig } from "@/types/payment"
 import type { PaymentGateway, GatewayConfig } from "./types"
-import { WompiGateway } from "./wompi-gateway"
-import { EpaycoGateway } from "./epayco-gateway"
+import { getProviderInfo } from "./registry"
 import { decrypt } from "@/lib/utils/encryption"
 
 /**
- * Crea una instancia de PaymentGateway según la configuración
+ * Crea una instancia de PaymentGateway según la configuración persistida en
+ * `payment_gateway_configs`. Desencripta los secretos si vienen encriptados,
+ * o usa los ya desencriptados que pasen los callers que ya hicieron decrypt.
+ *
+ * @throws Error si el provider no está registrado o no está habilitado
  */
 export function createPaymentGateway(
     config: PaymentGatewayConfig,
@@ -17,21 +23,28 @@ export function createPaymentGateway(
     decryptedIntegritySecret?: string,
     decryptedEncryptionKey?: string
 ): PaymentGateway {
-    // Desencriptar credenciales si no se proporcionan ya desencriptadas
+    const providerInfo = getProviderInfo(config.provider)
+    if (!providerInfo) {
+        throw new Error(`Proveedor de pago no soportado: ${config.provider}`)
+    }
+    if (!providerInfo.enabled) {
+        throw new Error(
+            `Proveedor "${config.provider}" registrado pero deshabilitado (pendiente de implementación o credenciales)`
+        )
+    }
+
     const privateKey =
-        decryptedPrivateKey ||
-        (config.private_key_encrypted
-            ? decrypt(config.private_key_encrypted)
-            : "")
+        decryptedPrivateKey ??
+        (config.private_key_encrypted ? decrypt(config.private_key_encrypted) : "")
 
     const integritySecret =
-        decryptedIntegritySecret ||
+        decryptedIntegritySecret ??
         (config.integrity_secret_encrypted
             ? decrypt(config.integrity_secret_encrypted)
             : undefined)
 
     const encryptionKey =
-        decryptedEncryptionKey ||
+        decryptedEncryptionKey ??
         (config.encryption_key_encrypted
             ? decrypt(config.encryption_key_encrypted)
             : undefined)
@@ -45,18 +58,12 @@ export function createPaymentGateway(
         isTestMode: config.is_test_mode,
     }
 
-    switch (config.provider) {
-        case "wompi":
-            return new WompiGateway(gatewayConfig)
-        case "epayco":
-            return new EpaycoGateway(gatewayConfig)
-        default:
-            throw new Error(`Proveedor de pago no soportado: ${config.provider}`)
-    }
+    return providerInfo.create(gatewayConfig)
 }
 
 /**
- * Obtiene la configuración de pasarela de pago para una organización
+ * Carga la pasarela activa de una organización.
+ * Usa el cliente de Supabase que se le pase (service o anon).
  */
 export async function getOrganizationPaymentGateway(
     supabase: { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => { eq: (column: string, value: boolean) => { single: () => Promise<{ data: PaymentGatewayConfig | null; error: Error | null }> } } } } },
