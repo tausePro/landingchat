@@ -13,7 +13,9 @@ import type {
     TransactionDetails,
     TokenResult,
     CardData,
+    WebhookParseResult,
 } from "./types"
+import type { TransactionStatus } from "@/types/payment"
 
 const EPAYCO_API_URL = {
     sandbox: "https://apify.epayco.co",
@@ -327,5 +329,75 @@ export class EpaycoGateway implements PaymentGateway {
             Reversada: "voided",
         }
         return statusMap[String(epaycoStatus)] || "pending"
+    }
+
+    /**
+     * Parsea webhook de ePayco. Soporta:
+     *   - GET con `x_*` en query string (cuando method_confirmation=GET)
+     *   - POST con `application/x-www-form-urlencoded`
+     *   - POST con `application/json`
+     *
+     * Valida firma SHA256(p_cust_id^p_key^x_ref_payco^x_transaction_id^x_amount^x_currency_code)
+     * y mapea `x_cod_response` (1=Aceptada, 2=Rechazada, 3=Pendiente, 4=Fallida, 6=Reversada)
+     * a `TransactionStatus`.
+     */
+    async parseWebhook(request: Request): Promise<WebhookParseResult> {
+        try {
+            const method = request.method.toUpperCase()
+            let payload: Record<string, string> = {}
+
+            if (method === "GET") {
+                const url = new URL(request.url)
+                payload = Object.fromEntries(url.searchParams.entries())
+            } else {
+                const contentType = request.headers.get("content-type") || ""
+                if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+                    const formData = await request.formData()
+                    payload = Object.fromEntries(
+                        Array.from(formData.entries()).map(([k, v]) => [k, typeof v === "string" ? v : String(v)]),
+                    )
+                } else {
+                    payload = (await request.json()) as Record<string, string>
+                }
+            }
+
+            // Validar firma (si tenemos p_cust_id_cliente y p_key)
+            if (this.pKey && this.customerId) {
+                const isValid = this.validateWebhookSignature(payload, payload.x_signature || "")
+                if (!isValid) {
+                    return { isValid: false, event: null, error: "Invalid signature", httpStatus: 401 }
+                }
+            }
+
+            const orderRef = payload.x_id_invoice || payload.x_extra1 || ""
+            if (!orderRef) {
+                return { isValid: false, event: null, error: "Missing x_id_invoice / x_extra1", httpStatus: 400 }
+            }
+
+            const status = this.mapValidationStatus(payload.x_cod_response) as TransactionStatus
+            const amountInCents = Math.round(parseFloat(payload.x_amount || "0") * 100)
+
+            return {
+                isValid: true,
+                event: {
+                    provider: "epayco",
+                    eventType: "transaction.updated",
+                    transactionId: payload.x_ref_payco || payload.x_transaction_id || orderRef,
+                    reference: orderRef,
+                    status,
+                    amount: amountInCents,
+                    currency: payload.x_currency_code || "COP",
+                    paymentMethod: payload.x_franchise || payload.x_bank_name,
+                    rawPayload: payload as unknown as Record<string, unknown>,
+                },
+            }
+        } catch (error) {
+            return {
+                isValid: false,
+                event: null,
+                error: error instanceof Error ? error.message : "ePayco webhook parse error",
+                httpStatus: 400,
+            }
+        }
     }
 }

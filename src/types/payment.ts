@@ -5,7 +5,7 @@
 import { z } from "zod"
 
 // Proveedores de pago soportados
-export const PaymentProviderSchema = z.enum(["wompi", "epayco"])
+export const PaymentProviderSchema = z.enum(["wompi", "epayco", "bold", "addi"])
 export type PaymentProvider = z.infer<typeof PaymentProviderSchema>
 
 // Estados de transacción

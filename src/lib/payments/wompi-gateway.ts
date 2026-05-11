@@ -13,7 +13,9 @@ import type {
     TransactionDetails,
     TokenResult,
     CardData,
+    WebhookParseResult,
 } from "./types"
+import type { TransactionStatus } from "@/types/payment"
 
 const WOMPI_API_URL = {
     sandbox: "https://sandbox.wompi.co/v1",
@@ -310,5 +312,70 @@ export class WompiGateway implements PaymentGateway {
             PENDING: "pending",
         }
         return statusMap[wompiStatus] || "pending"
+    }
+
+    /**
+     * Parsea webhook de Wompi: lee JSON, valida firma con `events_secret`,
+     * mapea a `WebhookEvent` normalizado.
+     *
+     * IMPORTANTE: el handler debe construir el gateway pasando el
+     * `events_secret` como `integritySecret`, ya que ambos secretos viven
+     * en `payment_gateway_configs` pero la clase usa un solo slot.
+     */
+    async parseWebhook(request: Request): Promise<WebhookParseResult> {
+        try {
+            const payload = (await request.json()) as {
+                event?: string
+                data?: { transaction?: Record<string, unknown> }
+                signature?: { checksum?: string; properties?: string[] }
+                timestamp?: number
+            }
+
+            const transaction = payload.data?.transaction
+            if (!transaction) {
+                return { isValid: false, event: null, error: "Missing transaction in payload", httpStatus: 400 }
+            }
+
+            // Validar firma (si hay secret configurado)
+            if (this.config.integritySecret) {
+                const isValid = this.validateWebhookSignature(payload, "")
+                if (!isValid) {
+                    return { isValid: false, event: null, error: "Invalid signature", httpStatus: 401 }
+                }
+            }
+
+            const wompiStatus = String(transaction.status || "PENDING")
+            const status: TransactionStatus = (
+                {
+                    APPROVED: "approved",
+                    DECLINED: "declined",
+                    VOIDED: "voided",
+                    ERROR: "error",
+                    PENDING: "pending",
+                } as Record<string, TransactionStatus>
+            )[wompiStatus] || "pending"
+
+            return {
+                isValid: true,
+                event: {
+                    provider: "wompi",
+                    eventType: "transaction.updated",
+                    transactionId: String(transaction.id),
+                    reference: String(transaction.reference),
+                    status,
+                    amount: Number(transaction.amount_in_cents) || 0,
+                    currency: String(transaction.currency || "COP"),
+                    paymentMethod: transaction.payment_method_type ? String(transaction.payment_method_type).toLowerCase() : undefined,
+                    rawPayload: payload as unknown as Record<string, unknown>,
+                },
+            }
+        } catch (error) {
+            return {
+                isValid: false,
+                event: null,
+                error: error instanceof Error ? error.message : "Wompi webhook parse error",
+                httpStatus: 400,
+            }
+        }
     }
 }
