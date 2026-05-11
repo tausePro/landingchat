@@ -192,36 +192,26 @@ export class EpaycoGateway implements PaymentGateway {
         }
     }
 
-    async getTransactionByReference(reference: string): Promise<TransactionDetails> {
-        const headers = await this.getHeaders()
-
-        const response = await fetch(
-            `${this.baseUrl}/transaction/detail?factura=${encodeURIComponent(reference)}`,
-            { headers }
+    /**
+     * Consulta una transacción por la referencia/factura del comerciante.
+     *
+     * ⚠️ ePayco no expone un endpoint público para consultar por
+     * `x_id_invoice` (factura). El único endpoint válido es
+     * `secure.epayco.co/validation/v1/reference/{x_ref_payco}` que requiere
+     * el `x_ref_payco` interno generado por ePayco al iniciar la transacción.
+     *
+     * Por eso, este método lanza un error informativo cuando no hay
+     * `x_ref_payco` disponible. La capa superior (`reconcileOrderPayment`)
+     * busca el `x_ref_payco` en `webhook_logs` (eventos previamente recibidos)
+     * antes de llamar a este método. Si tampoco lo encuentra, la única forma
+     * de validar es esperar al webhook automático o ingresar manualmente la
+     * referencia desde el dashboard ePayco.
+     */
+    async getTransactionByReference(_reference: string): Promise<TransactionDetails> {
+        void _reference
+        throw new Error(
+            "ePayco no permite consultar transacciones por factura. Necesita el x_ref_payco interno (lo entrega el webhook autom\u00e1tico o el dashboard ePayco)"
         )
-
-        if (!response.ok) {
-            throw new Error("Error al obtener transacción")
-        }
-
-        const data = await response.json()
-        if (!data.success || !data.data) {
-            throw new Error("Transacción no encontrada")
-        }
-
-        const tx = data.data
-        return {
-            id: tx.ref_payco,
-            providerTransactionId: tx.ref_payco,
-            reference: tx.factura,
-            amount: Math.round(parseFloat(tx.valor) * 100),
-            currency: tx.moneda,
-            status: this.mapStatus(tx.estado),
-            paymentMethod: tx.metodo,
-            createdAt: tx.fecha,
-            completedAt: tx.estado === "Aceptada" ? tx.fecha : undefined,
-            rawResponse: data,
-        }
     }
 
     async tokenizeCard(card: CardData): Promise<TokenResult> {
