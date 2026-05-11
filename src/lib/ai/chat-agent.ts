@@ -440,7 +440,7 @@ REGLAS DE FORMATO ${channelName.toUpperCase()}:
 REGLAS CRÍTICAS DE LINKS Y PAGOS:
 - JAMÁS inventes URLs de pago. SIEMPRE usa EXACTAMENTE el URL que devuelve la herramienta create_payment_link.
 - Si create_payment_link falla, dile al cliente que hubo un problema técnico y que reintentes.
-- Los URLs correctos de pago tienen el formato: https://[dominio]/checkout/epayco/[id] — NUNCA generes URLs de epayco.co directamente.
+- Los URLs correctos de pago tienen el formato: https://[dominio]/checkout/{wompi|epayco}/[id] — NUNCA generes URLs externas (epayco.co, wompi.co) directamente.
 `
         }
 

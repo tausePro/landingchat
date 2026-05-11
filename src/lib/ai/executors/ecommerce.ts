@@ -1368,14 +1368,31 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         customerId: chat?.customer_id || null,
     })
 
+    // Resolver provider de checkout. Hoy soportamos como link directo desde el agente:
+    //   - "manual" / "contraentrega": muestra la página de orden con instrucciones
+    //   - "wompi" / "epayco": envía a la página /checkout/{provider}/{orderId}
+    // Los proveedores hosted_redirect (Bold, Addi) requieren generar la URL externa
+    // server-side; cuando se habiliten habrá que pasar por paymentService.initiatePayment.
+    const SUPPORTED_GATEWAY_PROVIDERS = ["wompi", "epayco"] as const
+    type SupportedGatewayProvider = (typeof SUPPORTED_GATEWAY_PROVIDERS)[number]
+
+    const isManual = payment_method === "manual" || payment_method === "contraentrega"
+    const requestedProvider = (payment_method ?? "").toLowerCase() as SupportedGatewayProvider
+    const gatewayProvider: SupportedGatewayProvider = SUPPORTED_GATEWAY_PROVIDERS.includes(requestedProvider)
+        ? requestedProvider
+        : "epayco"
+
     let paymentUrl: string
     let paymentInstructions: string
 
-    if (payment_method === "manual" || payment_method === "contraentrega") {
+    if (isManual) {
         paymentUrl = appendStorefrontAccessParam(`${storeBaseUrl}/order/${order.id}`, orderAccessToken)
         paymentInstructions = "Tu pedido ha sido registrado. Puedes pagar contra entrega o por transferencia."
     } else {
-        paymentUrl = appendStorefrontAccessParam(`${storeBaseUrl}/checkout/epayco/${order.id}`, orderAccessToken)
+        paymentUrl = appendStorefrontAccessParam(
+            `${storeBaseUrl}/checkout/${gatewayProvider}/${order.id}`,
+            orderAccessToken,
+        )
         paymentInstructions = "Haz clic en el enlace para completar tu pago de forma segura."
     }
 
