@@ -12,8 +12,11 @@ import {
 } from "@/lib/storefrontAccess"
 import { notFound, redirect } from "next/navigation"
 import { decrypt } from "@/lib/utils/encryption"
+import { logger } from "@/lib/logger"
 import { WompiCheckoutClient } from "./components/wompi-checkout-client"
 import { getOrderDetails } from "../../../actions"
+
+const log = logger("checkout/wompi/subdomain")
 
 interface PageProps {
     params: Promise<{
@@ -100,6 +103,28 @@ export default async function WompiCheckoutPage({ params, searchParams }: PagePr
         .createHash("sha256")
         .update(concatenated)
         .digest("hex")
+
+    // 7. Logging defensivo del cálculo de la firma. Permite diagnosticar
+    // errores de "signature: La firma es inválida" en Wompi sin exponer el
+    // secreto completo en logs (solo fingerprint y prefijo).
+    log.info("Wompi checkout signature generated", {
+        organizationId: organization.id,
+        orderId,
+        orderTotal: order.total,
+        orderTotalType: typeof order.total,
+        amountInCents,
+        currency,
+        integritySecretLength: integritySecret.length,
+        integritySecretFingerprint:
+            integritySecret.length >= 8
+                ? `${integritySecret.slice(0, 4)}...${integritySecret.slice(-4)}`
+                : "TOO_SHORT",
+        integritySecretPrefix:
+            integritySecret.match(/^(test|prod)_(integrity|events)_/)?.[0] ?? "UNKNOWN",
+        signatureIntegrity,
+        publicKeyPrefix: gatewayConfig.public_key?.slice(0, 12) ?? "UNKNOWN",
+        isTestMode: Boolean(gatewayConfig.is_test_mode),
+    })
 
     // 8. Preparar datos para el Widget de Wompi
     const checkoutData = {

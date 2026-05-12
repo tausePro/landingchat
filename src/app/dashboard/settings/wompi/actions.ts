@@ -67,6 +67,17 @@ export async function getWompiConfig(): Promise<ActionResult<Record<string, unkn
 
 /**
  * Guarda la configuración de Wompi
+ *
+ * Contrato con el UI:
+ *   - `private_key`: SIEMPRE requerida al guardar (el UI obliga a re-ingresarla)
+ *   - `integrity_secret`: opcional — si llega vacía, se PRESERVA el valor existente en DB
+ *   - `events_secret`: opcional — si llega vacía, se PRESERVA el valor existente en DB
+ *
+ * Bug regresivo previo: el server convertía los secretos vacíos en `null` y los
+ * sobreescribía en DB, borrando configuraciones válidas previas. Fix: construir
+ * el objeto del upsert condicionalmente, sin incluir campos cuando el input
+ * llega vacío. En modo UPDATE (existe conflicto onConflict), los campos
+ * omitidos del objeto preservan su valor anterior en DB.
  */
 export async function saveWompiConfig(input: WompiConfigInput): Promise<ActionResult<Record<string, unknown>>> {
     try {
@@ -79,16 +90,38 @@ export async function saveWompiConfig(input: WompiConfigInput): Promise<ActionRe
             return failure("Llave pública y privada son requeridas")
         }
 
-        const supabase = await createClient()
+        // Validar prefijos de los secretos para evitar el error clásico de
+        // pegar "Eventos" donde va "Integridad" (o viceversa). Si vienen vacíos
+        // se preservan los existentes, así que solo validamos cuando hay input.
+        if (input.integrity_secret && !/^(test|prod)_integrity_/.test(input.integrity_secret)) {
+            return failure(
+                "El Secreto de Integridad debe empezar con 'test_integrity_' o 'prod_integrity_'. " +
+                "Verifica en Wompi → Desarrolladores → Secretos que copiaste el de 'Integridad', no el de 'Eventos'."
+            )
+        }
+        if (input.events_secret && !/^(test|prod)_events_/.test(input.events_secret)) {
+            return failure(
+                "El Secreto de Eventos debe empezar con 'test_events_' o 'prod_events_'. " +
+                "Verifica que copiaste el secreto correcto desde Wompi → Desarrolladores → Secretos."
+            )
+        }
+        if (!/^prv_(test|prod)_/.test(input.private_key)) {
+            return failure("La llave privada debe empezar con 'prv_test_' o 'prv_prod_'.")
+        }
+        if (!/^pub_(test|prod)_/.test(input.public_key)) {
+            return failure("La llave pública debe empezar con 'pub_test_' o 'pub_prod_'.")
+        }
+        // El modo de pruebas debe coincidir con el prefijo de la llave pública.
+        const isTestKey = input.public_key.startsWith("pub_test_")
+        if (input.is_test_mode !== isTestKey) {
+            return failure(
+                input.is_test_mode
+                    ? "Activaste modo de pruebas pero la llave pública parece ser de producción ('pub_prod_'). Verifica que todas las credenciales correspondan al mismo ambiente."
+                    : "Desactivaste modo de pruebas pero la llave pública parece ser de sandbox ('pub_test_'). Verifica que todas las credenciales correspondan al mismo ambiente."
+            )
+        }
 
-        // Encriptar credenciales sensibles
-        const encryptedPrivateKey = encrypt(input.private_key)
-        const encryptedIntegritySecret = input.integrity_secret
-            ? encrypt(input.integrity_secret)
-            : null
-        const encryptedEventsSecret = input.events_secret
-            ? encrypt(input.events_secret)
-            : null
+        const supabase = await createClient()
 
         // Generar URL de webhook
         const { data: org } = await supabase
@@ -101,17 +134,25 @@ export async function saveWompiConfig(input: WompiConfigInput): Promise<ActionRe
             ? `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/payments/wompi?org=${org.slug}`
             : null
 
-        const configData = {
+        // Construir el objeto del upsert. Los secretos solo se incluyen cuando
+        // el input los trae con contenido; si llegan vacíos, se omiten y el
+        // valor previo en DB queda intacto.
+        const configData: Record<string, unknown> = {
             organization_id: organizationId,
             provider: "wompi",
             is_active: input.is_active,
             is_test_mode: input.is_test_mode,
             public_key: input.public_key,
-            private_key_encrypted: encryptedPrivateKey,
-            integrity_secret_encrypted: encryptedIntegritySecret,
-            events_secret_encrypted: encryptedEventsSecret,
+            private_key_encrypted: encrypt(input.private_key),
             webhook_url: webhookUrl,
             updated_at: new Date().toISOString(),
+        }
+
+        if (input.integrity_secret) {
+            configData.integrity_secret_encrypted = encrypt(input.integrity_secret)
+        }
+        if (input.events_secret) {
+            configData.events_secret_encrypted = encrypt(input.events_secret)
         }
 
         const { data: result, error } = await supabase

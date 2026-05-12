@@ -57,7 +57,13 @@ export function WompiCheckoutClient({ data }: WompiCheckoutClientProps) {
                 const transaction = result.transaction
                 if (transaction) {
                     console.log("[Wompi] Transaction completed:", transaction.id, transaction.status)
-                    // El widget redirige automáticamente si hay redirectUrl
+                }
+                // El widget v2 con callback NO redirige automáticamente cuando
+                // el desarrollador define un handler. Forzamos la redirección al
+                // order tracking para que el comprador siempre llegue a la
+                // vista de seguimiento, sin importar el status final.
+                if (data.redirectUrl) {
+                    window.location.href = data.redirectUrl
                 }
             })
         } catch (err) {
