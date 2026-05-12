@@ -23,7 +23,7 @@ import {
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
 import { CartCleaner } from "./components/cart-cleaner"
-import { reconcileEpaycoOrderPayment } from "@/lib/payments/epayco-reconciliation"
+import { reconcileOrderPayment } from "@/lib/payments/epayco-reconciliation"
 import { MetaPixel } from "@/components/analytics/meta-pixel"
 import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 import { TrackingProvider } from "@/components/analytics/tracking-provider"
@@ -50,11 +50,21 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
 
     let { order, organization } = result
 
-    if (order.payment_method === "epayco" && order.payment_status === "pending") {
-        const reconciliation = await reconcileEpaycoOrderPayment({
+    // Auto-reconciliación al aterrizar en el seguimiento del pedido.
+    // Aplica a Wompi y ePayco: cuando el webhook no llega o se atrasa
+    // (común en sandbox), consultamos a la pasarela el estado real y
+    // sincronizamos la orden + transacción + side effects (stock, etc).
+    // Para ePayco aprovechamos el `ref_payco` del query string como hint;
+    // para Wompi el gateway resuelve la transacción por reference=orderId.
+    const supportsAutoReconcile =
+        order.payment_method === "wompi" || order.payment_method === "epayco"
+
+    if (supportsAutoReconcile && order.payment_status === "pending") {
+        const reconciliation = await reconcileOrderPayment({
             organizationId: organization.id,
             orderId: order.id,
-            providerTransactionId: refPayco,
+            expectedProvider: order.payment_method,
+            providerTransactionId: order.payment_method === "epayco" ? refPayco : undefined,
         })
 
         if (reconciliation.reconciled) {
