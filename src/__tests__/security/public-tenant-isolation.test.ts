@@ -17,6 +17,10 @@ vi.mock("@/lib/rate-limit", () => ({
     bookingsRateLimit: mockBookingsRateLimit,
     getClientIdentifier: mockGetClientIdentifier,
     getRateLimitHeaders: mockGetRateLimitHeaders,
+    limitOrAllowOnProviderError: async (
+        rateLimiter: { limit: (id: string) => Promise<unknown> },
+        identifier: string,
+    ) => rateLimiter.limit(identifier),
 }))
 
 vi.mock("@/lib/calendar/google-calendar", () => ({

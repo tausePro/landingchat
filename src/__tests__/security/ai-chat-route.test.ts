@@ -55,6 +55,10 @@ vi.mock("@/lib/rate-limit", () => ({
     aiChatRateLimit: mockAiChatRateLimit,
     getClientIdentifier: mockGetClientIdentifier,
     getRateLimitHeaders: mockGetRateLimitHeaders,
+    limitOrAllowOnProviderError: async (
+        rateLimiter: { limit: (id: string) => Promise<unknown> },
+        identifier: string,
+    ) => rateLimiter.limit(identifier),
 }))
 
 vi.mock("@/lib/logger", () => ({
