@@ -15,12 +15,16 @@
  * Seguridad: verificar `CRON_SECRET` en header Authorization.
  *
  * Vercel Cron config en vercel.json:
- *   { "path": "/api/cron/whatsapp/reset-counters", "schedule": "0 0 1 * *" }
+ *   { "path": "/api/cron/whatsapp/reset-counters", "schedule": "0 5 1 * *" }
  *
- * Schedule rationale: día 1 a las 00:00 UTC coincide con `startOfMonth`
- * que usa `canCreateResource` en `src/lib/utils/subscription.ts`,
- * manteniendo coherencia entre los dos sistemas de gating de
- * conversaciones (acumulativo vs. mensual por fecha).
+ * Schedule rationale: 05:00 UTC del día 1 = 00:00 America/Bogota (UTC-5)
+ * del día 1. La plataforma opera en Colombia, por lo que el "inicio de mes"
+ * se interpreta en hora local Bogotá. Esto introduce una pequeña ventana
+ * de 5h donde `canCreateResource` (que cuenta `chats` desde el `startOfMonth`
+ * UTC del servidor) ya ve el nuevo mes mientras el contador acumulativo
+ * aún no se ha reseteado; impacto operativo es mínimo (1 vez al mes, 5h).
+ * La unificación de los dos sistemas de gating queda pendiente como slice
+ * separado.
  */
 
 import { NextResponse } from "next/server"

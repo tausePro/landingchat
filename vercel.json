@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/whatsapp/reset-counters",
-      "schedule": "0 0 1 * *"
+      "schedule": "0 5 1 * *"
     }
   ]
 }
