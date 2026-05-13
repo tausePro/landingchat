@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/subscriptions/process-trials",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/whatsapp/reset-counters",
+      "schedule": "0 0 1 * *"
     }
   ]
 }
