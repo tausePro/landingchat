@@ -37,10 +37,10 @@ export async function processIncomingMessage(
     try {
         const supabase = await createServiceClient()
 
-        // Obtener información del chat
+        // Obtener información del chat (incluye campos de control IA: hard pause y soft pause)
         const { data: chat, error: chatError } = await supabase
             .from("chats")
-            .select("organization_id, customer_id, assigned_agent_id, ai_enabled")
+            .select("organization_id, customer_id, assigned_agent_id, ai_enabled, ai_paused_until")
             .eq("id", message.chatId)
             .single()
 
@@ -51,13 +51,64 @@ export async function processIncomingMessage(
             }
         }
 
-        // Check 1: IA desactivada manualmente en esta conversación
+        // Check 0: cliente en whitelist human-only (la IA NUNCA responde a este contacto)
+        // Tiene precedencia sobre cualquier otro flag.
+        if (chat.customer_id) {
+            const { data: customer } = await supabase
+                .from("customers")
+                .select("is_human_only")
+                .eq("id", chat.customer_id)
+                .single()
+
+            if (customer?.is_human_only === true) {
+                log.info("Customer is human-only, skipping AI", {
+                    chatId: message.chatId,
+                    customerId: chat.customer_id,
+                })
+                return {
+                    success: true,
+                    response: undefined,
+                }
+            }
+        }
+
+        // Check 1: IA desactivada manualmente en esta conversación (hard pause)
         if (chat.ai_enabled === false) {
-            log.info("AI disabled for chat", { chatId: message.chatId })
+            log.info("AI disabled for chat (hard pause)", { chatId: message.chatId })
             return {
                 success: true,
                 response: undefined,
             }
+        }
+
+        // Check 1.5: pausa suave con expiración (se activa al responder el operador desde WhatsApp)
+        if (chat.ai_paused_until) {
+            const pausedUntil = new Date(chat.ai_paused_until)
+            const now = new Date()
+
+            if (pausedUntil > now) {
+                log.info("AI in soft pause", {
+                    chatId: message.chatId,
+                    pausedUntil: chat.ai_paused_until,
+                    remainingMs: pausedUntil.getTime() - now.getTime(),
+                })
+                return {
+                    success: true,
+                    response: undefined,
+                }
+            }
+
+            // Soft-pause expirada: limpiar campo y dejar pasar (auto-reanudación)
+            // No bloqueamos en caso de error: la IA debe responder aunque falle el cleanup.
+            await supabase
+                .from("chats")
+                .update({ ai_paused_until: null })
+                .eq("id", message.chatId)
+
+            log.info("Soft pause expired, AI auto-resumed", {
+                chatId: message.chatId,
+                expiredAt: chat.ai_paused_until,
+            })
         }
 
         // Obtener agente asignado o el agente por defecto de la organización
