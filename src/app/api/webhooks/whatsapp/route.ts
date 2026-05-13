@@ -23,6 +23,13 @@ import {
     extractEvolutionState,
     normalizeEvolutionStatus,
 } from "@/lib/whatsapp/evolutionStatus"
+import {
+    isOperatorCommand,
+    handleOperatorCommand,
+    applySoftPause,
+    findActiveChatByPhone,
+} from "@/lib/whatsapp/operator-commands"
+import { sendWhatsAppMessage } from "@/lib/whatsapp"
 import { logger } from "@/lib/logger"
 
 const log = logger("webhooks/whatsapp")
@@ -220,8 +227,12 @@ async function handleIncomingMessage(
 
     const message = validation.data
 
-    // Ignorar mensajes enviados por nosotros
+    // Mensaje saliente: del operador hacia el cliente.
+    // Puede ser un comando slash (/yo, /bot, /help) o una respuesta normal.
+    // Una respuesta normal dispara una pausa suave automática para que la IA
+    // deje de responder mientras el operador maneja el chat.
     if (message.key.fromMe) {
+        await handleOperatorOutgoingMessage(supabase, instance, message)
         return
     }
 
@@ -285,6 +296,90 @@ async function handleIncomingMessage(
     } else {
         log.error("AI processing failed", { chatId: chat.id, error: result.error })
     }
+}
+
+/**
+ * Procesa mensajes salientes (fromMe = true): del operador hacia el cliente.
+ *
+ * Dos caminos:
+ *   1. Comando slash (/yo, /bot, /help, etc.):
+ *      - Ejecuta la acción correspondiente sobre el chat.
+ *      - Envía mensaje de confirmación al cliente (queda visible en la
+ *        conversación tanto para el operador como para el cliente).
+ *   2. Mensaje normal (no es comando):
+ *      - Aplica una soft-pause de 30 min al chat (el operador está manejando)
+ *        SOLO si el chat no tiene hard pause activa (no sobrescribimos manual).
+ *      - Silencioso: no envía nada al cliente.
+ */
+async function handleOperatorOutgoingMessage(
+    supabase: SupabaseClient,
+    instance: WhatsAppInstanceRecord,
+    message: z.infer<typeof IncomingMessageSchema>
+) {
+    const phoneNumber = message.key.remoteJid.replace("@s.whatsapp.net", "")
+    const messageText =
+        message.message?.conversation ||
+        message.message?.extendedTextMessage?.text ||
+        ""
+
+    if (!messageText) {
+        // Mensaje saliente sin texto (foto, audio, etc.): aplicar soft-pause igual
+        // si hay un chat activo, pero sin enviar nada.
+        const chat = await findActiveChatByPhone(supabase, instance.organization_id, phoneNumber)
+        if (chat && chat.ai_enabled !== false) {
+            await applySoftPause(supabase, chat.id)
+        }
+        return
+    }
+
+    // Camino 1: comando del operador
+    if (isOperatorCommand(messageText)) {
+        const result = await handleOperatorCommand(
+            supabase,
+            instance.organization_id,
+            phoneNumber,
+            messageText
+        )
+
+        // Enviar confirmación. Va al `phoneNumber` del cliente, lo cual significa
+        // que el operador la ve en su conversación con el cliente. El cliente también
+        // la ve, pero el formato del mensaje (con emojis y *negritas*) deja claro
+        // que es un mensaje del sistema.
+        if (!result.silent && result.message) {
+            try {
+                await sendWhatsAppMessage(
+                    instance.organization_id,
+                    phoneNumber,
+                    result.message
+                )
+            } catch (err) {
+                log.error("Error enviando respuesta del comando", {
+                    error: err instanceof Error ? err.message : String(err),
+                    phoneNumber,
+                    organizationId: instance.organization_id,
+                })
+            }
+        }
+        return
+    }
+
+    // Camino 2: mensaje normal del operador → soft-pause automática.
+    const chat = await findActiveChatByPhone(supabase, instance.organization_id, phoneNumber)
+    if (!chat) {
+        log.debug("Operator outgoing message but no active chat found", {
+            phoneNumber,
+            organizationId: instance.organization_id,
+        })
+        return
+    }
+
+    // No sobreescribir hard pause: si el operador ya pausó manualmente, dejar así.
+    if (chat.ai_enabled === false) {
+        log.debug("Skipping soft-pause: chat already in hard pause", { chatId: chat.id })
+        return
+    }
+
+    await applySoftPause(supabase, chat.id)
 }
 
 /**
