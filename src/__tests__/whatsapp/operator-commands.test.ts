@@ -3,9 +3,10 @@
  *
  * Cubre:
  *   - Parsing: isOperatorCommand, parseCommand
- *   - Acciones: applySoftPause, pauseAi, resumeAi (vía handleOperatorCommand)
+ *   - Acciones básicas: applySoftPause, pauseAi, resumeAi (Slice 2)
+ *   - Acciones avanzadas: showInfo, whitelist, unwhitelist, closeChat (Slice 3)
  *   - Dispatch del handler principal
- *   - Edge cases: chat no encontrado, comando inválido
+ *   - Edge cases: chat no encontrado, comando inválido, customer ausente
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest"
@@ -16,6 +17,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 
 const mockChatSelect = vi.fn()
 const mockChatUpdate = vi.fn()
+const mockCustomersSingle = vi.fn()
+const mockCustomersUpdate = vi.fn()
 
 const mockFrom = vi.fn((table: string) => {
   if (table === "chats") {
@@ -31,6 +34,19 @@ const mockFrom = vi.fn((table: string) => {
       })),
       update: vi.fn(() => ({
         eq: vi.fn(() => mockChatUpdate()),
+      })),
+    }
+  }
+
+  if (table === "customers") {
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(() => mockCustomersSingle()),
+        })),
+      })),
+      update: vi.fn(() => ({
+        eq: vi.fn(() => mockCustomersUpdate()),
       })),
     }
   }
@@ -376,5 +392,409 @@ describe("operator-commands - handleOperatorCommand", () => {
 
     expect(result.success).toBe(false)
     expect(result.message).toContain("inválido")
+  })
+})
+
+// =============================================================================
+// Slice 3: /info, /whitelist, /unwhitelist, /cerrar
+// =============================================================================
+
+describe("operator-commands - Slice 3 commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // ---------------------------------------------------------------------
+  // /info y /estado
+  // ---------------------------------------------------------------------
+
+  describe("/info", () => {
+    it("muestra estado normal: IA activa, abierto, no whitelisted", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersSingle.mockResolvedValue({
+        data: { is_human_only: false, full_name: "Cliente Demo" },
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/info"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("Estado del chat")
+      expect(result.message).toContain("IA activa")
+      expect(result.message).toContain("Abierto")
+      // No debe haber mutado nada
+      expect(mockChatUpdate).not.toHaveBeenCalled()
+      expect(mockCustomersUpdate).not.toHaveBeenCalled()
+    })
+
+    it("muestra timestamp restante cuando hay soft-pause vigente", async () => {
+      const pausedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: pausedUntil,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersSingle.mockResolvedValue({
+        data: { is_human_only: false, full_name: null },
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/info"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("Pausa automática")
+      expect(result.message).toMatch(/~\d+ min restantes/)
+    })
+
+    it("muestra 'IA pausada (hard)' cuando ai_enabled=false y no hay soft-pause", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: false,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersSingle.mockResolvedValue({
+        data: { is_human_only: false, full_name: null },
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/info"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("IA pausada (hard)")
+    })
+
+    it("muestra whitelist cuando customer.is_human_only === true", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersSingle.mockResolvedValue({
+        data: { is_human_only: true, full_name: "Cris" },
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/info"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("Sí (solo humano)")
+    })
+
+    it("/estado es alias de /info", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: null,
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/estado"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("Estado del chat")
+    })
+  })
+
+  // ---------------------------------------------------------------------
+  // /whitelist y /solohumano
+  // ---------------------------------------------------------------------
+
+  describe("/whitelist", () => {
+    it("marca customer como is_human_only=true", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersUpdate.mockResolvedValue({ error: null })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/whitelist"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("solo humano")
+      expect(mockCustomersUpdate).toHaveBeenCalled()
+    })
+
+    it("falla con mensaje claro si chat no tiene customer_id", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: null,
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/whitelist"
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.message).toContain("no tiene cliente asociado")
+      expect(mockCustomersUpdate).not.toHaveBeenCalled()
+    })
+
+    it("propaga error de DB con mensaje amigable", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersUpdate.mockResolvedValue({ error: { message: "rls policy violation" } })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/whitelist"
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.message).toContain("rls policy violation")
+    })
+
+    it("/solohumano es alias de /whitelist", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersUpdate.mockResolvedValue({ error: null })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/solohumano"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("solo humano")
+    })
+  })
+
+  // ---------------------------------------------------------------------
+  // /unwhitelist
+  // ---------------------------------------------------------------------
+
+  describe("/unwhitelist", () => {
+    it("marca customer como is_human_only=false", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockCustomersUpdate.mockResolvedValue({ error: null })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/unwhitelist"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("quitado")
+      expect(mockCustomersUpdate).toHaveBeenCalled()
+    })
+
+    it("falla cuando no hay customer asociado", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: null,
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/unwhitelist"
+      )
+
+      expect(result.success).toBe(false)
+      expect(mockCustomersUpdate).not.toHaveBeenCalled()
+    })
+  })
+
+  // ---------------------------------------------------------------------
+  // /cerrar y /resolver
+  // ---------------------------------------------------------------------
+
+  describe("/cerrar", () => {
+    it("cambia status a 'closed' cuando chat está abierto", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockChatUpdate.mockResolvedValue({ error: null })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/cerrar"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("Chat cerrado")
+      expect(mockChatUpdate).toHaveBeenCalled()
+    })
+
+    it("responde idémpotente cuando el chat ya está cerrado (no muta)", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "closed",
+        }],
+        error: null,
+      })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/cerrar"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("ya está cerrado")
+      expect(mockChatUpdate).not.toHaveBeenCalled()
+    })
+
+    it("/resolver es alias de /cerrar", async () => {
+      mockChatSelect.mockResolvedValue({
+        data: [{
+          id: "chat-1",
+          ai_enabled: true,
+          ai_paused_until: null,
+          customer_id: "cust-1",
+          phone_number: "+573001234567",
+          status: "active",
+        }],
+        error: null,
+      })
+      mockChatUpdate.mockResolvedValue({ error: null })
+
+      const result = await handleOperatorCommand(
+        { from: mockFrom } as unknown as never,
+        "org-1",
+        "+573001234567",
+        "/resolver"
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.message).toContain("Chat cerrado")
+    })
   })
 })
