@@ -146,7 +146,15 @@ export async function processIncomingMessage(
             }
         }
 
-        // Check 2: Horarios del agente por canal
+        // Check 2: Horario humano del agente por canal.
+        //
+        // Semantica del schedule (debe coincidir con el editor en el dashboard):
+        //   - Los dias/horas configurados representan cuando el HUMANO atiende,
+        //     por lo tanto la IA esta PAUSADA dentro de esa ventana.
+        //   - Los dias sin horario (null/undefined) o las horas fuera del rango
+        //     son los momentos en que la IA responde automaticamente 24/7.
+        //
+        // Ver: docs/AGENTS_GUIDE.md y el card "Como funciona" en agent-config.tsx.
         if (message.channel !== "web") {
             const { data: agent } = await supabase
                 .from("agents")
@@ -159,9 +167,9 @@ export async function processIncomingMessage(
                 const channelSchedule = schedule.channels?.[message.channel]
 
                 if (channelSchedule) {
-                    const isOutsideHours = isOutsideSchedule(channelSchedule, schedule.timezone || "America/Bogota")
-                    if (isOutsideHours) {
-                        log.info("AI paused by schedule (outside working hours)", { chatId: message.chatId, channel: message.channel, agentId })
+                    const aiPaused = isAiPausedBySchedule(channelSchedule, schedule.timezone || "America/Bogota")
+                    if (aiPaused) {
+                        log.info("AI paused by schedule (within human attention window)", { chatId: message.chatId, channel: message.channel, agentId })
                         return {
                             success: true,
                             response: undefined,
@@ -715,11 +723,21 @@ type ChannelSchedule = Record<string, DaySchedule | null>
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
 
 /**
- * Verifica si la hora actual está FUERA del horario configurado.
- * Si el día no tiene horario (null), se considera fuera de horario.
- * Si el día tiene horario, verifica si la hora actual está dentro del rango.
+ * Determina si la IA debe estar PAUSADA segun el horario humano configurado.
+ *
+ * Semantica (debe coincidir con la UI del editor de agente):
+ *   - Dia sin horario (null/undefined) -> la IA responde 24/7 (NO pausada).
+ *   - Dia con horario configurado -> la IA esta PAUSADA dentro del rango
+ *     (porque ahi atiende el humano) y responde fuera del rango.
+ *
+ * Esta funcion se exporta para tests unitarios. Es una funcion pura: no toca
+ * BD ni hace IO; solo evalua hora actual + zona horaria + schedule.
+ *
+ * Comportamiento ante errores (fail-open): si el calculo falla por cualquier
+ * razon (zona horaria invalida, schedule malformado, etc.) NO se pausa la IA.
+ * Es preferible que responda de mas a que se quede muda silenciosamente.
  */
-function isOutsideSchedule(channelSchedule: ChannelSchedule, timezone: string): boolean {
+export function isAiPausedBySchedule(channelSchedule: ChannelSchedule, timezone: string): boolean {
     try {
         const now = new Date()
         const formatter = new Intl.DateTimeFormat("en-US", {
@@ -744,14 +762,15 @@ function isOutsideSchedule(channelSchedule: ChannelSchedule, timezone: string): 
 
         const daySchedule = channelSchedule[dayKey]
 
-        // Si no hay horario para este día, la IA está pausada
-        if (!daySchedule) return true
+        // Dia inactivo (sin horario configurado) -> la IA responde 24/7
+        if (!daySchedule) return false
 
-        // Comparar hora actual con rango
-        return currentTime < daySchedule.from || currentTime >= daySchedule.to
+        // Dia activo -> la IA esta pausada DENTRO del rango (ahi atiende el humano).
+        // Fuera del rango la IA responde automaticamente.
+        return currentTime >= daySchedule.from && currentTime < daySchedule.to
     } catch (error) {
         log.error("Error checking schedule", { error: error instanceof Error ? error.message : String(error) })
-        // En caso de error, no pausar la IA (fail-open)
+        // Fail-open: ante error, no pausar la IA.
         return false
     }
 }
