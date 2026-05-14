@@ -8,6 +8,7 @@ import {
     sendAgentMessage,
     updateChatStatus,
     toggleAiEnabled,
+    toggleHumanOnly,
 } from "../actions"
 import type { ConsoleChatsResult, ConsoleChatItem, ChatDetailData } from "../actions"
 import { SidebarFolders } from "./components/sidebar-folders"
@@ -127,6 +128,23 @@ export function ChatConsole({ initialData }: ChatConsoleProps) {
         }
     }, [selectedChatId])
 
+    // Toggle whitelist "solo humano" en el cliente
+    const handleToggleHumanOnly = useCallback(async (isHumanOnly: boolean) => {
+        const customerId = chatDetail?.customer?.id
+        if (!customerId) return
+
+        const result = await toggleHumanOnly(customerId, isHumanOnly)
+        if (result.success) {
+            setChatDetail(prev => {
+                if (!prev || !prev.customer) return prev
+                return {
+                    ...prev,
+                    customer: { ...prev.customer, is_human_only: isHumanOnly },
+                }
+            })
+        }
+    }, [chatDetail?.customer?.id])
+
     return (
         <div className="flex h-screen w-full bg-background-light dark:bg-background-dark overflow-hidden">
             {/* Panel 1: Sidebar Carpetas */}
@@ -184,7 +202,10 @@ export function ChatConsole({ initialData }: ChatConsoleProps) {
             {/* Panel 4: Perfil Cliente */}
             {chatDetail && (
                 <div className="w-80 flex-shrink-0 border-l border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark overflow-y-auto">
-                    <CustomerSidebar chatDetail={chatDetail} />
+                    <CustomerSidebar
+                        chatDetail={chatDetail}
+                        onToggleHumanOnly={handleToggleHumanOnly}
+                    />
                 </div>
             )}
         </div>

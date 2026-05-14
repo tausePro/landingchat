@@ -2,22 +2,24 @@
 
 import type { ChatDetailData } from "../../actions"
 import { formatBogotaDate } from "@/lib/utils/date"
+import { useState } from "react"
 import {
-    User,
     Mail,
     Phone,
     MapPin,
     ShoppingCart,
-    Package,
     Tag,
     Calendar,
-    DollarSign,
     ShoppingBag,
+    Shield,
+    ShieldOff,
+    Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface CustomerSidebarProps {
     chatDetail: ChatDetailData
+    onToggleHumanOnly?: (isHumanOnly: boolean) => Promise<void>
 }
 
 function formatCurrency(amount: number): string {
@@ -41,9 +43,20 @@ function getStatusColor(status: string): string {
     return "text-slate-600 bg-slate-50 dark:text-slate-400 dark:bg-slate-800"
 }
 
-export function CustomerSidebar({ chatDetail }: CustomerSidebarProps) {
+export function CustomerSidebar({ chatDetail, onToggleHumanOnly }: CustomerSidebarProps) {
     const customer = chatDetail.customer
     const displayName = customer?.full_name || chatDetail.customer_name || "Sin nombre"
+    const [togglingHuman, setTogglingHuman] = useState(false)
+
+    const handleHumanOnlyClick = async () => {
+        if (!customer || !onToggleHumanOnly || togglingHuman) return
+        setTogglingHuman(true)
+        try {
+            await onToggleHumanOnly(!customer.is_human_only)
+        } finally {
+            setTogglingHuman(false)
+        }
+    }
 
     return (
         <div className="h-full flex flex-col">
@@ -56,6 +69,12 @@ export function CustomerSidebar({ chatDetail }: CustomerSidebarProps) {
                     <h3 className="text-sm font-semibold text-text-light-primary dark:text-text-dark-primary">
                         {displayName}
                     </h3>
+                    {customer?.is_human_only && (
+                        <span className="mt-2 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
+                            <Shield className="size-3" />
+                            Solo humano
+                        </span>
+                    )}
                     {customer?.category && (
                         <span className="mt-1 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                             <Tag className="size-3" />
@@ -64,6 +83,54 @@ export function CustomerSidebar({ chatDetail }: CustomerSidebarProps) {
                     )}
                 </div>
             </div>
+
+            {/* Control de IA - Whitelist */}
+            {customer && onToggleHumanOnly && (
+                <div className="p-4 border-b border-border-light dark:border-border-dark">
+                    <p className="text-xs font-semibold text-text-light-secondary dark:text-text-dark-secondary uppercase tracking-wider mb-3">
+                        Control de IA
+                    </p>
+                    <button
+                        onClick={handleHumanOnlyClick}
+                        disabled={togglingHuman}
+                        className={cn(
+                            "w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm transition-colors",
+                            customer.is_human_only
+                                ? "bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30 border border-amber-200 dark:border-amber-800"
+                                : "bg-slate-50 hover:bg-slate-100 text-text-light-primary dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-text-dark-primary border border-border-light dark:border-border-dark",
+                            togglingHuman && "opacity-50 cursor-not-allowed"
+                        )}
+                        title={
+                            customer.is_human_only
+                                ? "La IA NUNCA responde a este cliente. Click para reactivar respuestas autom\u00e1ticas."
+                                : "Marcar como 'solo humano' para que la IA NUNCA responda a este cliente."
+                        }
+                    >
+                        <div className="flex items-center gap-2">
+                            {customer.is_human_only ? (
+                                <Shield className="size-4" />
+                            ) : (
+                                <ShieldOff className="size-4" />
+                            )}
+                            <span className="font-medium">
+                                {customer.is_human_only ? "Solo humano" : "IA habilitada"}
+                            </span>
+                        </div>
+                        {togglingHuman ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <span className="text-[10px] uppercase tracking-wider opacity-60">
+                                {customer.is_human_only ? "Activa" : "Inactiva"}
+                            </span>
+                        )}
+                    </button>
+                    <p className="text-[11px] text-text-light-secondary dark:text-text-dark-secondary mt-2 leading-relaxed">
+                        {customer.is_human_only
+                            ? "Los mensajes de este cliente NO ser\u00e1n respondidos por la IA, ni siquiera si la conversaci\u00f3n tiene IA activa."
+                            : "Activa esta opci\u00f3n si este cliente requiere atenci\u00f3n exclusivamente humana (VIP, sensible, etc.)."}
+                    </p>
+                </div>
+            )}
 
             {/* Info del cliente */}
             <div className="p-4 border-b border-border-light dark:border-border-dark space-y-3">
@@ -143,7 +210,7 @@ export function CustomerSidebar({ chatDetail }: CustomerSidebarProps) {
                         Carrito activo
                     </p>
                     <div className="space-y-2">
-                        {chatDetail.cart.items.slice(0, 5).map((item: any, i: number) => (
+                        {chatDetail.cart.items.slice(0, 5).map((item, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                                 <span className="text-text-light-primary dark:text-text-dark-primary truncate mr-2">
                                     {item.quantity || 1}x {item.name || item.product_name || "Producto"}
