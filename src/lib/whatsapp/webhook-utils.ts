@@ -6,7 +6,7 @@
  */
 
 import crypto from "crypto"
-import { normalizePhone, getPhoneVariants } from "@/lib/utils/phone"
+import { normalizePhone, getPhoneVariants, buildWhatsAppJid } from "@/lib/utils/phone"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = any
@@ -112,19 +112,30 @@ export async function findOrCreateCustomer(
 /**
  * Busca o crea una conversación para el cliente
  * Reutiliza chats activos dentro de ventana de 24 horas
+ *
+ * @param phoneNumber  Numero limpio (sin sufijo @lid o @s.whatsapp.net), usado
+ *                     para matching y como id legible en la UI.
+ * @param remoteJid    JID completo original recibido del webhook (ej.
+ *                     `123@lid` o `573...@s.whatsapp.net`). Se persiste en
+ *                     `chats.whatsapp_jid` y es la fuente de verdad para
+ *                     enviar respuestas via Evolution API.
+ *
+ * Si `remoteJid` es undefined (callers legacy), se reconstruye heuristicamente
+ * desde `phoneNumber` via `buildWhatsAppJid` para no perder la columna.
  */
 export async function findOrCreateChat(
   supabase: SupabaseClient,
   organizationId: string,
   customerId: string,
-  phoneNumber: string
+  phoneNumber: string,
+  remoteJid?: string
 ) {
   // Buscar chat activo existente (últimas 24 horas)
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   const { data: existing } = await supabase
     .from("chats")
-    .select("id")
+    .select("id, whatsapp_jid")
     .eq("organization_id", organizationId)
     .eq("customer_id", customerId)
     .eq("channel", "whatsapp")
@@ -134,13 +145,24 @@ export async function findOrCreateChat(
     .single()
 
   if (existing) {
-    // Actualizar timestamp
+    // Actualizar timestamp; si el chat existente no tiene whatsapp_jid (legacy
+    // pre-v1.12.7) y AHORA tenemos uno fresco del webhook, lo poblamos.
+    const updates: Record<string, string> = {
+      updated_at: new Date().toISOString(),
+    }
+    if (!existing.whatsapp_jid && remoteJid) {
+      updates.whatsapp_jid = remoteJid
+    }
     await supabase
       .from("chats")
-      .update({ updated_at: new Date().toISOString() })
+      .update(updates)
       .eq("id", existing.id)
-    return existing
+    return { id: existing.id }
   }
+
+  // Resolver JID a persistir: preferir el original del webhook; si no existe
+  // (callers legacy o tests), reconstruir desde phone con heuristica.
+  const jidToPersist = remoteJid || buildWhatsAppJid(phoneNumber)
 
   // Crear nuevo chat
   const { data: newChat, error } = await supabase
@@ -151,6 +173,7 @@ export async function findOrCreateChat(
       channel: "whatsapp",
       whatsapp_chat_id: phoneNumber,
       phone_number: phoneNumber,
+      whatsapp_jid: jidToPersist,
       status: "active",
     })
     .select("id")

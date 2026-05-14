@@ -9,6 +9,7 @@ import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppMedia, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
 import { sendSocialMessage, sendSocialImage, sendSocialQuickReplies } from "@/lib/messaging/meta-social-client"
+import { buildWhatsAppJid } from "@/lib/utils/phone"
 import { logger } from "@/lib/logger"
 
 const log = logger("messaging/unified")
@@ -224,28 +225,40 @@ async function sendWhatsAppResponse(
     try {
         const supabase = await createServiceClient()
 
-        // Obtener número del cliente desde el chat
+        // Obtener identificador del destinatario desde el chat.
+        //
+        // Resolucion en cascada (de mas robusto a fallback):
+        //   1. `whatsapp_jid` (preferido): JID completo persistido al recibir
+        //      el webhook. Es la fuente de verdad porque preserva el sufijo
+        //      `@lid` o `@s.whatsapp.net` que Evolution API necesita para
+        //      entregar el mensaje a contactos con Linked ID.
+        //   2. `phone_number` reconstruido via `buildWhatsAppJid`: heuristica
+        //      por si el chat es legacy y aun no tiene `whatsapp_jid` poblado.
+        //   3. `whatsapp_chat_id`: ultimo recurso para chats muy antiguos.
         const { data: chat } = await supabase
             .from("chats")
-            .select("phone_number, whatsapp_chat_id")
+            .select("phone_number, whatsapp_chat_id, whatsapp_jid")
             .eq("id", chatId)
             .single()
 
-        const phoneNumber = chat?.phone_number || chat?.whatsapp_chat_id
+        const sendTarget =
+            chat?.whatsapp_jid ||
+            (chat?.phone_number ? buildWhatsAppJid(chat.phone_number) : null) ||
+            chat?.whatsapp_chat_id
 
-        if (!phoneNumber) {
-            log.error("No phone number in chat", { chatId })
+        if (!sendTarget) {
+            log.error("No phone number / JID in chat", { chatId })
             return
         }
 
         // Enviar respuesta de texto principal
-        await sendWhatsAppMessage(organizationId, phoneNumber, response)
+        await sendWhatsAppMessage(organizationId, sendTarget, response)
 
         // Enviar mensajes ricos basados en las acciones del AI
         if (actions && actions.length > 0) {
             for (const action of actions) {
                 try {
-                    await sendRichWhatsAppAction(organizationId, phoneNumber, action)
+                    await sendRichWhatsAppAction(organizationId, sendTarget, action)
                 } catch (richError) {
                     // No fallar si el mensaje rico no se envía
                     log.warn("Error sending rich WhatsApp message", { chatId, error: richError instanceof Error ? richError.message : String(richError) })

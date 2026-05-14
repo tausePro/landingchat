@@ -9,7 +9,7 @@
  * rompia la consulta).
  */
 import { describe, expect, it } from "vitest"
-import { extractPhoneFromJid, getPhoneVariants, normalizePhone } from "@/lib/utils/phone"
+import { buildWhatsAppJid, extractPhoneFromJid, getPhoneVariants, normalizePhone } from "@/lib/utils/phone"
 
 describe("extractPhoneFromJid", () => {
     describe("formatos validos de WhatsApp", () => {
@@ -117,5 +117,79 @@ describe("getPhoneVariants", () => {
         const variants = getPhoneVariants("573001234567")
         expect(new Set(variants).size).toBe(variants.length)
         expect(variants.every((v) => v.length > 0)).toBe(true)
+    })
+})
+
+describe("buildWhatsAppJid", () => {
+    describe("inputs ya con sufijo (idempotencia)", () => {
+        it("deja intacto un JID con @s.whatsapp.net", () => {
+            expect(buildWhatsAppJid("573001234567@s.whatsapp.net")).toBe("573001234567@s.whatsapp.net")
+        })
+
+        it("deja intacto un JID con @lid", () => {
+            expect(buildWhatsAppJid("65820390633601@lid")).toBe("65820390633601@lid")
+        })
+
+        it("deja intacto un JID con @c.us", () => {
+            expect(buildWhatsAppJid("573001234567@c.us")).toBe("573001234567@c.us")
+        })
+    })
+
+    describe("MSISDN -> @s.whatsapp.net", () => {
+        it("numero colombiano canonico (12 digitos) recibe @s.whatsapp.net", () => {
+            expect(buildWhatsAppJid("573001234567")).toBe("573001234567@s.whatsapp.net")
+        })
+
+        it("numero local de 10 digitos recibe @s.whatsapp.net", () => {
+            expect(buildWhatsAppJid("3001234567")).toBe("3001234567@s.whatsapp.net")
+        })
+
+        it("numero mexicano de 13 digitos recibe @s.whatsapp.net", () => {
+            // Mexico: 52 + 11 digitos local
+            expect(buildWhatsAppJid("5215512345678")).toBe("5215512345678@s.whatsapp.net")
+        })
+
+        it("numero USA de 11 digitos recibe @s.whatsapp.net", () => {
+            expect(buildWhatsAppJid("12025550100")).toBe("12025550100@s.whatsapp.net")
+        })
+    })
+
+    describe("Linked ID opaco -> @lid", () => {
+        it("identificador de 14 digitos recibe @lid", () => {
+            expect(buildWhatsAppJid("18459819782236")).toBe("18459819782236@lid")
+        })
+
+        it("identificador de 15 digitos recibe @lid", () => {
+            // Caso real de Casa Inmob (Query A)
+            expect(buildWhatsAppJid("114435377086503")).toBe("114435377086503@lid")
+        })
+
+        it("identificador con caracteres no-numericos recibe @lid", () => {
+            // Edge case: si entra algo raro, lo mandamos como LID (Evolution
+            // lo rechazara mejor que con un MSISDN incorrecto).
+            expect(buildWhatsAppJid("abc123")).toBe("abc123@lid")
+        })
+    })
+
+    describe("inputs degradados", () => {
+        it("string vacio devuelve vacio", () => {
+            expect(buildWhatsAppJid("")).toBe("")
+        })
+    })
+
+    describe("simetria con extractPhoneFromJid (round-trip)", () => {
+        it("extract + build conserva un JID @s.whatsapp.net si era MSISDN", () => {
+            const original = "573001234567@s.whatsapp.net"
+            const cleaned = extractPhoneFromJid(original)
+            expect(buildWhatsAppJid(cleaned)).toBe(original)
+        })
+
+        it("extract + build conserva un JID @lid si era Linked ID opaco", () => {
+            // Regresion del incidente: el round-trip debe preservar el sufijo
+            // correcto para que el envio al cliente con LID funcione.
+            const original = "65820390633601@lid"
+            const cleaned = extractPhoneFromJid(original)
+            expect(buildWhatsAppJid(cleaned)).toBe(original)
+        })
     })
 })

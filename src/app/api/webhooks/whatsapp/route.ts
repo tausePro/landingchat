@@ -264,8 +264,17 @@ async function handleIncomingMessage(
         return
     }
 
-    // Buscar o crear conversación (chat)
-    const chat = await findOrCreateChat(supabase, instance.organization_id, customer.id, phoneNumber)
+    // Buscar o crear conversación (chat). Pasar el remoteJid ORIGINAL (con
+    // sufijo @lid o @s.whatsapp.net) para que se persista en chats.whatsapp_jid
+    // y el sender pueda enviar respuestas con el JID completo a contactos
+    // con Linked ID. Sin esto, Evolution API falla en la entrega.
+    const chat = await findOrCreateChat(
+        supabase,
+        instance.organization_id,
+        customer.id,
+        phoneNumber,
+        message.key.remoteJid
+    )
 
     // Guardar mensaje en la base de datos
     await supabase.from("messages").insert({
