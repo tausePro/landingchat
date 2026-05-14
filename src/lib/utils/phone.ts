@@ -8,6 +8,33 @@
  */
 
 /**
+ * Extrae el número de teléfono (o identificador limpio) desde un JID de WhatsApp.
+ *
+ * Formatos soportados:
+ *   - "573001234567@s.whatsapp.net"  -> "573001234567" (formato clasico)
+ *   - "65820390633601@lid"           -> "65820390633601" (Linked ID, privacidad nueva)
+ *   - "573001234567@c.us"            -> "573001234567" (variante de algunos providers)
+ *   - "573001234567"                  -> "573001234567" (ya limpio)
+ *
+ * IMPORTANTE: usar esta funcion en TODOS los puntos donde se procesa un
+ * remoteJid del webhook, antes de pasar el valor a findOrCreateCustomer,
+ * findOrCreateChat o findActiveChatByPhone. La asimetria entre como se
+ * guarda el chat y como se busca causa el bug "No hay conversacion activa"
+ * cuando WhatsApp envia el remoteJid con sufijo @lid.
+ *
+ * Incidente Casa Inmobiliaria 2026-05-14: comandos /yo /info /bot fallaban
+ * porque el chat se guardaba con "...@lid" en phone_number pero la busqueda
+ * limpiaba el @lid via regex \D y nunca matcheaba.
+ */
+export function extractPhoneFromJid(jid: string): string {
+    if (!jid) return ""
+    // Quitar cualquier sufijo @xxx (todo lo que viene desde el @ en adelante).
+    // Esto cubre @s.whatsapp.net, @lid, @c.us, @g.us (grupos) y cualquier
+    // formato futuro que WhatsApp/Meta introduzca.
+    return jid.replace(/@.*$/, "")
+}
+
+/**
  * Normaliza un número de teléfono a formato canónico (solo dígitos con código de país)
  * Ejemplo: "+57 300 123 4567" → "573001234567"
  */
