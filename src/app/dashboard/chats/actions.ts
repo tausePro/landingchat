@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage } from "@/lib/whatsapp/provider"
+import { resolveWhatsAppSendTarget } from "@/lib/utils/phone"
 import type { ActionResult } from "@/types/common"
 
 export interface ChatWithDetails {
@@ -531,10 +532,13 @@ export async function sendAgentMessage(
             return { success: false, error: "Unauthorized" }
         }
 
-        // Obtener el chat para saber canal, phone_number y org
+        // Obtener el chat para saber canal, identificadores y org.
+        // whatsapp_jid es la fuente de verdad para enviar a contactos con
+        // Linked ID (@lid). Sin el sufijo, Evolution API no resuelve el
+        // destinatario y el envio falla silenciosamente.
         const { data: chat, error: chatError } = await supabase
             .from("chats")
-            .select("id, channel, phone_number, organization_id, status")
+            .select("id, channel, phone_number, whatsapp_chat_id, whatsapp_jid, organization_id, status")
             .eq("id", chatId)
             .single()
 
@@ -570,15 +574,23 @@ export async function sendAgentMessage(
             .update({ updated_at: new Date().toISOString() })
             .eq("id", chatId)
 
-        // Si el chat es WhatsApp y NO es nota interna, enviar por WhatsApp
-        if (chat.channel === "whatsapp" && !isInternal && chat.phone_number) {
+        // Si el chat es WhatsApp y NO es nota interna, enviar por WhatsApp.
+        // Cascada compartida con sendWhatsAppResponse via resolveWhatsAppSendTarget.
+        if (chat.channel === "whatsapp" && !isInternal) {
+            const sendTarget = resolveWhatsAppSendTarget(chat)
+
+            if (!sendTarget) {
+                console.error("[sendAgentMessage] No phone/JID for chat:", chatId)
+                return { success: true, data: { messageId: message.id } }
+            }
+
             try {
                 await sendWhatsAppMessage(
                     chat.organization_id,
-                    chat.phone_number,
+                    sendTarget,
                     content.trim()
                 )
-                console.log("[sendAgentMessage] WhatsApp message sent to:", chat.phone_number)
+                console.log("[sendAgentMessage] WhatsApp message sent to:", sendTarget)
             } catch (waError) {
                 console.error("[sendAgentMessage] WhatsApp send failed:", waError)
                 // El mensaje ya se guardó en BD — no fallar completamente

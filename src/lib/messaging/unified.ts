@@ -9,7 +9,7 @@ import { processMessage } from "@/lib/ai/chat-agent"
 import { createServiceClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage, sendWhatsAppImage, sendWhatsAppMedia, sendWhatsAppButtons, sendWhatsAppList } from "@/lib/whatsapp"
 import { sendSocialMessage, sendSocialImage, sendSocialQuickReplies } from "@/lib/messaging/meta-social-client"
-import { buildWhatsAppJid } from "@/lib/utils/phone"
+import { resolveWhatsAppSendTarget } from "@/lib/utils/phone"
 import { logger } from "@/lib/logger"
 
 const log = logger("messaging/unified")
@@ -226,25 +226,16 @@ async function sendWhatsAppResponse(
         const supabase = await createServiceClient()
 
         // Obtener identificador del destinatario desde el chat.
-        //
-        // Resolucion en cascada (de mas robusto a fallback):
-        //   1. `whatsapp_jid` (preferido): JID completo persistido al recibir
-        //      el webhook. Es la fuente de verdad porque preserva el sufijo
-        //      `@lid` o `@s.whatsapp.net` que Evolution API necesita para
-        //      entregar el mensaje a contactos con Linked ID.
-        //   2. `phone_number` reconstruido via `buildWhatsAppJid`: heuristica
-        //      por si el chat es legacy y aun no tiene `whatsapp_jid` poblado.
-        //   3. `whatsapp_chat_id`: ultimo recurso para chats muy antiguos.
+        // La cascada de resolucion vive en `resolveWhatsAppSendTarget` y se
+        // comparte con `sendAgentMessage` (dashboard) para garantizar que
+        // ambos call-sites se comportan igual frente a contactos con Linked ID.
         const { data: chat } = await supabase
             .from("chats")
             .select("phone_number, whatsapp_chat_id, whatsapp_jid")
             .eq("id", chatId)
             .single()
 
-        const sendTarget =
-            chat?.whatsapp_jid ||
-            (chat?.phone_number ? buildWhatsAppJid(chat.phone_number) : null) ||
-            chat?.whatsapp_chat_id
+        const sendTarget = chat ? resolveWhatsAppSendTarget(chat) : null
 
         if (!sendTarget) {
             log.error("No phone number / JID in chat", { chatId })

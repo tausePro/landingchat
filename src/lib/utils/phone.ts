@@ -70,6 +70,36 @@ export function buildWhatsAppJid(phoneOrJid: string): string {
 }
 
 /**
+ * Resuelve el destinatario de un envio WhatsApp desde una fila de `chats`.
+ *
+ * Cascada (de mas robusto a fallback):
+ *   1. `whatsapp_jid` (preferido): JID completo persistido al recibir el
+ *      webhook. Es la fuente de verdad porque preserva el sufijo `@lid` o
+ *      `@s.whatsapp.net` que Evolution API necesita para resolver contactos
+ *      con Linked ID.
+ *   2. `phone_number` reconstruido via `buildWhatsAppJid`: heuristica por si
+ *      el chat es legacy (creado antes del v1.12.7) y aun no tiene
+ *      `whatsapp_jid` poblado.
+ *   3. `whatsapp_chat_id`: ultimo recurso para chats muy antiguos.
+ *
+ * Devuelve `null` si no hay ningun identificador disponible.
+ *
+ * Centralizado aqui para que `sendWhatsAppResponse` (unified.ts) y
+ * `sendAgentMessage` (dashboard/chats/actions.ts) compartan la misma logica
+ * y los tests cubran ambos call-sites.
+ */
+export function resolveWhatsAppSendTarget(chat: {
+    whatsapp_jid?: string | null
+    phone_number?: string | null
+    whatsapp_chat_id?: string | null
+}): string | null {
+    if (chat.whatsapp_jid) return chat.whatsapp_jid
+    if (chat.phone_number) return buildWhatsAppJid(chat.phone_number)
+    if (chat.whatsapp_chat_id) return chat.whatsapp_chat_id
+    return null
+}
+
+/**
  * Normaliza un número de teléfono a formato canónico (solo dígitos con código de país)
  * Ejemplo: "+57 300 123 4567" → "573001234567"
  */
