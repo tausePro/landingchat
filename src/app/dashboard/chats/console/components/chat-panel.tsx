@@ -17,6 +17,8 @@ import {
     Loader2,
     Bot,
     BotOff,
+    Shield,
+    Clock,
 } from "lucide-react"
 
 interface ChatPanelProps {
@@ -170,6 +172,12 @@ export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange, 
 
     const isWhatsApp = chatDetail?.channel === "whatsapp"
     const isClosed = chatDetail?.status === "closed"
+    const isHumanOnly = chatDetail?.customer?.is_human_only ?? false
+    const softPauseUntil = chatDetail?.ai_paused_until
+        ? new Date(chatDetail.ai_paused_until)
+        : null
+    const isSoftPaused = softPauseUntil ? softPauseUntil > new Date() : false
+    const softPauseTimeStr = softPauseUntil ? formatBogotaTime(softPauseUntil.toISOString()) : null
 
     return (
         <div className="flex flex-col h-full">
@@ -180,7 +188,7 @@ export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange, 
                         {(chatDetail?.customer_name || "?").charAt(0).toUpperCase()}
                     </div>
                     <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
                                 {chatDetail?.customer_name || "Sin nombre"}
                             </span>
@@ -191,6 +199,15 @@ export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange, 
                                     <><Globe className="size-3 text-blue-500" /> Web</>
                                 )}
                             </span>
+                            {isHumanOnly && (
+                                <span
+                                    className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium"
+                                    title="Cliente marcado como 'solo humano'. La IA NUNCA responde."
+                                >
+                                    <Shield className="size-2.5" />
+                                    Solo humano
+                                </span>
+                            )}
                         </div>
                         <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary">
                             {chatDetail?.customer?.phone || ""}
@@ -199,22 +216,43 @@ export function ChatPanel({ chatDetail, loading, onSendMessage, onStatusChange, 
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => onToggleAi(!chatDetail?.ai_enabled)}
-                        className={cn(
-                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                            chatDetail?.ai_enabled
-                                ? "bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
-                                : "bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30"
-                        )}
-                        title={chatDetail?.ai_enabled ? "Pausar IA en esta conversación" : "Reactivar IA en esta conversación"}
-                    >
-                        {chatDetail?.ai_enabled ? (
-                            <><Bot className="size-3.5" /> IA activa</>
-                        ) : (
-                            <><BotOff className="size-3.5" /> IA pausada</>
-                        )}
-                    </button>
+                    {isHumanOnly ? (
+                        // Cliente whitelisted: la IA jamás responde, no tiene sentido el toggle de pausa.
+                        <span
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 cursor-default"
+                            title="Este cliente está marcado como 'solo humano'. Para reactivar la IA, ve al panel del cliente y desmarca la opción."
+                        >
+                            <Shield className="size-3.5" />
+                            Solo humano
+                        </span>
+                    ) : isSoftPaused ? (
+                        // Soft pause activa (auto-aplicada): mostrar timestamp + permitir reactivar
+                        <button
+                            onClick={() => onToggleAi(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+                            title={`IA auto-pausada (operador está atendiendo). Reactivará al expirar (~${softPauseTimeStr}) o al hacer click aquí.`}
+                        >
+                            <Clock className="size-3.5" />
+                            Pausa auto hasta {softPauseTimeStr}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => onToggleAi(!chatDetail?.ai_enabled)}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                                chatDetail?.ai_enabled
+                                    ? "bg-violet-50 text-violet-600 hover:bg-violet-100 dark:bg-violet-900/20 dark:text-violet-400 dark:hover:bg-violet-900/30"
+                                    : "bg-orange-50 text-orange-600 hover:bg-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30"
+                            )}
+                            title={chatDetail?.ai_enabled ? "Pausar IA en esta conversación" : "Reactivar IA en esta conversación"}
+                        >
+                            {chatDetail?.ai_enabled ? (
+                                <><Bot className="size-3.5" /> IA activa</>
+                            ) : (
+                                <><BotOff className="size-3.5" /> IA pausada</>
+                            )}
+                        </button>
+                    )}
                     {isClosed ? (
                         <button
                             onClick={() => onStatusChange("active")}

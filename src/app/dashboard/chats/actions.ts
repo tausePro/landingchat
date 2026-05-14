@@ -1,7 +1,6 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { createServiceClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage } from "@/lib/whatsapp/provider"
 import type { ActionResult } from "@/types/common"
 
@@ -59,6 +58,17 @@ export interface ConsoleChatsResult {
     }
 }
 
+// Item mínimo del carrito tal como se persiste en `carts.items` (JSONB).
+// Mantener compatibilidad con el shape histórico: name|product_name, price, quantity.
+export interface CartItem {
+    quantity?: number
+    name?: string
+    product_name?: string
+    price?: number
+    product_id?: string
+    variant_id?: string | null
+}
+
 export interface ChatDetailData {
     id: string
     customer_name: string | null
@@ -66,6 +76,11 @@ export interface ChatDetailData {
     status: string
     channel: string | null
     ai_enabled: boolean
+    /**
+     * Si NOT NULL y > NOW(), la IA está en pausa suave (auto-aplicada
+     * cuando el operador responde sin comando). Expira automáticamente.
+     */
+    ai_paused_until: string | null
     created_at: string
     updated_at: string | null
     customer: {
@@ -80,6 +95,8 @@ export interface ChatDetailData {
         } | null
         total_orders: number
         total_spent: number
+        /** Whitelist: si true, la IA NUNCA responde a este cliente */
+        is_human_only: boolean
     } | null
     messages: {
         id: string
@@ -95,7 +112,7 @@ export interface ChatDetailData {
     }[]
     cart: {
         id: string
-        items: any[]
+        items: CartItem[]
         total: number
     } | null
 }
@@ -119,6 +136,7 @@ export async function getChatDetail(chatId: string): Promise<ActionResult<ChatDe
                 status,
                 channel,
                 ai_enabled,
+                ai_paused_until,
                 created_at,
                 updated_at,
                 messages(id, content, sender_type, created_at),
@@ -136,7 +154,7 @@ export async function getChatDetail(chatId: string): Promise<ActionResult<ChatDe
         if (chat.customer_id) {
             const { data: customer } = await supabase
                 .from("customers")
-                .select("id, full_name, email, phone, category, address")
+                .select("id, full_name, email, phone, category, address, is_human_only")
                 .eq("id", chat.customer_id)
                 .single()
 
@@ -159,7 +177,8 @@ export async function getChatDetail(chatId: string): Promise<ActionResult<ChatDe
                     category: customer.category,
                     address: customer.address,
                     total_orders: completedOrders.length,
-                    total_spent: completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0)
+                    total_spent: completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0),
+                    is_human_only: customer.is_human_only ?? false,
                 }
             }
         }
@@ -195,6 +214,7 @@ export async function getChatDetail(chatId: string): Promise<ActionResult<ChatDe
                 status: chat.status,
                 channel: chat.channel || 'web',
                 ai_enabled: chat.ai_enabled ?? true,
+                ai_paused_until: chat.ai_paused_until ?? null,
                 created_at: chat.created_at,
                 updated_at: chat.updated_at,
                 customer: customerData,
@@ -655,6 +675,50 @@ export async function toggleAiEnabled(
         return {
             success: false,
             error: err instanceof Error ? err.message : "Unknown error toggling AI"
+        }
+    }
+}
+
+/**
+ * Marca o desmarca un cliente como "solo humano" (whitelist permanente).
+ * Cuando is_human_only=true, la IA nunca responderá automáticamente a este
+ * cliente, incluso si el flag chat.ai_enabled está en true.
+ *
+ * Esta acción tiene precedencia máxima sobre cualquier otro flag de pausa.
+ * Equivalente a los comandos /whitelist y /unwhitelist desde WhatsApp (Slice 3).
+ */
+export async function toggleHumanOnly(
+    customerId: string,
+    isHumanOnly: boolean
+): Promise<ActionResult<{ is_human_only: boolean }>> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+            return { success: false, error: "Unauthorized" }
+        }
+
+        const { error } = await supabase
+            .from("customers")
+            .update({
+                is_human_only: isHumanOnly,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", customerId)
+
+        if (error) {
+            return {
+                success: false,
+                error: `Failed to toggle human-only: ${error.message}`,
+            }
+        }
+
+        return { success: true, data: { is_human_only: isHumanOnly } }
+    } catch (err) {
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : "Unknown error toggling human-only",
         }
     }
 }
