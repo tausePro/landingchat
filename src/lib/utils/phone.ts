@@ -35,6 +35,41 @@ export function extractPhoneFromJid(jid: string): string {
 }
 
 /**
+ * Reconstruye un JID completo de WhatsApp a partir de un identificador
+ * (telefono limpio o JID parcial). Necesario para enviar mensajes via
+ * Evolution API: la API requiere el JID completo (con sufijo) para entregar
+ * mensajes a contactos con Linked ID; un MSISDN puro tambien funciona pero
+ * un identificador opaco sin sufijo NO se resuelve.
+ *
+ * Heuristica:
+ *   - Si ya contiene "@" -> devolver tal cual (asumir JID completo).
+ *   - Si parece MSISDN (10-13 digitos numericos puros) -> agregar
+ *     "@s.whatsapp.net" (formato clasico).
+ *   - En cualquier otro caso (>=14 digitos, no-numerico, etc.) -> asumir
+ *     Linked ID y agregar "@lid".
+ *
+ * Incidente Casa Inmobiliaria 2026-05-14: el envio de respuestas del agente
+ * fallaba para contactos con remoteJid `@lid` porque el phone_number en BD
+ * estaba sin sufijo y Evolution API no podia resolver el destinatario.
+ *
+ * Esta funcion es solo un fallback heuristico. La fuente de verdad debe ser
+ * `chats.whatsapp_jid` (introducida en migracion 20260514): el webhook
+ * persiste el remoteJid original al recibir, y el sender lo prefiere al enviar.
+ */
+export function buildWhatsAppJid(phoneOrJid: string): string {
+    if (!phoneOrJid) return phoneOrJid
+    if (phoneOrJid.includes("@")) return phoneOrJid
+
+    // MSISDN clasico: 10-13 digitos numericos puros.
+    if (/^[0-9]{10,13}$/.test(phoneOrJid)) {
+        return `${phoneOrJid}@s.whatsapp.net`
+    }
+
+    // Cualquier otro identificador: asumir Linked ID.
+    return `${phoneOrJid}@lid`
+}
+
+/**
  * Normaliza un número de teléfono a formato canónico (solo dígitos con código de país)
  * Ejemplo: "+57 300 123 4567" → "573001234567"
  */
