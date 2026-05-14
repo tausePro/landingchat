@@ -30,6 +30,7 @@ import {
     findActiveChatByPhone,
 } from "@/lib/whatsapp/operator-commands"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
+import { extractPhoneFromJid } from "@/lib/utils/phone"
 import { logger } from "@/lib/logger"
 
 const log = logger("webhooks/whatsapp")
@@ -236,8 +237,9 @@ async function handleIncomingMessage(
         return
     }
 
-    // Extraer número de teléfono (remover @s.whatsapp.net)
-    const phoneNumber = message.key.remoteJid.replace("@s.whatsapp.net", "")
+    // Extraer numero de telefono del remoteJid. Cubre @s.whatsapp.net y @lid
+    // (formato nuevo de privacidad de WhatsApp Business) entre otros sufijos.
+    const phoneNumber = extractPhoneFromJid(message.key.remoteJid)
     
     // Extraer texto del mensaje
     const messageText = message.message?.conversation || 
@@ -316,7 +318,7 @@ async function handleOperatorOutgoingMessage(
     instance: WhatsAppInstanceRecord,
     message: z.infer<typeof IncomingMessageSchema>
 ) {
-    const phoneNumber = message.key.remoteJid.replace("@s.whatsapp.net", "")
+    const phoneNumber = extractPhoneFromJid(message.key.remoteJid)
     const messageText =
         message.message?.conversation ||
         message.message?.extendedTextMessage?.text ||
