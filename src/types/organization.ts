@@ -133,11 +133,36 @@ export interface OrganizationBrandingSettings {
   [key: string]: unknown
 }
 
+/**
+ * Configuración del comportamiento del operador humano vía WhatsApp.
+ *
+ * Aplica al flujo del webhook cuando el operador responde un chat desde su
+ * WhatsApp directo (mensaje `fromMe = true`) sin usar un comando slash.
+ */
+export interface OrganizationWhatsAppOperatorSettings {
+  /**
+   * Duración (minutos) de la pausa suave automática que se aplica al chat
+   * cuando el operador responde sin comando.
+   *
+   * Rango válido: 0-240 minutos.
+   *   - `0` desactiva la pausa automática (la IA siempre responde aunque
+   *     el operador haya respondido). Útil para tenants donde IA y humano
+   *     deben coexistir libremente.
+   *   - `30` (default) es el comportamiento clásico introducido en v1.12.5.
+   *   - `240` (4 h) es el máximo permitido.
+   *
+   * Si la propiedad está ausente, se usa el default 30.
+   */
+  softPauseDurationMin?: number
+  [key: string]: unknown
+}
+
 export interface OrganizationSettingsOverrides {
   branding?: OrganizationBrandingSettings
   shipping?: {
     free_shipping_threshold?: number
     [key: string]: unknown
   }
+  whatsapp_operator?: OrganizationWhatsAppOperatorSettings
   [key: string]: unknown
 }

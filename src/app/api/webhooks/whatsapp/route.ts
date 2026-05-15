@@ -28,6 +28,7 @@ import {
     handleOperatorCommand,
     applySoftPause,
     findActiveChatByPhone,
+    getSoftPauseDurationMin,
 } from "@/lib/whatsapp/operator-commands"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
 import { extractPhoneFromJid } from "@/lib/utils/phone"
@@ -335,10 +336,14 @@ async function handleOperatorOutgoingMessage(
 
     if (!messageText) {
         // Mensaje saliente sin texto (foto, audio, etc.): aplicar soft-pause igual
-        // si hay un chat activo, pero sin enviar nada.
+        // si hay un chat activo, pero sin enviar nada. Respeta la duracion
+        // configurada por organizacion (0 = pausa desactivada -> no-op).
         const chat = await findActiveChatByPhone(supabase, instance.organization_id, phoneNumber)
         if (chat && chat.ai_enabled !== false) {
-            await applySoftPause(supabase, chat.id)
+            const durationMin = await getSoftPauseDurationMin(supabase, instance.organization_id)
+            if (durationMin > 0) {
+                await applySoftPause(supabase, chat.id, durationMin)
+            }
         }
         return
     }
@@ -390,7 +395,18 @@ async function handleOperatorOutgoingMessage(
         return
     }
 
-    await applySoftPause(supabase, chat.id)
+    // Lee la duracion configurada por organizacion. Si es 0, la pausa esta
+    // desactivada y la IA sigue respondiendo aunque el operador escriba.
+    const durationMin = await getSoftPauseDurationMin(supabase, instance.organization_id)
+    if (durationMin <= 0) {
+        log.debug("Soft pause desactivada para la organizacion, no se aplica", {
+            organizationId: instance.organization_id,
+            chatId: chat.id,
+        })
+        return
+    }
+
+    await applySoftPause(supabase, chat.id, durationMin)
 }
 
 /**
