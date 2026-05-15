@@ -19,6 +19,7 @@ const mockChatSelect = vi.fn()
 const mockChatUpdate = vi.fn()
 const mockCustomersSingle = vi.fn()
 const mockCustomersUpdate = vi.fn()
+const mockOrgSettingsSingle = vi.fn()
 
 const mockFrom = vi.fn((table: string) => {
   if (table === "chats") {
@@ -51,6 +52,16 @@ const mockFrom = vi.fn((table: string) => {
     }
   }
 
+  if (table === "organizations") {
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(() => mockOrgSettingsSingle()),
+        })),
+      })),
+    }
+  }
+
   return {
     select: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn() })) })),
     update: vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) })),
@@ -71,7 +82,9 @@ import {
   applySoftPause,
   findActiveChatByPhone,
   handleOperatorCommand,
-  SOFT_PAUSE_DURATION_MIN,
+  getSoftPauseDurationMin,
+  DEFAULT_SOFT_PAUSE_DURATION_MIN,
+  MAX_SOFT_PAUSE_DURATION_MIN,
 } from "@/lib/whatsapp/operator-commands"
 
 // =============================================================================
@@ -151,7 +164,7 @@ describe("operator-commands - acciones", () => {
       expect(result.until.getTime()).toBeLessThanOrEqual(after + 30 * 60 * 1000)
     })
 
-    it("usa SOFT_PAUSE_DURATION_MIN como default", async () => {
+    it("usa DEFAULT_SOFT_PAUSE_DURATION_MIN como default", async () => {
       mockChatUpdate.mockResolvedValue({ error: null })
 
       const before = Date.now()
@@ -159,7 +172,7 @@ describe("operator-commands - acciones", () => {
 
       // Default de 30 min
       expect(result.until.getTime()).toBeGreaterThanOrEqual(
-        before + SOFT_PAUSE_DURATION_MIN * 60 * 1000 - 100
+        before + DEFAULT_SOFT_PAUSE_DURATION_MIN * 60 * 1000 - 100
       )
     })
 
@@ -171,6 +184,148 @@ describe("operator-commands - acciones", () => {
 
       expect(result.success).toBe(false)
     })
+
+    describe("durationMinutes <= 0 (pausa desactivada por organizacion)", () => {
+      it("con duration 0 no llama a update y retorna success=true sin pausa real", async () => {
+        const supabase = { from: mockFrom }
+        const result = await applySoftPause(supabase as unknown as never, "chat-1", 0)
+
+        expect(result.success).toBe(true)
+        // No debe haber llamado al update porque la pausa esta desactivada.
+        expect(mockChatUpdate).not.toHaveBeenCalled()
+      })
+
+      it("con duration negativa (-5) tampoco toca BD", async () => {
+        const supabase = { from: mockFrom }
+        const result = await applySoftPause(supabase as unknown as never, "chat-1", -5)
+
+        expect(result.success).toBe(true)
+        expect(mockChatUpdate).not.toHaveBeenCalled()
+      })
+    })
+  })
+})
+
+describe("operator-commands - getSoftPauseDurationMin", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("devuelve el valor configurado por organizacion (caso clasico 15 min)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { whatsapp_operator: { softPauseDurationMin: 15 } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(15)
+  })
+
+  it("devuelve 0 cuando la organizacion lo configuro asi (pausa desactivada)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { whatsapp_operator: { softPauseDurationMin: 0 } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(0)
+  })
+
+  it("devuelve el default cuando settings no tiene la propiedad", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { branding: { primaryColor: "#fff" } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(DEFAULT_SOFT_PAUSE_DURATION_MIN)
+  })
+
+  it("devuelve el default cuando settings es null", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: null },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(DEFAULT_SOFT_PAUSE_DURATION_MIN)
+  })
+
+  it("clampea valores arriba del maximo (300 -> 240)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { whatsapp_operator: { softPauseDurationMin: 300 } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(MAX_SOFT_PAUSE_DURATION_MIN)
+  })
+
+  it("clampea valores negativos al minimo (-50 -> 0)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { whatsapp_operator: { softPauseDurationMin: -50 } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(0)
+  })
+
+  it("devuelve el default cuando el valor no es numerico (proteccion contra JSON corrupto)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { whatsapp_operator: { softPauseDurationMin: "30" } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(DEFAULT_SOFT_PAUSE_DURATION_MIN)
+  })
+
+  it("devuelve el default cuando la query falla (resilencia)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: null,
+      error: { message: "organization not found" },
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-inexistente"
+    )
+    expect(result).toBe(DEFAULT_SOFT_PAUSE_DURATION_MIN)
+  })
+
+  it("truncate valores decimales (15.7 -> 15)", async () => {
+    mockOrgSettingsSingle.mockResolvedValue({
+      data: { settings: { whatsapp_operator: { softPauseDurationMin: 15.7 } } },
+      error: null,
+    })
+
+    const result = await getSoftPauseDurationMin(
+      { from: mockFrom } as unknown as never,
+      "org-1"
+    )
+    expect(result).toBe(15)
   })
 })
 

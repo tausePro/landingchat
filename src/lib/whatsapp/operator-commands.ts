@@ -31,11 +31,78 @@ type SupabaseClient = any
 // =============================================================================
 
 /**
- * Duración (minutos) de la pausa suave automática que se aplica cuando un
- * operador responde un chat sin usar comando explícito.
- * En el futuro puede ser configurable por organización vía settings.
+ * Duración (minutos) por defecto de la pausa suave automática que se aplica
+ * cuando un operador responde un chat sin usar comando explícito.
+ *
+ * Es solo el fallback: cada organización puede sobreescribir este valor en
+ * `organizations.settings.whatsapp_operator.softPauseDurationMin`. Ver
+ * `getSoftPauseDurationMin` mas abajo.
  */
-export const SOFT_PAUSE_DURATION_MIN = 30
+export const DEFAULT_SOFT_PAUSE_DURATION_MIN = 30
+
+/**
+ * Limites permitidos para `softPauseDurationMin`:
+ *   - 0 = pausa desactivada (la IA nunca se pausa al responder operador).
+ *   - 240 = cuatro horas, el maximo razonable antes de exigir un comando
+ *     explicito como /yo (hard pause).
+ */
+export const MIN_SOFT_PAUSE_DURATION_MIN = 0
+export const MAX_SOFT_PAUSE_DURATION_MIN = 240
+
+/**
+ * Lee la duracion de la soft-pause configurada para la organizacion.
+ *
+ * Cascada:
+ *   1. `organizations.settings.whatsapp_operator.softPauseDurationMin`
+ *      (clampeado al rango 0-240).
+ *   2. Si la propiedad no existe o el JSON viene corrupto, devuelve
+ *      `DEFAULT_SOFT_PAUSE_DURATION_MIN` (30).
+ *
+ * Nunca lanza: si la query falla, loguea el error y usa el default. La IA
+ * nunca debe bloquearse por un fallo de lectura de settings.
+ */
+export async function getSoftPauseDurationMin(
+  supabase: SupabaseClient,
+  organizationId: string
+): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select("settings")
+      .eq("id", organizationId)
+      .single()
+
+    if (error || !data) {
+      log.warn("No se pudo leer settings de organizacion, usando default", {
+        organizationId,
+        error: error?.message,
+      })
+      return DEFAULT_SOFT_PAUSE_DURATION_MIN
+    }
+
+    const settings = (data.settings ?? {}) as Record<string, unknown>
+    const waOperator = (settings.whatsapp_operator ?? {}) as Record<string, unknown>
+    const raw = waOperator.softPauseDurationMin
+
+    if (typeof raw !== "number" || !Number.isFinite(raw)) {
+      return DEFAULT_SOFT_PAUSE_DURATION_MIN
+    }
+
+    // Clamp al rango permitido (defensa contra valores invalidos guardados
+    // por un cliente antiguo o intervencion manual en BD).
+    const clamped = Math.max(
+      MIN_SOFT_PAUSE_DURATION_MIN,
+      Math.min(MAX_SOFT_PAUSE_DURATION_MIN, Math.floor(raw))
+    )
+    return clamped
+  } catch (err) {
+    log.error("Excepcion leyendo softPauseDurationMin, usando default", {
+      organizationId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return DEFAULT_SOFT_PAUSE_DURATION_MIN
+  }
+}
 
 // =============================================================================
 // Tipos
@@ -141,12 +208,23 @@ export async function findActiveChatByPhone(
 /**
  * Aplica una soft-pause de N minutos al chat.
  * No modifica `ai_enabled` (la pausa hard manual no se toca).
+ *
+ * Si `durationMinutes` es `<= 0` retorna sin tocar BD: el caller usa esta
+ * convencion para representar "pausa desactivada" en la organizacion.
  */
 export async function applySoftPause(
   supabase: SupabaseClient,
   chatId: string,
-  durationMinutes: number = SOFT_PAUSE_DURATION_MIN
+  durationMinutes: number = DEFAULT_SOFT_PAUSE_DURATION_MIN
 ): Promise<{ success: boolean; until: Date }> {
+  if (durationMinutes <= 0) {
+    log.debug("Soft pause desactivada por configuracion de la organizacion, no-op", {
+      chatId,
+      durationMinutes,
+    })
+    return { success: true, until: new Date() }
+  }
+
   const until = new Date(Date.now() + durationMinutes * 60 * 1000)
 
   const { error } = await supabase
@@ -231,8 +309,18 @@ async function resumeAi(
 
 /**
  * Devuelve el mensaje de ayuda con la lista de comandos disponibles.
+ *
+ * El bloque informativo sobre soft-pause refleja la duracion REAL configurada
+ * para la organizacion (o "desactivada" si quedo en 0).
  */
-function showHelp(): CommandResult {
+function showHelp(softPauseDurationMin: number): CommandResult {
+  const softPauseLine =
+    softPauseDurationMin > 0
+      ? `ℹ️ Si respondes sin comando, la IA se pausa automáticamente *${softPauseDurationMin} min* en este chat.\n` +
+        "Usa */bot* para reactivar antes, o */yo* para pausa permanente."
+      : "ℹ️ La pausa automática está *desactivada* en esta organización. La IA responde aunque tú estés respondiendo.\n" +
+        "Usa */yo* si quieres pausar la IA manualmente en un chat."
+
   const helpText =
     "🤖 *Comandos del operador*\n\n" +
     "⏸️ *Pausa / reactivación*\n" +
@@ -245,8 +333,7 @@ function showHelp(): CommandResult {
     "*/info* o */estado* — Muestra estado actual de este chat\n" +
     "*/cerrar* o */resolver* — Marca este chat como resuelto\n\n" +
     "❓ */help* o */ayuda* — Esta ayuda\n\n" +
-    `ℹ️ Si respondes sin comando, la IA se pausa automáticamente *${SOFT_PAUSE_DURATION_MIN} min* en este chat.\n` +
-    "Usa */bot* para reactivar antes, o */yo* para pausa permanente."
+    softPauseLine
 
   return { success: true, message: helpText }
 }
@@ -471,9 +558,11 @@ export async function handleOperatorCommand(
     args: parsed.args,
   })
 
-  // Comando /help no requiere chat activo
+  // Comando /help no requiere chat activo, pero si la duracion configurada
+  // para mostrar el mensaje informativo personalizado por organizacion.
   if (parsed.command === "help" || parsed.command === "ayuda") {
-    return showHelp()
+    const softPauseDurationMin = await getSoftPauseDurationMin(supabase, organizationId)
+    return showHelp(softPauseDurationMin)
   }
 
   // Buscar chat activo con el cliente

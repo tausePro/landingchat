@@ -4,7 +4,7 @@
 > Permite pausar/reactivar la IA, marcar clientes "solo humano", ver estado
 > de un chat y cerrarlo, sin abrir el dashboard.
 
-**Versión:** v1.12.2 · **Última actualización:** 2026-05-14
+**Versión:** v1.13.0 · **Última actualización:** 2026-05-14
 
 ---
 
@@ -25,7 +25,8 @@
 ## ⚡ Comportamiento automático: la "pausa suave"
 
 **Cuando respondes a un cliente sin usar comando, la IA se pausa
-automáticamente en ese chat por 30 minutos.**
+automáticamente en ese chat por un tiempo configurable (30 minutos por
+defecto).**
 
 - Si terminas antes y quieres devolverle la palabra a la IA: usa `/bot`.
 - Si quieres pausa permanente (hasta que tú decidas reactivar): usa `/yo`.
@@ -33,6 +34,21 @@ automáticamente en ese chat por 30 minutos.**
 
 Esta pausa suave es para evitar que la IA "atropelle" tu respuesta mientras
 estás escribiendo.
+
+### ⚙️ Configuración por organización (v1.13.0+)
+
+Desde **Dashboard → Configuración → Organización → pestaña WhatsApp** puedes
+ajustar la duración de esta pausa entre **0 y 240 minutos**.
+
+- **`0`** desactiva la pausa automática: la IA siempre responde, incluso
+  si tú estás respondiendo el chat. Útil para tenants donde IA y humano
+  trabajan en paralelo. Si necesitas pausar puntualmente un chat, usa
+  `/yo`.
+- **`30`** (default) es el comportamiento clásico.
+- **`240`** (4 horas) es el máximo permitido.
+
+Usa `/help` desde WhatsApp para ver el valor configurado actualmente en
+esa organización.
 
 ---
 
@@ -168,7 +184,7 @@ Devuelve la lista completa de comandos.
    ```
    Hola, soy Cris. Cuéntame qué pasa.
    ```
-   → La IA se pausa automáticamente por 30 min.
+   → La IA se pausa automáticamente (30 min por defecto, configurable).
 4. Conversas con el cliente.
 5. Cuando termines, opcional: `/bot` para devolverle el chat a la IA.
 
@@ -227,7 +243,8 @@ desde WhatsApp.
 
 📌 LO BÁSICO
 
-• Si respondes un mensaje SIN comando, la IA se pausa 30 min sola.
+• Si respondes un mensaje SIN comando, la IA se pausa automáticamente
+  (30 min por defecto, configurable desde el dashboard).
 • Si quieres pausa permanente: */yo*
 • Si quieres devolverle el chat a la IA: */bot*
 
@@ -245,7 +262,7 @@ desde WhatsApp.
 
 Cliente escribe → IA responde
 Cliente: "quiero hablar con humano"
-Tú escribes tu respuesta normal → IA se pausa 30 min sola ✅
+Tú escribes tu respuesta normal → IA se pausa automáticamente ✅
 Cuando termines, opcional: */bot*
 
 📌 TIP

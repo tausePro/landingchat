@@ -75,6 +75,14 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         branding: {
             primaryColor: formData.settings?.branding?.primaryColor ?? "#2b7cee",
         },
+        whatsappOperator: {
+            // Default 30 min: misma constante que DEFAULT_SOFT_PAUSE_DURATION_MIN
+            // en src/lib/whatsapp/operator-commands.ts. Mantener sincronizado.
+            softPauseDurationMin:
+                typeof formData.settings?.whatsapp_operator?.softPauseDurationMin === "number"
+                    ? formData.settings.whatsapp_operator.softPauseDurationMin
+                    : 30,
+        },
     }), [formData.settings])
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -127,9 +135,10 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
             <CardContent>
                 <form onSubmit={handleSubmit}>
                     <Tabs defaultValue="general" className="space-y-4">
-                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsList className="grid w-full grid-cols-4">
                             <TabsTrigger value="general">General</TabsTrigger>
                             <TabsTrigger value="branding">Apariencia</TabsTrigger>
+                            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
                             <TabsTrigger value="seo">SEO & Tracking</TabsTrigger>
                         </TabsList>
 
@@ -255,6 +264,52 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="whatsapp" className="space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-lg font-semibold">Comportamiento del operador humano</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Controla cómo se comporta la IA cuando tú (o tus operadores) responden chats desde el WhatsApp del negocio.
+                                </p>
+                            </div>
+
+                            <div className="space-y-3 rounded-lg border p-4">
+                                <div className="flex items-baseline justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <Label htmlFor="softPauseDurationMin">
+                                            Pausa automática de la IA (minutos)
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground max-w-2xl">
+                                            Cuando un operador responde un chat desde su WhatsApp sin usar un comando como <code>/yo</code>, la IA se pausa automáticamente en ese chat durante este tiempo para que el humano pueda atender sin interrupciones.
+                                        </p>
+                                        <p className="text-xs text-muted-foreground max-w-2xl">
+                                            <strong>Rango:</strong> 0 a 240 minutos.{" "}
+                                            <strong>0</strong> desactiva la pausa automática (la IA siempre responde).{" "}
+                                            <strong>30</strong> es el valor por defecto.
+                                        </p>
+                                    </div>
+                                </div>
+                                <Input
+                                    id="softPauseDurationMin"
+                                    type="number"
+                                    min={0}
+                                    max={240}
+                                    step={1}
+                                    value={safeSettings.whatsappOperator.softPauseDurationMin}
+                                    onChange={(e) => {
+                                        const raw = parseInt(e.target.value, 10)
+                                        const next = Number.isFinite(raw) ? Math.max(0, Math.min(240, raw)) : 30
+                                        updateSettings("whatsapp_operator", "softPauseDurationMin", next)
+                                    }}
+                                    className="max-w-[12rem]"
+                                />
+                                {safeSettings.whatsappOperator.softPauseDurationMin === 0 && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        ⚠️ Con pausa en <strong>0</strong> la IA seguirá respondiendo aunque tú estés respondiendo manualmente. Usa <code>/yo</code> en WhatsApp para pausar puntualmente un chat.
+                                    </p>
+                                )}
                             </div>
                         </TabsContent>
 
