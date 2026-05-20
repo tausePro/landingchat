@@ -585,6 +585,107 @@ describe("t() — keys de product detail secciones secundarias (T1.3j.3)", () =>
   })
 })
 
+describe("t() — keys de email templates (T1.3i)", () => {
+  it("subject del email de confirmación con orderNumber + organizationName", () => {
+    expect(
+      t("email.order_confirmation.subject", "es-CO", {
+        orderNumber: "LC-2026-001",
+        organizationName: "Quality Pets",
+      }),
+    ).toBe("Confirmación de Pedido LC-2026-001 - Quality Pets")
+    expect(
+      t("email.order_confirmation.subject", "en-US", {
+        orderNumber: "LC-2026-002",
+        organizationName: "Tantor's House",
+      }),
+    ).toBe("Order Confirmation LC-2026-002 - Tantor's House")
+  })
+
+  it("subject del email del owner con orderNumber + organizationName", () => {
+    expect(
+      t("email.owner_notification.subject", "es-CO", {
+        orderNumber: "LC-2026-003",
+        organizationName: "Quality Pets",
+      }),
+    ).toBe("🛒 Nuevo Pedido LC-2026-003 - Quality Pets")
+    expect(
+      t("email.owner_notification.subject", "en-US", {
+        orderNumber: "LC-2026-004",
+        organizationName: "Tantor's House",
+      }),
+    ).toBe("🛒 New Order LC-2026-004 - Tantor's House")
+  })
+
+  it("payment instructions con orderNumber interpolado", () => {
+    expect(
+      t("email.order_confirmation.payment_keep_order_number", "es-CO", {
+        orderNumber: "<strong>LC-2026-005</strong>",
+      }),
+    ).toBe(
+      "Guarda el número de pedido <strong>LC-2026-005</strong> para tu referencia.",
+    )
+    expect(
+      t("email.order_confirmation.payment_keep_order_number", "en-US", {
+        orderNumber: "<strong>LC-2026-006</strong>",
+      }),
+    ).toBe(
+      "Keep your order number <strong>LC-2026-006</strong> for reference.",
+    )
+  })
+
+  it("dashboard hint del owner con organizationName interpolado", () => {
+    expect(
+      t("email.owner_notification.dashboard_hint", "es-CO", {
+        organizationName: "Quality Pets",
+      }),
+    ).toBe("Revisa los detalles completos en tu dashboard de Quality Pets.")
+    expect(
+      t("email.owner_notification.dashboard_hint", "en-US", {
+        organizationName: "Tantor's House",
+      }),
+    ).toBe("Review full details in your Tantor's House dashboard.")
+  })
+
+  it("table headers + total to pay + payment bank transfer", () => {
+    expect(t("email.order_confirmation.table_product", "es-CO")).toBe("Producto")
+    expect(t("email.order_confirmation.table_quantity", "es-CO")).toBe("Cant.")
+    expect(t("email.order_confirmation.table_price", "es-CO")).toBe("Precio")
+    expect(t("email.order_confirmation.table_total", "es-CO")).toBe("Total")
+    expect(t("email.order_confirmation.total_to_pay", "en-US")).toBe(
+      "Total to Pay:",
+    )
+    expect(t("email.order_confirmation.payment_bank_transfer", "en-US")).toBe(
+      "Bank Transfer",
+    )
+  })
+
+  it("next steps + footer del email del cliente", () => {
+    expect(t("email.order_confirmation.next_step_notify", "en-US")).toBe(
+      "We'll notify you when your order ships",
+    )
+    expect(t("email.order_confirmation.footer_view_order", "en-US")).toBe(
+      "View My Order",
+    )
+    expect(t("email.order_confirmation.footer_visit_store", "en-US")).toBe(
+      "Visit Store",
+    )
+  })
+
+  it("owner notification labels", () => {
+    expect(t("email.owner_notification.heading", "es-CO")).toBe(
+      "🛒 Nuevo Pedido Recibido",
+    )
+    expect(t("email.owner_notification.heading", "en-US")).toBe(
+      "🛒 New Order Received",
+    )
+    expect(t("email.owner_notification.number_label", "es-CO")).toBe("Número:")
+    expect(t("email.owner_notification.number_label", "en-US")).toBe("Number:")
+    expect(t("email.owner_notification.products_heading", "en-US")).toBe(
+      "Products:",
+    )
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]
