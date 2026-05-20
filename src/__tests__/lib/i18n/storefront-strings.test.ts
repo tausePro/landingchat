@@ -332,6 +332,101 @@ describe("t() — keys de product detail (T1.3j.1)", () => {
   })
 })
 
+describe("t() — keys de product detail render principal (T1.3j.2)", () => {
+  it("CTA buy now con price interpolado", () => {
+    expect(
+      t("store.product_detail.cta_buy_now_with_price", "es-CO", { price: "$ 45.000" }),
+    ).toBe("Comprar Ya — $ 45.000")
+    expect(
+      t("store.product_detail.cta_buy_now_with_price", "en-US", { price: "$24.99" }),
+    ).toBe("Buy Now — $24.99")
+  })
+
+  it("inventory message: variant unavailable interpolado", () => {
+    expect(
+      t("store.product_detail.inventory_title_variant_unavailable", "es-CO", {
+        variantTitle: "Talla M / Verde",
+      }),
+    ).toBe("Talla M / Verde no está disponible ahora")
+    expect(
+      t("store.product_detail.inventory_title_variant_unavailable", "en-US", {
+        variantTitle: "Size M / Green",
+      }),
+    ).toBe("Size M / Green is not available right now")
+  })
+
+  it("stock bar: only N left interpolado", () => {
+    expect(
+      t("store.product_detail.stock_only_n_left", "es-CO", { count: 3 }),
+    ).toBe("¡Quedan solo 3!")
+    expect(
+      t("store.product_detail.stock_only_n_left", "en-US", { count: 5 }),
+    ).toBe("Only 5 left!")
+  })
+
+  it("hero signals: only N units + viewers + sold", () => {
+    expect(
+      t("store.product_detail.signal_only_n_units", "en-US", { count: 4 }),
+    ).toBe("Only 4 units")
+    expect(
+      t("store.product_detail.signal_viewers", "es-CO", { count: 12 }),
+    ).toBe("12 personas viendo")
+    expect(
+      t("store.product_detail.signal_sold", "en-US", { count: 250 }),
+    ).toBe("250 sold")
+  })
+
+  it("quantity pricing: tiers + per unit interpolados", () => {
+    expect(
+      t("store.product_detail.quantity_tier_range", "en-US", { min: 5, max: 9 }),
+    ).toBe("5-9 units")
+    expect(
+      t("store.product_detail.quantity_tier_open", "es-CO", { min: 50 }),
+    ).toBe("50+ unidades")
+    expect(
+      t("store.product_detail.quantity_pricing_per_unit", "en-US", { price: "$2.50" }),
+    ).toBe("$2.50/u")
+  })
+
+  it("price support label: quantity total + savings + bundle discount", () => {
+    expect(
+      t("store.product_detail.price_support_quantity_total", "en-US", {
+        total: "$50.00",
+        unit: "$10.00",
+      }),
+    ).toBe("Current total $50.00 · $10.00 per unit.")
+    expect(
+      t("store.product_detail.price_support_savings_real", "es-CO", {
+        amount: "$ 25.000",
+      }),
+    ).toBe("Ahorro real de $ 25.000 frente al valor regular.")
+  })
+
+  it("free shipping labels (ProductShippingCard) con interpolación", () => {
+    expect(
+      t("store.product_detail.shipping_remaining", "en-US", {
+        remaining: "$15.00",
+        zonesText: "",
+      }),
+    ).toBe("Add $15.00 more and activate free shipping.")
+    expect(t("store.product_detail.shipping_free_active", "en-US")).toBe(
+      "Free shipping active",
+    )
+    expect(t("store.product_detail.shipping_free_label", "en-US")).toBe(
+      "Free shipping",
+    )
+  })
+
+  it("CTA unavailable traducido", () => {
+    expect(t("store.product_detail.cta_unavailable", "es-CO")).toBe(
+      "No disponible",
+    )
+    expect(t("store.product_detail.cta_unavailable", "en-US")).toBe(
+      "Unavailable",
+    )
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]

@@ -19,7 +19,7 @@ import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/ut
 import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel } from "@/types/product"
 import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
 import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
-import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
+import { useT, useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface ProductDetailClientProps {
     product: ProductDetailProduct
@@ -360,7 +360,7 @@ function formatCountdownPart(value: number): string {
     return value.toString().padStart(2, "0")
 }
 
-function OfferCountdown({ endsAt, accentColor }: { endsAt: string; accentColor: string }) {
+function OfferCountdown({ endsAt, accentColor, label }: { endsAt: string; accentColor: string; label: string }) {
     const [remaining, setRemaining] = useState<CountdownTime | null>(null)
 
     useEffect(() => {
@@ -377,7 +377,7 @@ function OfferCountdown({ endsAt, accentColor }: { endsAt: string; accentColor: 
     return (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
             <span className="material-symbols-outlined text-[17px]" style={{ color: accentColor }}>timer</span>
-            <span>Descuento termina en</span>
+            <span>{label}</span>
             <span className="ml-auto tabular-nums">
                 {remaining.days > 0 ? `${remaining.days}d ` : ""}
                 {formatCountdownPart(remaining.hours)}:{formatCountdownPart(remaining.minutes)}:{formatCountdownPart(remaining.seconds)}
@@ -646,15 +646,24 @@ function ProductDescription({ description, primaryColor }: ProductDescriptionPro
     )
 }
 
+interface ProductShippingCardLabels {
+    activeLabel: string
+    productHasFree: string
+    qualifies: (zonesText: string) => string
+    remaining: (remainingPrice: string, zonesText: string) => string
+    available: (zonesText: string) => string
+}
+
 interface ProductShippingCardProps {
     shippingConfig?: StorefrontShippingConfig | null
     subtotal: number
     primaryColor: string
     hasProductLevelFreeShipping: boolean
     formatPrice: FormatPriceFn
+    labels: ProductShippingCardLabels
 }
 
-function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping, formatPrice }: ProductShippingCardProps) {
+function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping, formatPrice, labels }: ProductShippingCardProps) {
     const progress = getFreeShippingProgress(shippingConfig, subtotal)
     const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
     const shippingQualified = hasProductLevelFreeShipping || (progress.enabled && (!progress.hasMinimum || progress.qualified))
@@ -664,12 +673,12 @@ function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProduc
     }
 
     const description = hasProductLevelFreeShipping
-        ? "Este producto ya cuenta con envío gratis."
+        ? labels.productHasFree
         : progress.hasMinimum
             ? progress.qualified
-                ? `Tu selección actual ya califica para envío gratis${progress.zonesText}.`
-                : `Agrega ${formatPrice(progress.remaining)} más y activa el envío gratis${progress.zonesText}.`
-            : `Envío gratis disponible${progress.zonesText}.`
+                ? labels.qualifies(progress.zonesText)
+                : labels.remaining(formatPrice(progress.remaining), progress.zonesText)
+            : labels.available(progress.zonesText)
 
     return (
         <div className="rounded-[10px] border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
@@ -677,7 +686,7 @@ function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProduc
                 <span className="material-symbols-outlined text-[16px]" style={{ color: primaryColor }}>local_shipping</span>
                 {shippingQualified ? (
                     <>
-                        <strong className="text-slate-900 dark:text-white">Envío gratis activo</strong>
+                        <strong className="text-slate-900 dark:text-white">{labels.activeLabel}</strong>
                         <span>{description}</span>
                     </>
                 ) : (
@@ -844,11 +853,28 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     // sin override caen al default seguro 'es-CO'/'COP'.
     // T1.3j.1: helper formatCurrency local hardcoded reemplazado por closure
     // que usa el global `formatTenantCurrency` con contexto del provider.
-    // T1.3j.2/3 introduciran `useT()` para los strings UI.
+    // T1.3j.2: useT() para strings UI del render principal.
+    const t = useT()
     const locale = useTenantLocale()
     const currency = useTenantCurrency()
     const formatPrice: FormatPriceFn = (amount: number) =>
         formatTenantCurrency(amount, { locale, currency })
+
+    // Labels precomputados para sub-helpers stateless. Se construyen aquí porque
+    // los helpers externos no tienen acceso al provider de i18n.
+    const shippingCardLabels: ProductShippingCardLabels = {
+        activeLabel: t("store.product_detail.shipping_free_active"),
+        productHasFree: t("store.product_detail.shipping_product_has_free"),
+        qualifies: (zonesText: string) =>
+            t("store.product_detail.shipping_qualifies", { zonesText }),
+        remaining: (remainingPrice: string, zonesText: string) =>
+            t("store.product_detail.shipping_remaining", {
+                remaining: remainingPrice,
+                zonesText,
+            }),
+        available: (zonesText: string) =>
+            t("store.product_detail.shipping_available", { zonesText }),
+    }
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
     const accentColor = normalizeHexColor(primaryColor, "#0bbfbf")
@@ -1089,45 +1115,62 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const configuredSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.secondaryText, totalPrice, formatPrice)
     const configuredMobileSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobileSecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice, formatPrice)
     const configuredStickySecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickySecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice, formatPrice)
-    const primaryCtaText = configuredPrimaryCtaText ?? `Comprar Ya — ${formatPrice(totalPrice)}`
-    const mobilePrimaryCtaText = configuredMobilePrimaryCtaText ?? "Comprar Ya"
-    const stickyPrimaryCtaText = configuredStickyPrimaryCtaText ?? "Comprar ahora"
-    const secondaryCtaText = configuredSecondaryCtaText ?? (product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar")
-    const mobileSecondaryCtaText = configuredMobileSecondaryCtaText ?? "Chat"
-    const stickySecondaryCtaText = configuredStickySecondaryCtaText ?? "Chat"
+    const primaryCtaText = configuredPrimaryCtaText ?? t("store.product_detail.cta_buy_now_with_price", { price: formatPrice(totalPrice) })
+    const mobilePrimaryCtaText = configuredMobilePrimaryCtaText ?? t("store.product_detail.cta_buy_now")
+    const stickyPrimaryCtaText = configuredStickyPrimaryCtaText ?? t("store.product_detail.cta_buy_now_short")
+    const secondaryCtaText = configuredSecondaryCtaText ?? (product.is_configurable ? t("store.product_detail.cta_customize_with_ai") : t("store.product_detail.cta_chat_to_buy"))
+    const mobileSecondaryCtaText = configuredMobileSecondaryCtaText ?? t("store.product_detail.cta_chat_short")
+    const stickySecondaryCtaText = configuredStickySecondaryCtaText ?? t("store.product_detail.cta_chat_short")
     const priceRangeLabel = displayPriceRange
         ? `${formatPrice(displayPriceRange.min_price)} - ${formatPrice(displayPriceRange.max_price)}`
         : null
+
+    // Extraemos los campos del CRO config del PDP a variables locales para
+    // que React Compiler infiera las dependencias correctamente sin confundir
+    // optional chaining (`?.`) anidado con accesos directos. Si las dejamos
+    // inline en el useMemo deps, React Compiler skipea la memoization.
+    const inventoryCfgBadge = productDetailCRO?.inventory?.badge
+    const inventoryCfgTitle = productDetailCRO?.inventory?.title
+    const inventoryCfgDescription = productDetailCRO?.inventory?.description
 
     const inventoryMessage = useMemo(() => {
         if (!resolvedInventory.inStock) {
             return {
                 tone: "critical",
-                badge: "Agotado",
+                badge: t("store.product_detail.inventory_badge_out_of_stock"),
                 title: selectedVariantTitle
-                    ? `${selectedVariantTitle} no está disponible ahora`
-                    : "Producto agotado temporalmente",
+                    ? t("store.product_detail.inventory_title_variant_unavailable", { variantTitle: selectedVariantTitle })
+                    : t("store.product_detail.inventory_title_temp_out_of_stock"),
                 description: resolvedInventory.source === "variant"
-                    ? "Cambia tu selección o escríbenos por chat para revisar reposición."
-                    : "Escríbenos por chat para confirmar reposición o alternativas disponibles.",
+                    ? t("store.product_detail.inventory_desc_variant_change")
+                    : t("store.product_detail.inventory_desc_chat_for_alts"),
             }
         }
 
         if (hasInsufficientStockForMinimum) {
+            // Concordancia singular/plural en es-CO ("unidad"/"unidades",
+            // "disponible"/"disponibles"). En en-US el plural es regular y
+            // el helper de i18n recibe los valores ya conjugados como params.
+            const isSingular = availableQuantity === 1
             return {
                 tone: "warning",
-                badge: `Solo ${availableQuantity}`,
-                title: "El inventario actual no alcanza el mínimo de compra",
-                description: `Hay ${availableQuantity} unidade${availableQuantity === 1 ? "d" : "s"} disponible${availableQuantity === 1 ? "" : "s"} y el mínimo actual es ${minimumQuantity}.`,
+                badge: t("store.product_detail.inventory_badge_only_n", { count: availableQuantity }),
+                title: t("store.product_detail.inventory_title_below_minimum"),
+                description: t("store.product_detail.inventory_desc_below_minimum", {
+                    available: availableQuantity,
+                    unitWord: isSingular ? "unidad" : "unidades",
+                    availableWord: isSingular ? "disponible" : "disponibles",
+                    minimum: minimumQuantity,
+                }),
             }
         }
 
-        if (productDetailCRO?.inventory?.title || productDetailCRO?.inventory?.description || productDetailCRO?.inventory?.badge) {
+        if (inventoryCfgTitle || inventoryCfgDescription || inventoryCfgBadge) {
             return {
                 tone: "warning",
-                badge: productDetailCRO.inventory.badge || resolvedInventory.lowStockLabel || "Entrega confirmada",
-                title: productDetailCRO.inventory.title || "Disponibilidad con fecha límite",
-                description: productDetailCRO.inventory.description || "Confirma tu compra hoy para asegurar disponibilidad y entrega.",
+                badge: inventoryCfgBadge || resolvedInventory.lowStockLabel || t("store.product_detail.inventory_badge_delivery_confirmed"),
+                title: inventoryCfgTitle || t("store.product_detail.inventory_title_deadline"),
+                description: inventoryCfgDescription || t("store.product_detail.inventory_desc_deadline"),
             }
         }
 
@@ -1136,32 +1179,32 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                 tone: "warning",
                 badge: resolvedInventory.lowStockLabel,
                 title: resolvedInventory.source === "variant" && selectedVariantTitle
-                    ? `${selectedVariantTitle} tiene inventario limitado`
-                    : "Inventario limitado",
+                    ? t("store.product_detail.inventory_title_variant_limited", { variantTitle: selectedVariantTitle })
+                    : t("store.product_detail.inventory_title_limited"),
                 description: resolvedInventory.source === "variant"
-                    ? "La disponibilidad mostrada corresponde a la variante seleccionada."
-                    : "La disponibilidad mostrada corresponde al inventario real del producto.",
+                    ? t("store.product_detail.inventory_desc_variant_limited")
+                    : t("store.product_detail.inventory_desc_product_limited"),
             }
         }
 
         if (resolvedInventory.source === "variant" && resolvedInventory.totalStock !== null) {
             return {
                 tone: "ok",
-                badge: "Inventario por variante",
+                badge: t("store.product_detail.inventory_badge_variant_inventory"),
                 title: selectedVariantTitle
-                    ? `${selectedVariantTitle} disponible para compra`
-                    : "Variante disponible para compra",
-                description: "Disponibilidad confirmada para la variante seleccionada.",
+                    ? t("store.product_detail.inventory_title_variant_available", { variantTitle: selectedVariantTitle })
+                    : t("store.product_detail.inventory_title_variant_available_generic"),
+                description: t("store.product_detail.inventory_desc_variant_confirmed"),
             }
         }
 
         return {
             tone: "ok",
-            badge: "En stock",
-            title: "Disponible para compra",
-            description: "Disponibilidad confirmada para compra.",
+            badge: t("store.product_detail.inventory_badge_in_stock"),
+            title: t("store.product_detail.inventory_title_available"),
+            description: t("store.product_detail.inventory_desc_available"),
         }
-    }, [availableQuantity, hasInsufficientStockForMinimum, minimumQuantity, productDetailCRO?.inventory, resolvedInventory, selectedVariantTitle])
+    }, [t, availableQuantity, hasInsufficientStockForMinimum, minimumQuantity, inventoryCfgBadge, inventoryCfgTitle, inventoryCfgDescription, resolvedInventory, selectedVariantTitle])
     const inventoryBadgeClass = inventoryMessage.tone === "critical"
         ? "bg-rose-100 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400"
         : inventoryMessage.tone === "warning"
@@ -1226,7 +1269,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             categories: product.categories ?? undefined,
         }
 
-        trackAddToCart(product.id, product.name, priceToUse * effectiveQuantity, "COP")
+        trackAddToCart(product.id, product.name, priceToUse * effectiveQuantity, currency)
         addItem(productToAdd, effectiveQuantity)
     }
 
@@ -1296,14 +1339,14 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         ? product.bundle_items.slice(0, 4).map((item, index) => ({
             id: `bundle-item-${index}-${item.product_id ?? item.product_name ?? "included"}`,
             icon: "inventory_2",
-            label: `${(item.quantity ?? 0) > 1 ? `${item.quantity}x ` : ""}${item.product_name || "Producto configurado"}`,
+            label: `${(item.quantity ?? 0) > 1 ? `${item.quantity}x ` : ""}${item.product_name || t("store.product_detail.bundle_item_fallback_name")}`,
             value: item.variant ?? null,
         }))
         : (() => {
             const rows: HeroValueRow[] = []
 
             if (selectedVariantTitle) {
-                rows.push({ id: "selected-variant", icon: "tune", label: "Selección actual", value: selectedVariantTitle })
+                rows.push({ id: "selected-variant", icon: "tune", label: t("store.product_detail.value_row_selected_variant"), value: selectedVariantTitle })
             }
 
             product.specifications?.slice(0, 2).forEach((spec, index) => {
@@ -1311,50 +1354,52 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             })
 
             if (minimumQuantity > 1) {
-                rows.push({ id: "minimum-quantity", icon: "shopping_bag", label: "Compra mínima", value: `${minimumQuantity} unidades` })
+                rows.push({ id: "minimum-quantity", icon: "shopping_bag", label: t("store.product_detail.value_row_minimum_purchase"), value: t("store.product_detail.value_row_units_count", { count: minimumQuantity }) })
             }
 
             if (hasQuantityPricing && viewModel.quantityPricing.priceTiers?.length) {
-                rows.push({ id: "quantity-pricing", icon: "price_change", label: "Precios por cantidad", value: `${viewModel.quantityPricing.priceTiers.length} niveles` })
+                rows.push({ id: "quantity-pricing", icon: "price_change", label: t("store.product_detail.value_row_quantity_pricing"), value: t("store.product_detail.value_row_levels_count", { count: viewModel.quantityPricing.priceTiers.length }) })
             }
 
             return rows.slice(0, 4)
         })()
-    const heroValueStackTitle = product.is_bundle && product.bundle_items?.length ? "¿Qué incluye este kit?" : "Lo que debes saber"
+    const heroValueStackTitle = product.is_bundle && product.bundle_items?.length
+        ? t("store.product_detail.value_stack_title_kit")
+        : t("store.product_detail.value_stack_title_default")
     const heroSignalItems: Array<{ id: string; icon: string; label: string; tone: "warning" | "brand" | "success" | "danger" }> = []
 
     if (hasKnownAvailableQuantity && availableQuantity > 0 && availableQuantity <= 10) {
-        heroSignalItems.push({ id: "inventory", icon: "inventory_2", label: `Solo ${availableQuantity} unidades`, tone: "danger" })
+        heroSignalItems.push({ id: "inventory", icon: "inventory_2", label: t("store.product_detail.signal_only_n_units", { count: availableQuantity }), tone: "danger" })
     } else if (!resolvedInventory.inStock) {
-        heroSignalItems.push({ id: "inventory", icon: "inventory_2", label: "Agotado", tone: "danger" })
+        heroSignalItems.push({ id: "inventory", icon: "inventory_2", label: t("store.product_detail.inventory_badge_out_of_stock"), tone: "danger" })
     }
 
     if (viewingCount) {
-        heroSignalItems.push({ id: "views", icon: "visibility", label: `${viewingCount} personas viendo`, tone: "brand" })
+        heroSignalItems.push({ id: "views", icon: "visibility", label: t("store.product_detail.signal_viewers", { count: viewingCount }), tone: "brand" })
     }
     if (soldCount) {
-        heroSignalItems.push({ id: "sold", icon: "trending_up", label: `${soldCount} vendidos`, tone: "success" })
+        heroSignalItems.push({ id: "sold", icon: "trending_up", label: t("store.product_detail.signal_sold", { count: soldCount }), tone: "success" })
     }
     const inventoryTrustLabel = productDetailCRO?.inventory?.trustLabel
         ? productDetailCRO.inventory.trustLabel
         : resolvedInventory.source === "variant"
-        ? (selectedVariantTitle ?? "Disponibilidad por variante")
+        ? (selectedVariantTitle ?? t("store.product_detail.inventory_trust_variant_default"))
         : inventoryMessage.badge
     const priceSupportLabel = productDetailCRO?.priceContext?.text
         ? productDetailCRO.priceContext.text
         : shouldShowPriceRange && priceRangeLabel
-        ? "Selecciona una variante para confirmar el precio final."
+        ? t("store.product_detail.price_support_select_variant")
         : hasQuantityPricing
-        ? `Total actual ${formatPrice(totalPrice)} · ${formatPrice(unitPrice)} por unidad.`
+        ? t("store.product_detail.price_support_quantity_total", { total: formatPrice(totalPrice), unit: formatPrice(unitPrice) })
         : savingsAmount > 0
-            ? `Ahorro real de ${formatPrice(savingsAmount)} frente al valor regular.`
+            ? t("store.product_detail.price_support_savings_real", { amount: formatPrice(savingsAmount) })
             : hasBundleConfiguredDiscount
-                ? `Descuento del bundle configurado: ${formatPrice(bundleConfiguredDiscountAmount)} sobre el valor individual.`
-                : (selectedVariantTitle ? `Precio final para ${selectedVariantTitle}.` : "Precio final para la selección actual.")
+                ? t("store.product_detail.price_support_bundle_discount", { amount: formatPrice(bundleConfiguredDiscountAmount) })
+                : (selectedVariantTitle ? t("store.product_detail.price_support_variant_final", { variantTitle: selectedVariantTitle }) : t("store.product_detail.price_support_selection_final"))
     const activePromotionLabel = activePromotion
         ? activePromotion.type === "percentage"
-            ? `${activePromotion.value}% OFF aplicado`
-            : `${formatPrice(activePromotion.value)} OFF aplicado`
+            ? t("store.product_detail.promo_percent_off", { percent: activePromotion.value })
+            : t("store.product_detail.promo_amount_off", { amount: formatPrice(activePromotion.value) })
         : null
 
     // Mapa de imágenes → variante (para sync thumbnail → color selector)
@@ -1416,7 +1461,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 {isSelectedImageOOS && (
                                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
                                         <span className="rounded-full bg-red-500/90 px-4 py-1.5 text-sm font-bold text-white shadow-lg">
-                                            Color agotado
+                                            {t("store.product_detail.variant_color_out_of_stock")}
                                         </span>
                                     </div>
                                 )}
@@ -1450,7 +1495,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 <div className="absolute right-4 top-4 flex flex-col items-end gap-2">
                                     {savingsAmount > 0 && (
                                         <div className="rounded bg-rose-600 px-2.5 py-1 text-[12px] font-bold text-white shadow-sm">
-                                            Ahorras {formatPrice(savingsAmount)}
+                                            {t("store.product_detail.savings_label", { amount: formatPrice(savingsAmount) })}
                                         </div>
                                     )}
                                 </div>
@@ -1476,7 +1521,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                 <Image src={img} alt={`${product.name} - Imagen ${idx + 1}`} fill className="object-cover" />
                                                 {isOOS && (
                                                     <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                                                        <span className="text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded">Agotado</span>
+                                                        <span className="text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded">{t("store.product_detail.variant_out_of_stock")}</span>
                                                     </div>
                                                 )}
                                             </button>
@@ -1564,7 +1609,11 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 )}
                             </div>
                             {offerCountdownEndsAt && (
-                                <OfferCountdown endsAt={offerCountdownEndsAt} accentColor={accentColor} />
+                                <OfferCountdown
+                                    endsAt={offerCountdownEndsAt}
+                                    accentColor={accentColor}
+                                    label={t("store.product_detail.discount_ends_in")}
+                                />
                             )}
                         </div>
 
@@ -1588,23 +1637,26 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                         <>
                                             {bundleSubtotal > 0 && (
                                                 <div className="mt-1 flex justify-between border-t-2 border-dashed border-slate-200 pt-2.5 text-[13.5px] font-bold text-slate-900 dark:border-slate-800 dark:text-white">
-                                                    <span>Valor individual</span>
+                                                    <span>{t("store.product_detail.bundle_individual_value")}</span>
                                                     <span className="text-slate-400 line-through dark:text-slate-500">{formatPrice(bundleSubtotal)}</span>
                                                 </div>
                                             )}
                                             {hasBundleConfiguredDiscount && (
                                                 <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                    <span>Descuento configurado</span>
+                                                    <span>{t("store.product_detail.bundle_configured_discount")}</span>
                                                     <span>-{formatPrice(bundleConfiguredDiscountAmount)}</span>
                                                 </div>
                                             )}
                                             <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-slate-900 dark:text-white">
-                                                <span>Precio del kit hoy</span>
+                                                <span>{t("store.product_detail.bundle_kit_price_today")}</span>
                                                 <span style={{ color: accentColor }}>{formatPrice(currentPrice)}</span>
                                             </div>
                                             {savingsAmount > 0 && (
                                                 <div className="mt-1 text-right text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                    🎉 Ahorras {formatPrice(savingsAmount)} ({compareAtPrice ? (savingsAmount / compareAtPrice * 100).toFixed(0) : 0}% descuento)
+                                                    {t("store.product_detail.bundle_savings_with_percent", {
+                                                        savings: formatPrice(savingsAmount),
+                                                        percent: compareAtPrice ? (savingsAmount / compareAtPrice * 100).toFixed(0) : 0,
+                                                    })}
                                                 </div>
                                             )}
                                         </>
@@ -1648,13 +1700,13 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         {/* Stock Bar */}
                         <div className="mb-4">
                             <div className="mb-1.5 flex justify-between text-[12px] text-slate-500 dark:text-slate-400">
-                                <span>Disponibilidad</span>
+                                <span>{t("store.product_detail.stock_label")}</span>
                                 <strong className={`rounded-full px-2 py-0.5 text-[11px] ${inventoryBadgeClass}`}>
-                                    {productDetailCRO?.inventory?.badge
+                                    {inventoryCfgBadge
                                         ? inventoryMessage.badge
                                         : resolvedInventory.inStock && hasKnownAvailableQuantity && availableQuantity <= 10
-                                        ? `¡Quedan solo ${availableQuantity}!`
-                                        : resolvedInventory.inStock ? "Disponible hoy" : "Agotado"}
+                                        ? t("store.product_detail.stock_only_n_left", { count: availableQuantity })
+                                        : resolvedInventory.inStock ? t("store.product_detail.stock_available_today") : t("store.product_detail.inventory_badge_out_of_stock")}
                                 </strong>
                             </div>
                             <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
@@ -1682,6 +1734,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 primaryColor={primaryColor}
                                 hasProductLevelFreeShipping={Boolean(product.free_shipping_enabled)}
                                 formatPrice={formatPrice}
+                                labels={shippingCardLabels}
                             />
                         </div>
 
@@ -1717,7 +1770,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                                         ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}
                                                                         ${isSelected && !isOutOfStock ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-primary' : isOutOfStock ? '' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}
                                                                     `}
-                                                                    title={isOutOfStock ? `${value} — Agotado` : value}
+                                                                    title={isOutOfStock ? t("store.product_detail.variant_oos_tooltip", { value }) : value}
                                                                 >
                                                                     <span
                                                                         className={`
@@ -1733,7 +1786,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                                         )}
                                                                     </span>
                                                                     <span className={`text-[10px] leading-tight text-center max-w-[60px] truncate ${isOutOfStock ? 'line-through text-red-400 dark:text-red-500' : isSelected ? 'font-bold text-primary' : 'text-slate-500 dark:text-slate-400'}`}>
-                                                                        {isOutOfStock ? 'Agotado' : value}
+                                                                        {isOutOfStock ? t("store.product_detail.variant_out_of_stock") : value}
                                                                     </span>
                                                                 </button>
                                                             )
@@ -1759,12 +1812,12 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                                         }
                                                                         transition-all duration-200
                                                                     `}
-                                                                    title={isOutOfStock ? `${value} — Agotado` : value}
+                                                                    title={isOutOfStock ? t("store.product_detail.variant_oos_tooltip", { value }) : value}
                                                                 >
                                                                     {value}
                                                                     {isOutOfStock && (
                                                                         <span className="absolute -top-2 -right-2 text-[9px] bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1 rounded font-medium">
-                                                                            Agotado
+                                                                            {t("store.product_detail.variant_out_of_stock")}
                                                                         </span>
                                                                     )}
                                                                 </button>
@@ -1782,10 +1835,10 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 <div className="mt-6 rounded-[18px] border p-4" style={{ backgroundColor: accentSurface, borderColor: accentBorder }}>
                                     <div className="flex items-center gap-2 mb-3">
                                         <span className="material-symbols-outlined" style={{ color: accentColor }}>price_change</span>
-                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">Precios por Cantidad</h4>
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">{t("store.product_detail.quantity_pricing_title")}</h4>
                                         {minimumQuantity && (
                                             <span className="ml-auto rounded-full px-2 py-0.5 text-xs font-semibold" style={{ backgroundColor: accentSurfaceStrong, color: accentColor }}>
-                                                Mín. {minimumQuantity} unidades
+                                                {t("store.product_detail.quantity_pricing_minimum", { min: minimumQuantity })}
                                             </span>
                                         )}
                                     </div>
@@ -1795,11 +1848,13 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                             return (
                                                 <div key={`price-tier-${idx}-${tier.min_quantity}-${tier.max_quantity ?? "plus"}`} className={`flex items-center justify-between rounded-[12px] px-3 py-2 text-sm transition-colors ${isActive ? 'ring-1' : ''}`} style={isActive ? { backgroundColor: accentSurfaceStrong, borderColor: accentBorder } : undefined}>
                                                     <span className={isActive ? 'font-medium text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}>
-                                                        {tier.min_quantity}{tier.max_quantity ? `-${tier.max_quantity}` : '+'} unidades
+                                                        {tier.max_quantity
+                                                            ? t("store.product_detail.quantity_tier_range", { min: tier.min_quantity, max: tier.max_quantity })
+                                                            : t("store.product_detail.quantity_tier_open", { min: tier.min_quantity })}
                                                         {tier.label && <span className="ml-1 text-xs" style={{ color: accentColor }}>({tier.label})</span>}
                                                     </span>
                                                     <span className={`font-bold ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
-                                                        {formatPrice(tier.unit_price)}/u
+                                                        {t("store.product_detail.quantity_pricing_per_unit", { price: formatPrice(tier.unit_price) })}
                                                     </span>
                                                 </div>
                                             )
@@ -1809,7 +1864,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             )}
 
                             <div className="mb-5 flex items-center gap-3">
-                                <span className="text-[13px] font-semibold text-slate-900 dark:text-white">Cantidad</span>
+                                <span className="text-[13px] font-semibold text-slate-900 dark:text-white">{t("store.product_detail.quantity_label")}</span>
                                 <div className="flex items-center overflow-hidden rounded-xl border-1.5 border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-950">
                                     <button
                                         onClick={() => setQuantity(Math.max(minimumQuantity, effectiveQuantity - 1))}
@@ -1837,7 +1892,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     </button>
                                 </div>
                                 <span className="ml-auto text-[13px] text-slate-500 dark:text-slate-400">
-                                    Total: <strong className="text-[14px] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">{formatPrice(totalPrice)}</strong>
+                                    {t("store.product_detail.quantity_total_label")} <strong className="text-[14px] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">{formatPrice(totalPrice)}</strong>
                                 </span>
                             </div>
 
@@ -1849,7 +1904,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     style={{ backgroundColor: primaryColor }}
                                 >
                                 <span className="material-symbols-outlined text-[22px] [font-variation-settings:'FILL'_1,'wght'_500,'GRAD'_0,'opsz'_24]">shopping_cart</span>
-                                <span>{canPurchase ? primaryCtaText : "No disponible"}</span>
+                                <span>{canPurchase ? primaryCtaText : t("store.product_detail.cta_unavailable")}</span>
                                 </button>
                                 <button
                                     onClick={() => handleChat(product.id)}
@@ -2151,7 +2206,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         style={{ backgroundColor: primaryColor }}
                     >
                         <span className="material-symbols-outlined text-lg">shopping_cart</span>
-                        <span>{canPurchase ? mobilePrimaryCtaText : "No disponible"}</span>
+                        <span>{canPurchase ? mobilePrimaryCtaText : t("store.product_detail.cta_unavailable")}</span>
                     </button>
                     <button
                         onClick={() => handleChat(product.id)}
@@ -2173,7 +2228,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 <span className="line-through">{formatPrice(compareAtPrice)}</span>
                             )}
                             <span>{inventoryTrustLabel}</span>
-                            {hasFreeShipping && <span>Envío gratis</span>}
+                            {hasFreeShipping && <span>{t("store.product_detail.shipping_free_label")}</span>}
                         </div>
                     </div>
                     <button
@@ -2190,7 +2245,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         style={{ backgroundColor: primaryColor }}
                     >
                         <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
-                        {canPurchase ? stickyPrimaryCtaText : "No disponible"}
+                        {canPurchase ? stickyPrimaryCtaText : t("store.product_detail.cta_unavailable")}
                     </button>
                 </div>
             </div>
