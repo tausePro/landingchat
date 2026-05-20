@@ -16,6 +16,10 @@ import {
     ManualPaymentMethodsInputSchema,
     deserializeManualPaymentMethods,
 } from "@/types"
+import {
+    getTenantLocale,
+    type TenantLocaleContext,
+} from "@/lib/i18n/tenant-locale"
 
 const PaymentGatewayBrandingInputSchema = z.object({
     provider: PaymentProviderSchema,
@@ -404,6 +408,42 @@ export async function toggleGateway(
 }
 
 /**
+ * Obtiene el contexto de localización (locale + currency + country) de la
+ * organización actual. Usado por el form de pagos manuales para parametrizar
+ * la lista de bancos, account types y formatear el costo COD según la moneda
+ * del tenant.
+ *
+ * T1.5 — Manual payment country-aware.
+ */
+export async function getOrganizationLocaleContext(): Promise<
+    ActionResult<TenantLocaleContext>
+> {
+    try {
+        const organizationId = await getCurrentOrganization()
+        if (!organizationId) {
+            return failure("No autorizado")
+        }
+
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from("organizations")
+            .select("locale, currency_code, country_code")
+            .eq("id", organizationId)
+            .single()
+
+        if (error) {
+            return failure(error.message)
+        }
+
+        return success(getTenantLocale(data))
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al obtener contexto"
+        )
+    }
+}
+
+/**
  * Obtiene la configuración de métodos de pago manuales
  */
 export async function getManualPaymentMethods(): Promise<
@@ -469,6 +509,10 @@ export async function saveManualPaymentMethods(
             account_number: data.account_number || null,
             account_holder: data.account_holder || null,
             nequi_number: data.nequi_number || null,
+            // T1.5 — campos nuevos country-aware
+            instant_payment_label: data.instant_payment_label || null,
+            instant_payment_value: data.instant_payment_value || null,
+            instructions: data.instructions || null,
             cod_enabled: data.cod_enabled,
             cod_additional_cost: data.cod_additional_cost,
             cod_zones: data.cod_zones,

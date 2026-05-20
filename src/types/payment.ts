@@ -154,16 +154,26 @@ export interface Bank {
 // Métodos de Pago Manuales
 // ============================================
 
+// T1.5 — `account_type` extendido a CO + US.
+// CO: 'ahorros' | 'corriente'. US: 'checking' | 'savings'.
+const ACCOUNT_TYPE_VALUES = ["ahorros", "corriente", "checking", "savings"] as const
+
 export const ManualPaymentMethodsSchema = z.object({
     id: z.string().uuid(),
     organization_id: z.string().uuid(),
     // Bank Transfer
     bank_transfer_enabled: z.boolean().default(false),
     bank_name: z.string().nullable().optional(),
-    account_type: z.enum(["ahorros", "corriente"]).nullable().optional(),
+    account_type: z.enum(ACCOUNT_TYPE_VALUES).nullable().optional(),
     account_number: z.string().nullable().optional(),
     account_holder: z.string().nullable().optional(),
+    /** @deprecated T1.5 — usar `instant_payment_label` + `instant_payment_value`. */
     nequi_number: z.string().nullable().optional(),
+    // T1.5 — Pago instantáneo genérico (Zelle, CashApp, PayPal, Nequi, etc.)
+    instant_payment_label: z.string().nullable().optional(),
+    instant_payment_value: z.string().nullable().optional(),
+    // T1.5 — Instrucciones libres del merchant (markdown-lite, mostrado al cliente)
+    instructions: z.string().nullable().optional(),
     // Cash on Delivery
     cod_enabled: z.boolean().default(false),
     cod_additional_cost: z.number().int().min(0).default(0),
@@ -180,10 +190,15 @@ export const ManualPaymentMethodsInputSchema = z.object({
     // Bank Transfer
     bank_transfer_enabled: z.boolean().default(false),
     bank_name: z.string().optional(),
-    account_type: z.enum(["ahorros", "corriente"]).optional(),
+    account_type: z.enum(ACCOUNT_TYPE_VALUES).optional(),
     account_number: z.string().optional(),
     account_holder: z.string().optional(),
+    /** @deprecated T1.5 — usar `instant_payment_label` + `instant_payment_value`. */
     nequi_number: z.string().optional(),
+    // T1.5
+    instant_payment_label: z.string().optional(),
+    instant_payment_value: z.string().optional(),
+    instructions: z.string().optional(),
     // Cash on Delivery
     cod_enabled: z.boolean().default(false),
     cod_additional_cost: z.number().int().min(0).default(0),
@@ -251,6 +266,10 @@ export function deserializeManualPaymentMethods(
         account_number: data.account_number,
         account_holder: data.account_holder,
         nequi_number: data.nequi_number,
+        // T1.5 — campos nuevos country-aware
+        instant_payment_label: data.instant_payment_label,
+        instant_payment_value: data.instant_payment_value,
+        instructions: data.instructions,
         cod_enabled: data.cod_enabled ?? false,
         cod_additional_cost: data.cod_additional_cost ?? 0,
         cod_zones: data.cod_zones ?? [],

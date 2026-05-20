@@ -195,7 +195,11 @@ export function PaymentStep({
                                     onClick={() => onPaymentMethodChange("manual")}
                                 >
                                     <span className="font-bold">{t("store.checkout.payment_bank_transfer_label")}</span>
-                                    <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
+                                    <span className="text-xs text-center text-slate-500">
+                                        {[manualPaymentInfo.bank_name, manualPaymentInfo.instant_payment_label]
+                                            .filter(Boolean)
+                                            .join(" / ") || t("store.checkout.payment_bank_transfer_label")}
+                                    </span>
                                 </div>
                             )}
 
@@ -271,7 +275,18 @@ export function PaymentStep({
                                 <span className="font-medium">{manualPaymentInfo.account_holder}</span>
                             </div>
                         )}
-                        {manualPaymentInfo.nequi_number && (
+                        {/* T1.5 — instant_payment genérico (Zelle, CashApp, Nequi, etc.).
+                            Mantenemos compat con `nequi_number` legacy: si está lleno y
+                            no hay instant_payment_*, lo mostramos como Nequi. */}
+                        {(manualPaymentInfo.instant_payment_label && manualPaymentInfo.instant_payment_value) ? (
+                            <>
+                                <hr className="border-blue-200 dark:border-blue-700" />
+                                <div className="flex justify-between">
+                                    <span className="text-blue-600 dark:text-blue-400">{manualPaymentInfo.instant_payment_label}</span>
+                                    <span className="font-mono font-medium">{manualPaymentInfo.instant_payment_value}</span>
+                                </div>
+                            </>
+                        ) : manualPaymentInfo.nequi_number ? (
                             <>
                                 <hr className="border-blue-200 dark:border-blue-700" />
                                 <div className="flex justify-between">
@@ -279,8 +294,14 @@ export function PaymentStep({
                                     <span className="font-mono font-medium">{manualPaymentInfo.nequi_number}</span>
                                 </div>
                             </>
-                        )}
+                        ) : null}
                     </div>
+                    {/* T1.5 — instrucciones libres del merchant en su idioma */}
+                    {manualPaymentInfo.instructions && (
+                        <div className="rounded-md bg-blue-100/50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 px-3 py-2 mt-2 text-sm text-blue-900 dark:text-blue-200 whitespace-pre-line">
+                            {manualPaymentInfo.instructions}
+                        </div>
+                    )}
                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
                         {t("store.checkout.bank_disclaimer")}
                     </p>

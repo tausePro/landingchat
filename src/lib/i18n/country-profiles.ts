@@ -43,6 +43,20 @@ export interface PersonTypeOption {
 }
 
 /**
+ * Opción de tipo de cuenta bancaria. El `value` se persiste en
+ * `manual_payment_methods.account_type`; el `labelKey` resuelve el string
+ * visible vía `t()`.
+ *
+ * T1.5 — Manual payment country-aware.
+ */
+export interface AccountTypeOption {
+  /** Valor persistido en DB (estable, no traducir). */
+  value: string
+  /** Key del diccionario i18n del label visible. */
+  labelKey: StorefrontStringKey
+}
+
+/**
  * Profile completo de UI/UX dependiente del país. Cada `SupportedCountry`
  * tiene un profile fijo en este registry.
  */
@@ -80,6 +94,16 @@ export interface CountryProfile {
   cityPlaceholderKey: StorefrontStringKey
   /** Placeholder del input de dirección completa. */
   addressPlaceholderKey: StorefrontStringKey
+
+  // ============= Bank / Manual payment (T1.5) =============
+  /**
+   * Tipos de cuenta bancaria disponibles para el merchant en el dashboard
+   * de configuración de pago manual. CO usa 'ahorros'/'corriente'; US usa
+   * 'checking'/'savings'.
+   */
+  accountTypes: AccountTypeOption[]
+  /** Valor default del account type cuando se inicializa el form. */
+  defaultAccountType: string
 
   // ============= Tracking =============
   /**
@@ -122,6 +146,11 @@ export const COUNTRY_PROFILES: Readonly<Record<SupportedCountry, CountryProfile>
     statePlaceholderKey: "store.checkout.location_state_placeholder",
     cityPlaceholderKey: "store.checkout.location_city_placeholder",
     addressPlaceholderKey: "store.checkout.location_address_placeholder",
+    accountTypes: [
+      { value: "ahorros", labelKey: "dashboard.payments.account_type_ahorros" },
+      { value: "corriente", labelKey: "dashboard.payments.account_type_corriente" },
+    ],
+    defaultAccountType: "ahorros",
     metaPixelCountry: "co",
   },
   US: {
@@ -148,6 +177,11 @@ export const COUNTRY_PROFILES: Readonly<Record<SupportedCountry, CountryProfile>
     statePlaceholderKey: "store.checkout.location_state_placeholder_us",
     cityPlaceholderKey: "store.checkout.location_city_placeholder_us",
     addressPlaceholderKey: "store.checkout.location_address_placeholder_us",
+    accountTypes: [
+      { value: "checking", labelKey: "dashboard.payments.account_type_checking" },
+      { value: "savings", labelKey: "dashboard.payments.account_type_savings" },
+    ],
+    defaultAccountType: "checking",
     metaPixelCountry: "us",
   },
 })

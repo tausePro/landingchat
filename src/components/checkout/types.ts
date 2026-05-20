@@ -45,7 +45,12 @@ export interface ManualPaymentInfo {
     account_type?: string
     account_number?: string
     account_holder?: string
+    /** @deprecated T1.5 — usar `instant_payment_label` + `instant_payment_value`. */
     nequi_number?: string
+    // T1.5 — campos genéricos country-aware
+    instant_payment_label?: string | null
+    instant_payment_value?: string | null
+    instructions?: string | null
     cod_enabled?: boolean
     cod_additional_cost?: number
 }
