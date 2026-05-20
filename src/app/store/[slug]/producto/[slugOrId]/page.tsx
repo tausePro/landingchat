@@ -10,6 +10,9 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { ProductUrgencyBanner } from "@/components/store/product-urgency-banner"
 import { resolveProductDetailCROConfig, type ProductDetailCROSearchParams } from "@/lib/storefront/product-detail-cro"
 import type { ProductReview, ProductReviewSummary } from "@/types/product"
+import { formatCurrency } from "@/lib/utils"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { t } from "@/lib/i18n/storefront-strings"
 
 interface ProductDetailPageProps {
     params: Promise<{ slug: string; slugOrId: string }>
@@ -22,20 +25,34 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
     const data = await getProductDetails(slug, slugOrId)
 
     if (!data) {
+        // Sin organización todavía: no podemos derivar locale del tenant.
+        // Caemos al default seguro (es-CO) que es OK porque la pagina ya
+        // termina en notFound() y solo importa para el <title> del 404.
         return {
-            title: "Producto no encontrado",
-            description: "El producto que buscas no existe."
+            title: t("store.product_detail.metadata_not_found_title"),
+            description: t("store.product_detail.metadata_not_found_description"),
         }
     }
 
     const { product, organization, productWithVariants } = data
     const defaultVariant = productWithVariants?.default_variant
     const priceRange = productWithVariants?.price_range
+
+    // Locale + currency del tenant para formatear el priceLabel del SEO meta.
+    // Tantor's House (en-US/USD) ve "$24.99" en sus meta tags vs "$ 24.000"
+    // de un tenant COP. Crucial para previsualización de OG y Twitter cards.
+    const tenantLocale = getTenantLocale(organization)
+    const { locale, currency } = tenantLocale
+
     const priceLabel = priceRange?.has_range
-        ? `$${priceRange.min_price.toLocaleString('es-CO')} - $${priceRange.max_price.toLocaleString('es-CO')} COP`
-        : `$${(defaultVariant?.price ?? (product.sale_price || product.price)).toLocaleString('es-CO')} COP`
+        ? `${formatCurrency(priceRange.min_price, { locale, currency })} - ${formatCurrency(priceRange.max_price, { locale, currency })}`
+        : formatCurrency(defaultVariant?.price ?? (product.sale_price || product.price), { locale, currency })
     const title = product.meta_title || `${product.name} | ${organization.name}`
-    const description = product.meta_description || product.description || `Compra ${product.name} en ${organization.name}. Precio: ${priceLabel}`
+    const description = product.meta_description || product.description || t("store.product_detail.metadata_default_description", locale, {
+        productName: product.name,
+        orgName: organization.name,
+        price: priceLabel,
+    })
     const images = product.images?.length
         ? product.images
         : defaultVariant?.image_url

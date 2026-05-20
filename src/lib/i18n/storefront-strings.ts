@@ -409,6 +409,14 @@ export const storefrontStrings = {
     "store.profile.access_form_submitting": "Validando acceso...",
     "store.profile.access_form_back": "← Volver a la tienda",
     "store.profile.access_form_default_error": "No pudimos validar tu acceso",
+    // ========================================================================
+    // Product detail page (T1.3j) — `/store/[slug]/producto/[slugOrId]`
+    // ========================================================================
+    // T1.3j.1: metadata SEO + CTA del botón de chat (page.tsx + product-cta-button.tsx)
+    "store.product_detail.metadata_not_found_title": "Producto no encontrado",
+    "store.product_detail.metadata_not_found_description": "El producto que buscas no existe.",
+    "store.product_detail.metadata_default_description": "Compra {{productName}} en {{orgName}}. Precio: {{price}}",
+    "store.product_detail.cta_chat_to_buy": "Chatear para Comprar",
   },
   "en-US": {
     // Order pages — common area
@@ -779,6 +787,14 @@ export const storefrontStrings = {
     "store.profile.access_form_submitting": "Validating access...",
     "store.profile.access_form_back": "← Back to store",
     "store.profile.access_form_default_error": "We couldn't validate your access",
+    // ========================================================================
+    // Product detail page (T1.3j) — `/store/[slug]/producto/[slugOrId]`
+    // ========================================================================
+    // T1.3j.1: metadata SEO + CTA del botón de chat (page.tsx + product-cta-button.tsx)
+    "store.product_detail.metadata_not_found_title": "Product not found",
+    "store.product_detail.metadata_not_found_description": "The product you're looking for doesn't exist.",
+    "store.product_detail.metadata_default_description": "Buy {{productName}} at {{orgName}}. Price: {{price}}",
+    "store.product_detail.cta_chat_to_buy": "Chat to Buy",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 

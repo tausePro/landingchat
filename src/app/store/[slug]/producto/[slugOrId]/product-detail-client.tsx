@@ -18,6 +18,8 @@ import { getColorHex } from "@/lib/constants/colors"
 import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/utils/shipping"
 import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel } from "@/types/product"
 import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface ProductDetailClientProps {
     product: ProductDetailProduct
@@ -184,9 +186,11 @@ function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<st
     return defaults
 }
 
-function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount)
-}
+// Helper que formatea precios con el contexto del tenant. Se construye dentro
+// del componente principal con `formatTenantCurrency(n, { locale, currency })`
+// y se inyecta a sub-helpers stateless (formatConfiguredCtaText,
+// ProductShippingCard) vía parámetro/prop.
+type FormatPriceFn = (amount: number) => string
 
 function calculateBundleDiscountAmount(subtotal: number, type?: string | null, value?: number | null): number {
     if (subtotal <= 0 || !type || !value || value <= 0) return 0
@@ -382,10 +386,10 @@ function OfferCountdown({ endsAt, accentColor }: { endsAt: string; accentColor: 
     )
 }
 
-function formatConfiguredCtaText(text: string | undefined, totalPrice: number): string | null {
+function formatConfiguredCtaText(text: string | undefined, totalPrice: number, formatPrice: FormatPriceFn): string | null {
     if (!text?.trim()) return null
 
-    return text.replaceAll("{price}", formatCurrency(totalPrice)).trim()
+    return text.replaceAll("{price}", formatPrice(totalPrice)).trim()
 }
 
 function ProductCROTrustBlock({ trust, primaryColor }: { trust: NonNullable<ProductDetailCROConfig["trust"]>; primaryColor: string }) {
@@ -647,9 +651,10 @@ interface ProductShippingCardProps {
     subtotal: number
     primaryColor: string
     hasProductLevelFreeShipping: boolean
+    formatPrice: FormatPriceFn
 }
 
-function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping }: ProductShippingCardProps) {
+function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping, formatPrice }: ProductShippingCardProps) {
     const progress = getFreeShippingProgress(shippingConfig, subtotal)
     const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
     const shippingQualified = hasProductLevelFreeShipping || (progress.enabled && (!progress.hasMinimum || progress.qualified))
@@ -663,7 +668,7 @@ function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProduc
         : progress.hasMinimum
             ? progress.qualified
                 ? `Tu selección actual ya califica para envío gratis${progress.zonesText}.`
-                : `Agrega ${formatCurrency(progress.remaining)} más y activa el envío gratis${progress.zonesText}.`
+                : `Agrega ${formatPrice(progress.remaining)} más y activa el envío gratis${progress.zonesText}.`
             : `Envío gratis disponible${progress.zonesText}.`
 
     return (
@@ -833,6 +838,17 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
     const { trackViewContent, trackAddToCart } = useTracking()
     const { addItem } = useCartStore()
+
+    // i18n + currency context del tenant. Tantor's House (en-US/USD) ve precios
+    // formateados con `Intl.NumberFormat('en-US', { currency: 'USD' })`. Tenants
+    // sin override caen al default seguro 'es-CO'/'COP'.
+    // T1.3j.1: helper formatCurrency local hardcoded reemplazado por closure
+    // que usa el global `formatTenantCurrency` con contexto del provider.
+    // T1.3j.2/3 introduciran `useT()` para los strings UI.
+    const locale = useTenantLocale()
+    const currency = useTenantCurrency()
+    const formatPrice: FormatPriceFn = (amount: number) =>
+        formatTenantCurrency(amount, { locale, currency })
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
     const accentColor = normalizeHexColor(primaryColor, "#0bbfbf")
@@ -1067,20 +1083,20 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const unitPrice = resolvedQuantityPricing?.final_price ?? (hasQuantityPricing ? getUnitPriceForQuantity(effectiveQuantity) : legacyPricing.currentPrice)
     const totalPrice = unitPrice * effectiveQuantity
     const currentPrice = resolvedHeadlinePricing?.final_price ?? legacyPricing.currentPrice
-    const configuredPrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.primaryText, totalPrice)
-    const configuredMobilePrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobilePrimaryText ?? productDetailCRO?.cta?.primaryText, totalPrice)
-    const configuredStickyPrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickyPrimaryText ?? productDetailCRO?.cta?.primaryText, totalPrice)
-    const configuredSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.secondaryText, totalPrice)
-    const configuredMobileSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobileSecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice)
-    const configuredStickySecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickySecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice)
-    const primaryCtaText = configuredPrimaryCtaText ?? `Comprar Ya — ${formatCurrency(totalPrice)}`
+    const configuredPrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.primaryText, totalPrice, formatPrice)
+    const configuredMobilePrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobilePrimaryText ?? productDetailCRO?.cta?.primaryText, totalPrice, formatPrice)
+    const configuredStickyPrimaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickyPrimaryText ?? productDetailCRO?.cta?.primaryText, totalPrice, formatPrice)
+    const configuredSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.secondaryText, totalPrice, formatPrice)
+    const configuredMobileSecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.mobileSecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice, formatPrice)
+    const configuredStickySecondaryCtaText = formatConfiguredCtaText(productDetailCRO?.cta?.stickySecondaryText ?? productDetailCRO?.cta?.secondaryText, totalPrice, formatPrice)
+    const primaryCtaText = configuredPrimaryCtaText ?? `Comprar Ya — ${formatPrice(totalPrice)}`
     const mobilePrimaryCtaText = configuredMobilePrimaryCtaText ?? "Comprar Ya"
     const stickyPrimaryCtaText = configuredStickyPrimaryCtaText ?? "Comprar ahora"
     const secondaryCtaText = configuredSecondaryCtaText ?? (product.is_configurable ? "Personalizar con IA" : "Chatear para Comprar")
     const mobileSecondaryCtaText = configuredMobileSecondaryCtaText ?? "Chat"
     const stickySecondaryCtaText = configuredStickySecondaryCtaText ?? "Chat"
     const priceRangeLabel = displayPriceRange
-        ? `${formatCurrency(displayPriceRange.min_price)} - ${formatCurrency(displayPriceRange.max_price)}`
+        ? `${formatPrice(displayPriceRange.min_price)} - ${formatPrice(displayPriceRange.max_price)}`
         : null
 
     const inventoryMessage = useMemo(() => {
@@ -1329,16 +1345,16 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
         : shouldShowPriceRange && priceRangeLabel
         ? "Selecciona una variante para confirmar el precio final."
         : hasQuantityPricing
-        ? `Total actual ${formatCurrency(totalPrice)} · ${formatCurrency(unitPrice)} por unidad.`
+        ? `Total actual ${formatPrice(totalPrice)} · ${formatPrice(unitPrice)} por unidad.`
         : savingsAmount > 0
-            ? `Ahorro real de ${formatCurrency(savingsAmount)} frente al valor regular.`
+            ? `Ahorro real de ${formatPrice(savingsAmount)} frente al valor regular.`
             : hasBundleConfiguredDiscount
-                ? `Descuento del bundle configurado: ${formatCurrency(bundleConfiguredDiscountAmount)} sobre el valor individual.`
+                ? `Descuento del bundle configurado: ${formatPrice(bundleConfiguredDiscountAmount)} sobre el valor individual.`
                 : (selectedVariantTitle ? `Precio final para ${selectedVariantTitle}.` : "Precio final para la selección actual.")
     const activePromotionLabel = activePromotion
         ? activePromotion.type === "percentage"
             ? `${activePromotion.value}% OFF aplicado`
-            : `${formatCurrency(activePromotion.value)} OFF aplicado`
+            : `${formatPrice(activePromotion.value)} OFF aplicado`
         : null
 
     // Mapa de imágenes → variante (para sync thumbnail → color selector)
@@ -1434,7 +1450,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 <div className="absolute right-4 top-4 flex flex-col items-end gap-2">
                                     {savingsAmount > 0 && (
                                         <div className="rounded bg-rose-600 px-2.5 py-1 text-[12px] font-bold text-white shadow-sm">
-                                            Ahorras {formatCurrency(savingsAmount)}
+                                            Ahorras {formatPrice(savingsAmount)}
                                         </div>
                                     )}
                                 </div>
@@ -1534,16 +1550,16 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         <div className="mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50">
                             <div className="flex items-baseline gap-3">
                                 <span className="text-[36px] font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">
-                                    {shouldShowPriceRange && priceRangeLabel ? priceRangeLabel : formatCurrency(currentPrice)}
+                                    {shouldShowPriceRange && priceRangeLabel ? priceRangeLabel : formatPrice(currentPrice)}
                                 </span>
                                 {compareAtPrice && (
                                     <span className="text-[18px] text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums]">
-                                        {formatCurrency(compareAtPrice)}
+                                        {formatPrice(compareAtPrice)}
                                     </span>
                                 )}
                                 {savingsAmount > 0 && (
                                     <span className="rounded bg-rose-100 px-2 py-0.5 text-[12px] font-bold text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
-                                        −{formatCurrency(savingsAmount)}
+                                        −{formatPrice(savingsAmount)}
                                     </span>
                                 )}
                             </div>
@@ -1573,22 +1589,22 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                             {bundleSubtotal > 0 && (
                                                 <div className="mt-1 flex justify-between border-t-2 border-dashed border-slate-200 pt-2.5 text-[13.5px] font-bold text-slate-900 dark:border-slate-800 dark:text-white">
                                                     <span>Valor individual</span>
-                                                    <span className="text-slate-400 line-through dark:text-slate-500">{formatCurrency(bundleSubtotal)}</span>
+                                                    <span className="text-slate-400 line-through dark:text-slate-500">{formatPrice(bundleSubtotal)}</span>
                                                 </div>
                                             )}
                                             {hasBundleConfiguredDiscount && (
                                                 <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
                                                     <span>Descuento configurado</span>
-                                                    <span>-{formatCurrency(bundleConfiguredDiscountAmount)}</span>
+                                                    <span>-{formatPrice(bundleConfiguredDiscountAmount)}</span>
                                                 </div>
                                             )}
                                             <div className="mt-0.5 flex justify-between text-[13.5px] font-bold text-slate-900 dark:text-white">
                                                 <span>Precio del kit hoy</span>
-                                                <span style={{ color: accentColor }}>{formatCurrency(currentPrice)}</span>
+                                                <span style={{ color: accentColor }}>{formatPrice(currentPrice)}</span>
                                             </div>
                                             {savingsAmount > 0 && (
                                                 <div className="mt-1 text-right text-[13.5px] font-bold text-emerald-600 dark:text-emerald-400">
-                                                    🎉 Ahorras {formatCurrency(savingsAmount)} ({compareAtPrice ? (savingsAmount / compareAtPrice * 100).toFixed(0) : 0}% descuento)
+                                                    🎉 Ahorras {formatPrice(savingsAmount)} ({compareAtPrice ? (savingsAmount / compareAtPrice * 100).toFixed(0) : 0}% descuento)
                                                 </div>
                                             )}
                                         </>
@@ -1665,6 +1681,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 subtotal={totalPrice}
                                 primaryColor={primaryColor}
                                 hasProductLevelFreeShipping={Boolean(product.free_shipping_enabled)}
+                                formatPrice={formatPrice}
                             />
                         </div>
 
@@ -1782,7 +1799,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                         {tier.label && <span className="ml-1 text-xs" style={{ color: accentColor }}>({tier.label})</span>}
                                                     </span>
                                                     <span className={`font-bold ${isActive ? 'text-slate-900 dark:text-white' : 'text-slate-900 dark:text-white'}`}>
-                                                        {formatCurrency(tier.unit_price)}/u
+                                                        {formatPrice(tier.unit_price)}/u
                                                     </span>
                                                 </div>
                                             )
@@ -1820,7 +1837,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     </button>
                                 </div>
                                 <span className="ml-auto text-[13px] text-slate-500 dark:text-slate-400">
-                                    Total: <strong className="text-[14px] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">{formatCurrency(totalPrice)}</strong>
+                                    Total: <strong className="text-[14px] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">{formatPrice(totalPrice)}</strong>
                                 </span>
                             </div>
 
@@ -2151,9 +2168,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-bold text-slate-950 dark:text-white">{product.name}</p>
                         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                            <span className="font-semibold text-slate-950 dark:text-white">{formatCurrency(totalPrice)}</span>
+                            <span className="font-semibold text-slate-950 dark:text-white">{formatPrice(totalPrice)}</span>
                             {compareAtPrice && (
-                                <span className="line-through">{formatCurrency(compareAtPrice)}</span>
+                                <span className="line-through">{formatPrice(compareAtPrice)}</span>
                             )}
                             <span>{inventoryTrustLabel}</span>
                             {hasFreeShipping && <span>Envío gratis</span>}

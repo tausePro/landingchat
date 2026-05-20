@@ -289,6 +289,49 @@ describe("t() — keys de profile (T1.3h)", () => {
   })
 })
 
+describe("t() — keys de product detail (T1.3j.1)", () => {
+  it("metadata not found traducida en ambos locales", () => {
+    expect(t("store.product_detail.metadata_not_found_title", "es-CO")).toBe(
+      "Producto no encontrado",
+    )
+    expect(t("store.product_detail.metadata_not_found_title", "en-US")).toBe(
+      "Product not found",
+    )
+    expect(
+      t("store.product_detail.metadata_not_found_description", "es-CO"),
+    ).toBe("El producto que buscas no existe.")
+    expect(
+      t("store.product_detail.metadata_not_found_description", "en-US"),
+    ).toBe("The product you're looking for doesn't exist.")
+  })
+
+  it("metadata default description interpola productName + orgName + price", () => {
+    expect(
+      t("store.product_detail.metadata_default_description", "es-CO", {
+        productName: "Collar reflectivo",
+        orgName: "Quality Pets",
+        price: "$ 45.000",
+      }),
+    ).toBe("Compra Collar reflectivo en Quality Pets. Precio: $ 45.000")
+    expect(
+      t("store.product_detail.metadata_default_description", "en-US", {
+        productName: "LED Dog Leash",
+        orgName: "Tantor's House",
+        price: "$24.99",
+      }),
+    ).toBe("Buy LED Dog Leash at Tantor's House. Price: $24.99")
+  })
+
+  it("CTA del botón de chat traducido", () => {
+    expect(t("store.product_detail.cta_chat_to_buy", "es-CO")).toBe(
+      "Chatear para Comprar",
+    )
+    expect(t("store.product_detail.cta_chat_to_buy", "en-US")).toBe(
+      "Chat to Buy",
+    )
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]

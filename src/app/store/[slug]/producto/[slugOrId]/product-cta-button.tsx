@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getChatUrl, getStoreLink } from "@/lib/utils/store-urls"
 import { getStoredUUID } from "@/lib/utils/storage"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 interface ProductCTAButtonProps {
     slug: string
@@ -15,6 +16,7 @@ interface ProductCTAButtonProps {
 export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mobile' }: ProductCTAButtonProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
+    const t = useT()
 
     const handleClick = () => {
         // Check if customer is already identified (with UUID validation)
@@ -39,7 +41,7 @@ export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mob
                 style={{ backgroundColor: primaryColor }}
             >
                 <span className="material-symbols-outlined">chat_bubble</span>
-                <span>Chatear para Comprar</span>
+                <span>{t("store.product_detail.cta_chat_to_buy")}</span>
             </button>
         )
     }
@@ -53,7 +55,7 @@ export function ProductCTAButton({ slug, productId, primaryColor, variant = 'mob
                     style={{ backgroundColor: primaryColor }}
                 >
                     <span className="material-symbols-outlined">chat_bubble</span>
-                    <span>Chatear para Comprar</span>
+                    <span>{t("store.product_detail.cta_chat_to_buy")}</span>
                 </button>
             </div>
         </div>
