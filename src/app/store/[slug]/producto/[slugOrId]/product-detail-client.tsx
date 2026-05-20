@@ -286,20 +286,27 @@ function getYouTubeEmbedUrl(value: string): string | null {
     }
 }
 
-function ProductVideoBlock({ videoUrl, productName, primaryColor }: { videoUrl: string; productName: string; primaryColor: string }) {
+interface ProductVideoBlockLabels {
+    eyebrow: string
+    title: string
+    iframeTitle: string
+    description: string
+}
+
+function ProductVideoBlock({ videoUrl, primaryColor, labels }: { videoUrl: string; primaryColor: string; labels: ProductVideoBlockLabels }) {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(videoUrl)
 
     return (
         <section id="product-video" className="mt-8 scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/50">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Míralo en acción</p>
-                <h3 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">Cómo se ve y cómo se usa</h3>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{labels.eyebrow}</p>
+                <h3 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">{labels.title}</h3>
             </div>
             <div className="bg-black">
                 {youtubeEmbedUrl ? (
                     <iframe
                         src={youtubeEmbedUrl}
-                        title={`Video de ${productName}`}
+                        title={labels.iframeTitle}
                         className="aspect-video w-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
@@ -315,7 +322,7 @@ function ProductVideoBlock({ videoUrl, productName, primaryColor }: { videoUrl: 
             </div>
             <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm text-slate-600 dark:text-slate-300 sm:px-5">
                 <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>play_circle</span>
-                <span>Resuelve dudas visuales antes de comprar y confirma si es lo que necesitas.</span>
+                <span>{labels.description}</span>
             </div>
         </section>
     )
@@ -552,7 +559,18 @@ function parsePlainDescription(description: string): ProductDescriptionBlock[] {
     return blocks
 }
 
-function ProductDescription({ description, primaryColor }: ProductDescriptionProps) {
+interface ProductDescriptionLabels {
+    eyebrow: string
+    title: string
+    seeMore: string
+    seeLess: string
+}
+
+interface ProductDescriptionPropsExtended extends ProductDescriptionProps {
+    labels: ProductDescriptionLabels
+}
+
+function ProductDescription({ description, primaryColor, labels }: ProductDescriptionPropsExtended) {
     const isHtml = looksLikeHtml(description)
     const plainTextLength = isHtml ? stripHtmlTags(description).length : description.length
     const hasLongDescription = plainTextLength > 520
@@ -568,8 +586,8 @@ function ProductDescription({ description, primaryColor }: ProductDescriptionPro
                     <span className="material-symbols-outlined text-[20px]">auto_stories</span>
                 </span>
                 <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Experiencia del producto</p>
-                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">Lo que estás comprando</h2>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{labels.eyebrow}</p>
+                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">{labels.title}</h2>
                 </div>
             </div>
 
@@ -636,7 +654,7 @@ function ProductDescription({ description, primaryColor }: ProductDescriptionPro
                     className="mt-5 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
                     aria-expanded={isExpanded}
                 >
-                    {isExpanded ? "Ver menos" : "Ver más"}
+                    {isExpanded ? labels.seeLess : labels.seeMore}
                     <span className={`material-symbols-outlined text-[18px] transition-transform ${isExpanded ? "rotate-180" : ""}`}>
                         expand_more
                     </span>
@@ -725,23 +743,30 @@ interface TrustBadgeItem {
     onClick?: () => void
 }
 
-function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeShipping, inventoryLabel = "Inventario confirmado", primaryColor = "#3B82F6", onStartChat }: ProductTrustRailProps) {
+function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeShipping, inventoryLabel, primaryColor = "#3B82F6", onStartChat }: ProductTrustRailProps) {
+    // useT() funciona porque el archivo es 'use client' y ProductTrustRail
+    // se renderiza dentro del provider tree de TenantStringsProvider.
+    const t = useT()
     const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
     const trustBadges: TrustBadgeItem[] = []
+    const resolvedInventoryLabel = inventoryLabel ?? t("store.product_detail.inventory_confirmed")
 
     if (estimatedDeliveryDays) {
         trustBadges.push({
             id: "shipping",
             icon: "local_shipping",
-            title: "Envío rápido",
-            description: `${estimatedDeliveryDays} día${estimatedDeliveryDays === 1 ? "" : "s"}`,
+            title: t("store.product_detail.trust_rail_fast_shipping"),
+            description: t("store.product_detail.trust_rail_days_label", {
+                count: estimatedDeliveryDays,
+                plural: estimatedDeliveryDays === 1 ? "" : "s",
+            }),
         })
     } else if (hasFreeShipping) {
         trustBadges.push({
             id: "shipping",
             icon: "local_shipping",
-            title: "Envío gratis",
-            description: "Activo para esta compra",
+            title: t("store.product_detail.trust_rail_free_shipping"),
+            description: t("store.product_detail.trust_rail_active_purchase"),
         })
     }
 
@@ -749,16 +774,16 @@ function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeS
         trustBadges.push({
             id: "chat",
             icon: "chat_bubble",
-            title: "Compra asistida",
-            description: "WhatsApp disponible",
+            title: t("store.product_detail.trust_badge_assisted_purchase"),
+            description: t("store.product_detail.trust_badge_whatsapp_available"),
             href: whatsappLink,
         })
     } else {
         trustBadges.push({
             id: "chat",
             icon: "chat_bubble",
-            title: "Compra asistida",
-            description: "Te ayudamos por chat",
+            title: t("store.product_detail.trust_badge_assisted_purchase"),
+            description: t("store.product_detail.trust_badge_we_help_chat"),
             onClick: onStartChat,
         })
     }
@@ -766,16 +791,18 @@ function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeS
     trustBadges.push({
         id: "inventory",
         icon: "inventory_2",
-        title: "Inventario real",
-        description: inventoryLabel,
+        title: t("store.product_detail.trust_rail_real_inventory"),
+        description: resolvedInventoryLabel,
     })
 
     if (sectionLinks.length > 0) {
         trustBadges.push({
             id: "sections",
             icon: "menu_book",
-            title: "Explora",
-            description: `${sectionLinks.length} secciones`,
+            title: t("store.product_detail.trust_rail_explore"),
+            description: t("store.product_detail.trust_rail_sections_count", {
+                count: sectionLinks.length,
+            }),
         })
     }
 
@@ -874,6 +901,21 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             }),
         available: (zonesText: string) =>
             t("store.product_detail.shipping_available", { zonesText }),
+    }
+
+    const descriptionLabels: ProductDescriptionLabels = {
+        eyebrow: t("store.product_detail.description_eyebrow"),
+        title: t("store.product_detail.description_title"),
+        seeMore: t("store.product_detail.description_see_more"),
+        seeLess: t("store.product_detail.description_see_less"),
+    }
+
+    const videoBlockLabels: ProductVideoBlockLabels = {
+        eyebrow: t("store.product_detail.video_eyebrow"),
+        title: t("store.product_detail.video_title"),
+        // Computado en el call site con productName interpolado
+        iframeTitle: t("store.product_detail.video_iframe_title", { productName: product.name }),
+        description: t("store.product_detail.video_description"),
     }
 
     const primaryColor = organization.settings?.branding?.primaryColor || "#3B82F6"
@@ -1310,28 +1352,31 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
             ? activePromotion.end_date
             : null
     const whatsappLink = useMemo(
-        () => buildWhatsAppLink(organization.settings?.whatsapp?.phone, `Hola, quiero más información sobre ${product.name}`),
-        [organization.settings?.whatsapp?.phone, product.name]
+        () => buildWhatsAppLink(
+            organization.settings?.whatsapp?.phone,
+            t("store.product_detail.whatsapp_default_message", { productName: product.name }),
+        ),
+        [t, organization.settings?.whatsapp?.phone, product.name]
     )
     const sectionLinks: ProductSectionLink[] = []
 
     if (product.benefits?.length) {
-        sectionLinks.push({ id: "product-benefits", label: "Beneficios" })
+        sectionLinks.push({ id: "product-benefits", label: t("store.product_detail.section_link_benefits") })
     }
 
     if (product.specifications?.length) {
-        sectionLinks.push({ id: "product-specifications", label: "Especificaciones" })
+        sectionLinks.push({ id: "product-specifications", label: t("store.product_detail.section_link_specifications") })
     }
 
     if (product.faq?.length) {
-        sectionLinks.push({ id: "product-faq", label: "Preguntas" })
+        sectionLinks.push({ id: "product-faq", label: t("store.product_detail.section_link_questions") })
     }
 
     if (productReviews.length > 0) {
-        sectionLinks.push({ id: "product-reviews", label: "Reseñas" })
+        sectionLinks.push({ id: "product-reviews", label: t("store.product_detail.section_link_reviews") })
     }
     if (product.video_url) {
-        sectionLinks.push({ id: "product-video", label: "Video" })
+        sectionLinks.push({ id: "product-video", label: t("store.product_detail.section_link_video") })
     }
 
     const featuredReview = productReviews[0] ?? null
@@ -1563,17 +1608,17 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     ))}
                                 </div>
                                 <span className="cursor-pointer border-b border-slate-200 pb-[1px] hover:text-slate-900 dark:border-slate-700 dark:hover:text-white">
-                                    {resolvedReviewSummary.averageRating.toFixed(1)} · <strong>{resolvedReviewSummary.reviewCount} reseñas</strong>
+                                    {resolvedReviewSummary.averageRating.toFixed(1)} · <strong>{t("store.product_detail.reviews_count_inline", { count: resolvedReviewSummary.reviewCount, plural: resolvedReviewSummary.reviewCount === 1 ? "" : "s" })}</strong>
                                 </span>
                                 {soldCount && (
                                     <span className="cursor-pointer border-b border-slate-200 pb-[1px] hover:text-slate-900 dark:border-slate-700 dark:hover:text-white">
-                                        | <strong>{soldCount}</strong> vendidos
+                                        | <strong>{t("store.product_detail.sold_count_inline", { count: soldCount })}</strong>
                                     </span>
                                 )}
                                 {viewingCount && (
                                     <div className="ml-auto flex items-center gap-1.5 text-[12.5px]">
                                         <div className="h-[7px] w-[7px] animate-pulse rounded-full bg-emerald-500" />
-                                        <span><strong>{viewingCount}</strong> personas viendo</span>
+                                        <span><strong>{t("store.product_detail.viewing_count_inline", { count: viewingCount })}</strong></span>
                                     </div>
                                 )}
                             </div>
@@ -1585,7 +1630,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     <span className="material-symbols-outlined text-[18px] text-white [font-variation-settings:'FILL'_1,'wght'_500]">auto_awesome</span>
                                 </div>
                                 <div className="text-[12.5px] leading-[1.5]" style={{ color: normalizeHexColor(primaryColor, "#0bbfbf") }}>
-                                    <strong className="mb-0.5 block text-[13px] text-slate-900 dark:text-white">Recomendado por tu agente IA ✦</strong>
+                                    <strong className="mb-0.5 block text-[13px] text-slate-900 dark:text-white">{t("store.product_detail.ai_recommendation_heading")}</strong>
                                     &quot;{aiRecommendation}&quot;
                                 </div>
                             </div>
@@ -1959,18 +2004,19 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 key={`${product.id}:${product.description}`}
                                 description={product.description}
                                 primaryColor={primaryColor}
+                                labels={descriptionLabels}
                             />
                         ) : (
                             <p className="mt-6 text-slate-600 dark:text-slate-300">
-                                Sin descripción disponible.
+                                {t("store.product_detail.description_fallback")}
                             </p>
                         )}
 
                         {product.video_url && (
                             <ProductVideoBlock
                                 videoUrl={product.video_url}
-                                productName={product.name}
                                 primaryColor={primaryColor}
+                                labels={videoBlockLabels}
                             />
                         )}
 
@@ -1979,15 +2025,15 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <div id="product-reviews" className="mt-8 scroll-mt-28 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <div>
-                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">Reseñas de clientes</h3>
+                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t("store.product_detail.reviews_section_title")}</h3>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            Opiniones reales asociadas a este producto
+                                            {t("store.product_detail.reviews_section_subtitle")}
                                         </p>
                                     </div>
                                     {resolvedReviewSummary && (
                                         <div className="text-right">
                                             <p className="text-lg font-bold text-slate-900 dark:text-white">{resolvedReviewSummary.averageRating.toFixed(1)}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{resolvedReviewSummary.reviewCount} reseña{resolvedReviewSummary.reviewCount === 1 ? "" : "s"}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">{t("store.product_detail.reviews_count_inline", { count: resolvedReviewSummary.reviewCount, plural: resolvedReviewSummary.reviewCount === 1 ? "" : "s" })}</p>
                                         </div>
                                     )}
                                 </div>
@@ -2009,7 +2055,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                         </div>
                                                         {review.verified_purchase && (
                                                             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                                                                Compra verificada
+                                                                {t("store.product_detail.reviews_verified_purchase")}
                                                             </span>
                                                         )}
                                                     </div>
@@ -2019,7 +2065,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                     </div>
                                                 </div>
                                                 <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                                    {new Date(review.published_at || review.created_at).toLocaleDateString("es-CO")}
+                                                    {new Date(review.published_at || review.created_at).toLocaleDateString(locale)}
                                                 </span>
                                             </div>
                                             {review.title && (
@@ -2031,7 +2077,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                 </div>
                                 {productReviews.length > 3 && (
                                     <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-                                        Mostrando 3 de {productReviews.length} reseñas. Las más recientes primero.
+                                        {t("store.product_detail.reviews_showing_count", { shown: 3, total: productReviews.length })}
                                     </p>
                                 )}
                             </div>
@@ -2040,7 +2086,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         {/* Benefits */}
                         {product.benefits && product.benefits.length > 0 && (
                             <div id="product-benefits" className="mt-10 scroll-mt-28 border-t border-slate-200 dark:border-slate-800 pt-6">
-                                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Por qué elegir este producto</h3>
+                                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">{t("store.product_detail.benefits_section_title")}</h3>
                                 <div className="space-y-3">
                                     {product.benefits.map((benefit: string, idx: number) => (
                                         <div key={`benefit-${idx}-${benefit}`} className="flex items-center gap-3">
@@ -2073,7 +2119,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <div id="product-faq" className="mt-8 scroll-mt-28 border-t border-slate-200 dark:border-slate-800">
                                 <details className="group border-b border-slate-200 dark:border-slate-800 py-4">
                                     <summary className="flex justify-between items-center w-full text-left font-semibold text-slate-800 dark:text-slate-200 cursor-pointer list-none">
-                                        <span>Preguntas frecuentes</span>
+                                        <span>{t("store.product_detail.faq_section_title")}</span>
                                         <span className="material-symbols-outlined transform group-open:rotate-180 transition-transform">expand_more</span>
                                     </summary>
                                     <div className="mt-4 space-y-4">
@@ -2095,14 +2141,16 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     <section className="mt-14 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 sm:p-8">
                         <div className="mb-7 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                             <div>
-                                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Caja completa</p>
-                                <h2 className="mt-1 text-2xl font-extrabold tracking-[-0.025em] text-slate-950 dark:text-white">Qué incluye</h2>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{t("store.product_detail.bundle_full_eyebrow")}</p>
+                                <h2 className="mt-1 text-2xl font-extrabold tracking-[-0.025em] text-slate-950 dark:text-white">{t("store.product_detail.bundle_full_title")}</h2>
                             </div>
                             <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                                {product.bundle_items.length} productos
+                                {t("store.product_detail.bundle_products_count", { count: product.bundle_items.length })}
                                 {(product.bundle_discount_type && (product.bundle_discount_value ?? 0) > 0) && (
                                     <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
-                                        {product.bundle_discount_type === 'percentage' ? `-${product.bundle_discount_value ?? 0}%` : `Ahorra ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(product.bundle_discount_value ?? 0)}`}
+                                        {product.bundle_discount_type === 'percentage'
+                                            ? `-${product.bundle_discount_value ?? 0}%`
+                                            : t("store.product_detail.bundle_savings_amount_label", { amount: formatPrice(product.bundle_discount_value ?? 0) })}
                                     </span>
                                 )}
                             </span>
@@ -2110,7 +2158,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {product.bundle_items.map((item, idx: number) => {
                                 const bundleItemImage = item.image_url || item.images?.[0] || null
-                                const bundleItemName = item.product_name || "Producto configurado"
+                                const bundleItemName = item.product_name || t("store.product_detail.bundle_item_fallback_name")
                                 const bundleItemHref = item.slug || item.product_id
                                     ? getStoreLink(`/producto/${item.slug || item.product_id}`, isSubdomain, slug)
                                     : null
@@ -2127,7 +2175,9 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                         </span>
                                         <div className="min-w-0">
                                             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                                                {(item.quantity ?? 0) > 1 ? `${item.quantity} unidades` : `Incluido ${idx + 1}`}
+                                                {(item.quantity ?? 0) > 1
+                                                    ? t("store.product_detail.value_row_units_count", { count: item.quantity ?? 0 })
+                                                    : t("store.product_detail.bundle_included_n", { n: idx + 1 })}
                                             </p>
                                             <h3 className="mt-1 text-sm font-bold leading-6 text-slate-950 dark:text-white">
                                                 {bundleItemName}
@@ -2160,7 +2210,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                 {/* Customers Also Bought */}
                 {relatedProducts.length > 0 && (
                     <div className="mt-16 border-t border-slate-200 dark:border-slate-800 pt-12">
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Clientes también compraron</h2>
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">{t("store.product_detail.related_section_title")}</h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                             {relatedProducts.map((relatedProduct) => {
                                 const productImage = relatedProduct.images?.[0] || relatedProduct.image_url || '/placeholder-product.png'
@@ -2185,7 +2235,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                                 {relatedProduct.name}
                                             </h3>
                                             <p className="text-lg font-bold" style={{ color: primaryColor }}>
-                                                {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(relatedProduct.price)}
+                                                {formatPrice(relatedProduct.price)}
                                             </p>
                                         </div>
                                     </Link>

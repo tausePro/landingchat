@@ -427,6 +427,164 @@ describe("t() — keys de product detail render principal (T1.3j.2)", () => {
   })
 })
 
+describe("t() — keys de product detail secciones secundarias (T1.3j.3)", () => {
+  it("description fallback + see more/less", () => {
+    expect(t("store.product_detail.description_fallback", "es-CO")).toBe(
+      "Sin descripción disponible.",
+    )
+    expect(t("store.product_detail.description_fallback", "en-US")).toBe(
+      "No description available.",
+    )
+    expect(t("store.product_detail.description_see_more", "en-US")).toBe(
+      "See more",
+    )
+    expect(t("store.product_detail.description_see_less", "en-US")).toBe(
+      "See less",
+    )
+  })
+
+  it("video block iframe title interpolado", () => {
+    expect(
+      t("store.product_detail.video_iframe_title", "es-CO", {
+        productName: "Camiseta",
+      }),
+    ).toBe("Video de Camiseta")
+    expect(
+      t("store.product_detail.video_iframe_title", "en-US", {
+        productName: "T-shirt",
+      }),
+    ).toBe("T-shirt video")
+  })
+
+  it("section links labels", () => {
+    expect(t("store.product_detail.section_link_benefits", "es-CO")).toBe(
+      "Beneficios",
+    )
+    expect(t("store.product_detail.section_link_specifications", "en-US")).toBe(
+      "Specifications",
+    )
+    expect(t("store.product_detail.section_link_questions", "en-US")).toBe(
+      "Questions",
+    )
+    expect(t("store.product_detail.section_link_reviews", "en-US")).toBe(
+      "Reviews",
+    )
+  })
+
+  it("reviews count con singular/plural via plural param", () => {
+    expect(
+      t("store.product_detail.reviews_count_inline", "es-CO", {
+        count: 1,
+        plural: "",
+      }),
+    ).toBe("1 reseña")
+    expect(
+      t("store.product_detail.reviews_count_inline", "es-CO", {
+        count: 12,
+        plural: "s",
+      }),
+    ).toBe("12 reseñas")
+    expect(
+      t("store.product_detail.reviews_count_inline", "en-US", {
+        count: 1,
+        plural: "",
+      }),
+    ).toBe("1 review")
+    expect(
+      t("store.product_detail.reviews_count_inline", "en-US", {
+        count: 42,
+        plural: "s",
+      }),
+    ).toBe("42 reviews")
+  })
+
+  it("reviews showing count + verified purchase", () => {
+    expect(
+      t("store.product_detail.reviews_showing_count", "en-US", {
+        shown: 3,
+        total: 8,
+      }),
+    ).toBe("Showing 3 of 8 reviews. Most recent first.")
+    expect(t("store.product_detail.reviews_verified_purchase", "es-CO")).toBe(
+      "Compra verificada",
+    )
+    expect(t("store.product_detail.reviews_verified_purchase", "en-US")).toBe(
+      "Verified purchase",
+    )
+  })
+
+  it("benefits + faq + ai recommendation headings", () => {
+    expect(t("store.product_detail.benefits_section_title", "en-US")).toBe(
+      "Why choose this product",
+    )
+    expect(t("store.product_detail.faq_section_title", "en-US")).toBe(
+      "Frequently asked questions",
+    )
+    expect(t("store.product_detail.ai_recommendation_heading", "es-CO")).toBe(
+      "Recomendado por tu agente IA ✦",
+    )
+  })
+
+  it("bundle full section + savings label", () => {
+    expect(
+      t("store.product_detail.bundle_products_count", "en-US", { count: 5 }),
+    ).toBe("5 products")
+    expect(
+      t("store.product_detail.bundle_savings_amount_label", "en-US", {
+        amount: "$15.00",
+      }),
+    ).toBe("Save $15.00")
+    expect(
+      t("store.product_detail.bundle_included_n", "es-CO", { n: 2 }),
+    ).toBe("Incluido 2")
+  })
+
+  it("trust rail labels (helper externo con useT)", () => {
+    expect(t("store.product_detail.trust_rail_fast_shipping", "en-US")).toBe(
+      "Fast shipping",
+    )
+    expect(
+      t("store.product_detail.trust_rail_days_label", "es-CO", {
+        count: 1,
+        plural: "",
+      }),
+    ).toBe("1 día")
+    expect(
+      t("store.product_detail.trust_rail_days_label", "en-US", {
+        count: 5,
+        plural: "s",
+      }),
+    ).toBe("5 days")
+    expect(
+      t("store.product_detail.trust_rail_sections_count", "en-US", {
+        count: 4,
+      }),
+    ).toBe("4 sections")
+  })
+
+  it("WhatsApp default message interpolado", () => {
+    expect(
+      t("store.product_detail.whatsapp_default_message", "es-CO", {
+        productName: "Camiseta básica",
+      }),
+    ).toBe("Hola, quiero más información sobre Camiseta básica")
+    expect(
+      t("store.product_detail.whatsapp_default_message", "en-US", {
+        productName: "Basic T-shirt",
+      }),
+    ).toBe("Hi, I'd like more information about Basic T-shirt")
+  })
+
+  it("related products section title", () => {
+    expect(t("store.product_detail.related_section_title", "es-CO")).toBe(
+      "Clientes también compraron",
+    )
+    expect(t("store.product_detail.related_section_title", "en-US")).toBe(
+      "Customers also bought",
+    )
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]
