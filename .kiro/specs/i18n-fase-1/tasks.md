@@ -315,10 +315,24 @@ PDP está ahora 100% i18n-aware. Tantor's House muestra:
 - WhatsApp default message en inglés.
 - OG/Twitter meta tags con currency correcta.
 
-### Áreas pendientes T1.3i — comunicación
+### T1.3i — Emails ✅ CERRADO
 
-**Pendiente.** Sub-slice independiente.
-- [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
+**Cerrado:** 2026-05-20
+
+- [x] **`src/lib/notifications/email.ts`** migrado completo:
+  - Imports nuevos: `t()` server-side, `formatCurrency` global parametrizado, tipos `SupportedCurrency`/`SupportedLocale`.
+  - `OrderEmailData` interface acepta `locale?` y `currency?` (default es-CO/COP).
+  - 2 helpers locales `formatCurrency` hardcoded a 'es-CO'/'COP' eliminados. Reemplazados por closure `formatPrice` usando el global parametrizado.
+  - `sendOrderConfirmationEmail` + `generateOrderEmailHTML`: 25 strings hardcoded migrados a `t()`; subject interpolado; HTML completo localizado; payment method `'manual'` traducido como `'payment_bank_transfer'` (otros providers quedan crudos).
+  - `sendOrderNotificationToOwner` + `generateOwnerNotificationHTML`: 8 strings + subject migrados.
+- [x] **`src/app/chat/actions.ts`** caller actualizado:
+  - Import `getTenantLocale`.
+  - SELECT a `organizations` expandido a `locale` + `currency_code`.
+  - Ambas llamadas pasan `locale: tenantLocale.locale` y `currency: tenantLocale.currency`.
+- [x] 39 keys nuevas en `email.*` (28 confirmation + 11 owner) + 7 tests (79/79 verdes).
+- [x] Backward compatible: tenants legacy con `locale/currency_code` en NULL siguen recibiendo emails idénticos al comportamiento previo.
+
+**Limitaciones documentadas:** payment methods de providers (Wompi, MercadoPago, etc.) quedan crudos porque vienen pre-formateados de la capa del provider. Si en futuro hace falta traducirlos, agregar mapping en `email.order_confirmation.payment_*`.
 
 ### Criterios de aceptación T1.3 (cuando se cierre completo)
 
@@ -467,7 +481,7 @@ PDP está ahora 100% i18n-aware. Tantor's House muestra:
 | T1.3j.1 | ✅ PDP infraestructura (formatCurrency + page metadata + cta) | 45min | 2026-05-20 |
 | T1.3j.2 | ✅ PDP render principal + currency en tracking | 2h | 2026-05-20 |
 | T1.3j.3 | ✅ PDP secciones secundarias + cierre completo PDP | 1.5h | 2026-05-20 |
-| T1.3i | Pendiente (emails) | ~3-4h | — |
+| T1.3i | ✅ Email templates (cliente + owner) i18n-aware | 1h | 2026-05-20 |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
