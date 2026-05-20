@@ -241,11 +241,41 @@
 - `'+57'` prefix + `'300 123 4567'` placeholder + `pattern='[0-9]{10}'` son formato CO — T1.4.
 - `<img>` del logo del header genera warning Next.js. Migrar a `<Image>` requiere agregar dominio a `remotePatterns` — slice futuro de optimización de imágenes.
 
-### Áreas pendientes T1.3i/j — comunicación + detalle
+### T1.3j — PDP (Product Detail Page) — EN PROGRESO
 
-**Pendiente.** Cada área es un sub-slice independiente.
+Dividido en 3 sub-slices por tamaño (2184 líneas client + page metadata + cta-button).
+
+#### T1.3j.1 — Infraestructura ✅ CERRADO
+
+**Cerrado:** 2026-05-20
+
+- [x] **Helper `formatCurrency` local eliminado** (línea 187, hardcoded `'es-CO'`/`COP`). Reemplazado por:
+  - Import del global con alias `formatTenantCurrency` desde `@/lib/utils`.
+  - Type `FormatPriceFn` para inyección a sub-helpers stateless.
+  - Closure `formatPrice` dentro del componente principal usando `useTenantLocale()` + `useTenantCurrency()`.
+- [x] **Sub-helpers parametrizados**: `formatConfiguredCtaText(text, total, formatPrice)`, `<ProductShippingCard formatPrice={formatPrice} />`.
+- [x] **Renombrado masivo**: 15+ call sites `formatCurrency(` → `formatPrice(`.
+- [x] **`page.tsx` metadata** migrado: `priceLabel` usa `formatCurrency(p, { locale, currency })`. Tantor's House ve `$24.99` en OG/Twitter cards vs `$ 24.000` de tenants COP. 404 metadata + description fallback con `t(key, locale, params)` interpolada.
+- [x] **`product-cta-button.tsx`**: 1 string ("Chatear para Comprar") migrado.
+- [x] 4 keys nuevas en `store.product_detail.*` + 3 tests (54/54 verdes).
+- [x] Cero `any` en el directorio `/producto/[slugOrId]/`.
+
+#### T1.3j.2 — Render principal (pendiente)
+
+**Pendiente.** Esfuerzo: ~2-3h.
+
+- [ ] Strings UI del render principal: price block, stock bar, quantity selector, bundles, CTAs primary/secondary, value stack, signals row, free shipping description.
+
+#### T1.3j.3 — Secciones secundarias (pendiente)
+
+**Pendiente.** Esfuerzo: ~1-2h.
+
+- [ ] Strings UI de secciones secundarias: descripción, especificaciones, reseñas, FAQ, related products, sticky bottom bar.
+
+### Áreas pendientes T1.3i — comunicación
+
+**Pendiente.** Sub-slice independiente.
 - [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
-- [ ] **T1.3j** — PDP (Product Detail Page) `src/app/store/[slug]/producto/[slugOrId]/product-detail-client.tsx` (21 matches de `formatCurrency`). Esfuerzo: ~4-6h.
 
 ### Criterios de aceptación T1.3 (cuando se cierre completo)
 
@@ -391,7 +421,10 @@
 | T1.3e | ✅ Carrito (drawer + sidebar) + currency provider | 1.5h | 2026-05-20 |
 | T1.3g | ✅ Order detail page + currency aware | 1h | 2026-05-20 |
 | T1.3h | ✅ Profile view + access form | 1.5h | 2026-05-20 |
-| T1.3i/j | Pendiente (emails, PDP) | ~7h | — |
+| T1.3j.1 | ✅ PDP infraestructura (formatCurrency + page metadata + cta) | 45min | 2026-05-20 |
+| T1.3j.2 | Pendiente (PDP render principal) | ~2-3h | — |
+| T1.3j.3 | Pendiente (PDP secciones secundarias) | ~1-2h | — |
+| T1.3i | Pendiente (emails) | ~3-4h | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
