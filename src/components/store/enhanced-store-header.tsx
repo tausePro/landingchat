@@ -11,6 +11,7 @@ import { useEffect, useState, useRef } from "react"
 import { AnnouncementBar } from "./announcement-bar"
 import { SmartSearch } from "./smart-search"
 import { cn, getContrastTextColor } from "@/lib/utils"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 interface MenuItem {
     id: string
@@ -68,6 +69,7 @@ export function EnhancedStoreHeader({
     const pathname = usePathname()
     const isSubdomain = useIsSubdomain()
     const { items, toggleCart } = useCartStore()
+    const t = useT()
 
     // Prevent hydration mismatch for cart count
     const [mounted, setMounted] = useState(false)
@@ -195,7 +197,7 @@ export function EnhancedStoreHeader({
                             <button
                                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                                 className="md:hidden p-2 text-slate-600 hover:text-slate-900 transition-colors"
-                                aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+                                aria-label={mobileMenuOpen ? t("store.header.close_menu") : t("store.header.open_menu")}
                             >
                                 {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                             </button>
@@ -209,7 +211,7 @@ export function EnhancedStoreHeader({
                                 size="sm"
                                 className="md:hidden text-xs px-2"
                             >
-                                Pregúntale a la IA
+                                {t("store.header.ask_ai")}
                             </Button>
                         )}
 
@@ -218,7 +220,7 @@ export function EnhancedStoreHeader({
                             <a
                                 href={profileLink}
                                 className="p-2 text-slate-600 hover:text-slate-900 transition-colors"
-                                aria-label="Mi perfil"
+                                aria-label={t("store.header.profile_aria")}
                             >
                                 <User className="w-5 h-5" />
                             </a>
@@ -229,7 +231,7 @@ export function EnhancedStoreHeader({
                             <button
                                 onClick={() => toggleCart()}
                                 className="relative p-2 text-slate-600 hover:text-slate-900 transition-colors"
-                                aria-label="Ver carrito"
+                                aria-label={t("store.header.cart_aria")}
                             >
                                 <ShoppingBag className="w-5 h-5" />
                                 {mounted && cartCount > 0 && (
@@ -248,7 +250,7 @@ export function EnhancedStoreHeader({
                                 className="hidden md:flex font-bold shadow-lg text-sm px-6 h-10 rounded-full items-center gap-2"
                             >
                                 <MessageCircle className="w-4 h-4" />
-                                {isRealEstate ? "Agenda tu visita" : "Iniciar Chat"}
+                                {isRealEstate ? t("store.header.book_visit") : t("store.header.start_chat")}
                             </Button>
                         )}
                     </div>
@@ -373,6 +375,7 @@ function MobileMenu({
     onStartChat: (query?: string) => void
 }) {
     const [expandedId, setExpandedId] = useState<string | null>(null)
+    const t = useT()
 
     return (
         <div className="md:hidden border-t bg-white px-4 py-2 space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -413,7 +416,7 @@ function MobileMenu({
                                                 : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                                         )}
                                     >
-                                        Ver todo
+                                        {t("store.header.see_all")}
                                     </a>
                                     {item.children!.map((child) => (
                                         <a
@@ -461,7 +464,7 @@ function MobileMenu({
                 onClick={() => { onNavClick(); onStartChat(); }}
                 className="w-full text-left px-3 py-2.5 text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
             >
-                Pregúntale a la IA
+                {t("store.header.ask_ai")}
             </button>
         </div>
     )

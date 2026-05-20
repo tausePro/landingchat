@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { Instagram, Facebook } from "lucide-react"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 const TikTokIcon = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -45,6 +46,7 @@ interface StoreFooterProps {
 }
 
 export function StoreFooter({ organization, pages = [], isSubdomain = false }: StoreFooterProps) {
+    const t = useT()
     const typographyConfig = organization.settings?.storefront?.typography || {
         fontFamily: "Inter",
         textColor: "default",
@@ -79,7 +81,7 @@ export function StoreFooter({ organization, pages = [], isSubdomain = false }: S
                             </span>
                         </div>
                         <p className="text-gray-500 max-w-xs mb-6" style={{ fontFamily, color: textColor, opacity: 0.7 }}>
-                            La mejor experiencia de compra conversacional. Encuentra lo que buscas, al instante.
+                            {t("store.footer.tagline")}
                         </p>
                         <div className="flex items-center gap-4">
                             {socialLinks.instagram && (
@@ -107,18 +109,18 @@ export function StoreFooter({ organization, pages = [], isSubdomain = false }: S
 
                     <div>
                         <h4 className="font-bold mb-4" style={{ fontFamily, color: textColor }}>
-                            Enlaces
+                            {t("store.footer.links")}
                         </h4>
                         <ul className="space-y-2 text-gray-600" style={{ fontFamily, color: textColor, opacity: 0.7 }}>
-                            <li><a href={getStoreLink("/", isSubdomain, organization.slug)} className="hover:text-primary">Inicio</a></li>
-                            <li><a href={getStoreLink("/productos", isSubdomain, organization.slug)} className="hover:text-primary">Productos</a></li>
-                            <li><a href={getStoreLink("/sobre-nosotros", isSubdomain, organization.slug)} className="hover:text-primary">Nosotros</a></li>
+                            <li><a href={getStoreLink("/", isSubdomain, organization.slug)} className="hover:text-primary">{t("store.nav.home")}</a></li>
+                            <li><a href={getStoreLink("/productos", isSubdomain, organization.slug)} className="hover:text-primary">{t("store.nav.products")}</a></li>
+                            <li><a href={getStoreLink("/sobre-nosotros", isSubdomain, organization.slug)} className="hover:text-primary">{t("store.nav.about")}</a></li>
                         </ul>
                     </div>
 
                     <div>
                         <h4 className="font-bold mb-4" style={{ fontFamily, color: textColor }}>
-                            Legal
+                            {t("store.footer.legal")}
                         </h4>
                         <ul className="space-y-2 text-gray-600" style={{ fontFamily, color: textColor, opacity: 0.7 }}>
                             {pages.length > 0 ? (
@@ -133,8 +135,8 @@ export function StoreFooter({ organization, pages = [], isSubdomain = false }: S
                                     ))
                             ) : (
                                 <>
-                                    <li><a href="#" className="hover:text-primary">Términos</a></li>
-                                    <li><a href="#" className="hover:text-primary">Privacidad</a></li>
+                                    <li><a href="#" className="hover:text-primary">{t("store.footer.terms")}</a></li>
+                                    <li><a href="#" className="hover:text-primary">{t("store.footer.privacy")}</a></li>
                                 </>
                             )}
                         </ul>

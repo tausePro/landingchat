@@ -6,6 +6,8 @@ import { TrackingProvider } from "@/components/analytics/tracking-provider"
 import { StorefrontPageTracker } from "@/components/analytics/StorefrontPageTracker"
 import { OrganizationJsonLd } from "@/components/seo/organization-json-ld"
 import { ForceLightTheme } from "@/components/store/force-light-theme"
+import { TenantLocaleProvider } from "@/lib/i18n/use-tenant-strings"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 
 type Props = {
     params: Promise<{ slug: string }>
@@ -61,6 +63,11 @@ export default async function StoreLayout({
     const metaPixelId = trackingConfig.meta_pixel_id as string | undefined
     const posthogEnabled = Boolean(trackingConfig.posthog_enabled)
 
+    // i18n Fase 1 (T1.3c): derivar el locale del tenant para los Client Components
+    // descendientes. Tenants sin locale configurado (defaults del schema) caen a
+    // 'es-CO'. Tantor's House con locale='en-US' verá header/footer/UI en inglés.
+    const tenantLocale = getTenantLocale(organization)
+
     // Construir URL base de la tienda
     const headersList = await headers()
     const host = headersList.get("host") || ""
@@ -93,8 +100,11 @@ export default async function StoreLayout({
                 organizationName={organization?.name}
                 posthogEnabled={posthogEnabled}
             >
-                <StorefrontPageTracker />
-                {children}
+                {/* i18n Provider para Client Components del storefront */}
+                <TenantLocaleProvider locale={tenantLocale.locale}>
+                    <StorefrontPageTracker />
+                    {children}
+                </TenantLocaleProvider>
             </TrackingProvider>
         </>
     )

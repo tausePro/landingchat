@@ -140,11 +140,28 @@
 - [x] Validaciones: tsc + eslint + 44/44 tests verdes
 - [x] Commit: `feat(i18n): T1.3b migrar order pages al diccionario`
 
-### T1.3c+ — Áreas pendientes (próximas sesiones / delegables)
+### T1.3c — Layout + Header/Footer/Nav globales ✅ CERRADO
 
-**Pendiente.** Cada área es un sub-slice independiente. Pueden delegarse a otro agente leyendo `requirements.md` + `design.md` + esta sección.
+**Cerrado:** 2026-05-19
 
-- [ ] **T1.3c** — Storefront templates (`src/components/store/templates/*`): home, navegación, header/footer. Esfuerzo: ~4h.
+- [x] Extender SELECT de `getStoreData` con `currency_code, locale, country_code` en `src/app/store/[slug]/actions.ts`
+- [x] Montar `<TenantLocaleProvider locale={tenantLocale.locale}>` en `src/app/store/[slug]/layout.tsx` (Server Component pasa locale a Client Component)
+- [x] Agregar 22 keys al diccionario:
+  - `store.nav.*` (home, products, properties, profile, about)
+  - `store.header.*` (cart_aria, profile_aria, open_menu, close_menu, start_chat, close_chat, ask_ai, book_visit, see_all)
+  - `store.footer.*` (tagline, links, legal, terms, privacy, powered_by)
+  - `store.whatsapp.*` (contact_aria, greeting)
+  - `store.chat.start_aria`
+- [x] Migrar `src/components/store/store-header.tsx` (legacy, usado en /chat) con `useT()`
+- [x] Migrar `src/components/store/store-footer.tsx` con `useT()`
+- [x] Migrar `src/components/store/enhanced-store-header.tsx` + `MobileMenu` interno (el que realmente usa el storefront)
+- [x] Migrar `src/app/store/[slug]/store-layout-client.tsx` (defaultMenuItems labels + WhatsApp aria/greeting + chat aria)
+- [x] Validaciones: tsc + eslint + 44/44 tests verdes
+- [x] Commit: `feat(i18n): T1.3c layout + header + footer + nav global del storefront`
+
+### Áreas pendientes T1.3d-i — próximas sesiones / delegables
+
+**Pendiente.** Cada área es un sub-slice independiente.
 - [ ] **T1.3d** — PDP (Product Detail Page) `src/app/store/[slug]/producto/[slugOrId]/product-detail-client.tsx` (21 matches de `formatCurrency`). Esfuerzo: ~4-6h. Es Client Component, requiere usar `useT()` + `TenantLocaleProvider`.
 - [ ] **T1.3e** — Carrito `src/components/store/cart/...`. Esfuerzo: ~2-3h.
 - [ ] **T1.3f** — Checkout (`src/app/chat/components/checkout-modal.tsx`, `src/app/store/[slug]/checkout/...`). Esfuerzo: ~4-6h. Strings + forms (forms van a T1.4).
@@ -286,7 +303,9 @@
 | T1.2 | ✅ Cerrado | 4h | 2026-05-19 |
 | T1.3a | ✅ Infra diccionario cerrado | 3h | 2026-05-19 |
 | T1.3b | ✅ Order pages migradas | 1h | 2026-05-19 |
-| T1.3c-i | Pendiente (templates, PDP, carrito, checkout, order detail, profile, emails) | ~1 día | — |
+| T1.3b' | ✅ SELECT order pages extendido | 5min | 2026-05-19 |
+| T1.3c | ✅ Layout + header + footer + nav global | 2h | 2026-05-19 |
+| T1.3d-i | Pendiente (PDP, carrito, checkout, order detail, profile, emails) | ~1 día | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |

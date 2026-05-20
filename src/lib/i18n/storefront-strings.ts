@@ -79,6 +79,33 @@ export const storefrontStrings = {
     "order.error.help_check_funds": "Asegúrate de tener fondos suficientes",
     "order.error.help_contact_bank": "Contacta a tu banco si el problema persiste",
     "order.error.help_try_other_method": "Intenta con otro método de pago",
+    // Navegación del storefront público (header, menús, footer)
+    "store.nav.home": "Inicio",
+    "store.nav.products": "Productos",
+    "store.nav.properties": "Propiedades",
+    "store.nav.profile": "Mi Perfil",
+    "store.nav.about": "Nosotros",
+    // Header del storefront
+    "store.header.cart_aria": "Ver carrito",
+    "store.header.profile_aria": "Mi perfil",
+    "store.header.open_menu": "Abrir menú",
+    "store.header.close_menu": "Cerrar menú",
+    "store.header.start_chat": "Iniciar Chat",
+    "store.header.close_chat": "Cerrar",
+    "store.header.ask_ai": "Pregúntale a la IA",
+    "store.header.book_visit": "Agenda tu visita",
+    "store.header.see_all": "Ver todo",
+    // Footer del storefront
+    "store.footer.tagline": "La mejor experiencia de compra conversacional. Encuentra lo que buscas, al instante.",
+    "store.footer.links": "Enlaces",
+    "store.footer.legal": "Legal",
+    "store.footer.terms": "Términos",
+    "store.footer.privacy": "Privacidad",
+    "store.footer.powered_by": "Powered by LandingChat",
+    // Contacto WhatsApp y chat flotante
+    "store.whatsapp.contact_aria": "Contactar por WhatsApp",
+    "store.whatsapp.greeting": "Hola, me gustaría obtener información",
+    "store.chat.start_aria": "Iniciar chat",
   },
   "en-US": {
     // Order pages — common area
@@ -119,6 +146,33 @@ export const storefrontStrings = {
     "order.error.help_check_funds": "Make sure you have sufficient funds",
     "order.error.help_contact_bank": "Contact your bank if the problem persists",
     "order.error.help_try_other_method": "Try a different payment method",
+    // Storefront public navigation (header, menus, footer)
+    "store.nav.home": "Home",
+    "store.nav.products": "Products",
+    "store.nav.properties": "Properties",
+    "store.nav.profile": "My Profile",
+    "store.nav.about": "About Us",
+    // Storefront header
+    "store.header.cart_aria": "View cart",
+    "store.header.profile_aria": "My profile",
+    "store.header.open_menu": "Open menu",
+    "store.header.close_menu": "Close menu",
+    "store.header.start_chat": "Start Chat",
+    "store.header.close_chat": "Close",
+    "store.header.ask_ai": "Ask the AI",
+    "store.header.book_visit": "Book a visit",
+    "store.header.see_all": "See all",
+    // Storefront footer
+    "store.footer.tagline": "The best conversational shopping experience. Find what you need, instantly.",
+    "store.footer.links": "Links",
+    "store.footer.legal": "Legal",
+    "store.footer.terms": "Terms",
+    "store.footer.privacy": "Privacy",
+    "store.footer.powered_by": "Powered by LandingChat",
+    // WhatsApp contact and floating chat
+    "store.whatsapp.contact_aria": "Contact via WhatsApp",
+    "store.whatsapp.greeting": "Hi, I'd like more information",
+    "store.chat.start_aria": "Start chat",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 
