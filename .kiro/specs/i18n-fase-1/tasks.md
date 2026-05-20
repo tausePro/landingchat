@@ -159,15 +159,24 @@
 - [x] Validaciones: tsc + eslint + 44/44 tests verdes
 - [x] Commit: `feat(i18n): T1.3c layout + header + footer + nav global del storefront`
 
-### Áreas pendientes T1.3d-i — próximas sesiones / delegables
+### T1.3d — Templates de home ✅ CERRADO (parcial: minimal + complete)
+
+**Cerrado:** 2026-05-19
+
+- [x] **T1.3d.1** — `MinimalTemplate` (template default). 6 keys + 6 strings migrados.
+- [x] **T1.3d.2** — `CompleteTemplate` (51KB, hero + steps + features + products + testimonios + CTA + footer). 27 keys + ~30 strings migrados.
+- [ ] **T1.3d.3** — `SingleProductTemplate`, `ServicesTemplate`, `RealEstateTemplate`: pendientes hasta que algún tenant los use con locale `en-US`.
+- [ ] **T1.3d.4** — Custom pages del tenant (about, FAQ, etc.): pendiente análisis si tienen strings de código (no solo data del tenant).
+
+### Áreas pendientes T1.3e-i — flujo de compra + comunicación
 
 **Pendiente.** Cada área es un sub-slice independiente.
-- [ ] **T1.3d** — PDP (Product Detail Page) `src/app/store/[slug]/producto/[slugOrId]/product-detail-client.tsx` (21 matches de `formatCurrency`). Esfuerzo: ~4-6h. Es Client Component, requiere usar `useT()` + `TenantLocaleProvider`.
 - [ ] **T1.3e** — Carrito `src/components/store/cart/...`. Esfuerzo: ~2-3h.
 - [ ] **T1.3f** — Checkout (`src/app/chat/components/checkout-modal.tsx`, `src/app/store/[slug]/checkout/...`). Esfuerzo: ~4-6h. Strings + forms (forms van a T1.4).
 - [ ] **T1.3g** — Order detail page `src/app/store/[slug]/order/[orderId]/page.tsx` (8 matches). Esfuerzo: ~2h.
 - [ ] **T1.3h** — Profile view `src/app/store/[slug]/profile/components/profile-view.tsx`. Esfuerzo: ~1h.
 - [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
+- [ ] **T1.3j** — PDP (Product Detail Page) `src/app/store/[slug]/producto/[slugOrId]/product-detail-client.tsx` (21 matches de `formatCurrency`). Esfuerzo: ~4-6h.
 
 ### Criterios de aceptación T1.3 (cuando se cierre completo)
 
@@ -305,7 +314,9 @@
 | T1.3b | ✅ Order pages migradas | 1h | 2026-05-19 |
 | T1.3b' | ✅ SELECT order pages extendido | 5min | 2026-05-19 |
 | T1.3c | ✅ Layout + header + footer + nav global | 2h | 2026-05-19 |
-| T1.3d-i | Pendiente (PDP, carrito, checkout, order detail, profile, emails) | ~1 día | — |
+| T1.3d.1 | ✅ MinimalTemplate (home default) | 1h | 2026-05-19 |
+| T1.3d.2 | ✅ CompleteTemplate (home alternativo, 51KB) | 2h | 2026-05-19 |
+| T1.3e-j | Pendiente (carrito, checkout, order detail, profile, emails, PDP) | ~1 día | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
