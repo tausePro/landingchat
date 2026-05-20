@@ -168,11 +168,24 @@
 - [ ] **T1.3d.3** — `SingleProductTemplate`, `ServicesTemplate`, `RealEstateTemplate`: pendientes hasta que algún tenant los use con locale `en-US`.
 - [ ] **T1.3d.4** — Custom pages del tenant (about, FAQ, etc.): pendiente análisis si tienen strings de código (no solo data del tenant).
 
-### Áreas pendientes T1.3e-i — flujo de compra + comunicación
+### T1.3f — Checkout completo ✅ CERRADO
+
+**Cerrado:** 2026-05-19
+
+- [x] **Diccionario**: ~70 keys nuevas en `store.checkout.*` (paridad es-CO/en-US, ~120 entries por locale).
+- [x] **Helper `t()` extendido** con interpolación de placeholders `{{var}}` + 8 tests nuevos.
+- [x] **`useT()` extendido** para aceptar segundo arg `params`.
+- [x] **T1.3f.1** — Diccionario + chrome (`page.tsx` server, `checkout-page-client.tsx`) + orchestrator (`checkout-flow.tsx`). 25 strings.
+- [x] **T1.3f.2** — Auxiliares (`order-summary.tsx`, `success-step.tsx`). 10 strings.
+- [x] **T1.3f.3** — Forms (`contact-step.tsx`, `payment-step.tsx`). 31 strings.
+- [x] Validaciones: tsc + eslint + 35/35 tests verdes.
+
+**Limitaciones documentadas:** strings que dependen del país (tipos de documento CC/NIT/CE/Passport/TI, bandera +57, placeholder de teléfono colombiano, "Bancolombia / Nequi" subtítulo del método transferencia) **no se migran via diccionario** — quedan para T1.4 (forms country-aware) y T1.5 (manual offline payment).
+
+### Áreas pendientes T1.3e/g/h/i/j — flujo de compra + comunicación
 
 **Pendiente.** Cada área es un sub-slice independiente.
 - [ ] **T1.3e** — Carrito `src/components/store/cart/...`. Esfuerzo: ~2-3h.
-- [ ] **T1.3f** — Checkout (`src/app/chat/components/checkout-modal.tsx`, `src/app/store/[slug]/checkout/...`). Esfuerzo: ~4-6h. Strings + forms (forms van a T1.4).
 - [ ] **T1.3g** — Order detail page `src/app/store/[slug]/order/[orderId]/page.tsx` (8 matches). Esfuerzo: ~2h.
 - [ ] **T1.3h** — Profile view `src/app/store/[slug]/profile/components/profile-view.tsx`. Esfuerzo: ~1h.
 - [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
@@ -316,7 +329,10 @@
 | T1.3c | ✅ Layout + header + footer + nav global | 2h | 2026-05-19 |
 | T1.3d.1 | ✅ MinimalTemplate (home default) | 1h | 2026-05-19 |
 | T1.3d.2 | ✅ CompleteTemplate (home alternativo, 51KB) | 2h | 2026-05-19 |
-| T1.3e-j | Pendiente (carrito, checkout, order detail, profile, emails, PDP) | ~1 día | — |
+| T1.3f.1 | ✅ Checkout chrome + flow + diccionario + interpolación | 2h | 2026-05-19 |
+| T1.3f.2 | ✅ Checkout OrderSummary + SuccessStep | 30min | 2026-05-19 |
+| T1.3f.3 | ✅ Checkout ContactStep + PaymentStep (forms) | 1.5h | 2026-05-19 |
+| T1.3e/g/h/i/j | Pendiente (carrito, order detail, profile, emails, PDP) | ~1 día | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
