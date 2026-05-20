@@ -222,10 +222,28 @@
 - `document_type` `'CC'` hardcoded como fallback — dependiente de país, T1.4.
 - `person_type === 'Jurídica'` comparison sigue siendo valor canónico CO. T1.4.
 
-### Áreas pendientes T1.3h/i/j — comunicación + detalle
+### T1.3h — Profile view + access form ✅ CERRADO
+
+**Cerrado:** 2026-05-20
+
+- [x] **Diccionario**: 60 keys nuevas en `store.profile.*` (paridad es-CO/en-US).
+- [x] **`profile-view.tsx`** (Client) migrado completo:
+  - `useT()`, `useTenantLocale()`, `useTenantCurrency()` del provider del slice T1.3e.
+  - `formatCurrency` parametrizado con `locale` + `currency` del tenant.
+  - `getStatusBadge` refactor: `getStatusBadgeMeta` helper retorna `{ className, labelKey, rawLabel }`. Type-safe contra el diccionario.
+  - 50+ strings UI: header/nav, profile greeting interpolado, tabs, active shipments, orders history table (headers + filas + empty + showing count), conversations empty, tracking timeline, sidebar chats + help, floating WhatsApp button.
+- [x] **`profile-access-form.tsx`** (Client) migrado: 12 strings + error handler con `t()` fallback.
+- [x] 7 tests nuevos: interpolación de name/number/shown+total/org name, tabs, badges, access form CTAs.
+- [x] 51/51 tests verdes.
+
+**Limitaciones documentadas:**
+- `formatBogotaDate` hardcoded a `America/Bogota` — slice futuro (i18n fase 2).
+- `'+57'` prefix + `'300 123 4567'` placeholder + `pattern='[0-9]{10}'` son formato CO — T1.4.
+- `<img>` del logo del header genera warning Next.js. Migrar a `<Image>` requiere agregar dominio a `remotePatterns` — slice futuro de optimización de imágenes.
+
+### Áreas pendientes T1.3i/j — comunicación + detalle
 
 **Pendiente.** Cada área es un sub-slice independiente.
-- [ ] **T1.3h** — Profile view `src/app/store/[slug]/profile/components/profile-view.tsx`. Esfuerzo: ~1h.
 - [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
 - [ ] **T1.3j** — PDP (Product Detail Page) `src/app/store/[slug]/producto/[slugOrId]/product-detail-client.tsx` (21 matches de `formatCurrency`). Esfuerzo: ~4-6h.
 
@@ -372,7 +390,8 @@
 | T1.3f.3 | ✅ Checkout ContactStep + PaymentStep (forms) | 1.5h | 2026-05-19 |
 | T1.3e | ✅ Carrito (drawer + sidebar) + currency provider | 1.5h | 2026-05-20 |
 | T1.3g | ✅ Order detail page + currency aware | 1h | 2026-05-20 |
-| T1.3h/i/j | Pendiente (profile, emails, PDP) | ~8h | — |
+| T1.3h | ✅ Profile view + access form | 1.5h | 2026-05-20 |
+| T1.3i/j | Pendiente (emails, PDP) | ~7h | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
