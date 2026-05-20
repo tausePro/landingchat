@@ -182,10 +182,29 @@
 
 **Limitaciones documentadas:** strings que dependen del país (tipos de documento CC/NIT/CE/Passport/TI, bandera +57, placeholder de teléfono colombiano, "Bancolombia / Nequi" subtítulo del método transferencia) **no se migran via diccionario** — quedan para T1.4 (forms country-aware) y T1.5 (manual offline payment).
 
-### Áreas pendientes T1.3e/g/h/i/j — flujo de compra + comunicación
+### T1.3e — Carrito (drawer + sidebar) ✅ CERRADO
+
+**Cerrado:** 2026-05-20
+
+- [x] **Provider extendido**: `TenantLocaleProvider` ahora expone `currencyCode`. Nuevo hook `useTenantCurrency()` para Client Components.
+- [x] **Layout server**: pasa `currency_code` derivado de `getTenantLocale()` al provider.
+- [x] **Diccionario**: 28 keys nuevas en `store.cart.*` (paridad es-CO/en-US).
+- [x] **`cart-drawer.tsx`** migrado + deuda técnica `any[]` cerrada.
+- [x] **`cart-sidebar.tsx`** migrado completo:
+  - 25+ strings UI a `useT()`.
+  - `formatPrice` hardcoded → `formatCurrency` con `locale` + `currencyCode` del context.
+  - Tracking events (`cart_opened`, `cart_coupon_*`, `cart_item_removed`, `cart_quantity_changed`) usan `currencyCode` dinámico — Meta/PostHog reciben USD para Tantor's House.
+  - 5 `aria-label` agregados (mejora a11y).
+- [x] 4 tests nuevos para keys del carrito (39/39 verdes en total).
+
+**Limitaciones documentadas:**
+- `formatPrice` del checkout (`src/components/checkout/utils/format-price.ts`) sigue hardcoded a `'es-CO'`/`'COP'`. Slice futuro de currency awareness del checkout.
+- Tracking events del checkout (`currency: 'COP'` hardcoded en `checkout-flow.tsx`) misma situación.
+- Cart en `/chat/[slug]/` cae a defaults (`es-CO`, `COP`) por falta de provider en ese layout. Sin regresión.
+
+### Áreas pendientes T1.3g/h/i/j — comunicación + detalle
 
 **Pendiente.** Cada área es un sub-slice independiente.
-- [ ] **T1.3e** — Carrito `src/components/store/cart/...`. Esfuerzo: ~2-3h.
 - [ ] **T1.3g** — Order detail page `src/app/store/[slug]/order/[orderId]/page.tsx` (8 matches). Esfuerzo: ~2h.
 - [ ] **T1.3h** — Profile view `src/app/store/[slug]/profile/components/profile-view.tsx`. Esfuerzo: ~1h.
 - [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
@@ -332,7 +351,8 @@
 | T1.3f.1 | ✅ Checkout chrome + flow + diccionario + interpolación | 2h | 2026-05-19 |
 | T1.3f.2 | ✅ Checkout OrderSummary + SuccessStep | 30min | 2026-05-19 |
 | T1.3f.3 | ✅ Checkout ContactStep + PaymentStep (forms) | 1.5h | 2026-05-19 |
-| T1.3e/g/h/i/j | Pendiente (carrito, order detail, profile, emails, PDP) | ~1 día | — |
+| T1.3e | ✅ Carrito (drawer + sidebar) + currency provider | 1.5h | 2026-05-20 |
+| T1.3g/h/i/j | Pendiente (order detail, profile, emails, PDP) | ~1 día | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
