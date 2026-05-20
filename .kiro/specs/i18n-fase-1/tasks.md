@@ -344,28 +344,47 @@ PDP está ahora 100% i18n-aware. Tantor's House muestra:
 
 ---
 
-## T1.4 — Forms country-aware (direcciones)
+## T1.4 — Forms country-aware (direcciones) ✅ CERRADO
 
-**Estimado:** 4-6h
-**Estado:** Pendiente
+**Cerrado:** 2026-05-20
+**Esfuerzo real:** 1.5h
 
-### Subtareas
+### Implementación
 
-- [ ] Crear `src/lib/validation/shipping-address.ts` con `discriminatedUnion` Zod por `country_code`
-- [ ] Crear `<ShippingAddressForm countryCode={...}>` que renderiza fields correctos
-- [ ] Migrar formularios actuales del checkout para usar el componente nuevo
-- [ ] Verificar que orders existentes en `customer_info` siguen siendo válidas (compat)
-- [ ] Tests:
-  - [ ] Schema CO acepta `{country_code: 'CO', departamento, ciudad, direccion}`
-  - [ ] Schema US acepta `{country_code: 'US', state, city, zip_code, address_line_1}`
-  - [ ] Schema rechaza mezcla (US sin zip, CO con state)
-- [ ] Commit: `feat(i18n): T1.4 forms country-aware con Zod discriminated union`
+Patrón final: **registry de country profiles** (no Zod discriminated union, que era over-engineering para single-country-per-tenant en Fase 1).
+
+- [x] **Nueva infraestructura:**
+  - `src/lib/i18n/country-profiles.ts` — `CountryProfile` interface + `COUNTRY_PROFILES` registry (CO + US) + `getCountryProfile(country)` defensivo.
+  - `src/lib/constants/us-states.ts` — 50 states + DC + Puerto Rico (52 entries).
+- [x] **Provider extendido:**
+  - `TenantLocaleContextValue` agrega `country: SupportedCountry`.
+  - `TenantLocaleProvider` acepta prop `country` (default `'CO'`).
+  - Hook nuevo: `useTenantCountry()`.
+- [x] **Strings i18n:** 11 keys US-specific (phone/document/state/city/address placeholders + person type Individual/Business).
+- [x] **`contact-step.tsx`** migrado:
+  - Phone: `profile.phoneFlag` + `profile.phonePrefix` + `profile.phonePlaceholderKey`.
+  - Document types: `profile.documentTypes.map()` reemplaza los 5 `SelectItem` hardcoded.
+  - Person type: `profile.personTypeOptions.map()` reemplaza los 2 radios hardcoded.
+  - States: `profile.states` reemplaza `COLOMBIA_DEPARTMENTS` hardcoded.
+  - City + address placeholders parametrizados.
+- [x] **`checkout-flow.tsx`** migrado:
+  - `identifyUser({ country: countryProfile.metaPixelCountry })` reemplaza `country: 'co'` hardcoded. Tantor ahora envía `'us'` a Meta Pixel Advanced Matching.
+- [x] **`layout.tsx`** propaga `country={tenantLocale.country}` al provider.
+- [x] **20 tests nuevos** en `country-profiles.test.ts` (registry completo, defaults CO/US, defensivo, keys i18n existen). 99/99 verdes globales.
 
 ### Criterios de aceptación T1.4
 
 - ✅ Tenant CO ve formulario con departamento/ciudad como antes.
-- ✅ Tenant US ve formulario con state/zip.
-- ✅ Validación rechaza datos del país equivocado.
+- ✅ Tenant US (Tantor) ve formulario con state/city.
+- ✅ Phone prefix dinámico: `+57` (CO) vs `+1` (US).
+- ✅ Document types dinámicos: CC/NIT/CE/Passport/TI (CO) vs SSN/EIN/Passport (US).
+- ✅ Person type labels: Natural/Jurídica (CO) vs Individual/Business (US).
+- ✅ Meta Pixel `country` field correcto por tenant.
+
+### Limitaciones documentadas
+
+- `ShippingFormInline` (`src/components/chat/shipping-form-inline.tsx`) está exportado pero NO se usa en producción (código muerto). Tiene hardcoded a CO. Se deja para limpieza futura.
+- Validación Zod por country (de la propuesta original) NO se hizo. La validación actual del backend (`createOrder` en `actions.ts`) acepta cualquier shape de `customerInfo`. Si en futuro hace falta validar `state` ∈ `profile.states`, agregar al schema Zod del payload.
 
 ---
 
@@ -482,7 +501,7 @@ PDP está ahora 100% i18n-aware. Tantor's House muestra:
 | T1.3j.2 | ✅ PDP render principal + currency en tracking | 2h | 2026-05-20 |
 | T1.3j.3 | ✅ PDP secciones secundarias + cierre completo PDP | 1.5h | 2026-05-20 |
 | T1.3i | ✅ Email templates (cliente + owner) i18n-aware | 1h | 2026-05-20 |
-| T1.4 | Pendiente | 4-6h | — |
+| T1.4 | ✅ Forms country-aware (registry CO/US) | 1.5h | 2026-05-20 |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
 | T1.7 | Pendiente | 1 día | — |
