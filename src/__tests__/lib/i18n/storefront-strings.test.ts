@@ -189,6 +189,49 @@ describe("t() — keys del carrito (T1.3e)", () => {
   })
 })
 
+describe("t() — keys de order detail (T1.3g)", () => {
+  it("interpola order_number en title y mensaje WhatsApp", () => {
+    expect(
+      t("store.order_detail.order_title", "es-CO", { number: "ORD-123" }),
+    ).toBe("Pedido ORD-123")
+    expect(
+      t("store.order_detail.order_title", "en-US", { number: "ORD-456" }),
+    ).toBe("Order ORD-456")
+    expect(
+      t("store.order_detail.whatsapp_message", "en-US", { number: "ORD-789" }),
+    ).toBe("Hi, I have a question about my order #ORD-789")
+  })
+
+  it("interpola org name en thanks_message", () => {
+    expect(
+      t("store.order_detail.thanks_message", "es-CO", { name: "Quality Pets" }),
+    ).toBe("Gracias por comprar en Quality Pets")
+    expect(
+      t("store.order_detail.thanks_message", "en-US", { name: "Tantor's House" }),
+    ).toBe("Thanks for shopping at Tantor's House")
+  })
+
+  it("status labels traducidos a en-US", () => {
+    expect(t("store.order_detail.status_pending", "en-US")).toBe("Confirmed")
+    expect(t("store.order_detail.status_processing", "en-US")).toBe("Processing")
+    expect(t("store.order_detail.status_shipped", "en-US")).toBe("Shipped")
+    expect(t("store.order_detail.status_delivered", "en-US")).toBe("Delivered")
+    expect(t("store.order_detail.status_cancelled", "en-US")).toBe("Cancelled")
+  })
+
+  it("payment status badges traducidos en en-US", () => {
+    expect(t("store.order_detail.payment_status_paid", "en-US")).toBe("Payment approved")
+    expect(t("store.order_detail.payment_status_pending", "en-US")).toBe("Payment pending")
+  })
+
+  it("person type neutralizado para US (Business / Individual)", () => {
+    expect(t("store.order_detail.person_legal", "en-US")).toBe("Business")
+    expect(t("store.order_detail.person_natural", "en-US")).toBe("Individual")
+    expect(t("store.order_detail.person_legal", "es-CO")).toBe("Persona Jurídica")
+    expect(t("store.order_detail.person_natural", "es-CO")).toBe("Persona Natural")
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]

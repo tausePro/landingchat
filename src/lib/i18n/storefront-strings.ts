@@ -283,6 +283,50 @@ export const storefrontStrings = {
     "store.cart.totals_calculated_at_checkout": "Calculado al pagar",
     "store.cart.totals_total": "Total a Pagar",
     "store.cart.checkout_button": "Finalizar Compra",
+    // ========================================================================
+    // Order detail page (T1.3g) — `/store/[slug]/order/[orderId]`
+    // ========================================================================
+    // Header / breadcrumbs
+    "store.order_detail.back_to_store": "Volver a la tienda",
+    "store.order_detail.order_date_label": "Fecha del pedido",
+    // Status labels (orders.status enum)
+    "store.order_detail.status_pending": "Confirmado",
+    "store.order_detail.status_processing": "En Preparación",
+    "store.order_detail.status_shipped": "En Camino",
+    "store.order_detail.status_delivered": "Entregado",
+    "store.order_detail.status_cancelled": "Cancelado",
+    "store.order_detail.status_unknown": "Pendiente",
+    // Title + thanks message
+    "store.order_detail.order_title": "Pedido {{number}}",
+    "store.order_detail.thanks_message": "Gracias por comprar en {{name}}",
+    // WhatsApp support
+    "store.order_detail.whatsapp_cta": "Ayuda por WhatsApp",
+    "store.order_detail.whatsapp_message": "Hola, tengo una consulta sobre mi pedido #{{number}}",
+    // Progress bar steps (subset de los status: pending → processing → shipped → delivered)
+    "store.order_detail.progress_confirmed": "Confirmado",
+    "store.order_detail.progress_preparing": "Preparando",
+    "store.order_detail.progress_shipping": "En Camino",
+    "store.order_detail.progress_delivered": "Entregado",
+    // Sections
+    "store.order_detail.section_products": "Productos",
+    "store.order_detail.product_fallback_name": "Producto",
+    "store.order_detail.section_shipping_address": "Dirección de Envío",
+    "store.order_detail.section_billing": "Facturación",
+    "store.order_detail.section_payment_summary": "Resumen de Pago",
+    // Person type (CO concept, neutralizado para US)
+    "store.order_detail.person_legal": "Persona Jurídica",
+    "store.order_detail.person_natural": "Persona Natural",
+    // Payment summary lines
+    "store.order_detail.summary_subtotal": "Subtotal",
+    "store.order_detail.summary_tax": "IVA",
+    "store.order_detail.summary_shipping": "Envío",
+    "store.order_detail.summary_shipping_free": "Gratis",
+    "store.order_detail.summary_cod_fee": "Recargo contraentrega",
+    "store.order_detail.summary_discount": "Descuento",
+    "store.order_detail.summary_total": "Total",
+    // Payment status badge
+    "store.order_detail.payment_status_paid": "Pago Aprobado",
+    "store.order_detail.payment_status_pending": "Pago Pendiente",
   },
   "en-US": {
     // Order pages — common area
@@ -527,6 +571,50 @@ export const storefrontStrings = {
     "store.cart.totals_calculated_at_checkout": "Calculated at checkout",
     "store.cart.totals_total": "Total",
     "store.cart.checkout_button": "Checkout",
+    // ========================================================================
+    // Order detail page (T1.3g) — `/store/[slug]/order/[orderId]`
+    // ========================================================================
+    // Header / breadcrumbs
+    "store.order_detail.back_to_store": "Back to store",
+    "store.order_detail.order_date_label": "Order date",
+    // Status labels (orders.status enum)
+    "store.order_detail.status_pending": "Confirmed",
+    "store.order_detail.status_processing": "Processing",
+    "store.order_detail.status_shipped": "Shipped",
+    "store.order_detail.status_delivered": "Delivered",
+    "store.order_detail.status_cancelled": "Cancelled",
+    "store.order_detail.status_unknown": "Pending",
+    // Title + thanks message
+    "store.order_detail.order_title": "Order {{number}}",
+    "store.order_detail.thanks_message": "Thanks for shopping at {{name}}",
+    // WhatsApp support
+    "store.order_detail.whatsapp_cta": "WhatsApp Support",
+    "store.order_detail.whatsapp_message": "Hi, I have a question about my order #{{number}}",
+    // Progress bar steps (subset de los status: pending → processing → shipped → delivered)
+    "store.order_detail.progress_confirmed": "Confirmed",
+    "store.order_detail.progress_preparing": "Preparing",
+    "store.order_detail.progress_shipping": "Shipping",
+    "store.order_detail.progress_delivered": "Delivered",
+    // Sections
+    "store.order_detail.section_products": "Products",
+    "store.order_detail.product_fallback_name": "Product",
+    "store.order_detail.section_shipping_address": "Shipping Address",
+    "store.order_detail.section_billing": "Billing",
+    "store.order_detail.section_payment_summary": "Payment Summary",
+    // Person type (CO concept, neutralizado para US)
+    "store.order_detail.person_legal": "Business",
+    "store.order_detail.person_natural": "Individual",
+    // Payment summary lines
+    "store.order_detail.summary_subtotal": "Subtotal",
+    "store.order_detail.summary_tax": "Tax",
+    "store.order_detail.summary_shipping": "Shipping",
+    "store.order_detail.summary_shipping_free": "Free",
+    "store.order_detail.summary_cod_fee": "COD fee",
+    "store.order_detail.summary_discount": "Discount",
+    "store.order_detail.summary_total": "Total",
+    // Payment status badge
+    "store.order_detail.payment_status_paid": "Payment approved",
+    "store.order_detail.payment_status_pending": "Payment pending",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 
