@@ -28,7 +28,11 @@
 
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react"
 
-import type { SupportedCurrency, SupportedLocale } from "@/types/organization"
+import type {
+  SupportedCountry,
+  SupportedCurrency,
+  SupportedLocale,
+} from "@/types/organization"
 import {
   t as translateRaw,
   type StorefrontStringKey,
@@ -42,11 +46,13 @@ import {
 interface TenantLocaleContextValue {
   locale: SupportedLocale
   currencyCode: SupportedCurrency
+  country: SupportedCountry
 }
 
 const DEFAULT_CONTEXT_VALUE: TenantLocaleContextValue = {
   locale: "es-CO",
   currencyCode: "COP",
+  country: "CO",
 }
 
 const TenantLocaleContext = createContext<TenantLocaleContextValue>(DEFAULT_CONTEXT_VALUE)
@@ -63,16 +69,25 @@ export interface TenantLocaleProviderProps {
    * Client Components descendientes.
    */
   currencyCode?: SupportedCurrency
+  /**
+   * ISO 3166-1 alpha-2 country code del tenant. Default `'CO'` cuando no se
+   * provee. Usado por `useTenantCountry()` y los country profiles para
+   * adaptar formularios (phone prefix, document types, person type, states,
+   * etc.) al país del tenant.
+   *
+   * T1.4 — Forms country-aware.
+   */
+  country?: SupportedCountry
   children: ReactNode
 }
 
 /**
- * Provider de locale + moneda para el árbol de Client Components del storefront.
+ * Provider de locale + moneda + país para el árbol de Client Components del storefront.
  *
  * Debe montarse en el root del storefront (o en cada page que tenga acceso a
- * `organization.locale` y `organization.currency_code`) con los valores exactos
- * del tenant. Tenants sin configuración caen a `('es-CO', 'COP')` (defaults
- * seguros definidos en el schema).
+ * `organization.locale`, `organization.currency_code` y `organization.country_code`)
+ * con los valores exactos del tenant. Tenants sin configuración caen a
+ * `('es-CO', 'COP', 'CO')` (defaults seguros definidos en el schema).
  *
  * El value se memoiza para evitar re-renders innecesarios cuando el padre
  * re-renderiza pero los props no cambian.
@@ -80,11 +95,12 @@ export interface TenantLocaleProviderProps {
 export function TenantLocaleProvider({
   locale,
   currencyCode = "COP",
+  country = "CO",
   children,
 }: TenantLocaleProviderProps) {
   const value = useMemo(
-    () => ({ locale, currencyCode }),
-    [locale, currencyCode],
+    () => ({ locale, currencyCode, country }),
+    [locale, currencyCode, country],
   )
   return (
     <TenantLocaleContext.Provider value={value}>
@@ -127,6 +143,32 @@ export function useTenantLocale(): SupportedLocale {
  */
 export function useTenantCurrency(): SupportedCurrency {
   return useContext(TenantLocaleContext).currencyCode
+}
+
+/**
+ * Hook que retorna el country code activo del tenant en este árbol.
+ *
+ * Útil para parametrizar formularios country-aware (phone prefix, document
+ * types, person type, states/regions). Tantor's House devuelve `'US'`;
+ * tenants legacy devuelven `'CO'` por default.
+ *
+ * @example
+ * ```tsx
+ * 'use client'
+ * import { useTenantCountry } from "@/lib/i18n/use-tenant-strings"
+ * import { getCountryProfile } from "@/lib/i18n/country-profiles"
+ *
+ * function PhoneInput() {
+ *   const country = useTenantCountry()
+ *   const profile = getCountryProfile(country)
+ *   return <span>{profile.phoneFlag} {profile.phonePrefix}</span>
+ * }
+ * ```
+ *
+ * T1.4 — Forms country-aware.
+ */
+export function useTenantCountry(): SupportedCountry {
+  return useContext(TenantLocaleContext).country
 }
 
 /**

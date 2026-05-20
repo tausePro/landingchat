@@ -23,7 +23,8 @@ import {
     useCartStore,
 } from "@/store/cart-store"
 
-import { useT } from "@/lib/i18n/use-tenant-strings"
+import { useT, useTenantCountry } from "@/lib/i18n/use-tenant-strings"
+import { getCountryProfile } from "@/lib/i18n/country-profiles"
 import type { StorefrontStringKey } from "@/lib/i18n/storefront-strings"
 
 import { CheckoutStepper } from "./components/checkout-stepper"
@@ -91,6 +92,10 @@ const INITIAL_FORM_DATA: CheckoutFormData = {
  */
 export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps) {
     const t = useT()
+    // T1.4 — country profile para Meta Pixel Advanced Matching y defaults
+    // del form. Tantor (US) envía "us"; tenants legacy "co".
+    const tenantCountry = useTenantCountry()
+    const countryProfile = getCountryProfile(tenantCountry)
     const router = useRouter()
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackInitiateCheckout, trackEvent, identifyUser } = useTracking()
@@ -415,7 +420,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                 ln: lastName || undefined,
                 ct: formData.city || undefined,
                 st: formData.state || undefined,
-                country: "co",
+                country: countryProfile.metaPixelCountry,
             })
 
             const result = await createOrder({

@@ -104,6 +104,7 @@ export default async function StoreLayout({
                 <TenantLocaleProvider
                     locale={tenantLocale.locale}
                     currencyCode={tenantLocale.currency}
+                    country={tenantLocale.country}
                 >
                     <StorefrontPageTracker />
                     {children}
