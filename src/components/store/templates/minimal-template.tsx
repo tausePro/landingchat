@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState, useEffect, useRef } from "react"
 import { ProductCard } from "../product-card"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 interface MinimalTemplateProps {
     organization: any
@@ -24,11 +25,15 @@ export function MinimalTemplate({
     onStartChat,
     isSubdomain
 }: MinimalTemplateProps) {
-    const heroTitle = heroSettings.title || "Encuentra tu producto ideal, chateando."
-    const heroSubtitle = heroSettings.subtitle || "Sin buscar, sin filtros, solo conversación."
+    const t = useT()
+    // i18n Fase 1 (T1.3d.1): defaults del hero desde el diccionario. Si el tenant
+    // tiene heroSettings.title/subtitle/chatButtonText configurado en BD, eso
+    // manda. Si no, cae al default localizado.
+    const heroTitle = heroSettings.title || t("store.home.hero_title_default")
+    const heroSubtitle = heroSettings.subtitle || t("store.home.hero_subtitle_default")
     const heroBackgroundImage = heroSettings.backgroundImage || ""
     const showChatButton = heroSettings.showChatButton ?? true
-    const chatButtonText = heroSettings.chatButtonText || "Chatear para Comprar"
+    const chatButtonText = heroSettings.chatButtonText || t("store.home.hero_cta_default")
 
     // State for Infinite Scroll
     const [displayProducts, setDisplayProducts] = useState<any[]>([])
@@ -110,7 +115,7 @@ export function MinimalTemplate({
             {/* Featured Products - Infinite Scroll Grid */}
             <section id="products" className="py-20 bg-gray-50">
                 <div className="container mx-auto px-4">
-                    <h2 className="text-3xl font-bold text-center mb-12">Nuestros Productos</h2>
+                    <h2 className="text-3xl font-bold text-center mb-12">{t("store.home.products_section_title")}</h2>
                     {displayProducts.length > 0 ? (
                         <>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8 max-w-7xl mx-auto">
@@ -136,9 +141,9 @@ export function MinimalTemplate({
                         </>
                     ) : (
                         <div className="max-w-2xl mx-auto rounded-3xl border border-dashed border-gray-300 bg-white px-8 py-14 text-center shadow-sm">
-                            <h3 className="text-2xl font-bold text-gray-900">Estamos preparando el catálogo</h3>
+                            <h3 className="text-2xl font-bold text-gray-900">{t("store.home.empty_catalog_title")}</h3>
                             <p className="mt-3 text-base text-gray-600">
-                                Aún no hay productos publicados en esta tienda.
+                                {t("store.home.empty_catalog_message")}
                             </p>
                             {showChatButton && (
                                 <Button

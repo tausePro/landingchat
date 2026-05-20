@@ -106,6 +106,13 @@ export const storefrontStrings = {
     "store.whatsapp.contact_aria": "Contactar por WhatsApp",
     "store.whatsapp.greeting": "Hola, me gustaría obtener información",
     "store.chat.start_aria": "Iniciar chat",
+    // Home templates (defaults del hero + sección productos + empty state)
+    "store.home.hero_title_default": "Encuentra tu producto ideal, chateando.",
+    "store.home.hero_subtitle_default": "Sin buscar, sin filtros, solo conversación.",
+    "store.home.hero_cta_default": "Chatear para Comprar",
+    "store.home.products_section_title": "Nuestros Productos",
+    "store.home.empty_catalog_title": "Estamos preparando el catálogo",
+    "store.home.empty_catalog_message": "Aún no hay productos publicados en esta tienda.",
   },
   "en-US": {
     // Order pages — common area
@@ -173,6 +180,13 @@ export const storefrontStrings = {
     "store.whatsapp.contact_aria": "Contact via WhatsApp",
     "store.whatsapp.greeting": "Hi, I'd like more information",
     "store.chat.start_aria": "Start chat",
+    // Home templates (hero defaults + products section + empty state)
+    "store.home.hero_title_default": "Find your ideal product, by chatting.",
+    "store.home.hero_subtitle_default": "No searching, no filters, just conversation.",
+    "store.home.hero_cta_default": "Chat to Shop",
+    "store.home.products_section_title": "Our Products",
+    "store.home.empty_catalog_title": "We're preparing the catalog",
+    "store.home.empty_catalog_message": "There are no products published in this store yet.",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 
