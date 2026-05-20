@@ -557,9 +557,13 @@ export async function getProductDetails(slug: string, slugOrId: string) {
 async function getStorefrontOrganizationForOrder(slug: string) {
     const supabase = createServiceClient()
 
+    // i18n Fase 1 (T1.3b'): incluir currency_code, locale, country_code en el
+    // select para que getTenantLocale(organization) en las order pages pueda
+    // derivar el contexto del tenant. REQUIERE que la migración
+    // 20260519_organizations_locale_currency.sql esté aplicada en este entorno.
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain, tracking_config")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain, tracking_config, currency_code, locale, country_code")
         .eq("slug", slug)
         .single()
 
