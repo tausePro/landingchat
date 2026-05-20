@@ -281,11 +281,39 @@ Dividido en 3 sub-slices por tamaño (2184 líneas client + page metadata + cta-
 - [x] **Helpers externos parametrizados**: `OfferCountdown` recibe `label`, `ProductShippingCard` recibe `labels` (objeto con funciones para interpolar).
 - [x] 60 keys nuevas en `store.product_detail.*` + 8 tests (62/62 verdes).
 
-#### T1.3j.3 — Secciones secundarias (pendiente)
+#### T1.3j.3 — Secciones secundarias ✅ CERRADO
 
-**Pendiente.** Esfuerzo: ~1-2h.
+**Cerrado:** 2026-05-20
 
-- [ ] Strings UI de secciones secundarias: descripción, especificaciones, reseñas, FAQ, related products, sticky bottom bar.
+- [x] **`ProductVideoBlock`** parametrizado con `labels` (eyebrow/title/iframeTitle/description). Eliminado prop `productName` (ya no necesario).
+- [x] **`ProductDescription`** parametrizado con `labels` (eyebrow/title/seeMore/seeLess).
+- [x] **`ProductTrustRail`** invoca `useT()` directo. 5 strings + fallback `inventory_confirmed` + plural concordance en `days_label`.
+- [x] **Trust badges chat**: 3 strings (assisted_purchase, whatsapp_available, we_help_chat).
+- [x] **Section links**: 5 labels (benefits, specifications, questions, reviews, video).
+- [x] **Reviews count inline**: `reviews_count_inline` con `{{plural}}` param para soportar singular/plural en ambos locales.
+- [x] **AI recommendation heading**: "Recomendado por tu agente IA ✦".
+- [x] **Sold/viewing inline counters**: 2 strings interpolados.
+- [x] **Description fallback**: "Sin descripción disponible." → "No description available.".
+- [x] **Reviews section completa**: title, subtitle, verified_purchase, showing_count (con shown/total interpolados).
+- [x] **Benefits + FAQ section titles**: 2 strings.
+- [x] **Bundle full section**: 5 strings (eyebrow, title, products_count, savings_amount_label, included_n).
+- [x] **Related products section title**.
+- [x] **WhatsApp default message** migrado con interpolación de `{{productName}}`.
+- [x] **Date formatting** de reviews: `toLocaleDateString("es-CO")` → `toLocaleDateString(locale)`.
+- [x] **Eliminados 2 `new Intl.NumberFormat('es-CO', ...)` hardcoded**: bundle discount label + related products price. Ambos ahora usan `formatPrice` closure.
+- [x] 35 keys nuevas en `store.product_detail.*` + 10 tests (72/72 verdes).
+
+#### T1.3j — PDP completo ✅ CERRADO
+
+**Total slice T1.3j:** 4 + 60 + 35 = **99 keys nuevas** en `store.product_detail.*`. Diccionario actualizado a ~430 keys totales con paridad es-CO/en-US verificada por 72 tests.
+
+PDP está ahora 100% i18n-aware. Tantor's House muestra:
+- Strings UI en inglés.
+- Precios en USD ($24.99) en lugar de COP ($ 24.000).
+- Fechas formato US en reseñas.
+- Tracking events con currency `'USD'` a Meta Pixel/PostHog.
+- WhatsApp default message en inglés.
+- OG/Twitter meta tags con currency correcta.
 
 ### Áreas pendientes T1.3i — comunicación
 
@@ -438,7 +466,7 @@ Dividido en 3 sub-slices por tamaño (2184 líneas client + page metadata + cta-
 | T1.3h | ✅ Profile view + access form | 1.5h | 2026-05-20 |
 | T1.3j.1 | ✅ PDP infraestructura (formatCurrency + page metadata + cta) | 45min | 2026-05-20 |
 | T1.3j.2 | ✅ PDP render principal + currency en tracking | 2h | 2026-05-20 |
-| T1.3j.3 | Pendiente (PDP secciones secundarias) | ~1-2h | — |
+| T1.3j.3 | ✅ PDP secciones secundarias + cierre completo PDP | 1.5h | 2026-05-20 |
 | T1.3i | Pendiente (emails) | ~3-4h | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
