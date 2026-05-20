@@ -63,28 +63,38 @@
 
 ---
 
-## T1.2 — `formatCurrency()` parametrizado por contexto
+## T1.2 — `formatCurrency()` parametrizado por contexto ✅ COMPLETADO
 
 **Estimado:** 4h
-**Estado:** Pendiente
+**Owner:** Cascade + tausePro
+**Estado:** Cerrado 2026-05-19
 
 ### Subtareas
 
-- [ ] Refactor `src/lib/utils.ts:formatCurrency()` con `FormatCurrencyOptions` opcional
-- [ ] Backward compat 100%: sin opciones → comportamiento legacy idéntico
-- [ ] Agregar `formatCurrency(amount, getTenantLocale(org))` en al menos 1 componente del storefront público para validar
-- [ ] Tests:
-  - [ ] `formatCurrency(100)` → `"$100"` (COP, sin decimales)
-  - [ ] `formatCurrency(100, { currency: 'USD', locale: 'en-US' })` → `"$100.00"`
-  - [ ] `formatCurrency(1234.56, { currency: 'USD', locale: 'en-US' })` → `"$1,234.56"`
-  - [ ] `formatCurrency(1234567, { currency: 'COP', locale: 'es-CO' })` → `"$ 1.234.567"` (locale CO)
-- [ ] Commit: `feat(i18n): T1.2 formatCurrency parametrizado por contexto del tenant`
+- [x] Refactor `src/lib/utils.ts:formatCurrency(amount, options?)` con `FormatCurrencyOptions` opcional
+- [x] Backward compat 100%: sin opciones → comportamiento legacy idéntico (COP/es-CO/0 decimales)
+- [x] Inferencia automática de decimales por currency (COP→0, USD→2) salvo override explícito
+- [x] Migrar `src/app/store/[slug]/order/[orderId]/success/page.tsx` para usar `getTenantLocale(organization)` en lugar de helper local hardcoded
+- [x] Refactor `getTenantLocale()` para aceptar `unknown` con narrowing interno (ergonomía: trabaja con tipos de Supabase, mocks, etc.)
+- [x] Tests:
+  - [x] Backward compat: 5 tests (default, redondeo, 0, negativos, símbolo)
+  - [x] USD/en-US: 5 tests (formato, redondeo, entero, 0, negativo)
+  - [x] COP explícito coincide con default
+  - [x] Override `fractionDigits`: 3 tests (COP con 2, USD con 0, USD con 4)
+  - [x] Integración con `getTenantLocale()`: 3 tests
+- [x] Validaciones:
+  - [x] `npx tsc --noEmit` ✅ sin errores en archivos tocados
+  - [x] `npx eslint` sobre archivos tocados ✅ sin warnings
+  - [x] `npx vitest run src/__tests__/lib/utils.test.ts src/__tests__/lib/i18n/` → 32/32 ✅
+- [x] Commit: `feat(i18n): T1.2 formatCurrency parametrizado por contexto del tenant`
+- [x] Actualizar TORRE_DE_CONTROL §18
 
 ### Criterios de aceptación T1.2
 
-- ✅ Llamadas existentes a `formatCurrency(x)` siguen funcionando idéntico.
-- ✅ Tests cubren COP y USD.
-- ✅ Al menos 1 componente del storefront ya usa el contexto del tenant.
+- ✅ Llamadas existentes a `formatCurrency(x)` siguen funcionando idéntico (backward compat verificado en tests).
+- ✅ Tests cubren COP y USD con assertions semánticas (símbolos, dígitos, decimales) + comparaciones contra `Intl.NumberFormat` canónico.
+- ✅ Storefront order success page usa contexto del tenant (`getTenantLocale(organization)`).
+- ✅ `getTenantLocale` acepta `unknown` y filtra valores no soportados → seguro contra datos sucios de cualquier fuente.
 
 ---
 
@@ -241,7 +251,7 @@
 | Slice | Estado | Estimado | Cerrado |
 | --- | --- | --- | --- |
 | T1.1 | ✅ Código listo (pending migration apply) | 2h | 2026-05-19 |
-| T1.2 | Pendiente | 4h | — |
+| T1.2 | ✅ Cerrado | 4h | 2026-05-19 |
 | T1.3 | Pendiente | 1-2 días | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |

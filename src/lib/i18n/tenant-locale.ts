@@ -10,7 +10,6 @@
  */
 
 import type {
-  Organization,
   SupportedCountry,
   SupportedCurrency,
   SupportedLocale,
@@ -41,18 +40,17 @@ export const DEFAULT_TENANT_LOCALE: TenantLocaleContext = Object.freeze({
 })
 
 /**
- * Subset mínimo de campos necesarios para derivar el `TenantLocaleContext`.
- * Útil para llamadores que solo tienen un proyectado parcial de `Organization`.
- */
-export type TenantLocaleSource = Pick<
-  Organization,
-  "currency_code" | "locale" | "country_code"
->
-
-/**
  * Resuelve el contexto de localización de un tenant a partir de una
- * organización (full o parcial). Cualquier campo ausente cae al default
- * seguro (`COP / es-CO / CO`).
+ * organización (full, parcial, mock, o `null`).
+ *
+ * Acepta `unknown` deliberadamente para máxima ergonomía: el `Organization`
+ * de la app, tipos inferidos por Supabase desde `SELECT` parciales, mocks
+ * de tests y objetos transitorios durante migración son todos válidos. El
+ * narrowing interno con type guards garantiza que sólo valores válidos se
+ * propagan al contexto resultante.
+ *
+ * Cualquier campo ausente o inválido cae al default seguro
+ * (`COP / es-CO / CO`).
  *
  * Ejemplos:
  * ```ts
@@ -64,19 +62,32 @@ export type TenantLocaleSource = Pick<
  *
  * getTenantLocale(null)
  * // → { currency: "COP", locale: "es-CO", country: "CO" }
+ *
+ * getTenantLocale({ currency_code: "EUR" }) // EUR no soportado en Fase 1
+ * // → { currency: "COP", locale: "es-CO", country: "CO" }
  * ```
  */
-export function getTenantLocale(
-  organization: TenantLocaleSource | null | undefined
-): TenantLocaleContext {
-  if (!organization) {
+export function getTenantLocale(organization: unknown): TenantLocaleContext {
+  if (!organization || typeof organization !== "object") {
     return DEFAULT_TENANT_LOCALE
   }
 
+  const source = organization as {
+    currency_code?: unknown
+    locale?: unknown
+    country_code?: unknown
+  }
+
   return {
-    currency: organization.currency_code ?? DEFAULT_TENANT_LOCALE.currency,
-    locale: organization.locale ?? DEFAULT_TENANT_LOCALE.locale,
-    country: organization.country_code ?? DEFAULT_TENANT_LOCALE.country,
+    currency: isSupportedCurrency(source.currency_code)
+      ? source.currency_code
+      : DEFAULT_TENANT_LOCALE.currency,
+    locale: isSupportedLocale(source.locale)
+      ? source.locale
+      : DEFAULT_TENANT_LOCALE.locale,
+    country: isSupportedCountry(source.country_code)
+      ? source.country_code
+      : DEFAULT_TENANT_LOCALE.country,
   }
 }
 

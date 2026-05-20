@@ -4,6 +4,8 @@ import { CheckCircle } from "lucide-react"
 import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 import { getOrderDetails } from "../../../actions"
 import { appendStorefrontAccessParam } from "@/lib/storefrontAccess"
+import { formatCurrency } from "@/lib/utils"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 
 interface SuccessPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -17,19 +19,15 @@ export default async function OrderSuccessPage({ params, searchParams }: Success
 
     if (!result) notFound()
 
-    const { order } = result
+    const { order, organization } = result
     const orderDetailsHref = access
         ? appendStorefrontAccessParam(`/store/${slug}/order/${orderId}`, access)
         : `/store/${slug}/order/${orderId}`
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount)
-    }
+    // i18n Fase 1 (T1.2): formato de moneda parametrizado por contexto del tenant.
+    // Para tenants en COP/es-CO (default) el output es idéntico al legacy. Tantors
+    // (USD/en-US) verá precios formateados como $1,234.56 con 2 decimales.
+    const tenantLocale = getTenantLocale(organization)
 
     return (
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center p-4">
@@ -78,7 +76,7 @@ export default async function OrderSuccessPage({ params, searchParams }: Success
                                     Total Pagado
                                 </span>
                                 <span className="text-2xl font-bold text-text-light-primary dark:text-text-dark-primary">
-                                    {formatCurrency(order.total)}
+                                    {formatCurrency(order.total, tenantLocale)}
                                 </span>
                             </div>
 

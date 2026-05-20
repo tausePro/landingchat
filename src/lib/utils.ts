@@ -1,6 +1,8 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+import type { SupportedCurrency, SupportedLocale } from "@/types/organization"
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
@@ -22,11 +24,66 @@ export function getContrastTextColor(hexColor: string): string {
   return luminance > 0.4 ? 'black' : 'white'
 }
 
-export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+/**
+ * Opciones para parametrizar `formatCurrency()` por contexto del tenant.
+ * Sin opciones → comportamiento legacy (COP / es-CO / 0 decimales).
+ *
+ * Spec: .kiro/specs/i18n-fase-1/ (T1.2)
+ */
+export interface FormatCurrencyOptions {
+  /** ISO 4217 currency code. Default `'COP'`. */
+  currency?: SupportedCurrency
+  /** BCP 47 locale para formato. Default `'es-CO'`. */
+  locale?: SupportedLocale
+  /**
+   * Número de decimales (min y max). Si no se pasa, se infiere del currency:
+   * - `COP` → 0 decimales (convención colombiana de redondeo).
+   * - `USD` → 2 decimales (estándar dólar).
+   *
+   * Si se pasa explícitamente, se usa ese valor para min y max.
+   */
+  fractionDigits?: number
+}
+
+/**
+ * Formatea un monto numérico como string de moneda usando `Intl.NumberFormat`.
+ *
+ * **Backward compatible:** sin opciones, retorna idéntico al comportamiento
+ * legacy (COP / es-CO / 0 decimales). Llamadas existentes a `formatCurrency(x)`
+ * siguen funcionando sin cambios.
+ *
+ * **Con contexto del tenant:** pasar `getTenantLocale(organization)` (o un
+ * subset `{ currency, locale }`) para formatear en la moneda y locale del
+ * tenant.
+ *
+ * @example
+ * ```ts
+ * // Legacy (COP, sin decimales):
+ * formatCurrency(1234567)
+ * // → "$ 1.234.567"
+ *
+ * // Con contexto del tenant (USD, en-US):
+ * formatCurrency(1234.56, { currency: "USD", locale: "en-US" })
+ * // → "$1,234.56"
+ *
+ * // Override explícito de decimales:
+ * formatCurrency(100, { currency: "COP", fractionDigits: 2 })
+ * // → "$ 100,00"
+ * ```
+ */
+export function formatCurrency(
+  amount: number,
+  options?: FormatCurrencyOptions
+): string {
+  const currency: SupportedCurrency = options?.currency ?? "COP"
+  const locale: SupportedLocale = options?.locale ?? "es-CO"
+  const fractionDigits =
+    options?.fractionDigits ?? (currency === "USD" ? 2 : 0)
+
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(amount)
 }
