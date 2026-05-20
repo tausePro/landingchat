@@ -151,6 +151,102 @@ export const storefrontStrings = {
     "store.home.cta_subtitle": "Únete a miles de clientes satisfechos que ya compran de manera inteligente.",
     // Footer — link extra "Contacto"
     "store.footer.nav_contact": "Contacto",
+    // ========================================================================
+    // Checkout (T1.3f) — page chrome + flow + steps + summary
+    // ========================================================================
+    // Page chrome
+    "store.checkout.meta_title": "Checkout",
+    "store.checkout.meta_description": "Finaliza tu compra en {{name}}.",
+    "store.checkout.fallback_org_name": "Tienda",
+    "store.checkout.back_aria": "Volver",
+    "store.checkout.back_to_store_aria": "Volver a {{name}}",
+    "store.checkout.secure_badge": "Checkout seguro",
+    "store.checkout.cart_loading": "Cargando tu carrito...",
+    // Steps stepper
+    "store.checkout.step_contact_label": "Datos",
+    "store.checkout.step_payment_label": "Pago",
+    "store.checkout.step_success_label": "Listo",
+    "store.checkout.step_contact_title": "Información de Envío",
+    "store.checkout.step_payment_title": "Pago y Confirmación",
+    "store.checkout.step_success_title": "¡Orden Recibida!",
+    "store.checkout.step_contact_description": "Completa tus datos para confirmar disponibilidad de envío y preparar tu pedido.",
+    "store.checkout.step_payment_description": "Revisa el total final antes de confirmar. No cambiaremos el monto después de crear la orden.",
+    "store.checkout.step_success_description": "Tu orden quedó registrada. Conserva el enlace para consultar el estado.",
+    // Toasts del flow
+    "store.checkout.toast_coupon_applied": "¡Cupón {{code}} aplicado!",
+    "store.checkout.toast_coupon_invalid": "Cupón inválido",
+    "store.checkout.toast_coupon_validation_error": "Error al validar cupón",
+    "store.checkout.toast_validation_billing": "Por favor completa todos los campos de facturación",
+    "store.checkout.toast_validation_state": "Por favor selecciona tu departamento",
+    "store.checkout.toast_shipping_unavailable_default": "No realizamos envíos a tu ciudad por el momento",
+    "store.checkout.toast_business_name_warning": "Se recomienda ingresar el nombre de la empresa para personas jurídicas",
+    "store.checkout.toast_no_payment_methods": "La tienda no tiene métodos de pago disponibles en este momento.",
+    "store.checkout.toast_order_created_payment_failed": "Tu orden fue creada, pero no pudimos abrir el pago. Puedes reintentarlo desde el detalle del pedido.",
+    "store.checkout.toast_order_create_error_prefix": "Error al crear la orden:",
+    "store.checkout.toast_unexpected_error": "Ocurrió un error inesperado",
+    // Order summary
+    "store.checkout.summary_title": "Resumen de tu pedido",
+    "store.checkout.summary_subtitle": "Este es el total final antes de crear la orden.",
+    "store.checkout.summary_taxable_base": "Base gravable",
+    "store.checkout.summary_subtotal_with_count": "Subtotal ({{count}} items)",
+    "store.checkout.summary_iva": "IVA",
+    "store.checkout.summary_iva_included_suffix": " (incluido)",
+    "store.checkout.summary_shipping": "Envío",
+    "store.checkout.summary_cod_fee": "Costo Contraentrega",
+    "store.checkout.summary_discount_with_code": "Descuento ({{code}})",
+    "store.checkout.summary_total": "Total a Pagar",
+    // Success step
+    "store.checkout.success_title": "¡Gracias por tu compra!",
+    "store.checkout.success_message": "Hemos recibido tu orden correctamente. Te enviaremos un correo con los detalles y el número de guía.",
+    "store.checkout.success_cta": "Ver Pedido",
+    // Contact step (datos personales + facturación + dirección)
+    "store.checkout.contact_disclaimer": "Usaremos estos datos solo para coordinar el envío, enviarte actualizaciones por WhatsApp y generar tu comprobante.",
+    "store.checkout.contact_name_label": "Nombre completo",
+    "store.checkout.contact_name_placeholder": "Ej. Juan Pérez",
+    "store.checkout.contact_email_label": "Email",
+    "store.checkout.contact_email_optional": "(Opcional)",
+    "store.checkout.contact_email_placeholder": "juan@ejemplo.com",
+    "store.checkout.contact_phone_label": "Teléfono (WhatsApp)",
+    "store.checkout.contact_phone_placeholder": "300 123 4567",
+    "store.checkout.billing_section_title": "Información de Facturación",
+    "store.checkout.billing_section_subtitle": "Estos datos permiten emitir el comprobante de compra y evitar retrasos al crear la orden.",
+    "store.checkout.billing_document_label": "Documento de Identidad",
+    "store.checkout.billing_document_number_placeholder": "Número",
+    "store.checkout.billing_person_natural": "Natural (Persona)",
+    "store.checkout.billing_person_legal": "Jurídica (Empresa)",
+    "store.checkout.billing_business_name_label": "Nombre de la Empresa",
+    "store.checkout.billing_business_name_placeholder": "Mi Empresa S.A.S.",
+    "store.checkout.location_label": "Ubicación",
+    "store.checkout.location_subtitle": "Confirmamos la cobertura de envío con tu ciudad antes de pasar al pago.",
+    "store.checkout.location_state_placeholder": "Departamento",
+    "store.checkout.location_city_placeholder": "Ciudad",
+    "store.checkout.location_address_placeholder": "Dirección completa",
+    "store.checkout.contact_submit_cta": "Confirmar envío y continuar",
+    "store.checkout.contact_data_disclaimer": "Tus datos se usan únicamente para procesar esta compra.",
+    // Payment step (cupón + método pago + transferencia + acciones)
+    "store.checkout.coupon_remove_aria": "Quitar cupón",
+    "store.checkout.coupon_placeholder": "Código de cupón",
+    "store.checkout.coupon_apply_btn": "Aplicar",
+    "store.checkout.coupon_loading": "...",
+    "store.checkout.payment_method_label": "Método de pago",
+    "store.checkout.payment_method_subtitle": "Elige cómo quieres pagar. Si algo falla, conservaremos la orden para que puedas reintentarlo.",
+    "store.checkout.gateways_loading": "Cargando métodos de pago...",
+    "store.checkout.gateway_test_mode": "Pruebas",
+    "store.checkout.payment_bank_transfer_label": "Transferencia",
+    "store.checkout.payment_cod_label": "Contra Entrega",
+    "store.checkout.payment_cod_subtitle": "Paga al recibir",
+    "store.checkout.bank_section_title": "Datos para Transferencia",
+    "store.checkout.bank_field_bank": "Banco:",
+    "store.checkout.bank_field_type": "Tipo:",
+    "store.checkout.bank_field_account": "Cuenta:",
+    "store.checkout.bank_field_holder": "Titular:",
+    "store.checkout.bank_field_nequi": "Nequi:",
+    "store.checkout.bank_disclaimer": "Recuerda enviar el comprobante de pago al WhatsApp de la tienda.",
+    "store.checkout.no_payment_methods_full": "La tienda no tiene métodos de pago disponibles en este momento. Intenta más tarde o contacta a la tienda.",
+    "store.checkout.action_back": "Atrás",
+    "store.checkout.action_creating_order": "Creando orden...",
+    "store.checkout.action_place_order": "Confirmar pedido",
+    "store.checkout.action_secure_disclaimer": "Pago procesado por métodos seguros de la tienda.",
   },
   "en-US": {
     // Order pages — common area
@@ -263,6 +359,102 @@ export const storefrontStrings = {
     "store.home.cta_subtitle": "Join thousands of happy customers already shopping smarter.",
     // Footer — extra "Contact" link
     "store.footer.nav_contact": "Contact",
+    // ========================================================================
+    // Checkout (T1.3f) — page chrome + flow + steps + summary
+    // ========================================================================
+    // Page chrome
+    "store.checkout.meta_title": "Checkout",
+    "store.checkout.meta_description": "Complete your purchase at {{name}}.",
+    "store.checkout.fallback_org_name": "Store",
+    "store.checkout.back_aria": "Back",
+    "store.checkout.back_to_store_aria": "Back to {{name}}",
+    "store.checkout.secure_badge": "Secure checkout",
+    "store.checkout.cart_loading": "Loading your cart...",
+    // Steps stepper
+    "store.checkout.step_contact_label": "Details",
+    "store.checkout.step_payment_label": "Payment",
+    "store.checkout.step_success_label": "Done",
+    "store.checkout.step_contact_title": "Shipping Information",
+    "store.checkout.step_payment_title": "Payment & Confirmation",
+    "store.checkout.step_success_title": "Order Received!",
+    "store.checkout.step_contact_description": "Complete your details to confirm shipping availability and prepare your order.",
+    "store.checkout.step_payment_description": "Review the final total before confirming. We won't change the amount after creating the order.",
+    "store.checkout.step_success_description": "Your order has been registered. Save the link to check the status.",
+    // Toasts del flow
+    "store.checkout.toast_coupon_applied": "Coupon {{code}} applied!",
+    "store.checkout.toast_coupon_invalid": "Invalid coupon",
+    "store.checkout.toast_coupon_validation_error": "Error validating coupon",
+    "store.checkout.toast_validation_billing": "Please complete all billing fields",
+    "store.checkout.toast_validation_state": "Please select your state",
+    "store.checkout.toast_shipping_unavailable_default": "We don't ship to your city at the moment",
+    "store.checkout.toast_business_name_warning": "We recommend entering the business name for legal entities",
+    "store.checkout.toast_no_payment_methods": "The store has no payment methods available at the moment.",
+    "store.checkout.toast_order_created_payment_failed": "Your order was created, but we couldn't open the payment. You can retry from the order details.",
+    "store.checkout.toast_order_create_error_prefix": "Error creating the order:",
+    "store.checkout.toast_unexpected_error": "An unexpected error occurred",
+    // Order summary
+    "store.checkout.summary_title": "Order Summary",
+    "store.checkout.summary_subtitle": "This is the final total before creating the order.",
+    "store.checkout.summary_taxable_base": "Taxable base",
+    "store.checkout.summary_subtotal_with_count": "Subtotal ({{count}} items)",
+    "store.checkout.summary_iva": "Tax",
+    "store.checkout.summary_iva_included_suffix": " (included)",
+    "store.checkout.summary_shipping": "Shipping",
+    "store.checkout.summary_cod_fee": "Cash on Delivery Fee",
+    "store.checkout.summary_discount_with_code": "Discount ({{code}})",
+    "store.checkout.summary_total": "Total to Pay",
+    // Success step
+    "store.checkout.success_title": "Thank you for your purchase!",
+    "store.checkout.success_message": "We've received your order correctly. We'll send you an email with the details and tracking number.",
+    "store.checkout.success_cta": "View Order",
+    // Contact step (personal data + billing + address)
+    "store.checkout.contact_disclaimer": "We'll use these details only to coordinate shipping, send you WhatsApp updates, and generate your receipt.",
+    "store.checkout.contact_name_label": "Full name",
+    "store.checkout.contact_name_placeholder": "e.g. John Smith",
+    "store.checkout.contact_email_label": "Email",
+    "store.checkout.contact_email_optional": "(Optional)",
+    "store.checkout.contact_email_placeholder": "john@example.com",
+    "store.checkout.contact_phone_label": "Phone (WhatsApp)",
+    "store.checkout.contact_phone_placeholder": "300 123 4567",
+    "store.checkout.billing_section_title": "Billing Information",
+    "store.checkout.billing_section_subtitle": "These details allow us to issue the purchase receipt and avoid delays when creating the order.",
+    "store.checkout.billing_document_label": "ID Document",
+    "store.checkout.billing_document_number_placeholder": "Number",
+    "store.checkout.billing_person_natural": "Individual (Person)",
+    "store.checkout.billing_person_legal": "Legal Entity (Business)",
+    "store.checkout.billing_business_name_label": "Business Name",
+    "store.checkout.billing_business_name_placeholder": "My Company LLC",
+    "store.checkout.location_label": "Location",
+    "store.checkout.location_subtitle": "We confirm shipping coverage with your city before moving to payment.",
+    "store.checkout.location_state_placeholder": "State",
+    "store.checkout.location_city_placeholder": "City",
+    "store.checkout.location_address_placeholder": "Full address",
+    "store.checkout.contact_submit_cta": "Confirm shipping and continue",
+    "store.checkout.contact_data_disclaimer": "Your details are used only to process this purchase.",
+    // Payment step (coupon + payment method + bank transfer + actions)
+    "store.checkout.coupon_remove_aria": "Remove coupon",
+    "store.checkout.coupon_placeholder": "Coupon code",
+    "store.checkout.coupon_apply_btn": "Apply",
+    "store.checkout.coupon_loading": "...",
+    "store.checkout.payment_method_label": "Payment method",
+    "store.checkout.payment_method_subtitle": "Choose how you want to pay. If something fails, we'll keep the order so you can retry.",
+    "store.checkout.gateways_loading": "Loading payment methods...",
+    "store.checkout.gateway_test_mode": "Test",
+    "store.checkout.payment_bank_transfer_label": "Bank Transfer",
+    "store.checkout.payment_cod_label": "Cash on Delivery",
+    "store.checkout.payment_cod_subtitle": "Pay on receipt",
+    "store.checkout.bank_section_title": "Bank Transfer Details",
+    "store.checkout.bank_field_bank": "Bank:",
+    "store.checkout.bank_field_type": "Type:",
+    "store.checkout.bank_field_account": "Account:",
+    "store.checkout.bank_field_holder": "Holder:",
+    "store.checkout.bank_field_nequi": "Nequi:",
+    "store.checkout.bank_disclaimer": "Remember to send the payment receipt to the store's WhatsApp.",
+    "store.checkout.no_payment_methods_full": "The store has no payment methods available at the moment. Try later or contact the store.",
+    "store.checkout.action_back": "Back",
+    "store.checkout.action_creating_order": "Creating order...",
+    "store.checkout.action_place_order": "Place order",
+    "store.checkout.action_secure_disclaimer": "Payment processed by the store's secure methods.",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 
@@ -283,7 +475,42 @@ export type StorefrontStringKey = keyof (typeof storefrontStrings)["es-CO"]
 // ============================================================================
 
 /**
- * Resuelve un string traducido para el locale dado.
+ * Mapa de parámetros para interpolar en strings con placeholders `{{name}}`.
+ *
+ * Las keys del objeto coinciden con los nombres dentro de las dobles llaves
+ * en el string original. Los valores se convierten a string si son `number`.
+ *
+ * @example
+ * ```ts
+ * // Diccionario: "Hola, {{name}}. Tienes {{count}} pedidos."
+ * t("greeting", "es-CO", { name: "Juan", count: 3 })
+ * // → "Hola, Juan. Tienes 3 pedidos."
+ * ```
+ */
+export type StringParams = Record<string, string | number>
+
+/**
+ * Interpola placeholders `{{key}}` en un string usando el mapa de params.
+ *
+ * - Reemplaza todas las ocurrencias de `{{key}}` por `params[key]`.
+ * - Si `params[key]` no existe, deja el placeholder intacto (visible para debug).
+ * - Tolera espacios alrededor del nombre: `{{ name }}` también se interpola.
+ *
+ * No usa `Intl.NumberFormat` ni nada complejo. Para formateo numérico avanzado,
+ * formatea fuera y pasa el string ya formateado.
+ */
+function interpolate(template: string, params?: StringParams): string {
+  if (!params) return template
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (match, key: string) => {
+    const value = params[key]
+    if (value === undefined || value === null) return match
+    return String(value)
+  })
+}
+
+/**
+ * Resuelve un string traducido para el locale dado, con interpolación opcional
+ * de parámetros via placeholders `{{key}}`.
  *
  * Cascada de fallbacks:
  * 1. Si el locale no existe en el dict → cae a `'es-CO'`.
@@ -296,23 +523,27 @@ export type StorefrontStringKey = keyof (typeof storefrontStrings)["es-CO"]
  *
  * @example
  * ```ts
- * t("order.success.title")               // → "¡Pago Exitoso!"
- * t("order.success.title", "en-US")       // → "Payment Successful!"
- * t("order.success.title", "es-MX" as any) // → "¡Pago Exitoso!" (locale no soportado, fallback)
+ * t("order.success.title")                                    // → "¡Pago Exitoso!"
+ * t("order.success.title", "en-US")                           // → "Payment Successful!"
+ * t("store.checkout.toast_coupon_applied", "en-US", { code: "FALL20" })
+ *   // → "Coupon FALL20 applied!"
+ * t("store.checkout.summary_subtotal_with_count", "es-CO", { count: 3 })
+ *   // → "Subtotal (3 items)"
  * ```
  */
 export function t(
   key: StorefrontStringKey,
-  locale: SupportedLocale = "es-CO"
+  locale: SupportedLocale = "es-CO",
+  params?: StringParams
 ): string {
   const dict = storefrontStrings[locale] ?? storefrontStrings["es-CO"]
   const value = dict[key]
   if (typeof value === "string") {
-    return value
+    return interpolate(value, params)
   }
   const fallback = storefrontStrings["es-CO"][key]
   if (typeof fallback === "string") {
-    return fallback
+    return interpolate(fallback, params)
   }
   return key
 }

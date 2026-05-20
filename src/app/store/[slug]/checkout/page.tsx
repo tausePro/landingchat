@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import { getStoreData } from "../actions"
 import { CheckoutPageClient } from "./checkout-page-client"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { t } from "@/lib/i18n/storefront-strings"
 
 type Props = {
     params: Promise<{ slug: string }>
@@ -11,10 +13,12 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params
     const data = await getStoreData(slug)
-    const name = data?.organization?.name ?? "Tienda"
+    const tenantLocale = getTenantLocale(data?.organization ?? null)
+    const locale = tenantLocale.locale
+    const name = data?.organization?.name ?? t("store.checkout.fallback_org_name", locale)
     return {
-        title: `Checkout — ${name}`,
-        description: `Finaliza tu compra en ${name}.`,
+        title: `${t("store.checkout.meta_title", locale)} — ${name}`,
+        description: t("store.checkout.meta_description", locale, { name }),
         robots: { index: false, follow: false },
     }
 }

@@ -32,6 +32,7 @@ import type { SupportedLocale } from "@/types/organization"
 import {
   t as translateRaw,
   type StorefrontStringKey,
+  type StringParams,
 } from "./storefront-strings"
 
 // ============================================================================
@@ -87,6 +88,9 @@ export function useTenantLocale(): SupportedLocale {
  * (memoizada con `useCallback`), evitando re-renders innecesarios en
  * descendientes que reciben `t` como prop.
  *
+ * Acepta un segundo argumento opcional `params` para interpolar placeholders
+ * `{{key}}` en el string traducido.
+ *
  * @example
  * ```tsx
  * 'use client'
@@ -94,11 +98,19 @@ export function useTenantLocale(): SupportedLocale {
  *   const t = useT()
  *   return <button>{t("order.common.view_order_details")}</button>
  * }
+ *
+ * // Con interpolación
+ * function Toast({ couponCode }: { couponCode: string }) {
+ *   const t = useT()
+ *   return <span>{t("store.checkout.toast_coupon_applied", { code: couponCode })}</span>
+ * }
  * ```
  */
-export function useT(): (key: StorefrontStringKey) => string {
+export function useT(): (key: StorefrontStringKey, params?: StringParams) => string {
   const locale = useTenantLocale()
-  return useCallback((key: StorefrontStringKey) => translateRaw(key, locale), [
-    locale,
-  ])
+  return useCallback(
+    (key: StorefrontStringKey, params?: StringParams) =>
+      translateRaw(key, locale, params),
+    [locale],
+  )
 }
