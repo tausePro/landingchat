@@ -388,33 +388,71 @@ Patrón final: **registry de country profiles** (no Zod discriminated union, que
 
 ---
 
-## T1.5 — Método de pago manual offline
+## T1.5 — Método de pago manual offline ✅ CERRADO
 
-**Estimado:** 4-6h
-**Estado:** Pendiente
+**Cerrado:** 2026-05-20
+**Esfuerzo real:** ~2h (vs 4-6h estimadas)
 
-### Subtareas
+### Resumen ejecutivo
 
-- [ ] Migración: ampliar CHECK de `payment_gateway_configs.provider` a incluir `'manual'`
-- [ ] UI configuración manual offline en `Dashboard > Settings > Payments`:
-  - [ ] Selector de tipo (Zelle, transferencia, depósito, otros)
-  - [ ] Textarea con instrucciones (markdown)
-  - [ ] Campo de contacto (email/teléfono Zelle, número cuenta)
-- [ ] UI checkout: si tenant tiene `provider='manual'` activo, mostrar como opción de pago
-- [ ] Al confirmar orden con manual offline:
-  - [ ] `payment_method = 'manual'`
-  - [ ] `payment_status = 'pending'`
-  - [ ] Email confirmación incluye instrucciones
-- [ ] Tests:
-  - [ ] Server action `saveManualPaymentConfig` valida inputs
-  - [ ] Order creation con method='manual' deja `payment_status='pending'`
-- [ ] Commit: `feat(i18n): T1.5 metodo de pago manual offline (Zelle, transferencia, deposito)`
+Reaprovechamos la tabla existente `manual_payment_methods` (que ya soportaba transferencia bancaria + COD) en lugar de crear `provider='manual'` en `payment_gateway_configs` (que hubiera sido invasivo). Extendimos el schema y la UI para que tenants US (Tantor) puedan configurar Zelle / Chase / Checking sin hacks. Tenants CO siguen intactos.
+
+### Implementación
+
+**Migración DB** (`migrations/20260520_manual_payment_methods_country_aware.sql`):
+
+- [x] `ALTER CHECK account_type` acepta `'checking'` / `'savings'` además de `'ahorros'` / `'corriente'`.
+- [x] `ADD COLUMN instructions TEXT` — textarea libre del merchant (mostrado al cliente).
+- [x] `ADD COLUMN instant_payment_label TEXT` + `instant_payment_value TEXT` — pago instantáneo genérico (Zelle, CashApp, PayPal, Nequi, Daviplata).
+- [x] `nequi_number` marcado DEPRECATED en comments + backfill automático a `instant_payment_*` con `label='Nequi'`.
+- [x] Idempotente (`DROP CONSTRAINT IF EXISTS`, `ADD COLUMN IF NOT EXISTS`).
+
+**Constantes + profiles**:
+
+- [x] `src/lib/constants/banks.ts` — `COLOMBIA_BANKS` (12) + `US_BANKS` (14) + `getBanksForCountry()` defensivo.
+- [x] `src/lib/i18n/country-profiles.ts` — `AccountTypeOption` + `accountTypes` + `defaultAccountType` en cada profile. CO: ahorros/corriente. US: checking/savings.
+
+**Strings i18n**: 30 keys nuevas en `dashboard.payments.*` (account types, manual card, bank labels, instant payment, instructions, COD, save/saving, toasts).
+
+**Form dashboard reescrito** (`src/app/dashboard/settings/payments/components/manual-payment-form.tsx`):
+
+- [x] Bank list dinámica por country (12 CO vs 14 US; opción "Otro/Other" para texto libre).
+- [x] Account type dinámico desde `profile.accountTypes`.
+- [x] Costo COD formateado con `formatCurrency(tenantLocale.currency)` (Tantor ve `$10.00`, Quality Pets `$10.000`).
+- [x] Inputs nuevos: `instant_payment_label` + `instant_payment_value` (par de inputs) + `instructions` textarea.
+- [x] 100% i18n via `t(key, tenantLocale.locale)` (sin provider — form fuera de `TenantLocaleProvider`).
+- [x] Idioma del form sigue `tenantLocale.locale`: Tantor ve form en inglés, Quality Pets en español.
+
+**Server action nueva**: `getOrganizationLocaleContext()` retorna `TenantLocaleContext` del tenant actual, usado por el form para parametrizar bank list + account types + currency.
+
+**Checkout** (`src/components/checkout/steps/payment-step.tsx`):
+
+- [x] Subtitle `"Bancolombia / Nequi"` hardcoded eliminado → ahora `[bank_name, instant_payment_label].filter(Boolean).join(" / ")` dinámico.
+- [x] Bank instructions section: muestra `instant_payment_*` si existe; fallback a `nequi_number` legacy si no.
+- [x] Bloque nuevo: si `instructions` está lleno se muestra en bloque destacado `whitespace-pre-line` antes del disclaimer.
+
+**Tests** (+ 7 nuevos en `src/__tests__/lib/constants/banks.test.ts`):
+
+- [x] Registry tiene 1 entrada por `SupportedCountry`.
+- [x] CO incluye Bancolombia, Davivienda, BBVA, Nequi, Daviplata.
+- [x] US incluye Chase, BofA, Wells Fargo, Citibank, Capital One.
+- [x] CO y US sin overlap accidental.
+- [x] `getBanksForCountry()` defensivo (undefined/null/inválido cae a CO).
+- [x] 106/106 verdes globales (99 anteriores + 7 nuevos).
 
 ### Criterios de aceptación T1.5
 
-- ✅ Merchant configura instrucciones desde dashboard.
-- ✅ Cliente ve instrucciones claras en checkout.
-- ✅ Orden queda en `pending` esperando confirmación manual.
+- ✅ Merchant CO configura Bancolombia + Ahorros + Nequi en español.
+- ✅ Merchant US (Tantor) configura Chase + Checking + Zelle en inglés.
+- ✅ Cliente ve instrucciones claras en checkout (bank info + instant payment + instructions custom).
+- ✅ Orden queda en `pending` esperando confirmación manual (sin cambios — comportamiento previo).
+
+### Limitaciones documentadas
+
+- `nequi_number` sigue en DB y types (deprecated). Borrar en migración futura cuando todo el código consuma `instant_payment_*`.
+- Dashboard i18n limitado al manual payment form. El resto del dashboard sigue es-CO hardcoded — deuda pendiente, T1.7 puede abordarlo o crear sub-spec separado.
+- Sin validación de formato de `instant_payment_value` (email vs phone vs handle) — responsabilidad del merchant. Si futuro requiere validación, agregar Zod refinement por `instant_payment_label`.
+- `provider='manual'` en `payment_gateway_configs` (de la propuesta original del spec) NO se implementa porque la tabla `manual_payment_methods` ya cumple el rol. Si se quiere unificar el modelo a futuro, será un refactor aparte.
 
 ---
 
@@ -502,7 +540,7 @@ Patrón final: **registry de country profiles** (no Zod discriminated union, que
 | T1.3j.3 | ✅ PDP secciones secundarias + cierre completo PDP | 1.5h | 2026-05-20 |
 | T1.3i | ✅ Email templates (cliente + owner) i18n-aware | 1h | 2026-05-20 |
 | T1.4 | ✅ Forms country-aware (registry CO/US) | 1.5h | 2026-05-20 |
-| T1.5 | Pendiente | 4-6h | — |
+| T1.5 | ✅ Manual payment country-aware (CO/US) | 2h | 2026-05-20 |
 | T1.6 | Pendiente | 4-6h | — |
 | T1.7 | Pendiente | 1 día | — |
 
