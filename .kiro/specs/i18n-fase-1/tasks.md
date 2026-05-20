@@ -260,11 +260,26 @@ Dividido en 3 sub-slices por tamaño (2184 líneas client + page metadata + cta-
 - [x] 4 keys nuevas en `store.product_detail.*` + 3 tests (54/54 verdes).
 - [x] Cero `any` en el directorio `/producto/[slugOrId]/`.
 
-#### T1.3j.2 — Render principal (pendiente)
+#### T1.3j.2 — Render principal ✅ CERRADO
 
-**Pendiente.** Esfuerzo: ~2-3h.
+**Cerrado:** 2026-05-20
 
-- [ ] Strings UI del render principal: price block, stock bar, quantity selector, bundles, CTAs primary/secondary, value stack, signals row, free shipping description.
+- [x] **`useT()` reintroducido** en el componente principal.
+- [x] **Tracking event currency dinámica**: `trackAddToCart(..., currency)` en vez de `"COP"` hardcoded. Tantor envía `'USD'` a Meta/PostHog.
+- [x] **`inventoryMessage` useMemo migrado**: 13 strings via `t()`, concordancia singular/plural inline para es-CO. `inventoryCfg{Badge,Title,Description}` extraídos a vars locales para satisfacer React Compiler.
+- [x] **CTA defaults**: 6 fallback strings (`cta_buy_now`, `cta_buy_now_with_price` con `{{price}}` interpolado, etc.).
+- [x] **Image OOS overlay**: `Color agotado` + `Agotado`.
+- [x] **Bundle price block**: 4 strings (Valor individual, Descuento configurado, Precio del kit hoy, Ahorras X (Y% descuento)).
+- [x] **Stock bar**: Disponibilidad, ¡Quedan solo X!, Disponible hoy, Agotado.
+- [x] **Variant selectors**: tooltip + label `Agotado` (4 sitios).
+- [x] **Quantity pricing**: título, mínimo, ranges (X-Y vs X+), per unit.
+- [x] **Quantity selector**: Cantidad + Total.
+- [x] **Hero value rows + signals**: 8 strings interpolados.
+- [x] **Price support label**: 6 variantes traducidas.
+- [x] **Active promotion label**: percent_off + amount_off.
+- [x] **CTA unavailable**: 3 sitios (desktop, mobile sticky, desktop sticky).
+- [x] **Helpers externos parametrizados**: `OfferCountdown` recibe `label`, `ProductShippingCard` recibe `labels` (objeto con funciones para interpolar).
+- [x] 60 keys nuevas en `store.product_detail.*` + 8 tests (62/62 verdes).
 
 #### T1.3j.3 — Secciones secundarias (pendiente)
 
@@ -422,7 +437,7 @@ Dividido en 3 sub-slices por tamaño (2184 líneas client + page metadata + cta-
 | T1.3g | ✅ Order detail page + currency aware | 1h | 2026-05-20 |
 | T1.3h | ✅ Profile view + access form | 1.5h | 2026-05-20 |
 | T1.3j.1 | ✅ PDP infraestructura (formatCurrency + page metadata + cta) | 45min | 2026-05-20 |
-| T1.3j.2 | Pendiente (PDP render principal) | ~2-3h | — |
+| T1.3j.2 | ✅ PDP render principal + currency en tracking | 2h | 2026-05-20 |
 | T1.3j.3 | Pendiente (PDP secciones secundarias) | ~1-2h | — |
 | T1.3i | Pendiente (emails) | ~3-4h | — |
 | T1.4 | Pendiente | 4-6h | — |
