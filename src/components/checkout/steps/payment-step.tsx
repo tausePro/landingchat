@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { AppliedCoupon, CartItem } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 import { OrderSummary } from "../components/order-summary"
 import type { ManualPaymentInfo, PaymentGatewayOption, PaymentMethod } from "../types"
 
@@ -81,6 +82,7 @@ export function PaymentStep({
     onBack,
     onPlaceOrder,
 }: PaymentStepProps) {
+    const t = useT()
     const showBankInstructions = paymentMethod === "manual" && manualPaymentInfo?.bank_transfer_enabled
 
     return (
@@ -99,14 +101,14 @@ export function PaymentStep({
                                     <p className="text-xs text-green-600 dark:text-green-400">{appliedCoupon.description}</p>
                                 </div>
                             </div>
-                            <button onClick={onRemoveCoupon} className="text-red-500 hover:text-red-700 p-1" aria-label="Quitar cupón">
+                            <button onClick={onRemoveCoupon} className="text-red-500 hover:text-red-700 p-1" aria-label={t("store.checkout.coupon_remove_aria")}>
                                 <span className="material-symbols-outlined text-sm">close</span>
                             </button>
                         </div>
                     ) : (
                         <div className="flex gap-2">
                             <Input
-                                placeholder="Código de cupón"
+                                placeholder={t("store.checkout.coupon_placeholder")}
                                 value={couponCode}
                                 onChange={onCouponCodeChange}
                                 className="h-10 rounded-lg border-gray-300 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm"
@@ -124,7 +126,7 @@ export function PaymentStep({
                                 disabled={couponLoading || !couponCode.trim()}
                                 className="h-10 px-4 shrink-0 text-sm"
                             >
-                                {couponLoading ? "..." : "Aplicar"}
+                                {couponLoading ? t("store.checkout.coupon_loading") : t("store.checkout.coupon_apply_btn")}
                             </Button>
                         </div>
                     )}
@@ -134,13 +136,13 @@ export function PaymentStep({
                 {/* Métodos de pago */}
                 <div className="space-y-3">
                     <div>
-                        <Label>Método de pago</Label>
+                        <Label>{t("store.checkout.payment_method_label")}</Label>
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Elige cómo quieres pagar. Si algo falla, conservaremos la orden para que puedas reintentarlo.
+                            {t("store.checkout.payment_method_subtitle")}
                         </p>
                     </div>
                     {gatewaysLoading ? (
-                        <div className="text-center py-4 text-slate-500">Cargando métodos de pago...</div>
+                        <div className="text-center py-4 text-slate-500">{t("store.checkout.gateways_loading")}</div>
                     ) : (
                         <div className="grid grid-cols-2 gap-3">
                             {availableGateways.map((gateway) => {
@@ -176,7 +178,7 @@ export function PaymentStep({
                                             </>
                                         )}
                                         {gateway.is_test_mode && (
-                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Pruebas</span>
+                                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">{t("store.checkout.gateway_test_mode")}</span>
                                         )}
                                     </div>
                                 )
@@ -192,7 +194,7 @@ export function PaymentStep({
                                     )}
                                     onClick={() => onPaymentMethodChange("manual")}
                                 >
-                                    <span className="font-bold">Transferencia</span>
+                                    <span className="font-bold">{t("store.checkout.payment_bank_transfer_label")}</span>
                                     <span className="text-xs text-center text-slate-500">Bancolombia / Nequi</span>
                                 </div>
                             )}
@@ -207,9 +209,9 @@ export function PaymentStep({
                                     )}
                                     onClick={() => onPaymentMethodChange("contraentrega")}
                                 >
-                                    <span className="font-bold">Contra Entrega</span>
+                                    <span className="font-bold">{t("store.checkout.payment_cod_label")}</span>
                                     <span className="text-xs text-center text-slate-500">
-                                        Paga al recibir
+                                        {t("store.checkout.payment_cod_subtitle")}
                                         {(manualPaymentInfo.cod_additional_cost ?? 0) > 0 && (
                                             <span className="block text-amber-600">
                                                 +${(manualPaymentInfo.cod_additional_cost ?? 0).toLocaleString("es-CO")}
@@ -242,30 +244,30 @@ export function PaymentStep({
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 space-y-3 lg:col-start-1">
                     <h4 className="font-semibold text-blue-800 dark:text-blue-300 flex items-center gap-2">
                         <span className="material-symbols-outlined">account_balance</span>
-                        Datos para Transferencia
+                        {t("store.checkout.bank_section_title")}
                     </h4>
                     <div className="text-sm space-y-2 text-blue-900 dark:text-blue-200">
                         {manualPaymentInfo.bank_name && (
                             <div className="flex justify-between">
-                                <span className="text-blue-600 dark:text-blue-400">Banco:</span>
+                                <span className="text-blue-600 dark:text-blue-400">{t("store.checkout.bank_field_bank")}</span>
                                 <span className="font-medium">{manualPaymentInfo.bank_name}</span>
                             </div>
                         )}
                         {manualPaymentInfo.account_type && (
                             <div className="flex justify-between">
-                                <span className="text-blue-600 dark:text-blue-400">Tipo:</span>
+                                <span className="text-blue-600 dark:text-blue-400">{t("store.checkout.bank_field_type")}</span>
                                 <span className="font-medium capitalize">{manualPaymentInfo.account_type}</span>
                             </div>
                         )}
                         {manualPaymentInfo.account_number && (
                             <div className="flex justify-between">
-                                <span className="text-blue-600 dark:text-blue-400">Cuenta:</span>
+                                <span className="text-blue-600 dark:text-blue-400">{t("store.checkout.bank_field_account")}</span>
                                 <span className="font-mono font-medium">{manualPaymentInfo.account_number}</span>
                             </div>
                         )}
                         {manualPaymentInfo.account_holder && (
                             <div className="flex justify-between">
-                                <span className="text-blue-600 dark:text-blue-400">Titular:</span>
+                                <span className="text-blue-600 dark:text-blue-400">{t("store.checkout.bank_field_holder")}</span>
                                 <span className="font-medium">{manualPaymentInfo.account_holder}</span>
                             </div>
                         )}
@@ -273,14 +275,14 @@ export function PaymentStep({
                             <>
                                 <hr className="border-blue-200 dark:border-blue-700" />
                                 <div className="flex justify-between">
-                                    <span className="text-blue-600 dark:text-blue-400">Nequi:</span>
+                                    <span className="text-blue-600 dark:text-blue-400">{t("store.checkout.bank_field_nequi")}</span>
                                     <span className="font-mono font-medium">{manualPaymentInfo.nequi_number}</span>
                                 </div>
                             </>
                         )}
                     </div>
                     <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                        Recuerda enviar el comprobante de pago al WhatsApp de la tienda.
+                        {t("store.checkout.bank_disclaimer")}
                     </p>
                 </div>
             )}
@@ -292,7 +294,7 @@ export function PaymentStep({
                         <span className="material-symbols-outlined text-amber-500">info</span>
                         <div>
                             <p className="text-sm text-amber-800 dark:text-amber-200">
-                                La tienda no tiene métodos de pago disponibles en este momento. Intenta más tarde o contacta a la tienda.
+                                {t("store.checkout.no_payment_methods_full")}
                             </p>
                         </div>
                     </div>
@@ -303,19 +305,19 @@ export function PaymentStep({
             <div className="space-y-3 pt-2 lg:col-start-1">
                 <div className="flex gap-3">
                     <Button variant="outline" onClick={onBack} className="flex-1">
-                        Atrás
+                        {t("store.checkout.action_back")}
                     </Button>
                     <Button
                         onClick={onPlaceOrder}
                         disabled={loading || gatewaysLoading || !hasConfiguredPaymentMethods}
                         className="flex-1 bg-primary text-white hover:bg-primary/90"
                     >
-                        {loading ? "Creando orden..." : "Confirmar pedido"}
+                        {loading ? t("store.checkout.action_creating_order") : t("store.checkout.action_place_order")}
                     </Button>
                 </div>
                 <div className="flex items-center justify-center gap-2 text-slate-400 opacity-80">
                     <span className="material-symbols-outlined text-base text-green-500">verified_user</span>
-                    <span className="text-xs font-medium">Pago procesado por métodos seguros de la tienda.</span>
+                    <span className="text-xs font-medium">{t("store.checkout.action_secure_disclaimer")}</span>
                 </div>
             </div>
         </div>

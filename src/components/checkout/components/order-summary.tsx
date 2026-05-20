@@ -2,6 +2,7 @@
 
 import type { AppliedCoupon, CartItem } from "@/store/cart-store"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 import { formatPrice } from "../utils/format-price"
 
 interface OrderSummaryProps {
@@ -37,12 +38,13 @@ export function OrderSummary({
     appliedCoupon,
     finalTotal,
 }: OrderSummaryProps) {
+    const t = useT()
     return (
         <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3 text-sm lg:sticky lg:top-4">
             <div>
-                <h4 className="font-semibold text-slate-900 dark:text-white">Resumen de tu pedido</h4>
+                <h4 className="font-semibold text-slate-900 dark:text-white">{t("store.checkout.summary_title")}</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Este es el total final antes de crear la orden.
+                    {t("store.checkout.summary_subtitle")}
                 </p>
             </div>
             <div className="space-y-2 pb-2 border-b border-slate-200 dark:border-slate-700 mb-2">
@@ -66,14 +68,16 @@ export function OrderSummary({
             </div>
             <div className="flex justify-between">
                 <span className="text-slate-500 dark:text-slate-400">
-                    {displayTax > 0 ? "Base gravable" : `Subtotal (${items.length} items)`}
+                    {displayTax > 0
+                        ? t("store.checkout.summary_taxable_base")
+                        : t("store.checkout.summary_subtotal_with_count", { count: items.length })}
                 </span>
                 <span>{formatPrice(displaySubtotal)}</span>
             </div>
             {displayTax > 0 && (
                 <div className="flex justify-between">
                     <span className="text-slate-500 dark:text-slate-400">
-                        IVA{pricesIncludeTax ? " (incluido)" : ""}
+                        {t("store.checkout.summary_iva")}{pricesIncludeTax ? t("store.checkout.summary_iva_included_suffix") : ""}
                     </span>
                     <span>
                         {pricesIncludeTax ? "" : "+"}
@@ -82,7 +86,7 @@ export function OrderSummary({
                 </div>
             )}
             <div className="flex justify-between">
-                <span className="text-slate-500 dark:text-slate-400">Envío</span>
+                <span className="text-slate-500 dark:text-slate-400">{t("store.checkout.summary_shipping")}</span>
                 <span>
                     {couponFreeShipping ? (
                         <span className="line-through text-slate-400 mr-1">{formatPrice(displayShipping)}</span>
@@ -92,18 +96,18 @@ export function OrderSummary({
             </div>
             {displayFee > 0 && (
                 <div className="flex justify-between text-amber-600">
-                    <span>Costo Contraentrega</span>
+                    <span>{t("store.checkout.summary_cod_fee")}</span>
                     <span>{formatPrice(displayFee)}</span>
                 </div>
             )}
             {couponDiscount > 0 && (
                 <div className="flex justify-between text-green-600">
-                    <span>Descuento ({appliedCoupon?.code})</span>
+                    <span>{t("store.checkout.summary_discount_with_code", { code: appliedCoupon?.code ?? "" })}</span>
                     <span>-{formatPrice(couponDiscount)}</span>
                 </div>
             )}
             <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between font-bold text-base">
-                <span>Total a Pagar</span>
+                <span>{t("store.checkout.summary_total")}</span>
                 <span className="text-primary">{formatPrice(finalTotal)}</span>
             </div>
         </div>
