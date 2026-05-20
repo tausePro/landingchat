@@ -4,6 +4,9 @@ import { Clock } from "lucide-react"
 import { getOrderDetails } from "../../../actions"
 import { CheckStatusButton } from "./check-status-button"
 import { OrderStatusTracker } from "@/components/analytics/order-status-tracker"
+import { formatCurrency } from "@/lib/utils"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { t } from "@/lib/i18n/storefront-strings"
 
 interface PendingPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -17,16 +20,11 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
 
     if (!result) notFound()
 
-    const { order } = result
+    const { order, organization } = result
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount)
-    }
+    // i18n Fase 1 (T1.2 + T1.3): contexto del tenant para moneda y strings.
+    const tenantLocale = getTenantLocale(organization)
+    const locale = tenantLocale.locale
 
     return (
         <div className="min-h-screen bg-background-light dark:bg-background-dark flex items-center justify-center p-4">
@@ -47,12 +45,12 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
 
                     {/* Title */}
                     <h1 className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary mb-3">
-                        Pago Pendiente
+                        {t("order.pending.title", locale)}
                     </h1>
 
                     {/* Message */}
                     <p className="text-lg text-text-light-secondary dark:text-text-dark-secondary mb-8">
-                        Tu pago está siendo procesado. Esto puede tomar unos minutos.
+                        {t("order.pending.message", locale)}
                     </p>
 
                     {/* Order Details */}
@@ -60,7 +58,7 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
                         <div className="space-y-4">
                             <div className="flex justify-between items-center pb-4 border-b border-border-light dark:border-border-dark">
                                 <span className="text-text-light-secondary dark:text-text-dark-secondary">
-                                    Número de Pedido
+                                    {t("order.common.order_number", locale)}
                                 </span>
                                 <span className="font-mono font-semibold text-text-light-primary dark:text-text-dark-primary">
                                     {order.order_number || `#${order.id.slice(0, 8)}`}
@@ -69,19 +67,19 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
 
                             <div className="flex justify-between items-center pb-4 border-b border-border-light dark:border-border-dark">
                                 <span className="text-text-light-secondary dark:text-text-dark-secondary">
-                                    Monto
+                                    {t("order.common.amount", locale)}
                                 </span>
                                 <span className="text-2xl font-bold text-text-light-primary dark:text-text-dark-primary">
-                                    {formatCurrency(order.total)}
+                                    {formatCurrency(order.total, tenantLocale)}
                                 </span>
                             </div>
 
                             <div className="flex justify-between items-center">
                                 <span className="text-text-light-secondary dark:text-text-dark-secondary">
-                                    Estado del Pago
+                                    {t("order.common.payment_status", locale)}
                                 </span>
                                 <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400">
-                                    Pendiente
+                                    {t("order.status.pending", locale)}
                                 </span>
                             </div>
                         </div>
@@ -90,24 +88,24 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
                     {/* Instructions */}
                     <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-8 text-left">
                         <h2 className="font-semibold text-text-light-primary dark:text-text-dark-primary mb-3">
-                            ¿Qué significa esto?
+                            {t("order.pending.what_means_title", locale)}
                         </h2>
                         <ul className="space-y-2 text-sm text-text-light-secondary dark:text-text-dark-secondary">
                             <li className="flex items-start gap-2">
                                 <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                                <span>Tu pago está siendo verificado por la pasarela de pagos</span>
+                                <span>{t("order.pending.what_means_verifying", locale)}</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                                <span>Recibirás una notificación cuando se confirme el pago</span>
+                                <span>{t("order.pending.what_means_notification", locale)}</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                                <span>Puedes verificar el estado en cualquier momento</span>
+                                <span>{t("order.pending.what_means_check_anytime", locale)}</span>
                             </li>
                             <li className="flex items-start gap-2">
                                 <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                                <span>Si el pago no se confirma en 24 horas, será cancelado automáticamente</span>
+                                <span>{t("order.pending.what_means_24h_expiry", locale)}</span>
                             </li>
                         </ul>
                     </div>
@@ -119,7 +117,7 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
                             href={`/store/${slug}`}
                             className="px-6 py-3 rounded-lg border border-border-light dark:border-border-dark text-text-light-primary dark:text-text-dark-primary font-medium hover:bg-background-light dark:hover:bg-background-dark transition-colors"
                         >
-                            Volver a la Tienda
+                            {t("order.common.back_to_store", locale)}
                         </Link>
                     </div>
                 </div>

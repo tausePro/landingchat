@@ -100,33 +100,65 @@
 
 ## T1.3 — Diccionario i18n storefront público
 
-**Estimado:** 1-2 días (slice más grande)
-**Estado:** Pendiente
+**Estimado total:** 1-2 días (dividido en sub-slices T1.3a → T1.3z)
+**Estado:** T1.3a + T1.3b cerrados (2026-05-19). T1.3c+ pendientes.
 
-### Subtareas
+### T1.3a — Infraestructura del diccionario ✅ CERRADO
 
-- [ ] Crear `src/lib/i18n/storefront-strings.ts` con tipo `StorefrontStringKey` y dict `{es-CO, en-US}`
-- [ ] Crear helper `t(key, locale)` con fallback a `es-CO`
-- [ ] Crear `src/lib/i18n/use-tenant-strings.ts` con `TenantLocaleProvider` + `useT()` hook
-- [ ] Extraer strings de los siguientes archivos en orden:
-  - [ ] Storefront templates (`src/components/store/templates/*`)
-  - [ ] PDP (`src/app/store/[slug]/products/[productId]/...`)
-  - [ ] Carrito (`src/components/store/cart/...`)
-  - [ ] Checkout (`src/app/chat/components/checkout-modal.tsx`, `src/app/store/[slug]/checkout/...`)
-  - [ ] Emails (`src/components/emails/...`) — solo strings, no templates aún
-- [ ] Pasar `organization.locale` desde Server Components y `TenantLocaleProvider` desde Client Components
-- [ ] Tests:
-  - [ ] `t('cart.empty', 'es-CO')` → "Tu carrito está vacío"
-  - [ ] `t('cart.empty', 'en-US')` → "Your cart is empty"
-  - [ ] `t('unknown.key', 'en-US')` → fallback a es-CO o error claro
-- [ ] Commits separados por área (storefront templates, PDP, carrito, checkout)
+**Cerrado:** 2026-05-19
 
-### Criterios de aceptación T1.3
+- [x] Crear `src/lib/i18n/storefront-strings.ts` con dict `{es-CO, en-US}` indexado por `SupportedLocale`
+- [x] Tipo `StorefrontStringKey` derivado del dict base `'es-CO'` (compile-time check de keys)
+- [x] Usar `as const satisfies Record<SupportedLocale, ...>` para preservar literal types + verificar paridad
+- [x] Helper `t(key, locale)` con cascada de fallbacks:
+  - Locale inválido → `'es-CO'`
+  - Key faltante en locale → busca en `'es-CO'`
+  - Key tampoco en `'es-CO'` → devuelve la key (visible para debug)
+- [x] Crear `src/lib/i18n/use-tenant-strings.tsx` con:
+  - `TenantLocaleProvider` (Client Component) para árbol de Client Components
+  - `useTenantLocale()` hook que retorna el locale actual
+  - `useT()` hook memoizado con `useCallback`
+- [x] Tests `src/__tests__/lib/i18n/storefront-strings.test.ts`:
+  - 12 tests cubriendo estructura del dict, lookups directos, fallbacks, paridad de keys es-CO ↔ en-US
+- [x] Seed inicial del diccionario con 31 keys de las 3 order pages (success/pending/error + status pills + common)
+- [x] Validaciones: tsc + eslint + 44/44 tests verdes (15 tenant-locale + 12 storefront-strings + 17 utils)
+- [x] Commit: `feat(i18n): T1.3a infraestructura diccionario storefront`
 
-- ✅ Diccionario tiene al menos 80% de los strings del storefront público.
-- ✅ Strings dispersos en componentes reemplazados por `t()` o `useT()`.
-- ✅ Tenant en `es-CO` sigue viendo todo en español sin cambios visuales.
-- ✅ Tenant en `en-US` (mock) muestra storefront en inglés correctamente.
+### T1.3b — Migrar order success / pending / error pages ✅ CERRADO
+
+**Cerrado:** 2026-05-19
+
+- [x] `src/app/store/[slug]/order/[orderId]/success/page.tsx`:
+  - Strings hardcoded reemplazados por `t(key, locale)` (15 strings migrados)
+  - Instrucciones de transferencia bancaria Bancolombia/Nequi **NO** migradas (van a venir de `payment_gateway_configs` en T1.5)
+- [x] `src/app/store/[slug]/order/[orderId]/pending/page.tsx`:
+  - Eliminado helper `formatCurrency` local hardcoded; usa global con tenant context
+  - 12 strings migrados al diccionario
+- [x] `src/app/store/[slug]/order/[orderId]/error/page.tsx`:
+  - Eliminado helper `formatCurrency` local hardcoded
+  - 13 strings migrados (incluyendo helper `getErrorMessage()` que devuelve `t(...)`)
+- [x] Validaciones: tsc + eslint + 44/44 tests verdes
+- [x] Commit: `feat(i18n): T1.3b migrar order pages al diccionario`
+
+### T1.3c+ — Áreas pendientes (próximas sesiones / delegables)
+
+**Pendiente.** Cada área es un sub-slice independiente. Pueden delegarse a otro agente leyendo `requirements.md` + `design.md` + esta sección.
+
+- [ ] **T1.3c** — Storefront templates (`src/components/store/templates/*`): home, navegación, header/footer. Esfuerzo: ~4h.
+- [ ] **T1.3d** — PDP (Product Detail Page) `src/app/store/[slug]/producto/[slugOrId]/product-detail-client.tsx` (21 matches de `formatCurrency`). Esfuerzo: ~4-6h. Es Client Component, requiere usar `useT()` + `TenantLocaleProvider`.
+- [ ] **T1.3e** — Carrito `src/components/store/cart/...`. Esfuerzo: ~2-3h.
+- [ ] **T1.3f** — Checkout (`src/app/chat/components/checkout-modal.tsx`, `src/app/store/[slug]/checkout/...`). Esfuerzo: ~4-6h. Strings + forms (forms van a T1.4).
+- [ ] **T1.3g** — Order detail page `src/app/store/[slug]/order/[orderId]/page.tsx` (8 matches). Esfuerzo: ~2h.
+- [ ] **T1.3h** — Profile view `src/app/store/[slug]/profile/components/profile-view.tsx`. Esfuerzo: ~1h.
+- [ ] **T1.3i** — Emails templates (`src/lib/notifications/email.ts` + `src/components/emails/...`). Esfuerzo: ~3-4h. Se entrelaza con T1.7.
+
+### Criterios de aceptación T1.3 (cuando se cierre completo)
+
+- ✅ Diccionario tiene cobertura del storefront público.
+- ✅ Strings dispersos reemplazados por `t()` o `useT()`.
+- ✅ Tenant en `es-CO` sigue viendo todo en español sin cambios visuales (verificado con QP/Tez/etc).
+- ✅ Tenant en `en-US` (mock o Tantors) muestra storefront en inglés correctamente.
+- ✅ Cero regresión en tests E2E (manuales) sobre tenants COP.
 
 ---
 
@@ -252,7 +284,9 @@
 | --- | --- | --- | --- |
 | T1.1 | ✅ Código listo (pending migration apply) | 2h | 2026-05-19 |
 | T1.2 | ✅ Cerrado | 4h | 2026-05-19 |
-| T1.3 | Pendiente | 1-2 días | — |
+| T1.3a | ✅ Infra diccionario cerrado | 3h | 2026-05-19 |
+| T1.3b | ✅ Order pages migradas | 1h | 2026-05-19 |
+| T1.3c-i | Pendiente (templates, PDP, carrito, checkout, order detail, profile, emails) | ~1 día | — |
 | T1.4 | Pendiente | 4-6h | — |
 | T1.5 | Pendiente | 4-6h | — |
 | T1.6 | Pendiente | 4-6h | — |
