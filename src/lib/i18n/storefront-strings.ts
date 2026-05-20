@@ -113,6 +113,44 @@ export const storefrontStrings = {
     "store.home.products_section_title": "Nuestros Productos",
     "store.home.empty_catalog_title": "Estamos preparando el catálogo",
     "store.home.empty_catalog_message": "Aún no hay productos publicados en esta tienda.",
+    // Home — CompleteTemplate específico (hero extendido + secciones largas)
+    "store.home.hero_subtitle_complete_default": "Sin buscar, sin filtros, solo conversación. Nuestro asistente de IA te ayuda a encontrar exactamente lo que necesitas en segundos.",
+    "store.home.hero_badge": "✨ La nueva forma de comprar",
+    "store.home.hero_cta_catalog": "Ver Catálogo",
+    "store.home.hero_whatsapp_greeting": "Hola, quiero más información",
+    "store.home.hero_chat_demo_ai_label": "IA",
+    "store.home.hero_chat_demo_you_label": "Tú",
+    "store.home.hero_chat_demo_greeting": "¡Hola! 👋 Soy tu asistente personal. ¿Qué estás buscando hoy?",
+    "store.home.hero_chat_demo_user_query": "Busco un regalo para mi novia, le gusta la tecnología.",
+    "store.home.hero_chat_demo_bot_response": "¡Perfecto! Tengo unas opciones geniales. ¿Qué tal estos audífonos con cancelación de ruido? 🎧",
+    "store.home.hero_stat_national_shipping": "Envíos Nacionales",
+    "store.home.hero_stat_secure_purchase": "Compra Segura",
+    // Steps "Cómo funciona" (3 pasos)
+    "store.home.steps_step1_title": "1. Chatea",
+    "store.home.steps_step1_description": "Cuéntale a nuestro asistente qué necesitas, como si hablaras con un amigo.",
+    "store.home.steps_step2_title": "2. Elige",
+    "store.home.steps_step2_description": "Recibe recomendaciones personalizadas y selecciona tu favorita.",
+    "store.home.steps_step3_title": "3. Recibe",
+    "store.home.steps_step3_description": "Coordina el envío y el pago directamente en el chat. ¡Listo!",
+    "store.home.how_it_works_title": "Cómo funciona",
+    "store.home.how_it_works_subtitle": "Comprar nunca fue tan fácil. Olvídate de los carritos complicados.",
+    // Features section
+    "store.home.features_title": "¿Por qué elegirnos?",
+    "store.home.features_subtitle": "Beneficios que hacen la diferencia",
+    // Products section
+    "store.home.products_section_title_default": "Tendencias",
+    "store.home.products_section_subtitle_default": "Lo más vendido de la semana",
+    "store.home.products_filter_all": "Todos",
+    "store.home.products_empty_filtered_title": "No encontramos productos para este filtro",
+    "store.home.products_empty_filtered_message": "Prueba otra categoría o vuelve al catálogo completo.",
+    // Testimonials section
+    "store.home.testimonials_title": "Lo que dicen nuestros clientes",
+    "store.home.testimonials_subtitle": "Testimonios reales de personas satisfechas",
+    // Final CTA section
+    "store.home.cta_title": "¿Listo para empezar?",
+    "store.home.cta_subtitle": "Únete a miles de clientes satisfechos que ya compran de manera inteligente.",
+    // Footer — link extra "Contacto"
+    "store.footer.nav_contact": "Contacto",
   },
   "en-US": {
     // Order pages — common area
@@ -187,6 +225,44 @@ export const storefrontStrings = {
     "store.home.products_section_title": "Our Products",
     "store.home.empty_catalog_title": "We're preparing the catalog",
     "store.home.empty_catalog_message": "There are no products published in this store yet.",
+    // Home — CompleteTemplate specific (extended hero + large sections)
+    "store.home.hero_subtitle_complete_default": "No searching, no filters, just conversation. Our AI assistant helps you find exactly what you need in seconds.",
+    "store.home.hero_badge": "✨ The new way to shop",
+    "store.home.hero_cta_catalog": "View Catalog",
+    "store.home.hero_whatsapp_greeting": "Hi, I'd like more information",
+    "store.home.hero_chat_demo_ai_label": "AI",
+    "store.home.hero_chat_demo_you_label": "You",
+    "store.home.hero_chat_demo_greeting": "Hi there! 👋 I'm your personal assistant. What are you looking for today?",
+    "store.home.hero_chat_demo_user_query": "I'm looking for a gift for my partner, they like tech.",
+    "store.home.hero_chat_demo_bot_response": "Perfect! I have some great options. How about these noise-cancelling headphones? 🎧",
+    "store.home.hero_stat_national_shipping": "Nationwide Shipping",
+    "store.home.hero_stat_secure_purchase": "Secure Checkout",
+    // Steps "How it works" (3 steps)
+    "store.home.steps_step1_title": "1. Chat",
+    "store.home.steps_step1_description": "Tell our assistant what you need, just like talking to a friend.",
+    "store.home.steps_step2_title": "2. Choose",
+    "store.home.steps_step2_description": "Get personalized recommendations and pick your favorite.",
+    "store.home.steps_step3_title": "3. Receive",
+    "store.home.steps_step3_description": "Arrange shipping and payment directly in the chat. Done!",
+    "store.home.how_it_works_title": "How it works",
+    "store.home.how_it_works_subtitle": "Shopping has never been easier. Forget the complicated carts.",
+    // Features section
+    "store.home.features_title": "Why choose us?",
+    "store.home.features_subtitle": "Benefits that make the difference",
+    // Products section
+    "store.home.products_section_title_default": "Trending",
+    "store.home.products_section_subtitle_default": "Best sellers of the week",
+    "store.home.products_filter_all": "All",
+    "store.home.products_empty_filtered_title": "We couldn't find products for this filter",
+    "store.home.products_empty_filtered_message": "Try another category or go back to the full catalog.",
+    // Testimonials section
+    "store.home.testimonials_title": "What our customers say",
+    "store.home.testimonials_subtitle": "Real testimonials from happy people",
+    // Final CTA section
+    "store.home.cta_title": "Ready to get started?",
+    "store.home.cta_subtitle": "Join thousands of happy customers already shopping smarter.",
+    // Footer — extra "Contact" link
+    "store.footer.nav_contact": "Contact",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 
