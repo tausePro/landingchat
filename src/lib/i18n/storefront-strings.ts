@@ -327,6 +327,88 @@ export const storefrontStrings = {
     // Payment status badge
     "store.order_detail.payment_status_paid": "Pago Aprobado",
     "store.order_detail.payment_status_pending": "Pago Pendiente",
+    // ========================================================================
+    // Profile page (T1.3h) — `/store/[slug]/profile`
+    // ========================================================================
+    // Header / nav
+    "store.profile.nav_home": "Inicio",
+    "store.profile.nav_products": "Productos",
+    "store.profile.nav_account": "Mi Cuenta",
+    "store.profile.back_to_store": "Volver a la Tienda",
+    // Profile header / greeting
+    "store.profile.greeting": "Hola, {{name}}",
+    "store.profile.welcome_subtitle": "Es un gusto tenerte de vuelta. Aquí está el resumen de tu actividad.",
+    // Tabs
+    "store.profile.tab_orders": "Mis Pedidos",
+    "store.profile.tab_conversations": "Mis Conversaciones",
+    "store.profile.tab_tracking": "Seguimiento de Envío",
+    // Status badges (más concisos que order_detail)
+    "store.profile.status_delivered": "Entregado",
+    "store.profile.status_in_transit": "En tránsito",
+    "store.profile.status_processing": "Procesando",
+    "store.profile.status_payment_pending": "Pendiente Pago",
+    // Active shipments section
+    "store.profile.shipments_section_title": "Envíos Activos",
+    "store.profile.order_with_number": "Pedido {{number}}",
+    "store.profile.estimated_delivery_label": "Entrega estimada:",
+    "store.profile.estimated_delivery_value": "Próximamente",
+    "store.profile.see_details": "Ver Detalles",
+    "store.profile.shipping_progress_processed": "Procesado",
+    "store.profile.shipping_progress_in_transit": "En camino",
+    "store.profile.shipping_progress_delivered": "Entregado",
+    // Orders history table
+    "store.profile.orders_history_title": "Historial de Pedidos",
+    "store.profile.search_orders_placeholder": "Buscar pedido...",
+    "store.profile.table_col_order_id": "ID Pedido",
+    "store.profile.table_col_date": "Fecha",
+    "store.profile.table_col_total": "Total",
+    "store.profile.table_col_status": "Estado",
+    "store.profile.table_col_actions": "Acciones",
+    "store.profile.no_orders_match_search": "No se encontraron pedidos con ese criterio",
+    "store.profile.no_orders_yet": "No tienes pedidos aún",
+    "store.profile.showing_count": "Mostrando {{shown}} de {{total}} pedidos",
+    // Conversations tab (empty state)
+    "store.profile.start_conversation_title": "Inicia una conversación",
+    "store.profile.start_conversation_subtitle": "Chatea con nuestro asistente para obtener ayuda con tus pedidos o encontrar productos.",
+    "store.profile.start_chat_cta": "Iniciar Chat",
+    // Tracking tab
+    "store.profile.tracking_order_confirmed": "Pedido confirmado",
+    "store.profile.tracking_in_transit": "En tránsito",
+    "store.profile.tracking_shipped": "Enviado",
+    "store.profile.tracking_preparing": "Preparando envío",
+    "store.profile.tracking_no_active": "No hay envíos activos",
+    "store.profile.tracking_no_active_subtitle": "Cuando tengas pedidos en camino, aparecerán aquí con información de seguimiento.",
+    // Sidebar - chats recientes
+    "store.profile.sidebar_recent_chats": "Chats Recientes",
+    "store.profile.sidebar_view_all": "Ver todos",
+    "store.profile.sidebar_active_chat": "Conversación Activa",
+    "store.profile.sidebar_bot_assistant": "Bot Asistente",
+    "store.profile.sidebar_continue_chat_hint": "Haz clic para continuar...",
+    "store.profile.sidebar_bot_default_msg": "¿En qué más puedo ayudarte?",
+    "store.profile.sidebar_no_chats": "Aún no tienes conversaciones",
+    "store.profile.sidebar_continue_chat_cta": "Continuar Chat",
+    "store.profile.sidebar_start_chat_cta": "Iniciar Chat",
+    // Sidebar - help
+    "store.profile.help_title": "¿Necesitas ayuda?",
+    "store.profile.help_returns": "Política de devoluciones",
+    "store.profile.help_shipping": "Información de envíos",
+    "store.profile.help_faq": "Preguntas frecuentes",
+    // Floating WhatsApp / chat button
+    "store.profile.whatsapp_default_message": "Hola, tengo una consulta sobre mi pedido",
+    "store.profile.whatsapp_aria_label": "Contactar por WhatsApp",
+    "store.profile.chat_aria_label": "Iniciar chat",
+    // ProfileAccessForm (login)
+    "store.profile.access_form_title": "Mi Cuenta",
+    "store.profile.access_form_subtitle": "Valida tu acceso con el mismo nombre y WhatsApp que usaste en {{name}}",
+    "store.profile.access_form_name_label": "Nombre completo",
+    "store.profile.access_form_name_placeholder": "Ej. Juan Pérez",
+    "store.profile.access_form_phone_label": "Número de WhatsApp",
+    "store.profile.access_form_phone_placeholder": "300 123 4567",
+    "store.profile.access_form_phone_hint": "El mismo número que usaste para chatear o comprar",
+    "store.profile.access_form_submit": "Ver Mi Cuenta",
+    "store.profile.access_form_submitting": "Validando acceso...",
+    "store.profile.access_form_back": "← Volver a la tienda",
+    "store.profile.access_form_default_error": "No pudimos validar tu acceso",
   },
   "en-US": {
     // Order pages — common area
@@ -615,6 +697,88 @@ export const storefrontStrings = {
     // Payment status badge
     "store.order_detail.payment_status_paid": "Payment approved",
     "store.order_detail.payment_status_pending": "Payment pending",
+    // ========================================================================
+    // Profile page (T1.3h) — `/store/[slug]/profile`
+    // ========================================================================
+    // Header / nav
+    "store.profile.nav_home": "Home",
+    "store.profile.nav_products": "Products",
+    "store.profile.nav_account": "My Account",
+    "store.profile.back_to_store": "Back to store",
+    // Profile header / greeting
+    "store.profile.greeting": "Hi, {{name}}",
+    "store.profile.welcome_subtitle": "Welcome back. Here's a summary of your activity.",
+    // Tabs
+    "store.profile.tab_orders": "My Orders",
+    "store.profile.tab_conversations": "My Conversations",
+    "store.profile.tab_tracking": "Shipping Tracking",
+    // Status badges
+    "store.profile.status_delivered": "Delivered",
+    "store.profile.status_in_transit": "In transit",
+    "store.profile.status_processing": "Processing",
+    "store.profile.status_payment_pending": "Payment pending",
+    // Active shipments section
+    "store.profile.shipments_section_title": "Active Shipments",
+    "store.profile.order_with_number": "Order {{number}}",
+    "store.profile.estimated_delivery_label": "Estimated delivery:",
+    "store.profile.estimated_delivery_value": "Coming soon",
+    "store.profile.see_details": "See Details",
+    "store.profile.shipping_progress_processed": "Processed",
+    "store.profile.shipping_progress_in_transit": "In transit",
+    "store.profile.shipping_progress_delivered": "Delivered",
+    // Orders history table
+    "store.profile.orders_history_title": "Order History",
+    "store.profile.search_orders_placeholder": "Search order...",
+    "store.profile.table_col_order_id": "Order ID",
+    "store.profile.table_col_date": "Date",
+    "store.profile.table_col_total": "Total",
+    "store.profile.table_col_status": "Status",
+    "store.profile.table_col_actions": "Actions",
+    "store.profile.no_orders_match_search": "No orders match your search",
+    "store.profile.no_orders_yet": "You have no orders yet",
+    "store.profile.showing_count": "Showing {{shown}} of {{total}} orders",
+    // Conversations tab (empty state)
+    "store.profile.start_conversation_title": "Start a conversation",
+    "store.profile.start_conversation_subtitle": "Chat with our assistant for help with your orders or to find products.",
+    "store.profile.start_chat_cta": "Start Chat",
+    // Tracking tab
+    "store.profile.tracking_order_confirmed": "Order confirmed",
+    "store.profile.tracking_in_transit": "In transit",
+    "store.profile.tracking_shipped": "Shipped",
+    "store.profile.tracking_preparing": "Preparing shipment",
+    "store.profile.tracking_no_active": "No active shipments",
+    "store.profile.tracking_no_active_subtitle": "When you have orders on the way, they'll appear here with tracking info.",
+    // Sidebar - recent chats
+    "store.profile.sidebar_recent_chats": "Recent Chats",
+    "store.profile.sidebar_view_all": "View all",
+    "store.profile.sidebar_active_chat": "Active Conversation",
+    "store.profile.sidebar_bot_assistant": "Bot Assistant",
+    "store.profile.sidebar_continue_chat_hint": "Click to continue...",
+    "store.profile.sidebar_bot_default_msg": "What else can I help you with?",
+    "store.profile.sidebar_no_chats": "You don't have any conversations yet",
+    "store.profile.sidebar_continue_chat_cta": "Continue Chat",
+    "store.profile.sidebar_start_chat_cta": "Start Chat",
+    // Sidebar - help
+    "store.profile.help_title": "Need help?",
+    "store.profile.help_returns": "Return policy",
+    "store.profile.help_shipping": "Shipping information",
+    "store.profile.help_faq": "Frequently asked questions",
+    // Floating WhatsApp / chat button
+    "store.profile.whatsapp_default_message": "Hi, I have a question about my order",
+    "store.profile.whatsapp_aria_label": "Contact via WhatsApp",
+    "store.profile.chat_aria_label": "Start chat",
+    // ProfileAccessForm (login)
+    "store.profile.access_form_title": "My Account",
+    "store.profile.access_form_subtitle": "Validate your access with the same name and WhatsApp you used at {{name}}",
+    "store.profile.access_form_name_label": "Full name",
+    "store.profile.access_form_name_placeholder": "E.g. John Smith",
+    "store.profile.access_form_phone_label": "WhatsApp Number",
+    "store.profile.access_form_phone_placeholder": "300 123 4567",
+    "store.profile.access_form_phone_hint": "The same number you used to chat or shop",
+    "store.profile.access_form_submit": "See My Account",
+    "store.profile.access_form_submitting": "Validating access...",
+    "store.profile.access_form_back": "← Back to store",
+    "store.profile.access_form_default_error": "We couldn't validate your access",
   },
 } as const satisfies Record<SupportedLocale, Record<string, string>>
 

@@ -4,6 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { formatCurrency } from "@/lib/utils"
 import { formatBogotaDate } from "@/lib/utils/date"
+import { useT, useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
+import type { StorefrontStringKey } from "@/lib/i18n/storefront-strings"
 
 interface Customer {
     id: string
@@ -53,6 +55,9 @@ interface ProfileViewProps {
 export function ProfileView({ customer, orders, organization, chats = [] }: ProfileViewProps) {
     const [activeTab, setActiveTab] = useState<'orders' | 'conversations' | 'tracking'>('orders')
     const [searchTerm, setSearchTerm] = useState('')
+    const t = useT()
+    const locale = useTenantLocale()
+    const currency = useTenantCurrency()
 
     // Filter orders based on search
     const filteredOrders = orders.filter(order => 
@@ -74,39 +79,49 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
     // el cliente ve en su confirmación de orden).
     const formatDate = (dateString: string) => formatBogotaDate(dateString)
 
-    // Get status badge
-    const getStatusBadge = (status: string, paymentStatus: string) => {
+    // Get status badge — returns un objeto con className + i18n key.
+    // El status raw (`status`) sigue siendo fallback cuando no matchea ningún caso.
+    interface BadgeMeta {
+        className: string
+        labelKey?: StorefrontStringKey
+        rawLabel?: string
+    }
+    const getStatusBadgeMeta = (status: string, paymentStatus: string): BadgeMeta => {
         if (status === 'delivered') {
-            return (
-                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
-                    Entregado
-                </span>
-            )
+            return {
+                className: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                labelKey: "store.profile.status_delivered",
+            }
         }
         if (status === 'shipped') {
-            return (
-                <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                    En tránsito
-                </span>
-            )
+            return {
+                className: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                labelKey: "store.profile.status_in_transit",
+            }
         }
         if (status === 'processing' || status === 'confirmed') {
-            return (
-                <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
-                    Procesando
-                </span>
-            )
+            return {
+                className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
+                labelKey: "store.profile.status_processing",
+            }
         }
         if (paymentStatus === 'pending') {
-            return (
-                <span className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-900 dark:text-orange-300">
-                    Pendiente Pago
-                </span>
-            )
+            return {
+                className: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+                labelKey: "store.profile.status_payment_pending",
+            }
         }
+        return {
+            className: "bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300",
+            rawLabel: status,
+        }
+    }
+
+    const getStatusBadge = (status: string, paymentStatus: string) => {
+        const meta = getStatusBadgeMeta(status, paymentStatus)
         return (
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                {status}
+            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.className}`}>
+                {meta.labelKey ? t(meta.labelKey) : meta.rawLabel}
             </span>
         )
     }
@@ -134,16 +149,16 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         <span className="text-lg md:text-xl font-bold tracking-tight">{organization.name}</span>
                     </Link>
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-                        <Link href="/" className="hover:text-primary transition-colors">Inicio</Link>
-                        <Link href="/productos" className="hover:text-primary transition-colors">Productos</Link>
-                        <span className="text-primary font-semibold">Mi Cuenta</span>
+                        <Link href="/" className="hover:text-primary transition-colors">{t("store.profile.nav_home")}</Link>
+                        <Link href="/productos" className="hover:text-primary transition-colors">{t("store.profile.nav_products")}</Link>
+                        <span className="text-primary font-semibold">{t("store.profile.nav_account")}</span>
                     </nav>
                     <div className="flex items-center gap-4">
                         <Link 
                             href="/" 
                             className="text-sm font-medium text-slate-500 hover:text-slate-700"
                         >
-                            Volver a la Tienda
+                            {t("store.profile.back_to_store")}
                         </Link>
                     </div>
                 </div>
@@ -166,10 +181,10 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                 </div>
                                 <div className="flex-1">
                                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                                        Hola, {customer.full_name}
+                                        {t("store.profile.greeting", { name: customer.full_name })}
                                     </h1>
                                     <p className="mt-1 text-slate-500 dark:text-slate-400">
-                                        Es un gusto tenerte de vuelta. Aquí está el resumen de tu actividad.
+                                        {t("store.profile.welcome_subtitle")}
                                     </p>
                                     <div className="mt-3 flex items-center gap-3 flex-wrap">
                                         {customer.phone && (
@@ -200,7 +215,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                             : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
                                     }`}
                                 >
-                                    Mis Pedidos
+                                    {t("store.profile.tab_orders")}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('conversations')}
@@ -210,7 +225,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                             : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
                                     }`}
                                 >
-                                    Mis Conversaciones
+                                    {t("store.profile.tab_conversations")}
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('tracking')}
@@ -220,7 +235,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                             : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
                                     }`}
                                 >
-                                    Seguimiento de Envío
+                                    {t("store.profile.tab_tracking")}
                                 </button>
                             </nav>
                         </div>
@@ -228,19 +243,19 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         {/* Active Shipments */}
                         {activeTab === 'orders' && activeShipments.length > 0 && (
                             <section>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Envíos Activos</h3>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{t("store.profile.shipments_section_title")}</h3>
                                 {activeShipments.map((order) => (
                                     <div key={order.id} className="rounded-xl border border-blue-100 bg-blue-50/50 p-6 dark:border-blue-900/30 dark:bg-blue-900/10 mb-4">
                                         <div className="flex flex-col md:flex-row justify-between gap-4 mb-6">
                                             <div>
                                                 <div className="flex items-center gap-3 mb-1">
                                                     <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                                                        Pedido {order.order_number || `#${order.id.slice(0, 8)}`}
+                                                        {t("store.profile.order_with_number", { number: order.order_number || `#${order.id.slice(0, 8)}` })}
                                                     </h4>
                                                     {getStatusBadge(order.status, order.payment_status)}
                                                 </div>
                                                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                                                    Entrega estimada: <span className="font-semibold text-slate-900 dark:text-white">Próximamente</span>
+                                                    {t("store.profile.estimated_delivery_label")} <span className="font-semibold text-slate-900 dark:text-white">{t("store.profile.estimated_delivery_value")}</span>
                                                 </p>
                                             </div>
                                             <Link
@@ -248,7 +263,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                 className="flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-900/5 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
                                             >
                                                 <span className="material-symbols-outlined text-lg">local_shipping</span>
-                                                Ver Detalles
+                                                {t("store.profile.see_details")}
                                             </Link>
                                         </div>
                                         <div className="relative mb-2">
@@ -259,9 +274,9 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                 ></div>
                                             </div>
                                             <div className="flex justify-between text-xs font-medium text-slate-500 dark:text-slate-400">
-                                                <span>Procesado</span>
-                                                <span className={order.status === 'shipped' ? 'text-primary font-bold' : ''}>En camino</span>
-                                                <span>Entregado</span>
+                                                <span>{t("store.profile.shipping_progress_processed")}</span>
+                                                <span className={order.status === 'shipped' ? 'text-primary font-bold' : ''}>{t("store.profile.shipping_progress_in_transit")}</span>
+                                                <span>{t("store.profile.shipping_progress_delivered")}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -273,11 +288,11 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         {activeTab === 'orders' && (
                             <section>
                                 <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Historial de Pedidos</h3>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t("store.profile.orders_history_title")}</h3>
                                     <div className="relative">
                                         <input
                                             className="pl-9 pr-4 py-2 text-sm rounded-lg border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 focus:border-primary focus:ring-primary w-48"
-                                            placeholder="Buscar pedido..."
+                                            placeholder={t("store.profile.search_orders_placeholder")}
                                             type="text"
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -290,11 +305,11 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                         <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400">
                                             <thead className="bg-slate-50 text-xs uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                                                 <tr>
-                                                    <th className="px-6 py-4 font-semibold" scope="col">ID Pedido</th>
-                                                    <th className="px-6 py-4 font-semibold" scope="col">Fecha</th>
-                                                    <th className="px-6 py-4 font-semibold" scope="col">Total</th>
-                                                    <th className="px-6 py-4 font-semibold" scope="col">Estado</th>
-                                                    <th className="px-6 py-4 font-semibold text-right" scope="col">Acciones</th>
+                                                    <th className="px-6 py-4 font-semibold" scope="col">{t("store.profile.table_col_order_id")}</th>
+                                                    <th className="px-6 py-4 font-semibold" scope="col">{t("store.profile.table_col_date")}</th>
+                                                    <th className="px-6 py-4 font-semibold" scope="col">{t("store.profile.table_col_total")}</th>
+                                                    <th className="px-6 py-4 font-semibold" scope="col">{t("store.profile.table_col_status")}</th>
+                                                    <th className="px-6 py-4 font-semibold text-right" scope="col">{t("store.profile.table_col_actions")}</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -305,7 +320,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                                 {order.order_number || `#${order.id.slice(0, 8)}`}
                                                             </td>
                                                             <td className="whitespace-nowrap px-6 py-4">{formatDate(order.created_at)}</td>
-                                                            <td className="whitespace-nowrap px-6 py-4">{formatCurrency(order.total)}</td>
+                                                            <td className="whitespace-nowrap px-6 py-4">{formatCurrency(order.total, { locale, currency })}</td>
                                                             <td className="whitespace-nowrap px-6 py-4">
                                                                 {getStatusBadge(order.status, order.payment_status)}
                                                             </td>
@@ -314,7 +329,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                                     href={`/order/${order.id}`}
                                                                     className="text-primary hover:text-primary-dark font-medium text-sm"
                                                                 >
-                                                                    Ver Detalles
+                                                                    {t("store.profile.see_details")}
                                                                 </Link>
                                                             </td>
                                                         </tr>
@@ -322,7 +337,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                 ) : (
                                                     <tr>
                                                         <td colSpan={5} className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
-                                                            {searchTerm ? 'No se encontraron pedidos con ese criterio' : 'No tienes pedidos aún'}
+                                                            {searchTerm ? t("store.profile.no_orders_match_search") : t("store.profile.no_orders_yet")}
                                                         </td>
                                                     </tr>
                                                 )}
@@ -332,7 +347,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                     {filteredOrders.length > 0 && (
                                         <div className="border-t border-slate-200 bg-slate-50 px-6 py-3 dark:border-slate-700 dark:bg-slate-800/50">
                                             <p className="text-xs text-center text-slate-500 dark:text-slate-400">
-                                                Mostrando {filteredOrders.length} de {orders.length} pedidos
+                                                {t("store.profile.showing_count", { shown: filteredOrders.length, total: orders.length })}
                                             </p>
                                         </div>
                                     )}
@@ -343,23 +358,23 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         {/* Conversations Tab */}
                         {activeTab === 'conversations' && (
                             <section>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Mis Conversaciones</h3>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{t("store.profile.tab_conversations")}</h3>
                                 <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900 text-center">
                                     <div className="flex size-16 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 mx-auto mb-4">
                                         <span className="material-symbols-outlined text-2xl">chat</span>
                                     </div>
                                     <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                                        Inicia una conversación
+                                        {t("store.profile.start_conversation_title")}
                                     </h4>
                                     <p className="text-slate-500 dark:text-slate-400 mb-6">
-                                        Chatea con nuestro asistente para obtener ayuda con tus pedidos o encontrar productos.
+                                        {t("store.profile.start_conversation_subtitle")}
                                     </p>
                                     <Link
                                         href="/chat"
                                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
                                     >
                                         <span className="material-symbols-outlined text-lg">chat</span>
-                                        Iniciar Chat
+                                        {t("store.profile.start_chat_cta")}
                                     </Link>
                                 </div>
                             </section>
@@ -368,14 +383,14 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         {/* Tracking Tab */}
                         {activeTab === 'tracking' && (
                             <section>
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Seguimiento de Envío</h3>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{t("store.profile.tab_tracking")}</h3>
                                 {activeShipments.length > 0 ? (
                                     <div className="space-y-4">
                                         {activeShipments.map((order) => (
                                             <div key={order.id} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                                                 <div className="flex items-center justify-between mb-4">
                                                     <h4 className="text-lg font-semibold text-slate-900 dark:text-white">
-                                                        Pedido {order.order_number || `#${order.id.slice(0, 8)}`}
+                                                        {t("store.profile.order_with_number", { number: order.order_number || `#${order.id.slice(0, 8)}` })}
                                                     </h4>
                                                     {getStatusBadge(order.status, order.payment_status)}
                                                 </div>
@@ -385,7 +400,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                             <span className="material-symbols-outlined text-sm">check</span>
                                                         </div>
                                                         <div>
-                                                            <p className="text-sm font-medium text-slate-900 dark:text-white">Pedido confirmado</p>
+                                                            <p className="text-sm font-medium text-slate-900 dark:text-white">{t("store.profile.tracking_order_confirmed")}</p>
                                                             <p className="text-xs text-slate-500 dark:text-slate-400">{formatDate(order.created_at)}</p>
                                                         </div>
                                                     </div>
@@ -401,9 +416,9 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                                                 </span>
                                                             </div>
                                                             <div>
-                                                                <p className="text-sm font-medium text-slate-900 dark:text-white">En tránsito</p>
+                                                                <p className="text-sm font-medium text-slate-900 dark:text-white">{t("store.profile.tracking_in_transit")}</p>
                                                                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                                                                    {order.status === 'shipped' ? 'Enviado' : 'Preparando envío'}
+                                                                    {order.status === 'shipped' ? t("store.profile.tracking_shipped") : t("store.profile.tracking_preparing")}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -418,10 +433,10 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                             <span className="material-symbols-outlined text-2xl">local_shipping</span>
                                         </div>
                                         <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                                            No hay envíos activos
+                                            {t("store.profile.tracking_no_active")}
                                         </h4>
                                         <p className="text-slate-500 dark:text-slate-400">
-                                            Cuando tengas pedidos en camino, aparecerán aquí con información de seguimiento.
+                                            {t("store.profile.tracking_no_active_subtitle")}
                                         </p>
                                     </div>
                                 )}
@@ -434,10 +449,10 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                         {/* Chats Recientes */}
                         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-800">
-                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Chats Recientes</h3>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t("store.profile.sidebar_recent_chats")}</h3>
                                 {chats.length > 0 && (
                                     <Link href="/chat" className="text-xs font-medium text-primary hover:underline">
-                                        Ver todos
+                                        {t("store.profile.sidebar_view_all")}
                                     </Link>
                                 )}
                             </div>
@@ -463,14 +478,14 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1">
                                                     <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                                                        {chat.status === 'active' ? 'Conversación Activa' : 'Bot Asistente'}
+                                                        {chat.status === 'active' ? t("store.profile.sidebar_active_chat") : t("store.profile.sidebar_bot_assistant")}
                                                     </p>
                                                     <span className="text-xs text-slate-400">
                                                         {formatDate(chat.updated_at || chat.created_at)}
                                                     </span>
                                                 </div>
                                                 <p className="truncate text-sm text-slate-500 dark:text-slate-400">
-                                                    {chat.status === 'active' ? 'Haz clic para continuar...' : '¿En qué más puedo ayudarte?'}
+                                                    {chat.status === 'active' ? t("store.profile.sidebar_continue_chat_hint") : t("store.profile.sidebar_bot_default_msg")}
                                                 </p>
                                             </div>
                                         </Link>
@@ -481,7 +496,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                             <span className="material-symbols-outlined">chat_bubble</span>
                                         </div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                                            Aún no tienes conversaciones
+                                            {t("store.profile.sidebar_no_chats")}
                                         </p>
                                     </div>
                                 )}
@@ -492,31 +507,31 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                                 >
                                     <span className="material-symbols-outlined text-lg">chat</span>
-                                    {chats.length > 0 ? 'Continuar Chat' : 'Iniciar Chat'}
+                                    {chats.length > 0 ? t("store.profile.sidebar_continue_chat_cta") : t("store.profile.sidebar_start_chat_cta")}
                                 </Link>
                             </div>
                         </div>
 
                         {/* Help Section */}
                         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                            <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white">¿Necesitas ayuda?</h3>
+                            <h3 className="mb-4 text-base font-bold text-slate-900 dark:text-white">{t("store.profile.help_title")}</h3>
                             <ul className="space-y-3">
                                 <li>
                                     <Link href="/chat?context=devoluciones" className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">undo</span>
-                                        Política de devoluciones
+                                        {t("store.profile.help_returns")}
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/chat?context=envios" className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">local_shipping</span>
-                                        Información de envíos
+                                        {t("store.profile.help_shipping")}
                                     </Link>
                                 </li>
                                 <li>
                                     <Link href="/chat?context=preguntas" className="flex items-center gap-3 text-sm text-slate-600 hover:text-primary dark:text-slate-400 dark:hover:text-primary">
                                         <span className="material-symbols-outlined text-lg">question_answer</span>
-                                        Preguntas frecuentes
+                                        {t("store.profile.help_faq")}
                                     </Link>
                                 </li>
                             </ul>
@@ -529,11 +544,11 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
             <div className="fixed bottom-6 right-6 z-50">
                 {organization.phone ? (
                     <a
-                        href={`https://wa.me/${organization.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola, tengo una consulta sobre mi pedido`)}`}
+                        href={`https://wa.me/${organization.phone.replace(/\D/g, '')}?text=${encodeURIComponent(t("store.profile.whatsapp_default_message"))}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-green-300"
-                        aria-label="Contactar por WhatsApp"
+                        aria-label={t("store.profile.whatsapp_aria_label")}
                     >
                         <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
@@ -543,7 +558,7 @@ export function ProfileView({ customer, orders, organization, chats = [] }: Prof
                     <Link
                         href="/chat"
                         className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg shadow-blue-500/30 transition-transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-blue-300"
-                        aria-label="Iniciar chat"
+                        aria-label={t("store.profile.chat_aria_label")}
                     >
                         <span className="material-symbols-outlined text-3xl">chat</span>
                     </Link>

@@ -232,6 +232,63 @@ describe("t() — keys de order detail (T1.3g)", () => {
   })
 })
 
+describe("t() — keys de profile (T1.3h)", () => {
+  it("interpola customer name en greeting", () => {
+    expect(t("store.profile.greeting", "es-CO", { name: "Camilo" })).toBe(
+      "Hola, Camilo",
+    )
+    expect(t("store.profile.greeting", "en-US", { name: "Sarah" })).toBe(
+      "Hi, Sarah",
+    )
+  })
+
+  it("interpola order_number en order_with_number", () => {
+    expect(
+      t("store.profile.order_with_number", "es-CO", { number: "ORD-001" }),
+    ).toBe("Pedido ORD-001")
+    expect(
+      t("store.profile.order_with_number", "en-US", { number: "ORD-002" }),
+    ).toBe("Order ORD-002")
+  })
+
+  it("interpola shown + total en showing_count", () => {
+    expect(
+      t("store.profile.showing_count", "es-CO", { shown: 5, total: 12 }),
+    ).toBe("Mostrando 5 de 12 pedidos")
+    expect(
+      t("store.profile.showing_count", "en-US", { shown: 3, total: 8 }),
+    ).toBe("Showing 3 of 8 orders")
+  })
+
+  it("interpola org name en access_form_subtitle", () => {
+    expect(
+      t("store.profile.access_form_subtitle", "es-CO", { name: "Quality Pets" }),
+    ).toBe("Valida tu acceso con el mismo nombre y WhatsApp que usaste en Quality Pets")
+    expect(
+      t("store.profile.access_form_subtitle", "en-US", { name: "Tantor's House" }),
+    ).toBe("Validate your access with the same name and WhatsApp you used at Tantor's House")
+  })
+
+  it("tabs traducidos en en-US", () => {
+    expect(t("store.profile.tab_orders", "en-US")).toBe("My Orders")
+    expect(t("store.profile.tab_conversations", "en-US")).toBe("My Conversations")
+    expect(t("store.profile.tab_tracking", "en-US")).toBe("Shipping Tracking")
+  })
+
+  it("status badges traducidos en en-US", () => {
+    expect(t("store.profile.status_delivered", "en-US")).toBe("Delivered")
+    expect(t("store.profile.status_in_transit", "en-US")).toBe("In transit")
+    expect(t("store.profile.status_processing", "en-US")).toBe("Processing")
+    expect(t("store.profile.status_payment_pending", "en-US")).toBe("Payment pending")
+  })
+
+  it("access form CTAs y back link traducidos", () => {
+    expect(t("store.profile.access_form_submit", "en-US")).toBe("See My Account")
+    expect(t("store.profile.access_form_submitting", "en-US")).toBe("Validating access...")
+    expect(t("store.profile.access_form_back", "en-US")).toBe("← Back to store")
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]
