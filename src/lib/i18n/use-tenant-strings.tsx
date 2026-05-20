@@ -26,9 +26,9 @@
  * Spec: .kiro/specs/i18n-fase-1/ (T1.3)
  */
 
-import { createContext, useCallback, useContext, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react"
 
-import type { SupportedLocale } from "@/types/organization"
+import type { SupportedCurrency, SupportedLocale } from "@/types/organization"
 import {
   t as translateRaw,
   type StorefrontStringKey,
@@ -39,7 +39,17 @@ import {
 // Context
 // ============================================================================
 
-const TenantLocaleContext = createContext<SupportedLocale>("es-CO")
+interface TenantLocaleContextValue {
+  locale: SupportedLocale
+  currencyCode: SupportedCurrency
+}
+
+const DEFAULT_CONTEXT_VALUE: TenantLocaleContextValue = {
+  locale: "es-CO",
+  currencyCode: "COP",
+}
+
+const TenantLocaleContext = createContext<TenantLocaleContextValue>(DEFAULT_CONTEXT_VALUE)
 
 // ============================================================================
 // Provider
@@ -47,22 +57,37 @@ const TenantLocaleContext = createContext<SupportedLocale>("es-CO")
 
 export interface TenantLocaleProviderProps {
   locale: SupportedLocale
+  /**
+   * ISO 4217 currency code del tenant. Default `'COP'` cuando no se provee.
+   * Usado por `useTenantCurrency()` para parametrizar `formatCurrency()` en
+   * Client Components descendientes.
+   */
+  currencyCode?: SupportedCurrency
   children: ReactNode
 }
 
 /**
- * Provider de locale para el árbol de Client Components del storefront.
+ * Provider de locale + moneda para el árbol de Client Components del storefront.
  *
- * Debe montarse en el root del storefront (o en cada page que tenga acceso
- * a `organization.locale`) con el valor exacto del tenant. Tenants sin locale
- * configurado caen a `'es-CO'` (default seguro definido en el schema).
+ * Debe montarse en el root del storefront (o en cada page que tenga acceso a
+ * `organization.locale` y `organization.currency_code`) con los valores exactos
+ * del tenant. Tenants sin configuración caen a `('es-CO', 'COP')` (defaults
+ * seguros definidos en el schema).
+ *
+ * El value se memoiza para evitar re-renders innecesarios cuando el padre
+ * re-renderiza pero los props no cambian.
  */
 export function TenantLocaleProvider({
   locale,
+  currencyCode = "COP",
   children,
 }: TenantLocaleProviderProps) {
+  const value = useMemo(
+    () => ({ locale, currencyCode }),
+    [locale, currencyCode],
+  )
   return (
-    <TenantLocaleContext.Provider value={locale}>
+    <TenantLocaleContext.Provider value={value}>
       {children}
     </TenantLocaleContext.Provider>
   )
@@ -78,7 +103,30 @@ export function TenantLocaleProvider({
  * (ej. pasarlo a `formatCurrency`, `Intl.DateTimeFormat`, etc.).
  */
 export function useTenantLocale(): SupportedLocale {
-  return useContext(TenantLocaleContext)
+  return useContext(TenantLocaleContext).locale
+}
+
+/**
+ * Hook que retorna el currency code activo del tenant en este árbol.
+ *
+ * Útil para parametrizar `formatCurrency()` en componentes que ya están
+ * dentro del provider (ej. carrito, resumen de orden, totalizadores).
+ *
+ * @example
+ * ```tsx
+ * 'use client'
+ * import { formatCurrency } from "@/lib/utils"
+ * import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
+ *
+ * function CartTotal({ amount }: { amount: number }) {
+ *   const locale = useTenantLocale()
+ *   const currency = useTenantCurrency()
+ *   return <span>{formatCurrency(amount, { locale, currency })}</span>
+ * }
+ * ```
+ */
+export function useTenantCurrency(): SupportedCurrency {
+  return useContext(TenantLocaleContext).currencyCode
 }
 
 /**

@@ -148,6 +148,47 @@ describe("t() — interpolación de placeholders {{key}}", () => {
   })
 })
 
+describe("t() — keys del carrito (T1.3e)", () => {
+  it("interpola count en singular/plural del carrito", () => {
+    expect(
+      t("store.cart.items_count_singular", "es-CO", { count: 1 }),
+    ).toBe("1 ítem")
+    expect(
+      t("store.cart.items_count_plural", "es-CO", { count: 4 }),
+    ).toBe("4 ítems")
+    expect(
+      t("store.cart.items_count_singular", "en-US", { count: 1 }),
+    ).toBe("1 item")
+    expect(
+      t("store.cart.items_count_plural", "en-US", { count: 12 }),
+    ).toBe("12 items")
+  })
+
+  it("interpola amount preformateado en free shipping remaining", () => {
+    expect(
+      t("store.cart.free_shipping_remaining", "es-CO", { amount: "$ 25.000" }),
+    ).toBe("$ 25.000 más")
+    expect(
+      t("store.cart.free_shipping_remaining", "en-US", { amount: "$25.00" }),
+    ).toBe("$25.00 more")
+  })
+
+  it("interpola código de cupón en discount label", () => {
+    expect(
+      t("store.cart.totals_discount_with_code", "es-CO", { code: "FALL20" }),
+    ).toBe("Descuento (FALL20)")
+    expect(
+      t("store.cart.totals_discount_with_code", "en-US", { code: "SUMMER" }),
+    ).toBe("Discount (SUMMER)")
+  })
+
+  it("título y empty state están traducidos en en-US", () => {
+    expect(t("store.cart.title", "en-US")).toBe("Your Cart")
+    expect(t("store.cart.empty", "en-US")).toBe("Your cart is empty")
+    expect(t("store.cart.checkout_button", "en-US")).toBe("Checkout")
+  })
+})
+
 describe("t() — integridad del set", () => {
   it("todas las keys producen strings en ambos locales", () => {
     const keys = Object.keys(storefrontStrings["es-CO"]) as StorefrontStringKey[]

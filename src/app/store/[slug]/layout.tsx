@@ -101,7 +101,10 @@ export default async function StoreLayout({
                 posthogEnabled={posthogEnabled}
             >
                 {/* i18n Provider para Client Components del storefront */}
-                <TenantLocaleProvider locale={tenantLocale.locale}>
+                <TenantLocaleProvider
+                    locale={tenantLocale.locale}
+                    currencyCode={tenantLocale.currency}
+                >
                     <StorefrontPageTracker />
                     {children}
                 </TenantLocaleProvider>
