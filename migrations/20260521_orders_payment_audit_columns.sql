@@ -35,6 +35,8 @@
 --
 -- ============================================================================
 
+BEGIN;
+
 -- 1. Agregar columnas (idempotente)
 ALTER TABLE public.orders
     ADD COLUMN IF NOT EXISTS payment_confirmed_at TIMESTAMPTZ;
@@ -46,7 +48,9 @@ ALTER TABLE public.orders
 ALTER TABLE public.orders
     ADD COLUMN IF NOT EXISTS payment_confirmation_note TEXT;
 
--- 2. Índice para consultas dashboard tipo "qué pagos confirmé yo este mes"
+-- 2. Índice para consultas dashboard tipo "qué pagos confirmé yo este mes".
+-- Índice parcial: empieza vacío (no hay órdenes con payment_confirmed_at
+-- poblado pre-migración) → creación instantánea, no bloquea writes.
 CREATE INDEX IF NOT EXISTS idx_orders_payment_confirmed_by_at
     ON public.orders (payment_confirmed_by, payment_confirmed_at DESC)
     WHERE payment_confirmed_at IS NOT NULL;
@@ -58,3 +62,5 @@ COMMENT ON COLUMN public.orders.payment_confirmed_by IS
     'auth.users.id del operator que confirmó el pago manualmente. NULL en confirmaciones automáticas.';
 COMMENT ON COLUMN public.orders.payment_confirmation_note IS
     'Nota libre opcional del operator al confirmar el pago (T1.6 — markOrderAsPaid).';
+
+COMMIT;
