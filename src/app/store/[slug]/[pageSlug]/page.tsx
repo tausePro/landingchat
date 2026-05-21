@@ -4,6 +4,16 @@ import { Metadata } from "next"
 import { StoreLayoutClient } from "../store-layout-client"
 import { PageTemplateRenderer } from "@/components/store/page-templates/page-template-renderer"
 import { parsePageContent } from "@/lib/page-content-parser"
+// v1.14.2: aplicar el mismo enrich de organización que usa getStoreData
+// para que el botón flotante de WhatsApp aparezca también en páginas
+// custom (e.g. /quienes-somos, /contacto). Sin esto, el botón siempre
+// caía al fallback de chat IA en páginas custom aunque el tenant tuviera
+// WhatsApp Business conectado.
+import {
+    enrichOrganizationWithStorefrontContact,
+    resolveOrganizationAgentIdentity,
+    resolveOrganizationWhatsAppPhone,
+} from "@/lib/storefront/organization-enrichment"
 
 interface PageProps {
     params: Promise<{ slug: string; pageSlug: string }>
@@ -91,10 +101,17 @@ export default async function StorePageComponent({ params }: PageProps) {
     const primaryColor = org.settings?.branding?.primaryColor || "#2b7cee"
     const whatsappNumber = org.settings?.storefront?.footer?.whatsappNumber
 
+    // v1.14.2: aplicar el mismo enrich que getStoreData para que el botón
+    // flotante use el número resuelto (con fallback a whatsapp_instances).
+    const supabase = createServiceClient()
+    const enrichedWhatsAppPhone = await resolveOrganizationWhatsAppPhone(supabase, org.id, org.settings)
+    const agentIdentity = await resolveOrganizationAgentIdentity(supabase, org.id, org.settings)
+    const enrichedOrg = enrichOrganizationWithStorefrontContact(org, enrichedWhatsAppPhone, agentIdentity)
+
     return (
         <StoreLayoutClient
             slug={slug}
-            organization={org}
+            organization={enrichedOrg}
             products={[]}
             pages={pages}
         >

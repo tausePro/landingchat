@@ -83,6 +83,14 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                     ? formData.settings.whatsapp_operator.softPauseDurationMin
                     : 30,
         },
+        whatsapp: {
+            // v1.14.2: override manual del número WhatsApp del storefront público.
+            // Si está vacío, el storefront cae al fallback automático (whatsapp_instances).
+            phone:
+                typeof formData.settings?.whatsapp?.phone === "string"
+                    ? formData.settings.whatsapp.phone
+                    : "",
+        },
     }), [formData.settings])
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -268,7 +276,51 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                         </TabsContent>
 
                         <TabsContent value="whatsapp" className="space-y-6">
+                            {/*
+                              v1.14.2: bloque "Número WhatsApp del storefront" añadido aquí
+                              para que el merchant pueda forzar un número distinto al de
+                              `whatsapp_instances`. Si lo deja vacío, el storefront usa el
+                              fallback automático (corporate connected → personal connected).
+                            */}
                             <div className="space-y-2">
+                                <h3 className="text-lg font-semibold">Número WhatsApp del storefront</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Es el número que aparece en el botón flotante de tu tienda online (storefront público). Si lo dejas vacío, usaremos automáticamente el número de tu instancia de WhatsApp Business conectada.
+                                </p>
+                            </div>
+
+                            <div className="space-y-3 rounded-lg border p-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="storefrontWhatsappPhone">
+                                        Número con código de país (sin +, sin espacios)
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground max-w-2xl">
+                                        Ejemplo Colombia: <code>573001234567</code>. Ejemplo USA: <code>14155559876</code>. El botón abrirá <code>wa.me/[número]</code> con un saludo prellenado.
+                                    </p>
+                                </div>
+                                <Input
+                                    id="storefrontWhatsappPhone"
+                                    type="tel"
+                                    inputMode="numeric"
+                                    pattern="[0-9+\s\-()]*"
+                                    placeholder="Ej: 573001234567"
+                                    value={safeSettings.whatsapp.phone}
+                                    onChange={(e) => updateSettings("whatsapp", "phone", e.target.value)}
+                                    className="max-w-md"
+                                />
+                                {safeSettings.whatsapp.phone.length > 0 && safeSettings.whatsapp.phone.replace(/\D/g, "").length < 8 && (
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        ⚠️ El número debe tener al menos 8 dígitos. El botón flotante no se mostrará hasta que sea válido.
+                                    </p>
+                                )}
+                                {safeSettings.whatsapp.phone.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Vacío: el storefront usará automáticamente el número de tu WhatsApp Business conectado.
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2 pt-4 border-t">
                                 <h3 className="text-lg font-semibold">Comportamiento del operador humano</h3>
                                 <p className="text-sm text-muted-foreground">
                                     Controla cómo se comporta la IA cuando tú (o tus operadores) responden chats desde el WhatsApp del negocio.

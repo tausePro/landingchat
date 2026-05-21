@@ -185,12 +185,26 @@ export interface OrganizationWhatsAppOperatorSettings {
   [key: string]: unknown
 }
 
+/**
+ * Override manual del número WhatsApp que se muestra en el storefront público
+ * (botón flotante). Tiene prioridad sobre `whatsapp_instances` y permite al
+ * merchant exponer un número distinto al que usa para recibir mensajes
+ * automatizados (e.g. cuando la instancia corporate está disconnected pero
+ * tiene un personal connected, o cuando quiere desviar leads del storefront
+ * a un asesor humano específico).
+ */
+export interface OrganizationStorefrontWhatsAppSettings {
+  phone?: string | null
+  [key: string]: unknown
+}
+
 export interface OrganizationSettingsOverrides {
   branding?: OrganizationBrandingSettings
   shipping?: {
     free_shipping_threshold?: number
     [key: string]: unknown
   }
+  whatsapp?: OrganizationStorefrontWhatsAppSettings
   whatsapp_operator?: OrganizationWhatsAppOperatorSettings
   [key: string]: unknown
 }
