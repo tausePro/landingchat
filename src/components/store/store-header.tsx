@@ -8,6 +8,7 @@ import { getStoreLink } from "@/lib/utils/store-urls"
 import { useCartStore } from "@/store/cart-store"
 import { ShoppingBag, User } from "lucide-react"
 import { useEffect, useState } from "react"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 interface StoreHeaderProps {
     slug: string
@@ -37,6 +38,7 @@ export function StoreHeader({
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
     const { items, toggleCart } = useCartStore()
+    const t = useT()
 
     // Prevent hydration mismatch for cart count
     const [mounted, setMounted] = useState(false)
@@ -73,16 +75,16 @@ export function StoreHeader({
                     )}
                 </div>
                 <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-                    <a href={homeLink} className="hover:text-primary transition-colors">Inicio</a>
-                    <a href={productsLink} className="hover:text-primary transition-colors">Productos</a>
-                    <a href={profileLink} className="hover:text-primary transition-colors">Mi Perfil</a>
+                    <a href={homeLink} className="hover:text-primary transition-colors">{t("store.nav.home")}</a>
+                    <a href={productsLink} className="hover:text-primary transition-colors">{t("store.nav.products")}</a>
+                    <a href={profileLink} className="hover:text-primary transition-colors">{t("store.nav.profile")}</a>
                 </nav>
                 <div className="flex items-center gap-4">
                     {/* Profile Button - Mobile */}
                     <a
                         href={profileLink}
                         className="md:hidden p-2 text-slate-600 hover:text-slate-900 transition-colors"
-                        aria-label="Mi perfil"
+                        aria-label={t("store.header.profile_aria")}
                     >
                         <User className="w-6 h-6" />
                     </a>
@@ -91,7 +93,7 @@ export function StoreHeader({
                     <button
                         onClick={() => toggleCart()}
                         className={`relative p-2 text-slate-600 hover:text-slate-900 transition-colors ${isChatMode ? 'md:hidden' : ''}`}
-                        aria-label="Ver carrito"
+                        aria-label={t("store.header.cart_aria")}
                     >
                         <ShoppingBag className="w-6 h-6" />
                         {mounted && cartCount > 0 && (
@@ -109,7 +111,7 @@ export function StoreHeader({
                             className="font-bold border border-gray-200 text-gray-700 hover:bg-gray-100 h-9 px-3 gap-1"
                         >
                             <span className="material-symbols-outlined text-lg">close</span>
-                            <span className="hidden sm:inline text-xs">Cerrar</span>
+                            <span className="hidden sm:inline text-xs">{t("store.header.close_chat")}</span>
                         </Button>
                     ) : (
                         !hideChatButton && (
@@ -118,7 +120,7 @@ export function StoreHeader({
                                 style={{ backgroundColor: primaryColor }}
                                 className="font-bold shadow-lg shadow-blue-500/20 text-sm md:text-base px-4 md:px-6"
                             >
-                                Iniciar Chat
+                                {t("store.header.start_chat")}
                             </Button>
                         )
                     )}

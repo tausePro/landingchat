@@ -105,18 +105,25 @@ export function getToolsForMode(mode: OrgMode): Anthropic.Tool[] {
  *   2. Skills: instrucciones procedurales (defaults + overrides del agente)
  *
  * @param agentSkillsConfig - overrides de skills del agente (de agent.configuration.skills)
+ * @param locale T1.7 — locale del tenant (BCP 47). Default `'es-CO'` por
+ *               retro-compat. Determina el formato de la fecha del addendum
+ *               inmobiliario y el timezone (CO usa Bogota; US usa New York).
  */
 export function getModePromptAddendum(
     mode: OrgMode,
     propertyCount: number,
-    agentSkillsConfig?: SkillsConfig | null
+    agentSkillsConfig?: SkillsConfig | null,
+    locale: string = "es-CO",
 ): string {
     let addendum = ""
 
     // Contexto inmobiliario (metadata que no es un skill)
     if (mode === "real_estate" || mode === "hybrid") {
-        const now = new Date().toLocaleString("es-CO", {
-            timeZone: "America/Bogota",
+        // T1.7 — formato + timezone basado en locale. Tenants US ven la fecha
+        // en inglés con TZ America/New_York; tenants CO siguen es-CO/Bogota.
+        const timeZone = locale === "en-US" ? "America/New_York" : "America/Bogota"
+        const now = new Date().toLocaleString(locale, {
+            timeZone,
             weekday: "long",
             year: "numeric",
             month: "long",
@@ -124,10 +131,16 @@ export function getModePromptAddendum(
             hour: "2-digit",
             minute: "2-digit",
         })
-        addendum += `\nMODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.\nFECHA Y HORA ACTUAL: ${now}\n`
+        if (locale === "en-US") {
+            addendum += `\nREAL ESTATE MODE: This organization has ${propertyCount} active properties.\nCURRENT DATE AND TIME: ${now}\n`
+        } else {
+            addendum += `\nMODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.\nFECHA Y HORA ACTUAL: ${now}\n`
+        }
     }
 
-    // Skills: instrucciones procedurales configurables
+    // Skills: instrucciones procedurales configurables (siguen en español;
+    // el modelo los entiende y responde en el idioma instruido por
+    // `buildLanguageInstruction` en context.ts).
     addendum += composeSkillsPrompt(mode, agentSkillsConfig)
 
     return addendum

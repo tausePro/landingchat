@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import { calculateTaxForItems, buildProductTaxMap, type OrgTaxSettings } from "@/lib/utils/tax"
 import { getPhoneVariants, normalizePhone } from "@/lib/utils/phone"
 import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
@@ -843,15 +844,20 @@ export async function createOrder(params: CreateOrderParams) {
 
         // Send notifications (Fire and Forget)
         try {
-            // Get organization details for notifications
+            // Get organization details for notifications.
+            // T1.3i — incluimos `locale` y `currency_code` para que los emails
+            // se rendericen en el idioma y moneda del tenant. Tantor's House
+            // recibe emails en inglés con precios en USD; tenants legacy quedan
+            // en es-CO/COP por default vía `getTenantLocale()`.
             const { data: orgDetails } = await supabase
                 .from("organizations")
-                .select("name, contact_email, custom_domain")
+                .select("name, contact_email, custom_domain, locale, currency_code")
                 .eq("id", org.id)
                 .single()
 
             const organizationName = orgDetails?.name || "Tu Tienda"
             const ownerEmail = orgDetails?.contact_email
+            const tenantLocale = getTenantLocale(orgDetails)
             const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://landingchat.co'
 
             let storeUrl: string
@@ -889,6 +895,8 @@ export async function createOrder(params: CreateOrderParams) {
                 organizationName: organizationName,
                 storeUrl,
                 orderUrl,
+                locale: tenantLocale.locale,
+                currency: tenantLocale.currency,
             })
 
             // Send email notification to store owner
@@ -901,7 +909,9 @@ export async function createOrder(params: CreateOrderParams) {
                     total: params.total,
                     items: params.items,
                     ownerEmail: ownerEmail,
-                    organizationName: organizationName
+                    organizationName: organizationName,
+                    locale: tenantLocale.locale,
+                    currency: tenantLocale.currency,
                 })
             } else {
                 console.log("[createOrder] No owner email configured, skipping owner notification")

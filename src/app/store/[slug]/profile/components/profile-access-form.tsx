@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 interface ProfileAccessFormProps {
     slug: string
@@ -11,6 +12,7 @@ interface ProfileAccessFormProps {
 
 export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormProps) {
     const router = useRouter()
+    const t = useT()
     const [name, setName] = useState("")
     const [phone, setPhone] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -37,12 +39,12 @@ export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormP
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.error || "No pudimos validar tu acceso")
+                throw new Error(data.error || t("store.profile.access_form_default_error"))
             }
 
             router.refresh()
         } catch (submitError) {
-            setError(submitError instanceof Error ? submitError.message : "No pudimos validar tu acceso")
+            setError(submitError instanceof Error ? submitError.message : t("store.profile.access_form_default_error"))
         } finally {
             setIsSubmitting(false)
         }
@@ -57,17 +59,17 @@ export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormP
                             <span className="material-symbols-outlined text-2xl">smartphone</span>
                         </div>
                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                            Mi Cuenta
+                            {t("store.profile.access_form_title")}
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400">
-                            Valida tu acceso con el mismo nombre y WhatsApp que usaste en {organizationName}
+                            {t("store.profile.access_form_subtitle", { name: organizationName })}
                         </p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
                             <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                Nombre completo
+                                {t("store.profile.access_form_name_label")}
                             </label>
                             <input
                                 id="name"
@@ -76,13 +78,13 @@ export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormP
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                                placeholder="Ej. Juan Pérez"
+                                placeholder={t("store.profile.access_form_name_placeholder")}
                             />
                         </div>
 
                         <div>
                             <label htmlFor="phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                Número de WhatsApp
+                                {t("store.profile.access_form_phone_label")}
                             </label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 text-sm">
@@ -97,11 +99,11 @@ export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormP
                                     value={phone}
                                     onChange={(event) => setPhone(event.target.value)}
                                     className="flex-1 px-3 py-2 border border-slate-200 rounded-r-lg bg-white dark:bg-slate-900 dark:border-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                                    placeholder="300 123 4567"
+                                    placeholder={t("store.profile.access_form_phone_placeholder")}
                                 />
                             </div>
                             <p className="mt-1 text-xs text-slate-400">
-                                El mismo número que usaste para chatear o comprar
+                                {t("store.profile.access_form_phone_hint")}
                             </p>
                         </div>
 
@@ -117,7 +119,7 @@ export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormP
                             className="w-full bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white py-2.5 px-4 rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
                         >
                             <span className="material-symbols-outlined text-lg">login</span>
-                            {isSubmitting ? "Validando acceso..." : "Ver Mi Cuenta"}
+                            {isSubmitting ? t("store.profile.access_form_submitting") : t("store.profile.access_form_submit")}
                         </button>
                     </form>
 
@@ -126,7 +128,7 @@ export function ProfileAccessForm({ slug, organizationName }: ProfileAccessFormP
                             href={`/store/${slug}`}
                             className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
                         >
-                            ← Volver a la tienda
+                            {t("store.profile.access_form_back")}
                         </Link>
                     </div>
                 </div>

@@ -10,6 +10,7 @@ import { CheckoutFlow } from "@/components/checkout/checkout-flow"
 import { useCartStore } from "@/store/cart-store"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 interface Props {
     slug: string
@@ -33,6 +34,7 @@ function useCartHydrated(): boolean {
 }
 
 export function CheckoutPageClient({ slug, sourceChannel, chatId, organizationName, organizationLogo }: Props) {
+    const t = useT()
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
     const items = useCartStore(s => s.items)
@@ -73,7 +75,7 @@ export function CheckoutPageClient({ slug, sourceChannel, chatId, organizationNa
                         variant="ghost"
                         size="icon"
                         onClick={handleBack}
-                        aria-label="Volver"
+                        aria-label={t("store.checkout.back_aria")}
                         className="h-9 w-9 shrink-0"
                     >
                         <ArrowLeft className="h-5 w-5" />
@@ -82,7 +84,7 @@ export function CheckoutPageClient({ slug, sourceChannel, chatId, organizationNa
                     <Link
                         href={storeHref}
                         className="flex min-w-0 flex-1 items-center gap-2"
-                        aria-label={`Volver a ${organizationName}`}
+                        aria-label={t("store.checkout.back_to_store_aria", { name: organizationName })}
                     >
                         {organizationLogo && (
                             <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-slate-100 dark:bg-slate-800">
@@ -101,7 +103,7 @@ export function CheckoutPageClient({ slug, sourceChannel, chatId, organizationNa
                     </Link>
 
                     <span className="hidden sm:inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                        Checkout seguro
+                        {t("store.checkout.secure_badge")}
                     </span>
                 </div>
             </header>
@@ -117,7 +119,7 @@ export function CheckoutPageClient({ slug, sourceChannel, chatId, organizationNa
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                         <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
                         <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                            Cargando tu carrito...
+                            {t("store.checkout.cart_loading")}
                         </p>
                     </div>
                 )}

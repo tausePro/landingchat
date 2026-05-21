@@ -6,6 +6,7 @@ import { executeTool } from "./tool-executor"
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { formatBogotaDate } from "@/lib/utils/date"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import {
     PRODUCT_WITH_VARIANTS_VARIANT_SELECT,
     normalizeVariantRow,
@@ -194,12 +195,17 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             customInstructions: agent.configuration?.personality?.instructions?.substring(0, 100) + "..."
         })
 
-        // 2. Load organization (incluye industry para determinar modo)
+        // 2. Load organization (incluye industry + locale i18n para sistema bilingue)
+        // T1.7 — cargamos locale/currency/country para parametrizar el system
+        // prompt. Tantor's House (en-US) recibe instrucciones en inglés y
+        // responde en inglés. Tenants legacy CO siguen con es-CO sin cambios.
         const { data: organization } = await supabase
             .from("organizations")
-            .select("name, industry")
+            .select("name, industry, locale, currency_code, country_code")
             .eq("id", input.organizationId)
             .single()
+
+        const tenantLocale = getTenantLocale(organization)
 
         // 2.1 Load subscription features (flags del plan activo)
         const { data: subscription } = await supabase
@@ -314,13 +320,14 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 7. Build system prompt (optimized: only pass product count, not all products)
-        log.debug("Building system prompt", { currentProduct: currentProduct?.name || "NONE" })
+        log.debug("Building system prompt", { currentProduct: currentProduct?.name || "NONE", locale: tenantLocale.locale })
         let systemPrompt = buildSystemPromptOptimized(
             agent,
             organization?.name || "la tienda",
             productCount || 0,
             customer || undefined,
-            currentProduct || undefined
+            currentProduct || undefined,
+            tenantLocale.locale,
         )
 
         // 7.5. Inyectar documentos de conocimiento del agente (si existen)
@@ -395,7 +402,7 @@ INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción
         })
         const agentSkillsConfig = agent.configuration?.skills || null
         log.info("Org mode resolved", { mode: orgMode, industry: organization?.industry, products: productCount, properties: propertyCount })
-        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig)
+        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig, tenantLocale.locale)
 
         // Add channel-specific instructions
         const channel = input.channel || "web"
@@ -629,8 +636,31 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
         const log = logger("ai/chat-agent").withContext({ orgId: input.organizationId, chatId: input.chatId })
         log.error("processMessage failed", { name: err.name, message: err.message, stack: err.stack?.split("\n").slice(0, 3).join(" | ") })
 
+        // T1.7 — fallback locale-aware. Tantor recibe error en inglés.
+        // No usamos `t()` aquí para no agregar otra dependencia: ya tenemos
+        // input.organizationId pero NO el locale resuelto en este catch
+        // (la falla pudo ocurrir antes del query). Hard-coded ES + EN cubre
+        // ambos verticales sin ramificar.
+        const fallbackErrorByLocale: Record<string, string> = {
+            "es-CO": "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",
+            "en-US": "Sorry, I had trouble processing your message. Could you try again?",
+        }
+        // Best effort: re-leer el locale del org desde DB. Si falla, default es-CO.
+        let errorLocale = "es-CO"
+        try {
+            const supabase = createServiceClient()
+            const { data: org } = await supabase
+                .from("organizations")
+                .select("locale")
+                .eq("id", input.organizationId)
+                .single()
+            if (org?.locale === "en-US") errorLocale = "en-US"
+        } catch {
+            // si la lectura falla, fallback a es-CO
+        }
+
         return {
-            response: "Lo siento, tuve un problema procesando tu mensaje. ¿Podrías intentarlo de nuevo?",
+            response: fallbackErrorByLocale[errorLocale] || fallbackErrorByLocale["es-CO"],
             actions: [],
             metadata: {
                 model: AI_MODEL,

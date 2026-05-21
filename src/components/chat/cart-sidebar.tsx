@@ -1,15 +1,16 @@
 "use client"
 
 import { getCartItemLineId, getCartItemProductId, toCouponCartItem, toOrderSummaryItem, useCartStore } from "@/store/cart-store"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
 import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/utils/shipping"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { useState, useEffect, useRef } from "react"
 import { validateCoupon, calculateOrderSummary } from "@/app/chat/actions"
 import { calculateCouponDiscount } from "@/lib/utils/coupon"
 import { useTracking } from "@/components/analytics/tracking-provider"
+import { useT, useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
-interface RecommendationItem {
+export interface RecommendationItem {
     id: string
     name: string
     price: number
@@ -30,6 +31,9 @@ interface CartSidebarProps {
 export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", recommendations = [], onClose, onCheckout }: CartSidebarProps) {
     const { items, removeItem, updateQuantity, total, addItem, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackAddToCart, trackEvent } = useTracking()
+    const t = useT()
+    const locale = useTenantLocale()
+    const currencyCode = useTenantCurrency()
     const [showCouponInput, setShowCouponInput] = useState(false)
     const [couponCode, setCouponCode] = useState("")
     const [couponLoading, setCouponLoading] = useState(false)
@@ -45,7 +49,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
         hasTrackedOpen.current = true
         trackEvent("cart_opened", {
             value: currentTotal,
-            currency: "COP",
+            currency: currencyCode,
             contentIds: items.map(item => getCartItemProductId(item)),
             properties: {
                 itemCount: items.length,
@@ -53,7 +57,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 hasCoupon: Boolean(appliedCoupon),
             },
         })
-    }, [appliedCoupon, currentTotal, items, trackEvent])
+    }, [appliedCoupon, currentTotal, currencyCode, items, trackEvent])
 
     // Descuento reactivo: recalcular cada vez que cambia el carrito
     // Pasar items para que cupones targeted solo apliquen a productos/categorías correspondientes
@@ -95,7 +99,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 setAppliedCoupon(result.coupon)
                 trackEvent("cart_coupon_applied", {
                     value: currentTotal,
-                    currency: "COP",
+                    currency: currencyCode,
                     contentIds: items.map(item => getCartItemProductId(item)),
                     properties: {
                         couponCode: result.coupon.code,
@@ -105,10 +109,10 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 setCouponCode("")
                 setShowCouponInput(false)
             } else {
-                setCouponError(result.error || "Cupón inválido")
+                setCouponError(result.error || t("store.cart.coupon_invalid"))
                 trackEvent("cart_coupon_failed", {
                     value: currentTotal,
-                    currency: "COP",
+                    currency: currencyCode,
                     properties: {
                         couponCode: couponCode.trim().toUpperCase(),
                         failureReason: result.error || "invalid_coupon",
@@ -116,10 +120,10 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 })
             }
         } catch {
-            setCouponError("Error al validar cupón")
+            setCouponError(t("store.cart.coupon_validate_error"))
             trackEvent("cart_coupon_failed", {
                 value: currentTotal,
-                currency: "COP",
+                currency: currencyCode,
                 properties: {
                     couponCode: couponCode.trim().toUpperCase(),
                     failureReason: "validation_error",
@@ -134,13 +138,11 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
     // null min_amount = sin mínimo requerido (siempre gratis)
     const freeShippingProgress = getFreeShippingProgress(shippingConfig, currentTotal)
 
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(price)
-    }
+    // Formato de precio parametrizado por contexto del tenant (locale + currency)
+    // via TenantLocaleProvider del storefront. Tenants sin config (chat layout sin
+    // provider) caen al default seguro 'es-CO' / 'COP' del context.
+    const formatPrice = (price: number) =>
+        formatCurrency(price, { locale, currency: currencyCode })
 
     // Usar la primera recomendación disponible si existe
     const crossSellProduct = recommendations.length > 0 ? recommendations[0] : null
@@ -159,14 +161,14 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
             image_url: crossSellProduct.image_url,
             categories: crossSellProduct.categories,
         })
-        trackAddToCart(crossSellProduct.id, crossSellProduct.name, crossSellProduct.sale_price || crossSellProduct.price, "COP")
+        trackAddToCart(crossSellProduct.id, crossSellProduct.name, crossSellProduct.sale_price || crossSellProduct.price, currencyCode)
     }
 
     const handleRemoveItem = (lineId: string, productId: string, itemTotal: number) => {
         removeItem(lineId)
         trackEvent("cart_item_removed", {
             value: itemTotal,
-            currency: "COP",
+            currency: currencyCode,
             contentIds: [productId],
         })
     }
@@ -175,7 +177,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
         updateQuantity(lineId, newQuantity)
         trackEvent("cart_quantity_changed", {
             value: itemValue,
-            currency: "COP",
+            currency: currencyCode,
             contentIds: [productId],
             properties: {
                 previousQuantity,
@@ -190,23 +192,32 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 {/* Header */}
                 <div className="h-16 px-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm shrink-0">
                     <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">Tu Carrito</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">{t("store.cart.title")}</h3>
                         <span 
                             className="text-white text-[10px] font-bold px-2 py-0.5 rounded-full"
                             style={{ backgroundColor: primaryColor }}
                         >
-                            {items.length} ítem{items.length !== 1 ? 's' : ''}
+                            {t(
+                                items.length === 1
+                                    ? "store.cart.items_count_singular"
+                                    : "store.cart.items_count_plural",
+                                { count: items.length },
+                            )}
                         </span>
                     </div>
                     {onClose ? (
                         <button 
                             onClick={onClose}
                             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1"
+                            aria-label={t("store.cart.aria_close")}
                         >
                             <span className="material-symbols-outlined">close</span>
                         </button>
                     ) : (
-                        <button className="text-gray-400 hover:text-primary transition-colors">
+                        <button
+                            className="text-gray-400 hover:text-primary transition-colors"
+                            aria-label={t("store.cart.aria_more")}
+                        >
                             <span className="material-symbols-outlined">more_horiz</span>
                         </button>
                     )}
@@ -216,11 +227,16 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 {freeShippingProgress.enabled && (
                     <div className="bg-white dark:bg-gray-800 p-4 border-b border-gray-100 dark:border-gray-700">
                         <div className="flex justify-between items-end mb-1">
-                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Envío Gratis{freeShippingProgress.zonesText}</span>
+                            {/* zonesText es data del tenant (ej. ' a Bogotá') y se concatena tal cual */}
+                            <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300">
+                                {t("store.cart.free_shipping_label")}{freeShippingProgress.zonesText}
+                            </span>
                             <span className="text-[10px] font-bold" style={{ color: primaryColor }}>
                                 {freeShippingProgress.hasMinimum && !freeShippingProgress.qualified
-                                    ? `${formatPrice(freeShippingProgress.remaining)} más`
-                                    : "¡Conseguido!"}
+                                    ? t("store.cart.free_shipping_remaining", {
+                                          amount: formatPrice(freeShippingProgress.remaining),
+                                      })
+                                    : t("store.cart.free_shipping_qualified")}
                             </span>
                         </div>
                         <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
@@ -230,7 +246,9 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                             ></div>
                         </div>
                         <p className="text-[10px] text-gray-400 mt-1 text-right">
-                            {freeShippingProgress.hasMinimum && !freeShippingProgress.qualified ? "¡Casi lo tienes!" : `¡Envío gratis${freeShippingProgress.zonesText} activado!`}
+                            {freeShippingProgress.hasMinimum && !freeShippingProgress.qualified
+                                ? t("store.cart.free_shipping_almost")
+                                : t("store.cart.free_shipping_active")}
                         </p>
                     </div>
                 )}
@@ -240,7 +258,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                     {items.length === 0 ? (
                          <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
                             <span className="material-symbols-outlined text-4xl mb-2">remove_shopping_cart</span>
-                            <p className="text-sm">Tu carrito está vacío</p>
+                            <p className="text-sm">{t("store.cart.empty")}</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -249,6 +267,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                     <button 
                                         onClick={() => handleRemoveItem(getCartItemLineId(item), getCartItemProductId(item), item.unit_price * item.quantity)}
                                         className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                        aria-label={t("store.cart.aria_remove_item")}
                                     >
                                         <span className="material-symbols-outlined text-[16px]">delete</span>
                                     </button>
@@ -270,11 +289,13 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                                     <button 
                                                         onClick={() => handleUpdateQuantity(getCartItemLineId(item), getCartItemProductId(item), item.quantity, Math.max(0, item.quantity - 1), item.unit_price * Math.max(0, item.quantity - 1))}
                                                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[12px] font-bold px-1"
+                                                        aria-label={t("store.cart.aria_decrease_qty")}
                                                     >-</button>
                                                     <span className="text-[10px] font-medium w-3 text-center text-gray-700 dark:text-gray-200">{item.quantity}</span>
                                                     <button 
                                                         onClick={() => handleUpdateQuantity(getCartItemLineId(item), getCartItemProductId(item), item.quantity, item.quantity + 1, item.unit_price * (item.quantity + 1))}
                                                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-[12px] font-bold px-1"
+                                                        aria-label={t("store.cart.aria_increase_qty")}
                                                     >+</button>
                                                 </div>
                                             </div>
@@ -288,7 +309,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                     {/* Cross-selling Section */}
                     {items.length > 0 && crossSellProduct && !items.find(i => getCartItemProductId(i) === crossSellProduct.id) && (
                         <div className="mt-6">
-                            <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Comprados juntos</h5>
+                            <h5 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{t("store.cart.cross_sell_title")}</h5>
                             <div 
                                 className="bg-white/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-2 flex gap-2 items-center hover:bg-white dark:hover:bg-gray-800 transition-colors cursor-pointer group"
                                 onClick={handleAddCrossSell}
@@ -302,7 +323,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{crossSellProduct.name}</p>
                                     <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                                        {formatPrice(crossSellProduct.price)} • <span className="text-green-600 font-bold">Oferta</span>
+                                        {formatPrice(crossSellProduct.price)} • <span className="text-green-600 font-bold">{t("store.cart.cross_sell_offer_badge")}</span>
                                     </p>
                                 </div>
                                 <button 
@@ -337,7 +358,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                 style={{ color: primaryColor }}
                             >
                                 <span className="material-symbols-outlined text-[16px]">sell</span>
-                                Aplicar Cupón de descuento
+                                {t("store.cart.coupon_apply_cta")}
                             </button>
                         ) : (
                             <div className="space-y-1.5">
@@ -346,7 +367,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                         type="text"
                                         value={couponCode}
                                         onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(null) }}
-                                        placeholder="Código"
+                                        placeholder={t("store.cart.coupon_code_placeholder")}
                                         className="flex-1 px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs focus:ring-1 focus:ring-primary focus:border-primary outline-none font-mono"
                                         onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
                                     />
@@ -356,7 +377,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                                         disabled={couponLoading || !couponCode.trim()}
                                         onClick={handleApplyCoupon}
                                     >
-                                        {couponLoading ? "..." : "Aplicar"}
+                                        {couponLoading ? t("store.cart.coupon_loading") : t("store.cart.coupon_apply_short")}
                                     </button>
                                     <button 
                                         onClick={() => { setShowCouponInput(false); setCouponError(null) }}
@@ -375,14 +396,14 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                 <div className="p-5 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-30 shrink-0">
                     <div className="space-y-1.5 mb-4">
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                            <span>{taxInfo ? 'Base gravable' : 'Subtotal'}</span>
+                            <span>{taxInfo ? t("store.cart.totals_taxable_base") : t("store.cart.totals_subtotal")}</span>
                             <span className="font-medium text-gray-900 dark:text-white">
                                 {formatPrice(taxInfo ? taxInfo.baseSubtotal : currentTotal)}
                             </span>
                         </div>
                         {taxInfo && taxInfo.tax > 0 && (
                             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                                <span>IVA{taxInfo.pricesIncludeTax ? ' (incluido)' : ''}</span>
+                                <span>{t("store.cart.totals_tax_label")}{taxInfo.pricesIncludeTax ? t("store.cart.totals_tax_included_suffix") : ''}</span>
                                 <span className="font-medium text-gray-900 dark:text-white">
                                     {taxInfo.pricesIncludeTax ? '' : '+'}{formatPrice(taxInfo.tax)}
                                 </span>
@@ -390,18 +411,20 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                         )}
                         {couponDiscount > 0 && (
                             <div className="flex justify-between text-xs text-green-600">
-                                <span>Descuento ({appliedCoupon?.code})</span>
+                                <span>{t("store.cart.totals_discount_with_code", { code: appliedCoupon?.code ?? "" })}</span>
                                 <span className="font-medium">-{formatPrice(couponDiscount)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                            <span>Envío estimado</span>
+                            <span>{t("store.cart.totals_estimated_shipping")}</span>
                             <span className={cn("font-medium", freeShippingProgress.enabled && freeShippingProgress.qualified ? "text-green-600" : "text-gray-900 dark:text-white")}>
-                                {freeShippingProgress.enabled && freeShippingProgress.qualified ? "Gratis" : "Calculado al pagar"}
+                                {freeShippingProgress.enabled && freeShippingProgress.qualified
+                                    ? t("store.cart.totals_free")
+                                    : t("store.cart.totals_calculated_at_checkout")}
                             </span>
                         </div>
                         <div className="pt-3 mt-1 border-t border-dashed border-gray-200 dark:border-gray-700 flex justify-between items-end">
-                            <span className="text-sm font-bold text-gray-900 dark:text-white">Total a Pagar</span>
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">{t("store.cart.totals_total")}</span>
                             <span className="text-lg font-extrabold" style={{ color: primaryColor }}>{formatPrice(Math.max(0, currentTotal - couponDiscount))}</span>
                         </div>
                     </div>
@@ -412,7 +435,7 @@ export function CartSidebar({ slug, shippingConfig, primaryColor = "#3B82F6", re
                         style={{ backgroundColor: '#111827' }} // Black button for checkout as in design, or could be primaryColor
                     >
                         <span className="material-symbols-outlined text-[18px]">lock</span>
-                        Finalizar Compra
+                        {t("store.cart.checkout_button")}
                     </button>
                 </div>
             </div>

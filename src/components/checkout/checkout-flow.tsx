@@ -23,6 +23,10 @@ import {
     useCartStore,
 } from "@/store/cart-store"
 
+import { useT, useTenantCountry } from "@/lib/i18n/use-tenant-strings"
+import { getCountryProfile } from "@/lib/i18n/country-profiles"
+import type { StorefrontStringKey } from "@/lib/i18n/storefront-strings"
+
 import { CheckoutStepper } from "./components/checkout-stepper"
 import { ContactStep } from "./steps/contact-step"
 import { PaymentStep } from "./steps/payment-step"
@@ -43,22 +47,25 @@ export interface CheckoutFlowProps {
     chatId?: string
 }
 
-const CHECKOUT_STEPS: ReadonlyArray<{ key: CheckoutStepKey; label: string }> = [
-    { key: "contact", label: "Datos" },
-    { key: "payment", label: "Pago" },
-    { key: "success", label: "Listo" },
+// i18n Fase 1 (T1.3f): mantenemos arrays de keys de diccionario al top-level
+// (puro y serializable) y resolvemos los strings dentro del componente con
+// useT() en el contexto del tenant.
+const CHECKOUT_STEPS: ReadonlyArray<{ key: CheckoutStepKey; labelKey: StorefrontStringKey }> = [
+    { key: "contact", labelKey: "store.checkout.step_contact_label" },
+    { key: "payment", labelKey: "store.checkout.step_payment_label" },
+    { key: "success", labelKey: "store.checkout.step_success_label" },
 ]
 
-const STEP_TITLES: Record<CheckoutStepKey, string> = {
-    contact: "Información de Envío",
-    payment: "Pago y Confirmación",
-    success: "¡Orden Recibida!",
+const STEP_TITLE_KEYS: Record<CheckoutStepKey, StorefrontStringKey> = {
+    contact: "store.checkout.step_contact_title",
+    payment: "store.checkout.step_payment_title",
+    success: "store.checkout.step_success_title",
 }
 
-const STEP_DESCRIPTIONS: Record<CheckoutStepKey, string> = {
-    contact: "Completa tus datos para confirmar disponibilidad de envío y preparar tu pedido.",
-    payment: "Revisa el total final antes de confirmar. No cambiaremos el monto después de crear la orden.",
-    success: "Tu orden quedó registrada. Conserva el enlace para consultar el estado.",
+const STEP_DESCRIPTION_KEYS: Record<CheckoutStepKey, StorefrontStringKey> = {
+    contact: "store.checkout.step_contact_description",
+    payment: "store.checkout.step_payment_description",
+    success: "store.checkout.step_success_description",
 }
 
 const INITIAL_FORM_DATA: CheckoutFormData = {
@@ -84,6 +91,11 @@ const INITIAL_FORM_DATA: CheckoutFormData = {
  * button los maneja el page-client; este componente solo se ocupa del flujo.
  */
 export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps) {
+    const t = useT()
+    // T1.4 — country profile para Meta Pixel Advanced Matching y defaults
+    // del form. Tantor (US) envía "us"; tenants legacy "co".
+    const tenantCountry = useTenantCountry()
+    const countryProfile = getCountryProfile(tenantCountry)
     const router = useRouter()
     const { items, total, clearCart, appliedCoupon, setAppliedCoupon } = useCartStore()
     const { trackInitiateCheckout, trackEvent, identifyUser } = useTracking()
@@ -253,9 +265,9 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                     },
                 })
                 setCouponCode("")
-                toast.success(`¡Cupón ${result.coupon.code} aplicado!`)
+                toast.success(t("store.checkout.toast_coupon_applied", { code: result.coupon.code }))
             } else {
-                setCouponError(result.error || "Cupón inválido")
+                setCouponError(result.error || t("store.checkout.toast_coupon_invalid"))
                 setAppliedCoupon(null)
                 trackEvent("cart_coupon_failed", {
                     value: subtotal,
@@ -268,7 +280,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                 })
             }
         } catch {
-            setCouponError("Error al validar cupón")
+            setCouponError(t("store.checkout.toast_coupon_validation_error"))
             trackEvent("cart_coupon_failed", {
                 value: subtotal,
                 currency: "COP",
@@ -301,7 +313,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                 sourceChannel,
                 properties: { validationField: "billing", itemCount: items.length },
             })
-            toast.error("Por favor completa todos los campos de facturación")
+            toast.error(t("store.checkout.toast_validation_billing"))
             return
         }
 
@@ -313,7 +325,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                 sourceChannel,
                 properties: { validationField: "state", itemCount: items.length },
             })
-            toast.error("Por favor selecciona tu departamento")
+            toast.error(t("store.checkout.toast_validation_state"))
             return
         }
 
@@ -328,12 +340,12 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                     failureReason: shippingAvailability.message || "shipping_unavailable",
                 },
             })
-            toast.error(shippingAvailability.message || "No realizamos envíos a tu ciudad por el momento")
+            toast.error(shippingAvailability.message || t("store.checkout.toast_shipping_unavailable_default"))
             return
         }
 
         if (formData.person_type === "Jurídica" && !formData.business_name) {
-            toast.warning("Se recomienda ingresar el nombre de la empresa para personas jurídicas")
+            toast.warning(t("store.checkout.toast_business_name_warning"))
         }
 
         trackEvent("checkout_contact_submitted", {
@@ -385,7 +397,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                 sourceChannel,
                 properties: { failureReason: "no_payment_methods_configured", paymentMethod },
             })
-            toast.error("La tienda no tiene métodos de pago disponibles en este momento.")
+            toast.error(t("store.checkout.toast_no_payment_methods"))
             return
         }
 
@@ -408,7 +420,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                 ln: lastName || undefined,
                 ct: formData.city || undefined,
                 st: formData.state || undefined,
-                country: "co",
+                country: countryProfile.metaPixelCountry,
             })
 
             const result = await createOrder({
@@ -518,9 +530,7 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                             failureReason: result.error || "payment_initialization_failed",
                         },
                     })
-                    toast.error(
-                        "Tu orden fue creada, pero no pudimos abrir el pago. Puedes reintentarlo desde el detalle del pedido.",
-                    )
+                    toast.error(t("store.checkout.toast_order_created_payment_failed"))
                 } else {
                     trackEvent("checkout_order_create_failed", {
                         value: finalTotal,
@@ -529,12 +539,12 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
                         sourceChannel,
                         properties: { paymentMethod, failureReason: result.error || "order_create_failed" },
                     })
-                    toast.error("Error al crear la orden: " + result.error)
+                    toast.error(`${t("store.checkout.toast_order_create_error_prefix")} ${result.error}`)
                 }
             }
         } catch (error) {
             console.error(error)
-            toast.error("Ocurrió un error inesperado")
+            toast.error(t("store.checkout.toast_unexpected_error"))
         } finally {
             setLoading(false)
         }
@@ -549,14 +559,21 @@ export function CheckoutFlow({ slug, sourceChannel, chatId }: CheckoutFlowProps)
         router.push(`/store/${slug}`)
     }
 
+    // i18n: traducimos las labels de pasos en el render para que respeten el
+    // locale del provider del tenant.
+    const stepperSteps = CHECKOUT_STEPS.map(({ key, labelKey }) => ({
+        key,
+        label: t(labelKey),
+    }))
+
     return (
         <div className="flex min-h-full flex-col bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
             <div className="flex-shrink-0 space-y-4 px-1 pb-2">
                 <CheckoutStepper
-                    steps={CHECKOUT_STEPS}
+                    steps={stepperSteps}
                     currentStep={step}
-                    title={STEP_TITLES[step]}
-                    description={STEP_DESCRIPTIONS[step]}
+                    title={t(STEP_TITLE_KEYS[step])}
+                    description={t(STEP_DESCRIPTION_KEYS[step])}
                 />
             </div>
 

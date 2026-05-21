@@ -60,8 +60,32 @@ export type AgentDataInput = z.infer<typeof agentDataSchema>
 export type UpdateOrganizationInput = z.infer<typeof updateOrganizationSchema>
 
 // ============================================================================
-// Organization Data Interface (full organization from database)
+// i18n / Localization (Fase 1 — single-locale-per-tenant)
 // ============================================================================
+
+/**
+ * ISO 4217 currency codes soportados en Fase 1.
+ *
+ * Ampliar a 'EUR' | 'MXN' | 'BRL' cuando aparezcan tenants concretos,
+ * sincronizando el CHECK constraint en `organizations.currency_code`.
+ */
+export type SupportedCurrency = "COP" | "USD"
+
+/**
+ * BCP 47 locale codes soportados en Fase 1.
+ *
+ * Ampliar a 'es-MX' | 'es-ES' | 'pt-BR' cuando aparezcan tenants concretos,
+ * sincronizando el CHECK constraint en `organizations.locale`.
+ */
+export type SupportedLocale = "es-CO" | "en-US"
+
+/**
+ * ISO 3166-1 alpha-2 country codes soportados en Fase 1.
+ *
+ * Drives el shape de formularios country-aware (departamento/ciudad para CO,
+ * state/zip para US). Ampliar junto con `SupportedLocale`.
+ */
+export type SupportedCountry = "CO" | "US"
 
 export interface Organization {
   id: string
@@ -97,6 +121,10 @@ export interface Organization {
   tax_enabled?: boolean
   tax_rate?: number
   prices_include_tax?: boolean
+  // i18n / Localization (Fase 1)
+  currency_code?: SupportedCurrency
+  locale?: SupportedLocale
+  country_code?: SupportedCountry
 }
 
 // ============================================================================

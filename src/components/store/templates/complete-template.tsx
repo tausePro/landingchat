@@ -9,6 +9,7 @@ import { ShoppingBag, MessageCircle, Truck, ShieldCheck, Instagram, Facebook } f
 import { ProductCard } from "@/components/store/product-card"
 import { getStoreLink } from "@/lib/utils/store-urls"
 import { getContrastTextColor } from "@/lib/utils"
+import { useT } from "@/lib/i18n/use-tenant-strings"
 
 // Custom icons for TikTok and WhatsApp if not in lucide
 const TikTokIcon = ({ className }: { className?: string }) => (
@@ -80,20 +81,26 @@ export function CompleteTemplate({
     onStartChat,
     isSubdomain = false
 }: CompleteTemplateProps & { isSubdomain?: boolean }) {
+    const t = useT()
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {
         setMounted(true)
     }, [])
-    const heroTitle = heroSettings.title || "Encuentra tu producto ideal, chateando."
-    const heroSubtitle = heroSettings.subtitle || "Sin buscar, sin filtros, solo conversación. Nuestro asistente de IA te ayuda a encontrar exactamente lo que necesitas en segundos."
+    // i18n Fase 1 (T1.3d.2): hero defaults desde el diccionario. Si el tenant
+    // tiene heroSettings.title/subtitle/chatButtonText configurado en BD, eso
+    // manda. Si no, cae al default localizado.
+    const heroTitle = heroSettings.title || t("store.home.hero_title_default")
+    const heroSubtitle = heroSettings.subtitle || t("store.home.hero_subtitle_complete_default")
     const heroBackgroundImage = heroSettings.backgroundImage || ""
     const showChatButton = heroSettings.showChatButton ?? true
-    const chatButtonText = heroSettings.chatButtonText || "Chatear para Comprar"
+    const chatButtonText = heroSettings.chatButtonText || t("store.home.hero_cta_default")
 
     const templateConfig = organization.settings?.storefront?.templateConfig?.complete || {}
 
-    // Ensure we have a proper default config and merge with saved settings
+    // Ensure we have a proper default config and merge with saved settings.
+    // i18n: sectionTitle/sectionSubtitle vienen del diccionario; si savedProductConfig
+    // los sobrescribe (Tantor configura su propio texto), gana lo guardado.
     const defaultProductConfig = {
         showSection: true,
         itemsToShow: 8,
@@ -102,8 +109,8 @@ export function CompleteTemplate({
         showAddToCart: true,
         showAIRecommended: false,
         categories: { enabled: true, selected: [] },
-        sectionTitle: "Tendencias",
-        sectionSubtitle: "Lo más vendido de la semana"
+        sectionTitle: t("store.home.products_section_title_default"),
+        sectionSubtitle: t("store.home.products_section_subtitle_default")
     }
 
     const savedProductConfig = organization.settings?.storefront?.products || {}
@@ -123,10 +130,12 @@ export function CompleteTemplate({
     const testimonials = organization.settings?.storefront?.testimonials || []
     const socialLinks = organization.settings?.storefront?.footer?.social || {}
 
+    // i18n: steps default localizados. Si templateConfig.steps los sobrescribe
+    // desde la config del tenant, gana esa config.
     const steps = templateConfig.steps || [
-        { id: "1", title: "1. Chatea", description: "Cuéntale a nuestro asistente qué necesitas, como si hablaras con un amigo." },
-        { id: "2", title: "2. Elige", description: "Recibe recomendaciones personalizadas y selecciona tu favorita." },
-        { id: "3", title: "3. Recibe", description: "Coordina el envío y el pago directamente en el chat. ¡Listo!" }
+        { id: "1", title: t("store.home.steps_step1_title"), description: t("store.home.steps_step1_description") },
+        { id: "2", title: t("store.home.steps_step2_title"), description: t("store.home.steps_step2_description") },
+        { id: "3", title: t("store.home.steps_step3_title"), description: t("store.home.steps_step3_description") }
     ]
 
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -215,7 +224,7 @@ export function CompleteTemplate({
                     <div className="grid lg:grid-cols-2 gap-12 items-center">
                         <div className="max-w-2xl">
                             <Badge variant="outline" className={`mb-6 px-3 py-1 text-sm ${heroBackgroundImage ? 'border-white/30 bg-white/20 text-white' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
-                                ✨ La nueva forma de comprar
+                                {t("store.home.hero_badge")}
                             </Badge>
                             <h1
                                 className={`text-4xl font-extrabold tracking-tight sm:text-6xl mb-6 leading-[1.1] ${heroBackgroundImage ? 'text-white' : 'text-gray-900'}`}
@@ -255,11 +264,11 @@ export function CompleteTemplate({
                                             window.location.href = productsUrl
                                         }}
                                     >
-                                        {heroSettings.catalogButtonText || 'Ver Catálogo'}
+                                        {heroSettings.catalogButtonText || t("store.home.hero_cta_catalog")}
                                     </Button>
                                     {heroSettings.whatsappButton?.enabled && organization.settings?.whatsapp?.phone && (
                                         <a
-                                            href={`https://wa.me/${organization.settings.whatsapp.phone.replace(/\D/g, '')}?text=${encodeURIComponent(heroSettings.whatsappButton.message || 'Hola, quiero más información')}`}
+                                            href={`https://wa.me/${organization.settings.whatsapp.phone.replace(/\D/g, '')}?text=${encodeURIComponent(heroSettings.whatsappButton.message || t("store.home.hero_whatsapp_greeting"))}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className={`inline-flex items-center justify-center gap-2 w-full sm:w-auto text-base font-bold h-14 px-8 rounded-md transition-transform hover:scale-105 ${
@@ -286,8 +295,8 @@ export function CompleteTemplate({
                                     }}
                                 >
                                     {(heroSettings.stats || [
-                                        { icon: 'Truck', text: 'Envíos Nacionales' },
-                                        { icon: 'ShieldCheck', text: 'Compra Segura' }
+                                        { icon: 'Truck', text: t("store.home.hero_stat_national_shipping") },
+                                        { icon: 'ShieldCheck', text: t("store.home.hero_stat_secure_purchase") }
                                     ]).map((stat: any, index: number) => (
                                         <div key={index} className="flex items-center gap-2">
                                             <div className="p-2 rounded-full bg-white/10 backdrop-blur-sm">
@@ -309,21 +318,21 @@ export function CompleteTemplate({
                                 <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-100 p-8">
                                     <div className="space-y-4">
                                         <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">IA</div>
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">{t("store.home.hero_chat_demo_ai_label")}</div>
                                             <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4 text-sm text-gray-700 max-w-[80%]">
-                                                ¡Hola! 👋 Soy tu asistente personal. ¿Qué estás buscando hoy?
+                                                {t("store.home.hero_chat_demo_greeting")}
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-4 flex-row-reverse">
-                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">Tú</div>
+                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">{t("store.home.hero_chat_demo_you_label")}</div>
                                             <div className="bg-blue-600 rounded-2xl rounded-tr-none p-4 text-sm text-white max-w-[80%]">
-                                                Busco un regalo para mi novia, le gusta la tecnología.
+                                                {t("store.home.hero_chat_demo_user_query")}
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">IA</div>
+                                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">{t("store.home.hero_chat_demo_ai_label")}</div>
                                             <div className="bg-gray-100 rounded-2xl rounded-tl-none p-4 text-sm text-gray-700 max-w-[80%]">
-                                                ¡Perfecto! Tengo unas opciones geniales. ¿Qué tal estos audífonos con cancelación de ruido? 🎧
+                                                {t("store.home.hero_chat_demo_bot_response")}
                                             </div>
                                         </div>
                                     </div>
@@ -345,7 +354,7 @@ export function CompleteTemplate({
                                 color: getTextColor(typographyConfig.textColor)
                             }}
                         >
-                            Cómo funciona
+                            {t("store.home.how_it_works_title")}
                         </h2>
                         <p
                             className="text-gray-600 text-lg"
@@ -355,7 +364,7 @@ export function CompleteTemplate({
                                 opacity: 0.7
                             }}
                         >
-                            Comprar nunca fue tan fácil. Olvídate de los carritos complicados.
+                            {t("store.home.how_it_works_subtitle")}
                         </p>
                     </div>
 
@@ -407,7 +416,7 @@ export function CompleteTemplate({
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
-                                ¿Por qué elegirnos?
+                                {t("store.home.features_title")}
                             </h2>
                             <p
                                 className="text-gray-600"
@@ -417,7 +426,7 @@ export function CompleteTemplate({
                                     opacity: 0.7
                                 }}
                             >
-                                Beneficios que hacen la diferencia
+                                {t("store.home.features_subtitle")}
                             </p>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
@@ -545,7 +554,7 @@ export function CompleteTemplate({
                                         color: getTextColor(typographyConfig.textColor)
                                     }}
                                 >
-                                    {productConfig.sectionTitle || "Tendencias"}
+                                    {productConfig.sectionTitle || t("store.home.products_section_title_default")}
                                 </h2>
                                 <p
                                     className="text-gray-600"
@@ -555,7 +564,7 @@ export function CompleteTemplate({
                                         opacity: 0.7
                                     }}
                                 >
-                                    {productConfig.sectionSubtitle || "Lo más vendido de la semana"}
+                                    {productConfig.sectionSubtitle || t("store.home.products_section_subtitle_default")}
                                 </p>
                             </div>
 
@@ -568,7 +577,7 @@ export function CompleteTemplate({
                                         className="rounded-full font-bold"
                                         style={selectedCategory === null ? { backgroundColor: primaryColor, color: getContrastTextColor(primaryColor) } : {}}
                                     >
-                                        Todos
+                                        {t("store.home.products_filter_all")}
                                     </Button>
                                     {availableCategories.map((cat: string) => (
                                         <Button
@@ -611,7 +620,7 @@ export function CompleteTemplate({
                                         color: getTextColor(typographyConfig.textColor)
                                     }}
                                 >
-                                    {products.length > 0 ? "No encontramos productos para este filtro" : "Estamos preparando el catálogo"}
+                                    {products.length > 0 ? t("store.home.products_empty_filtered_title") : t("store.home.empty_catalog_title")}
                                 </h3>
                                 <p
                                     className="mt-3 text-base text-gray-600"
@@ -622,8 +631,8 @@ export function CompleteTemplate({
                                     }}
                                 >
                                     {products.length > 0
-                                        ? "Prueba otra categoría o vuelve al catálogo completo."
-                                        : "Aún no hay productos publicados en esta tienda."}
+                                        ? t("store.home.products_empty_filtered_message")
+                                        : t("store.home.empty_catalog_message")}
                                 </p>
                                 {showChatButton && (
                                     <Button
@@ -653,7 +662,7 @@ export function CompleteTemplate({
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
-                                Lo que dicen nuestros clientes
+                                {t("store.home.testimonials_title")}
                             </h2>
                             <p
                                 className="text-gray-600 text-lg"
@@ -663,7 +672,7 @@ export function CompleteTemplate({
                                     opacity: 0.7
                                 }}
                             >
-                                Testimonios reales de personas satisfechas
+                                {t("store.home.testimonials_subtitle")}
                             </p>
                         </div>
                         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -739,7 +748,7 @@ export function CompleteTemplate({
                             color: 'white'
                         }}
                     >
-                        ¿Listo para empezar?
+                        {t("store.home.cta_title")}
                     </h2>
                     <p
                         className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto"
@@ -748,7 +757,7 @@ export function CompleteTemplate({
                             color: '#d1d5db'
                         }}
                     >
-                        Únete a miles de clientes satisfechos que ya compran de manera inteligente.
+                        {t("store.home.cta_subtitle")}
                     </p>
                     <Button
                         onClick={() => onStartChat()}
@@ -804,7 +813,7 @@ export function CompleteTemplate({
                                     opacity: 0.7
                                 }}
                             >
-                                La mejor experiencia de compra conversacional. Encuentra lo que buscas, al instante.
+                                {t("store.footer.tagline")}
                             </p>
 
                             {/* Social Links */}
@@ -839,7 +848,7 @@ export function CompleteTemplate({
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
-                                Enlaces
+                                {t("store.footer.links")}
                             </h4>
                             <ul
                                 className="space-y-2 text-gray-600"
@@ -849,17 +858,17 @@ export function CompleteTemplate({
                                     opacity: 0.7
                                 }}
                             >
-                                <li><a href="#" className="hover:text-primary">Inicio</a></li>
-                                <li><a href="#products" className="hover:text-primary">Productos</a></li>
+                                <li><a href="#" className="hover:text-primary">{t("store.nav.home")}</a></li>
+                                <li><a href="#products" className="hover:text-primary">{t("store.nav.products")}</a></li>
                                 <li>
                                     <a
                                         href={getStoreLink('/sobre-nosotros', isSubdomain, organization.slug)}
                                         className="hover:text-primary"
                                     >
-                                        Nosotros
+                                        {t("store.nav.about")}
                                     </a>
                                 </li>
-                                <li><a href="#" className="hover:text-primary">Contacto</a></li>
+                                <li><a href="#" className="hover:text-primary">{t("store.footer.nav_contact")}</a></li>
                             </ul>
                         </div>
                         <div>
@@ -870,7 +879,7 @@ export function CompleteTemplate({
                                     color: getTextColor(typographyConfig.textColor)
                                 }}
                             >
-                                Legal
+                                {t("store.footer.legal")}
                             </h4>
                             <ul
                                 className="space-y-2 text-gray-600"
@@ -895,8 +904,8 @@ export function CompleteTemplate({
                                         ))
                                 ) : (
                                     <>
-                                        <li><a href="#" className="hover:text-primary">Términos</a></li>
-                                        <li><a href="#" className="hover:text-primary">Privacidad</a></li>
+                                        <li><a href="#" className="hover:text-primary">{t("store.footer.terms")}</a></li>
+                                        <li><a href="#" className="hover:text-primary">{t("store.footer.privacy")}</a></li>
                                     </>
                                 )}
                             </ul>

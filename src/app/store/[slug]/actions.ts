@@ -358,9 +358,12 @@ export async function getStoreData(slug: string, limit?: number) {
     const supabase = await createClient()
 
     // 1. Fetch Organization by Slug
+    // i18n Fase 1 (T1.3c): currency_code, locale, country_code se incluyen para
+    // que el layout monte el TenantLocaleProvider con el locale correcto del
+    // tenant. REQUIERE migración 20260519_organizations_locale_currency.sql aplicada.
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, industry, settings, tracking_config, custom_domain")
+        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, industry, settings, tracking_config, custom_domain, currency_code, locale, country_code")
         .eq("slug", slug)
         .single()
 
@@ -557,9 +560,13 @@ export async function getProductDetails(slug: string, slugOrId: string) {
 async function getStorefrontOrganizationForOrder(slug: string) {
     const supabase = createServiceClient()
 
+    // i18n Fase 1 (T1.3b'): incluir currency_code, locale, country_code en el
+    // select para que getTenantLocale(organization) en las order pages pueda
+    // derivar el contexto del tenant. REQUIERE que la migración
+    // 20260519_organizations_locale_currency.sql esté aplicada en este entorno.
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain, tracking_config")
+        .select("id, name, slug, logo_url, settings, primary_color, secondary_color, contact_email, custom_domain, tracking_config, currency_code, locale, country_code")
         .eq("slug", slug)
         .single()
 
