@@ -2,7 +2,30 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { trackServerPurchase } from "@/lib/analytics/meta-conversions-api"
 import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
 import { logger } from "@/lib/logger"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { sendOrderPaidEmail } from "@/lib/notifications/email"
 import type { PaymentStatus, TransactionStatus } from "@/types/payment"
+
+/**
+ * Construye la URL absoluta del storefront del tenant.
+ *
+ * Replica la lógica de `createOrder` en `src/app/chat/actions.ts`:
+ *   - Si tiene `custom_domain` → `https://{custom_domain}`
+ *   - Localhost dev → `{appUrl}/store/{slug}`
+ *   - Producción default → `https://{slug}.landingchat.co`
+ *
+ * Hoy inline porque solo lo usamos aquí. Si en futuro lo necesita otro
+ * módulo, mover a `src/lib/utils/store-urls.ts` como helper compartido.
+ */
+function buildStoreUrl(org: { slug?: string | null; custom_domain?: string | null }): string {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
+    const slug = org.slug || ""
+    if (org.custom_domain) return `https://${org.custom_domain}`
+    if (appUrl.includes("localhost") || appUrl.includes("127.0.0.1")) {
+        return `${appUrl}/store/${slug}`
+    }
+    return `https://${slug}.landingchat.co`
+}
 
 const log = logger("payments/payment-confirmation")
 
@@ -14,11 +37,23 @@ interface OrderPaymentState {
     order_number?: string | null
     status?: string | null
     payment_status?: PaymentStatus | null
+    payment_method?: string | null
     total?: number | string | null
     items?: unknown
     customer_info?: unknown
     utm_data?: unknown
     customers?: CustomerRow | CustomerRow[] | null
+    /** T1.6 — organization data joined para resolver locale/currency. */
+    organizations?: OrganizationRow | OrganizationRow[] | null
+}
+
+interface OrganizationRow {
+    name?: string | null
+    slug?: string | null
+    custom_domain?: string | null
+    locale?: string | null
+    currency_code?: string | null
+    country_code?: string | null
 }
 
 interface CustomerInfo {
@@ -93,6 +128,12 @@ function getCustomer(value: CustomerRow | CustomerRow[] | null | undefined): Cus
     return value || null
 }
 
+/** Normaliza el join `organizations(...)` (puede venir array o single). */
+function getOrganization(value: OrganizationRow | OrganizationRow[] | null | undefined): OrganizationRow | null {
+    if (Array.isArray(value)) return value[0] || null
+    return value || null
+}
+
 function getCustomerInfo(value: unknown): CustomerInfo | null {
     return isRecord(value) ? value as CustomerInfo : null
 }
@@ -121,6 +162,15 @@ async function runPaidOrderSideEffects(params: {
     const customer = getCustomer(params.order.customers)
     const customerInfo = getCustomerInfo(params.order.customer_info)
     const attribution = getAttributionData(params.order.utm_data)
+    // T1.6 — resolvemos locale + currency + country desde la org joined.
+    // Si por alguna razón no vino la org (fallback ultra-defensivo), usamos
+    // el default es-CO/COP/CO de `getTenantLocale`.
+    const organization = getOrganization(params.order.organizations)
+    const tenantLocale = getTenantLocale({
+        locale: organization?.locale,
+        currency_code: organization?.currency_code,
+        country_code: organization?.country_code,
+    })
 
     const decrementResult = await decrementOrderStock(
         params.supabase,
@@ -166,7 +216,7 @@ async function runPaidOrderSideEffects(params: {
                 id: params.order.id,
                 orderNumber: params.order.order_number || undefined,
                 total: Number(params.order.total || 0),
-                currency: "COP",
+                currency: tenantLocale.currency,  // T1.6 — USD para Tantor, COP para CO
                 items: itemsJsonb
                     .filter((item) => typeof item.product_id === "string" && typeof item.quantity === "number" && item.quantity > 0)
                     .map((item) => ({
@@ -192,6 +242,43 @@ async function runPaidOrderSideEffects(params: {
             error: error instanceof Error ? error.message : String(error),
         })
     }
+
+    // T1.6 — Email order-paid al cliente, en el idioma + moneda del tenant.
+    // Cubre tanto confirmaciones manuales (dashboard) como webhooks automáticos
+    // (Wompi/ePayco). Errores no rompen el flow — ya quedaron stock + status
+    // actualizados, el email es complementario.
+    try {
+        const customerEmail = customer?.email || customerInfo?.email || ""
+        if (customerEmail) {
+            const organizationName = organization?.name || ""
+            const orderUrl = `${buildStoreUrl({
+                slug: organization?.slug,
+                custom_domain: organization?.custom_domain,
+            })}/order/${params.order.id}`
+            await sendOrderPaidEmail({
+                orderNumber: params.order.order_number || params.order.id,
+                customerName: customer?.name || customerInfo?.name || "",
+                customerEmail,
+                total: Number(params.order.total || 0),
+                paymentMethod: typeof params.order.payment_method === "string"
+                    ? params.order.payment_method
+                    : "manual",
+                organizationName,
+                orderUrl,
+                locale: tenantLocale.locale,
+                currency: tenantLocale.currency,
+            })
+        } else {
+            log.info("Skipping order-paid email: customer has no email", {
+                orderId: params.order.id,
+            })
+        }
+    } catch (error) {
+        log.error("Error sending order-paid email", {
+            orderId: params.order.id,
+            error: error instanceof Error ? error.message : String(error),
+        })
+    }
 }
 
 export async function applyPaymentStatusToOrder(
@@ -208,11 +295,13 @@ export async function applyPaymentStatusToOrder(
             order_number,
             status,
             payment_status,
+            payment_method,
             total,
             items,
             customer_info,
             utm_data,
-            customers(name, email, phone)
+            customers(name, email, phone),
+            organizations(name, slug, custom_domain, locale, currency_code, country_code)
         `)
         .eq("id", params.orderId)
         .eq("organization_id", params.organizationId)

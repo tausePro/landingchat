@@ -352,3 +352,182 @@ function generateOwnerNotificationHTML(
     </html>
     `
 }
+
+// ============================================================================
+// Email order-paid (T1.6 — markOrderAsPaid)
+// ============================================================================
+// Se dispara desde `runPaidOrderSideEffects` cada vez que una orden pasa a
+// `payment_status='paid'` por primera vez. Cubre tanto confirmaciones
+// manuales desde el dashboard (T1.6) como webhooks Wompi/ePayco automáticos.
+//
+// Idioma + currency siguen el locale del tenant (mismo patrón que T1.3i).
+// Tantor's House (en-US/USD) recibe el email en inglés con precios USD.
+
+interface OrderPaidEmailData {
+    orderNumber: string
+    customerName: string
+    customerEmail: string
+    total: number
+    paymentMethod: string
+    organizationName: string
+    orderUrl: string
+    /**
+     * Locale del tenant (BCP 47). Default `'es-CO'` por retro-compat.
+     */
+    locale?: SupportedLocale
+    /**
+     * Currency del tenant (ISO 4217). Default `'COP'`.
+     */
+    currency?: SupportedCurrency
+    /**
+     * Timestamp UTC de confirmación. Default `now()` al render.
+     */
+    confirmedAt?: string
+}
+
+/**
+ * Envía el email "Pago confirmado" al cliente.
+ *
+ * Retorna `true` si:
+ *   - El email se mandó correctamente.
+ *   - No había `RESEND_API_KEY` (no-op silencioso, no es error).
+ *   - El cliente no tenía email (no-op).
+ *
+ * Retorna `false` solo en errores reales del envío. Errores no rompen el flow
+ * del caller — la confirmación del pago no debe fallar por un email.
+ */
+export async function sendOrderPaidEmail(data: OrderPaidEmailData): Promise<boolean> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping order-paid email to ${data.customerEmail}`)
+            return true
+        }
+
+        if (!data.customerEmail || data.customerEmail.trim() === '') {
+            console.log(`[EMAIL] Customer email is empty, skipping order-paid email`)
+            return true
+        }
+
+        const locale: SupportedLocale = data.locale ?? "es-CO"
+        const currency: SupportedCurrency = data.currency ?? "COP"
+        const emailContent = generateOrderPaidEmailHTML(data, locale, currency)
+        const subject = t("email.order_paid.subject", locale, {
+            orderNumber: data.orderNumber,
+            organizationName: data.organizationName,
+        })
+
+        console.log(`[EMAIL] Sending order-paid to ${data.customerEmail} for order ${data.orderNumber} (locale=${locale}, currency=${currency})`)
+
+        const response = await resend.emails.send({
+            from: `${data.organizationName} <noreply@landingchat.co>`,
+            to: data.customerEmail,
+            subject,
+            html: emailContent,
+        })
+
+        if (response.error) {
+            console.error('[EMAIL] Resend error for order-paid:', response.error)
+            return false
+        }
+
+        console.log(`[EMAIL] Order-paid sent successfully to ${data.customerEmail}, ID: ${response.data?.id}`)
+        return true
+    } catch (error) {
+        console.error('[EMAIL] Error sending order-paid:', error)
+        return false
+    }
+}
+
+/**
+ * Genera el HTML del email order-paid.
+ *
+ * @param locale  Locale del tenant (BCP 47). Determina los strings i18n.
+ * @param currency Currency del tenant (ISO 4217). Determina el formato del monto.
+ */
+function generateOrderPaidEmailHTML(
+    data: OrderPaidEmailData,
+    locale: SupportedLocale,
+    currency: SupportedCurrency,
+): string {
+    const formatPrice = (amount: number) =>
+        formatCurrency(amount, { locale, currency })
+
+    const paymentMethodLabel = data.paymentMethod === 'manual'
+        ? t("email.order_confirmation.payment_bank_transfer", locale)
+        : data.paymentMethod
+
+    // Fecha localizada (es-CO → "21 de mayo de 2026", en-US → "May 21, 2026")
+    const confirmedDate = new Date(data.confirmedAt ?? new Date().toISOString())
+    const dateLabel = new Intl.DateTimeFormat(locale, {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    }).format(confirmedDate)
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${t("email.order_paid.title", locale)}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px;">
+
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
+            <h1 style="color: #1f2937; margin: 0; font-size: 28px;">${data.organizationName}</h1>
+            <p style="color: #6b7280; margin: 8px 0 0 0;">${t("email.order_paid.title", locale)}</p>
+        </div>
+
+        <!-- Hero green -->
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 24px; margin-bottom: 30px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+            <h2 style="color: #166534; margin: 0 0 8px 0;">${t("email.order_paid.heading", locale)}</h2>
+            <p style="color: #166534; margin: 0;">${t("email.order_paid.body", locale)}</p>
+        </div>
+
+        <!-- Payment details -->
+        <div style="background: #f9fafb; border-radius: 8px; padding: 24px; margin-bottom: 30px;">
+            <h3 style="margin: 0 0 16px 0; color: #1f2937;">${t("email.order_paid.order_details_heading", locale)}</h3>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span style="color: #6b7280;">${t("email.order_paid.order_number_label", locale)}</span>
+                <span style="font-weight: 600; font-family: monospace;">${data.orderNumber}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span style="color: #6b7280;">${t("email.order_paid.amount_label", locale)}</span>
+                <span style="font-weight: 700; color: #059669;">${formatPrice(data.total)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span style="color: #6b7280;">${t("email.order_paid.payment_method_label", locale)}</span>
+                <span style="font-weight: 600;">${paymentMethodLabel}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #6b7280;">${t("email.order_paid.date_label", locale)}</span>
+                <span style="font-weight: 600;">${dateLabel}</span>
+            </div>
+        </div>
+
+        <!-- Next steps -->
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+            <h3 style="margin: 0 0 12px 0; color: #1e40af;">${t("email.order_paid.next_steps_heading", locale)}</h3>
+            <p style="margin: 0; color: #1e40af;">${t("email.order_paid.next_steps_body", locale)}</p>
+        </div>
+
+        <!-- CTA -->
+        <div style="text-align: center; margin-bottom: 30px;">
+            <a href="${data.orderUrl}" style="display: inline-block; background: #059669; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                ${t("email.order_paid.view_order_cta", locale)}
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <p style="text-align: center; color: #6b7280; font-size: 14px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            ${t("email.order_paid.thanks_footer", locale, { organizationName: data.organizationName })}
+        </p>
+    </body>
+    </html>
+    `
+}

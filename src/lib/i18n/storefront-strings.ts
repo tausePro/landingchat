@@ -603,6 +603,26 @@ export const storefrontStrings = {
     "email.owner_notification.products_heading": "Productos:",
     "email.owner_notification.dashboard_hint": "Revisa los detalles completos en tu dashboard de {{organizationName}}.",
     // ========================================================================
+    // Email order-paid (T1.6 — markOrderAsPaid)
+    // ========================================================================
+    // Se dispara cuando el merchant confirma manualmente el pago desde el
+    // dashboard o cuando llega un webhook approved de Wompi/ePayco. Reusa
+    // varias keys de `email.order_confirmation.*` (table_*, totals) — aquí
+    // sólo definimos los textos exclusivos del email de "pago confirmado".
+    "email.order_paid.subject": "Pago confirmado · {{orderNumber}} - {{organizationName}}",
+    "email.order_paid.title": "Pago Confirmado",
+    "email.order_paid.heading": "¡Pago confirmado!",
+    "email.order_paid.body": "Hemos recibido tu pago. Estamos preparando tu pedido y te avisaremos cuando esté en camino.",
+    "email.order_paid.order_details_heading": "Detalles del Pago",
+    "email.order_paid.order_number_label": "Número de pedido:",
+    "email.order_paid.amount_label": "Monto pagado:",
+    "email.order_paid.date_label": "Fecha de confirmación:",
+    "email.order_paid.payment_method_label": "Método de pago:",
+    "email.order_paid.next_steps_heading": "¿Y ahora qué?",
+    "email.order_paid.next_steps_body": "Vamos a preparar tu pedido y te notificaremos cuando esté listo para envío. Si tienes preguntas, responde a este email.",
+    "email.order_paid.view_order_cta": "Ver mi pedido",
+    "email.order_paid.thanks_footer": "Gracias por confiar en {{organizationName}}.",
+    // ========================================================================
     // Dashboard payments — manual payment form (T1.5)
     // ========================================================================
     // Account types (CO + US)
@@ -1202,6 +1222,22 @@ export const storefrontStrings = {
     "email.owner_notification.total_label": "Total:",
     "email.owner_notification.products_heading": "Products:",
     "email.owner_notification.dashboard_hint": "Review full details in your {{organizationName}} dashboard.",
+    // ========================================================================
+    // Email order-paid (T1.6 — markOrderAsPaid)
+    // ========================================================================
+    "email.order_paid.subject": "Payment confirmed · {{orderNumber}} - {{organizationName}}",
+    "email.order_paid.title": "Payment Confirmed",
+    "email.order_paid.heading": "Payment confirmed!",
+    "email.order_paid.body": "We've received your payment. We're preparing your order and will notify you once it's on its way.",
+    "email.order_paid.order_details_heading": "Payment Details",
+    "email.order_paid.order_number_label": "Order number:",
+    "email.order_paid.amount_label": "Amount paid:",
+    "email.order_paid.date_label": "Confirmation date:",
+    "email.order_paid.payment_method_label": "Payment method:",
+    "email.order_paid.next_steps_heading": "What's next?",
+    "email.order_paid.next_steps_body": "We'll prepare your order and notify you once it's ready to ship. If you have any questions, reply to this email.",
+    "email.order_paid.view_order_cta": "View my order",
+    "email.order_paid.thanks_footer": "Thank you for choosing {{organizationName}}.",
     // ========================================================================
     // Dashboard payments — manual payment form (T1.5)
     // ========================================================================

@@ -226,7 +226,37 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
     return { success: true }
 }
 
-export async function confirmOrderPayment(orderId: string) {
+/**
+ * Marca manualmente una orden como pagada desde el dashboard.
+ *
+ * T1.6 — server action principal de confirmación manual de pago. Reemplaza
+ * el `confirmOrderPayment` legacy (que sigue exportado como alias para no
+ * romper imports existentes).
+ *
+ * Comportamiento:
+ *   1. Valida que el usuario actual pertenece a una organization.
+ *   2. Carga la orden + su organization (currency_code) en paralelo.
+ *   3. Si la orden ya está `payment_status='paid'` lanza error (idempotencia
+ *      a nivel de UX — el side-effect interno también es idempotente).
+ *   4. Crea o actualiza la `store_transactions` correspondiente con la
+ *      moneda real del tenant (no más 'COP' hardcoded).
+ *   5. Escribe las columnas audit en `orders`:
+ *      - `payment_confirmed_at` (now)
+ *      - `payment_confirmed_by` (user.id)
+ *      - `payment_confirmation_note` (param opcional)
+ *   6. Invoca `applyPaymentStatusToOrder` que se encarga de:
+ *      - Actualizar `payment_status='paid'` + `status='confirmed'`.
+ *      - Decrementar stock idempotentemente (`stock_decremented_at` flag).
+ *      - Enviar email order-paid al cliente locale-aware.
+ *      - Notificar al merchant por WhatsApp.
+ *      - Trackear server-side Meta CAPI Purchase.
+ *
+ * @param orderId UUID de la orden a confirmar.
+ * @param note Nota opcional del operator (ej: "transferencia verificada
+ *             con captura en WhatsApp 21:43"). Persiste en
+ *             `orders.payment_confirmation_note` + `store_transactions.provider_response.note`.
+ */
+export async function markOrderAsPaid(orderId: string, note?: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -241,15 +271,37 @@ export async function confirmOrderPayment(orderId: string) {
     if (!profile?.organization_id) throw new Error("No organization found")
 
     const serviceSupabase = createServiceClient()
-    const { data: order, error: orderError } = await serviceSupabase
-        .from("orders")
-        .select("id, organization_id, total, payment_method, payment_status, customer_id")
-        .eq("id", orderId)
-        .eq("organization_id", profile.organization_id)
-        .maybeSingle()
 
-    if (orderError || !order) {
+    // Cargar orden + organization en paralelo. La org la necesitamos para
+    // resolver la moneda real (Tantor=USD, QP/Tez=COP) en lugar del COP
+    // hardcoded del legacy.
+    const [orderResult, orgResult] = await Promise.all([
+        serviceSupabase
+            .from("orders")
+            .select("id, organization_id, total, payment_method, payment_status, customer_id")
+            .eq("id", orderId)
+            .eq("organization_id", profile.organization_id)
+            .maybeSingle(),
+        serviceSupabase
+            .from("organizations")
+            .select("currency_code")
+            .eq("id", profile.organization_id)
+            .single(),
+    ])
+
+    if (orderResult.error || !orderResult.data) {
         throw new Error("Orden no encontrada o no tienes permisos para actualizarla")
+    }
+
+    const order = orderResult.data
+    const currency = typeof orgResult.data?.currency_code === "string"
+        ? orgResult.data.currency_code
+        : "COP"
+
+    // Idempotencia a nivel UX: la lógica interna ya es idempotente, pero
+    // queremos fallar rápido si el operator hace doble-click o re-confirma.
+    if (order.payment_status === "paid") {
+        throw new Error("La orden ya está marcada como pagada")
     }
 
     const paymentMethod = typeof order.payment_method === "string" ? order.payment_method : "manual"
@@ -269,6 +321,9 @@ export async function confirmOrderPayment(orderId: string) {
         .maybeSingle()
 
     const completedAt = new Date().toISOString()
+    const trimmedNote = typeof note === "string" && note.trim().length > 0
+        ? note.trim().slice(0, 1000)  // hard cap defensivo contra abuse
+        : null
 
     if (existingTransaction) {
         const { error: transactionUpdateError } = await serviceSupabase
@@ -281,6 +336,7 @@ export async function confirmOrderPayment(orderId: string) {
                     source: "dashboard_manual_confirmation",
                     confirmed_by: user.id,
                     previous_status: existingTransaction.status,
+                    ...(trimmedNote ? { note: trimmedNote } : {}),
                 },
             })
             .eq("id", existingTransaction.id)
@@ -296,7 +352,7 @@ export async function confirmOrderPayment(orderId: string) {
                 order_id: orderId,
                 customer_id: order.customer_id || null,
                 amount: Math.round(Number(order.total || 0) * 100),
-                currency: "COP",
+                currency,  // T1.6 — moneda real del tenant (no más COP hardcoded)
                 status: "approved",
                 provider,
                 provider_transaction_id: null,
@@ -304,6 +360,7 @@ export async function confirmOrderPayment(orderId: string) {
                 provider_response: {
                     source: "dashboard_manual_confirmation",
                     confirmed_by: user.id,
+                    ...(trimmedNote ? { note: trimmedNote } : {}),
                 },
                 payment_method: paymentMethod,
                 completed_at: completedAt,
@@ -312,6 +369,27 @@ export async function confirmOrderPayment(orderId: string) {
         if (transactionInsertError) {
             throw new Error("No se pudo crear la transacción de pago")
         }
+    }
+
+    // T1.6 — Audit log directo en orders: queryable + 1 query menos para
+    // mostrar "quién y cuándo" en la UI dashboard. Si futuro necesita
+    // histórico (revertir paid → pending), migración aparte sin pérdida.
+    const { error: auditError } = await serviceSupabase
+        .from("orders")
+        .update({
+            payment_confirmed_at: completedAt,
+            payment_confirmed_by: user.id,
+            payment_confirmation_note: trimmedNote,
+            updated_at: completedAt,
+        })
+        .eq("id", orderId)
+        .eq("organization_id", profile.organization_id)
+
+    if (auditError) {
+        // No bloqueamos: las columnas audit son complementarias. Si fallan,
+        // el pago igual se marca como paid (next step). Loggeamos para
+        // reconciliar manualmente.
+        console.error("[markOrderAsPaid] Failed to write audit columns:", auditError.message)
     }
 
     const result = await applyPaymentStatusToOrder({
@@ -330,6 +408,17 @@ export async function confirmOrderPayment(orderId: string) {
     revalidatePath(`/dashboard/orders/${orderId}`)
 
     return { success: true, sideEffectsRan: result.sideEffectsRan }
+}
+
+/**
+ * Alias legacy de `markOrderAsPaid` para no romper imports existentes en la
+ * UI (`order-actions.tsx`). En PRs futuros se puede migrar el caller y
+ * eliminar este alias.
+ *
+ * @deprecated T1.6 — usar `markOrderAsPaid(orderId, note?)` directamente.
+ */
+export async function confirmOrderPayment(orderId: string) {
+    return markOrderAsPaid(orderId)
 }
 
 export async function reconcileOrderPaymentFromGateway(orderId: string) {
