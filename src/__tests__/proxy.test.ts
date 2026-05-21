@@ -215,6 +215,95 @@ describe('Middleware Routing Tests', () => {
     })
   })
 
+  describe('Hotfix v1.14.1 — www→apex redirect for custom domains', () => {
+    // Bug: cuando un cliente accedía a www.<custom_domain>, el middleware
+    // hacía lookup exacto a organizations.custom_domain = 'www.X', no encontraba
+    // match (los tenants guardan el apex), slug quedaba null y caía al
+    // fallback de landing principal mostrando landingchat.co en vez de la tienda.
+    //
+    // Fix: redirect 301 www → apex ANTES del lookup. Afecta a TODOS los
+    // custom domains de forma transparente (goldcaps, tez, futuros).
+
+    it('redirige 301 www.goldcaps.com.co → goldcaps.com.co preservando path y query', async () => {
+      const url = new URL('https://www.goldcaps.com.co/producto/cap-001?ref=promo&utm=meta')
+      const request = new NextRequest(url, {
+        headers: { host: 'www.goldcaps.com.co' }
+      })
+      const response = await middleware(request)
+
+      expect(response.status).toBe(301)
+      const location = response.headers.get('location')
+      expect(location).toBeTruthy()
+      const target = new URL(location!)
+      expect(target.host).toBe('goldcaps.com.co')
+      expect(target.pathname).toBe('/producto/cap-001')
+      expect(target.searchParams.get('ref')).toBe('promo')
+      expect(target.searchParams.get('utm')).toBe('meta')
+    })
+
+    it('redirige 301 www.tez.com.co → tez.com.co en la raíz', async () => {
+      const url = new URL('https://www.tez.com.co/')
+      const request = new NextRequest(url, {
+        headers: { host: 'www.tez.com.co' }
+      })
+      const response = await middleware(request)
+
+      expect(response.status).toBe(301)
+      const location = response.headers.get('location')
+      const target = new URL(location!)
+      expect(target.host).toBe('tez.com.co')
+      expect(target.pathname).toBe('/')
+    })
+
+    it('NO redirige goldcaps.com.co (apex sin www) — sigue al lookup de tenant normal', async () => {
+      const url = new URL('https://goldcaps.com.co/')
+      const request = new NextRequest(url, {
+        headers: { host: 'goldcaps.com.co' }
+      })
+      const response = await middleware(request)
+
+      // No es 301 redirect: el código continúa al flujo normal
+      // (que terminará en handleAuth o rewrite según el slug).
+      expect(response.status).not.toBe(301)
+    })
+
+    it('NO redirige www.landingchat.co (dominio principal del producto)', async () => {
+      const url = new URL('https://www.landingchat.co/')
+      const request = new NextRequest(url, {
+        headers: { host: 'www.landingchat.co' }
+      })
+      const response = await middleware(request)
+
+      // El dominio www.landingchat.co es el del producto principal.
+      // No debe ser redirigido a landingchat.co por el hotfix.
+      // (Vercel maneja el redirect a nivel infra si lo configura.)
+      expect(response.status).not.toBe(301)
+    })
+
+    it('NO redirige subdominios de landingchat.co (e.g. www.quality-pets.landingchat.co edge case)', async () => {
+      // Edge case: si alguien accede a `www.quality-pets.landingchat.co`,
+      // contiene "landingchat.co" en el host → no aplica nuestro redirect.
+      // El subdominio reservado 'www' lo maneja el resto del flujo.
+      const url = new URL('https://www.quality-pets.landingchat.co/')
+      const request = new NextRequest(url, {
+        headers: { host: 'www.quality-pets.landingchat.co' }
+      })
+      const response = await middleware(request)
+
+      expect(response.status).not.toBe(301)
+    })
+
+    it('NO redirige hosts localhost (entorno de desarrollo)', async () => {
+      const url = new URL('http://www.localhost:3000/')
+      const request = new NextRequest(url, {
+        headers: { host: 'www.localhost:3000' }
+      })
+      const response = await middleware(request)
+
+      expect(response.status).not.toBe(301)
+    })
+  })
+
   describe('Unit tests for specific subdomain examples', () => {
     it('should rewrite tez.landingchat.co to /store/tez', async () => {
       const url = new URL('https://tez.landingchat.co/')

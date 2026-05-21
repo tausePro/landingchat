@@ -138,6 +138,39 @@ export async function proxy(request: NextRequest) {
         pathname.startsWith('/.well-known/')
 
     // ============================================
+    // HOTFIX v1.14.1 — Normalización www → apex (solo custom domains)
+    // ============================================
+    // Cuando un cliente accede a `www.<custom_domain>.com` (e.g. www.goldcaps.com.co
+    // o www.tez.com.co), Vercel enruta al middleware con `hostname = www.X`.
+    // El lookup posterior consulta `organizations.custom_domain = 'www.X'`
+    // que NO existe en DB (los tenants guardan el apex). Como resultado,
+    // el slug queda en null y el middleware cae al fallback de landing
+    // principal, mostrando landingchat.co en vez de la tienda.
+    //
+    // Fix: si el host empieza con `www.` Y NO es un subdominio de
+    // landingchat.co, redirigir 301 al apex preservando path + query.
+    // Beneficios:
+    //   - El lookup de DB encuentra el tenant correctamente.
+    //   - Una sola URL canónica (apex) → mejor SEO + cookies consistentes.
+    //   - Aplicable a TODOS los custom domains, no solo goldcaps.
+    // No tocamos `www.landingchat.co` porque ese es el dominio principal
+    // del producto, ni `localhost`/`127.0.0.1` (dev sin www).
+    if (
+        hostname.startsWith('www.') &&
+        !hostname.includes('landingchat.co') &&
+        !hostname.includes('localhost') &&
+        !hostname.includes('127.0.0.1')
+    ) {
+        const apexHost = hostname.substring(4)
+        const redirectUrl = new URL(
+            request.nextUrl.pathname + request.nextUrl.search,
+            `https://${apexHost}`,
+        )
+        console.log(`[MIDDLEWARE] www→apex redirect (custom domain): ${hostname} → ${apexHost}`)
+        return NextResponse.redirect(redirectUrl, 301)
+    }
+
+    // ============================================
     // MODO EMERGENCIA: Cortar TODO el tráfico a Supabase
     // Cambiar a false cuando la BD esté healthy
     // ============================================
