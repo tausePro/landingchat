@@ -116,13 +116,36 @@ interface Message {
     content: string
 }
 
+/**
+ * Construye el bloque de instrucción de idioma que se inyecta al inicio del
+ * system prompt. Esto fuerza al modelo a responder en el idioma del tenant
+ * sin necesidad de traducir las 280+ líneas de instrucciones procedurales
+ * (Claude entiende español pero responde en el idioma instruido).
+ *
+ * T1.7 — Tantor en-US recibe respuestas en inglés; tenants CO siguen es-CO
+ * sin cambios.
+ */
+function buildLanguageInstruction(locale: string): string {
+    if (locale === "en-US") {
+        return `RESPONSE LANGUAGE (CRITICAL): You MUST respond ONLY in English (en-US). All your messages to the customer must be in English, even though the system prompt below contains Spanish instructions. Use natural American English, friendly tone, and US currency formatting ($X.XX) when mentioning prices.
+
+---
+
+`
+    }
+    // Default es-CO: el prompt ya está en español, no hace falta instruir nada extra.
+    return ""
+}
+
 // Build system prompt - OPTIMIZED version that only needs product count (not all products)
 export function buildSystemPromptOptimized(
     agent: AgentConfig,
     organizationName: string,
     productCount: number,
     customer?: Customer,
-    currentProduct?: Product
+    currentProduct?: Product,
+    /** T1.7 — Locale del tenant (BCP 47). Default `'es-CO'` por retro-compat. */
+    locale: string = "es-CO",
 ): string {
     const customInstructions = agent.configuration?.personality?.instructions
     const hasCustomPrompt = customInstructions && customInstructions.trim().length > 50
@@ -296,7 +319,9 @@ IMPORTANTE:
 - Usa 'confirm_shipping_details' cuando tengas TODOS los datos del cliente`
     }
 
-    return prompt
+    // T1.7 — prependar instrucción de idioma al inicio (mayor prioridad que las
+    // instrucciones procedurales en español). Para es-CO retorna string vacío.
+    return buildLanguageInstruction(locale) + prompt
 }
 
 // Legacy function - calls optimized version (for backwards compatibility)
@@ -305,9 +330,10 @@ export function buildSystemPrompt(
     organizationName: string,
     products: Product[],
     customer?: Customer,
-    currentProduct?: Product
+    currentProduct?: Product,
+    locale: string = "es-CO",
 ): string {
-    return buildSystemPromptOptimized(agent, organizationName, products.length, customer, currentProduct)
+    return buildSystemPromptOptimized(agent, organizationName, products.length, customer, currentProduct, locale)
 }
 
 // Format products for context
