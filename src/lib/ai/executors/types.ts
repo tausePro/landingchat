@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/server"
+import type { SupabaseServiceClient } from "@/lib/supabase/server"
 
 export interface ToolContext {
     chatId: string
@@ -13,7 +13,7 @@ export interface ToolResult {
     error?: string
 }
 
-export type ToolSupabaseClient = ReturnType<typeof createServiceClient>
+export type ToolSupabaseClient = SupabaseServiceClient
 
 export type ToolHandler = (
     supabase: ToolSupabaseClient,

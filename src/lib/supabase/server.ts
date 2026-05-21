@@ -85,3 +85,15 @@ export function createServiceClient() {
         }
     })
 }
+
+/**
+ * Tipo del cliente con permisos de servicio.
+ *
+ * Usar este alias en signatures de funciones que reciben el cliente como
+ * parámetro, en lugar de `ReturnType<typeof createServiceClient>`. Mantiene
+ * la métrica oficial de `createServiceClient` enfocada en llamadas reales
+ * (que sí indican bypass de RLS) en lugar de referencias de tipo.
+ *
+ * Fase 0.5 / F0.5.1 — `refactor/reduce-service-client-surface`.
+ */
+export type SupabaseServiceClient = ReturnType<typeof createServiceClient>

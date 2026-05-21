@@ -19,7 +19,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import { logger } from "@/lib/logger"
 import { getProviderInfo } from "@/lib/payments/registry"
@@ -33,7 +33,7 @@ interface RouteContext {
 }
 
 async function loadGatewayForOrg(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     providerId: string,
     orgSlug: string,
 ): Promise<{ gateway: PaymentGateway | null; orgId: string | null; error?: string; httpStatus?: number }> {

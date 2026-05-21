@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
 import { WompiClient } from "@/lib/wompi/client"
 import { type WompiWebhookPayload, WOMPI_STATUS_MAP } from "@/lib/wompi/types"
 import { decrypt } from "@/lib/utils/encryption"
@@ -31,7 +31,7 @@ interface PlatformConfigRow {
 /**
  * Obtiene la configuración de Wompi de la plataforma desde platform_config
  */
-async function getPlatformWompiConfig(supabase: ReturnType<typeof createServiceClient>): Promise<{
+async function getPlatformWompiConfig(supabase: SupabaseServiceClient): Promise<{
     publicKey: string
     privateKey: string
     eventsSecret: string

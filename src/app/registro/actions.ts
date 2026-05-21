@@ -1,6 +1,6 @@
 "use server"
 
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
 
 import { calculateCurrentPrice } from "@/types"
 
@@ -132,7 +132,7 @@ export async function setupNewUser(
  * Crea una suscripción trial de 7 días con el plan free
  */
 async function createTrialSubscription(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     organizationId: string
 ): Promise<void> {
     // Verificar si ya tiene suscripción
@@ -210,7 +210,7 @@ async function createTrialSubscription(
  * Asegura que una organización existente tenga suscripción
  */
 async function ensureSubscriptionExists(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     organizationId: string
 ): Promise<void> {
     const { data: existingSub } = await supabase
