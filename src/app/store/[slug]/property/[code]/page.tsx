@@ -1,4 +1,4 @@
-import { createServiceClient } from "@/lib/supabase/server"
+import { createClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
@@ -36,12 +36,14 @@ export default async function PropertyDetailPage({
 
   const { organization, products, pages, properties: allProperties, badges } = storeData
 
-  // Obtener la propiedad específica (por external_code o por UUID)
-  const serviceClient = createServiceClient()
+  // Obtener la propiedad específica (por external_code o por UUID).
+  // T0.5.1.1: Usa cliente anon. La policy properties_public_read_active
+  // (migración 20260521a) permite SELECT con status='active'.
+  const supabase = await createClient()
   let property = null
 
   // 1. Buscar por external_code
-  const { data: byCode } = await serviceClient
+  const { data: byCode } = await supabase
     .from("properties")
     .select("*")
     .eq("organization_id", organization.id)
@@ -55,7 +57,7 @@ export default async function PropertyDetailPage({
     // 2. Fallback: buscar por UUID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
     if (isUUID) {
-      const { data: byId } = await serviceClient
+      const { data: byId } = await supabase
         .from("properties")
         .select("*")
         .eq("organization_id", organization.id)
