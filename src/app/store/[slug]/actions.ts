@@ -15,28 +15,16 @@ import {
     getStorefrontCustomerSession,
     verifyStorefrontOrderAccessToken,
 } from "@/lib/storefrontAccess"
-
-type StorefrontSupabaseClient = Awaited<ReturnType<typeof createClient>>
-
-interface StoreOrganizationSettings {
-    whatsapp?: {
-        phone?: string | null
-    }
-    contact?: {
-        phone?: string | null
-    }
-    agent?: {
-        name?: unknown
-        avatar?: unknown
-        [key: string]: unknown
-    }
-    [key: string]: unknown
-}
-
-interface StorefrontAgentIdentity {
-    name: string | null
-    avatar: string | null
-}
+// v1.14.2: helpers de enrichment movidos a un módulo separado para poder
+// reutilizarlos desde server components (como [pageSlug]/page.tsx) sin
+// chocar con la restricción "use server" de este archivo (que exige que
+// todos los exports sean async server actions).
+import {
+    enrichOrganizationWithStorefrontContact,
+    resolveOrganizationAgentIdentity,
+    resolveOrganizationWhatsAppPhone,
+    type StorefrontSupabaseClient,
+} from "@/lib/storefront/organization-enrichment"
 
 interface StorefrontBundleItem {
     product_id?: string | null
@@ -238,85 +226,12 @@ async function getProactiveCouponOfferForProduct(params: {
     }
 }
 
-async function resolveOrganizationWhatsAppPhone(
-    supabase: StorefrontSupabaseClient,
-    organizationId: string,
-    settings?: StoreOrganizationSettings | null,
-): Promise<string | null> {
-    const configuredPhone = settings?.whatsapp?.phone || settings?.contact?.phone
-    if (configuredPhone) {
-        return configuredPhone
-    }
-
-    const { data: whatsappInstance } = await supabase
-        .from("whatsapp_instances")
-        .select("phone_number")
-        .eq("organization_id", organizationId)
-        .eq("instance_type", "corporate")
-        .eq("status", "connected")
-        .single()
-
-    return whatsappInstance?.phone_number || null
-}
-
-async function resolveOrganizationAgentIdentity(
-    supabase: StorefrontSupabaseClient,
-    organizationId: string,
-    settings?: StoreOrganizationSettings | null,
-): Promise<StorefrontAgentIdentity | null> {
-    const configuredAgent = isRecord(settings?.agent) ? settings.agent : null
-    const configuredName = getOptionalString(configuredAgent?.name)
-    const configuredAvatar = getOptionalString(configuredAgent?.avatar)
-
-    if (configuredName || configuredAvatar) {
-        return {
-            name: configuredName,
-            avatar: configuredAvatar,
-        }
-    }
-
-    const { data: agent } = await supabase
-        .from("agents")
-        .select("name, avatar_url")
-        .eq("organization_id", organizationId)
-        .eq("type", "bot")
-        .eq("status", "available")
-        .limit(1)
-        .maybeSingle()
-
-    if (!agent) {
-        return null
-    }
-
-    return {
-        name: getOptionalString(agent.name),
-        avatar: getOptionalString(agent.avatar_url),
-    }
-}
-
-function enrichOrganizationWithStorefrontContact<T extends { id: string; settings?: StoreOrganizationSettings | null }>(
-    organization: T,
-    whatsappPhone: string | null,
-    agentIdentity: StorefrontAgentIdentity | null,
-): T {
-    const configuredAgent = isRecord(organization.settings?.agent) ? organization.settings.agent : {}
-
-    return {
-        ...organization,
-        settings: {
-            ...organization.settings,
-            whatsapp: {
-                ...organization.settings?.whatsapp,
-                phone: whatsappPhone,
-            },
-            agent: {
-                ...configuredAgent,
-                ...(agentIdentity?.name ? { name: agentIdentity.name } : {}),
-                ...(agentIdentity?.avatar ? { avatar: agentIdentity.avatar } : {}),
-            },
-        },
-    }
-}
+// v1.14.2: las funciones resolveOrganizationWhatsAppPhone,
+// resolveOrganizationAgentIdentity y enrichOrganizationWithStorefrontContact
+// viven ahora en `src/lib/storefront/organization-enrichment.ts`. Se importan
+// en el top de este archivo. Movidas allá para poder reutilizarlas desde
+// server components/pages sin chocar con la restricción de "use server"
+// (todos los exports de un archivo "use server" deben ser async functions).
 
 async function getLegacyStorefrontProducts(params: {
     supabase: StorefrontSupabaseClient
