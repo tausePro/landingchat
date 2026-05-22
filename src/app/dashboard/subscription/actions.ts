@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
 import { getPlatformWompiCredentials } from "@/app/admin/platform-payments/actions"
 import crypto from "crypto"
 
@@ -114,7 +114,7 @@ export async function upgradeSubscription(planId: string): Promise<{
 }
 
 async function changeToFreePlan(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     organizationId: string,
     plan: Record<string, unknown>,
     subscriptionId?: string
@@ -158,7 +158,7 @@ async function changeToFreePlan(
 }
 
 async function changePlanImmediately(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     organizationId: string,
     plan: Record<string, unknown>,
     subscriptionId?: string
@@ -209,7 +209,7 @@ async function changePlanImmediately(
  * La firma se genera en el servidor, el cliente solo recibe datos seguros
  */
 async function generateWompiWidgetData(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     organizationId: string,
     plan: Record<string, unknown>,
     subscriptionId?: string,

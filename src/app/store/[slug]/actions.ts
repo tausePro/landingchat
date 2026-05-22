@@ -327,16 +327,18 @@ export async function getStoreData(slug: string, limit?: number) {
         org.settings?.storefront?.template === 'real-estate'
     
     if (isRealEstate) {
-        // Usar service client para evitar restricciones RLS en acceso público (subdominios)
-        const serviceClient = createServiceClient()
-        const { data: props } = await serviceClient
+        // T0.5.1.1: Usa el cliente anon (createClient sin sesión).
+        // La migración 20260521a_properties_public_read.sql asegura policy
+        // `properties_public_read_active` que permite SELECT a anon cuando
+        // status='active'. Filtro por organization_id explícito en la query.
+        const { data: props } = await supabase
             .from('properties')
             .select('*')
             .eq('organization_id', org.id)
             .eq('status', 'active')
             .order('is_featured', { ascending: false })
             .order('created_at', { ascending: false })
-        
+
         properties = props || []
     }
 

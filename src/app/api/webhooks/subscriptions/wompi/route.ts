@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
 import { decrypt } from "@/lib/utils/encryption"
 import crypto from "crypto"
 import { logger } from "@/lib/logger"
@@ -277,7 +277,7 @@ function validateWompiSignature(payload: WompiWebhookPayload, integritySecret: s
  * Registra el evento del webhook
  */
 async function logWebhook(
-    supabase: ReturnType<typeof createServiceClient>,
+    supabase: SupabaseServiceClient,
     organizationId: string | null,
     status: "success" | "error",
     payload: unknown,
