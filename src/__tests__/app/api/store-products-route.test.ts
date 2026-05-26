@@ -115,6 +115,9 @@ describe("GET /api/store/[slug]/products", () => {
       client: expect.any(Object),
       search: "camiseta",
       limit: 5,
+      minPrice: null,
+      maxPrice: null,
+      categories: null,
     })
     expect(payload).toEqual({
       products: [
@@ -135,6 +138,59 @@ describe("GET /api/store/[slug]/products", () => {
         },
       ],
       total: 1,
+    })
+  })
+
+  it("propaga filtros opcionales min_price, max_price y categorias al read path", async () => {
+    createClientMock.mockResolvedValue(
+      createOrganizationsClient({
+        organization: { id: "org-1" },
+      }),
+    )
+    listProductsWithVariantsMock.mockResolvedValue([])
+
+    const request = new NextRequest(
+      "https://example.com/api/store/demo-store/products?search=arena&limit=20&min_price=1000&max_price=80000&categorias=mascotas,gatos",
+    )
+    const response = await GET(request, {
+      params: Promise.resolve({ slug: "demo-store" }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(listProductsWithVariantsMock).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      client: expect.any(Object),
+      search: "arena",
+      limit: 20,
+      minPrice: 1000,
+      maxPrice: 80000,
+      categories: ["mascotas", "gatos"],
+    })
+  })
+
+  it("ignora min_price/max_price no numericos y categorias vacias", async () => {
+    createClientMock.mockResolvedValue(
+      createOrganizationsClient({
+        organization: { id: "org-1" },
+      }),
+    )
+    listProductsWithVariantsMock.mockResolvedValue([])
+
+    const request = new NextRequest(
+      "https://example.com/api/store/demo-store/products?min_price=abc&max_price=&categorias=,,",
+    )
+    await GET(request, {
+      params: Promise.resolve({ slug: "demo-store" }),
+    })
+
+    expect(listProductsWithVariantsMock).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      client: expect.any(Object),
+      search: null,
+      limit: 20,
+      minPrice: null,
+      maxPrice: null,
+      categories: null,
     })
   })
 
