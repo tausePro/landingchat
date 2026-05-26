@@ -202,6 +202,31 @@ export async function reconcileOrderPayment(
                 source: "payment_reconciliation",
             })
 
+            // Si applyPaymentStatusToOrder falla, propagar el error en vez
+            // de enmascararlo. Antes este shortcut retornaba reconciled=true
+            // siempre, lo cual ocultaba bugs como order_not_found y dejaba
+            // el toast mostrando "Pago conciliado: approved" mientras la
+            // orden seguía en payment_status=pending en DB.
+            if (!result.success) {
+                log.error("Reconciliation shortcut: applyPaymentStatusToOrder failed", {
+                    orderId: params.orderId,
+                    organizationId: params.organizationId,
+                    provider,
+                    reason: result.reason,
+                    error: result.error,
+                })
+                return {
+                    reconciled: false,
+                    orderUpdated: false,
+                    transactionUpdated: false,
+                    sideEffectsRan: false,
+                    provider,
+                    status: "approved",
+                    reason: result.reason || "apply_payment_status_failed",
+                    error: result.error,
+                }
+            }
+
             return {
                 reconciled: true,
                 orderUpdated: result.orderUpdated,
