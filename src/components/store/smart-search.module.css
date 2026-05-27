@@ -13,6 +13,16 @@
     --dropdown-pre-scale: 0.97;
     --dropdown-closing-scale: 0.99;
     --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* card-resize */
+    --resize-dur: 300ms;
+    --resize-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* text-states-swap */
+    --text-swap-dur: 150ms;
+    --text-swap-translate-y: 4px;
+    --text-swap-blur: 2px;
+    --text-swap-ease: ease-in-out;
 }
 
 .dropdown {
@@ -41,6 +51,46 @@
         transform var(--dropdown-close-dur) var(--dropdown-ease);
 }
 
+/*
+ * card-resize: tween de max-height cuando cambia el estado del panel
+ * (loading -> resultados -> empty). Pure CSS — el cambio de max-height
+ * lo dispara React vía inline style.
+ */
+.cardResize {
+    transition: max-height var(--resize-dur) var(--resize-ease);
+    will-change: max-height;
+}
+
+/*
+ * text-states-swap: blur+translate-y al texto del header del panel
+ * cuando cambia el estado (loading | resultados | empty | empty-no-sugg).
+ * Orquestado por React: is-exit -> swap text -> is-enter-start -> reflow -> resting.
+ */
+.textSwap {
+    display: inline-block;
+    transform: translateY(0);
+    filter: blur(0);
+    opacity: 1;
+    transition:
+        transform var(--text-swap-dur) var(--text-swap-ease),
+        filter var(--text-swap-dur) var(--text-swap-ease),
+        opacity var(--text-swap-dur) var(--text-swap-ease);
+    will-change: transform, filter, opacity;
+}
+
+.textSwapExit {
+    transform: translateY(calc(var(--text-swap-translate-y) * -1));
+    filter: blur(var(--text-swap-blur));
+    opacity: 0;
+}
+
+.textSwapEnterStart {
+    transform: translateY(var(--text-swap-translate-y));
+    filter: blur(var(--text-swap-blur));
+    opacity: 0;
+    transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .dropdown,
     .dropdown[data-state="opening"],
@@ -48,6 +98,17 @@
     .dropdown[data-state="closing"] {
         transition: none;
         transform: none;
+        opacity: 1;
+    }
+    .cardResize {
+        transition: none;
+    }
+    .textSwap,
+    .textSwapExit,
+    .textSwapEnterStart {
+        transition: none;
+        transform: none;
+        filter: none;
         opacity: 1;
     }
 }
