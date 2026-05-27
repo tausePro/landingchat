@@ -21,6 +21,12 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { buildHighlightSegments } from "@/lib/storefront/highlight-match"
 import type { VariantPriceRange } from "@/types/product"
 
+import styles from "./smart-search.module.css"
+
+type DropdownState = "closed" | "opening" | "open" | "closing"
+
+const DROPDOWN_CLOSE_DURATION_MS = 150
+
 interface SmartSearchProps {
     slug: string
     onStartChat: (query?: string) => void
@@ -110,6 +116,7 @@ export function SmartSearch({
     const [suggestions, setSuggestions] = useState<SuggestionRow[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [showResults, setShowResults] = useState(false)
+    const [dropdownState, setDropdownState] = useState<DropdownState>("closed")
     const [selectedIndex, setSelectedIndex] = useState(-1)
     const [hasSearchedOnce, setHasSearchedOnce] = useState(false)
 
@@ -233,6 +240,30 @@ export function SmartSearch({
             document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    // Orquesta la transición menu-dropdown del catálogo transitions-motion.
+    // closed -> opening -> open al abrir (rAF para que el estilo inicial se aplique antes del transition).
+    // open -> closing -> closed al cerrar (timeout = --dropdown-close-dur del CSS).
+    useEffect(() => {
+        if (showResults) {
+            if (dropdownState === "closed" || dropdownState === "closing") {
+                setDropdownState("opening")
+                const rafId = requestAnimationFrame(() => {
+                    setDropdownState("open")
+                })
+                return () => cancelAnimationFrame(rafId)
+            }
+            return undefined
+        }
+        if (dropdownState === "open" || dropdownState === "opening") {
+            setDropdownState("closing")
+            const timer = window.setTimeout(() => {
+                setDropdownState("closed")
+            }, DROPDOWN_CLOSE_DURATION_MS)
+            return () => window.clearTimeout(timer)
+        }
+        return undefined
+    }, [showResults, dropdownState])
+
     const closeAndReset = useCallback(() => {
         setShowResults(false)
         setQuery("")
@@ -338,7 +369,7 @@ export function SmartSearch({
         suggestions.length === 0
 
     return (
-        <div ref={searchRef} className="relative flex-1 max-w-md mx-4">
+        <div ref={searchRef} className={`${styles.container} relative flex-1 max-w-md mx-4`}>
             <form
                 onSubmit={(event) => {
                     event.preventDefault()
@@ -391,11 +422,13 @@ export function SmartSearch({
                 </div>
             </form>
 
-            {showResults && (
+            {dropdownState !== "closed" && (
                 <div
                     id="smart-search-results"
                     role="listbox"
-                    className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-[28rem] overflow-y-auto"
+                    data-state={dropdownState}
+                    aria-hidden={dropdownState === "closing"}
+                    className={`${styles.dropdown} absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-[28rem] overflow-y-auto`}
                 >
                     {isLoading && <ResultSkeleton />}
 
