@@ -101,14 +101,22 @@ export function ProductFiltersPanel({
     }
 
     function toggleCategory(category: string) {
-        const lower = category.toLowerCase()
-        const set = new Set(activeCategories.map((c) => c.toLowerCase()))
-        if (set.has(lower)) {
-            set.delete(lower)
-        } else {
-            set.add(lower)
-        }
-        const next = Array.from(set)
+        // v1.15.1: preserva el casing real de availableCategories (que viene
+        // de la RPC storefront_facets con el casing original de DB). Antes
+        // se forzaba lowercase y rompia el filtro `overlaps()` case-sensitive
+        // de Postgres en listProductsWithVariants.
+        //
+        // Para dedup contra activeCategories (que pueden venir lowercase de
+        // URLs legacy generadas por header-editor.tsx) hacemos comparison
+        // case-insensitive pero guardamos el casing canonico.
+        const isAlreadyActive = activeCategories.some(
+            (c) => c.toLowerCase() === category.toLowerCase(),
+        )
+        const next = isAlreadyActive
+            ? activeCategories.filter(
+                  (c) => c.toLowerCase() !== category.toLowerCase(),
+              )
+            : [...activeCategories.filter((c) => c.toLowerCase() !== category.toLowerCase()), category]
         pushParams({ categorias: next.length > 0 ? next.join(",") : null })
     }
 

@@ -421,21 +421,24 @@ export async function getStorefrontProductsCatalog(
         ? Math.min(Math.trunc(filters.limit), 100)
         : 100
 
-    const productsPromise = listProductsWithVariants({
-        organizationId: org.id,
-        client: supabase,
-        search: filters.search ?? null,
-        limit: sanitizedLimit,
-        orderBy,
-        minPrice: filters.minPrice ?? null,
-        maxPrice: filters.maxPrice ?? null,
-        categories: filters.categories ?? null,
-    }).catch((error) => {
-        console.error("[getStorefrontProductsCatalog] listProductsWithVariants failed:", error)
-        return [] as Awaited<ReturnType<typeof listProductsWithVariants>>
-    })
-
-    const facetsPromise = supabase
+    // v1.15.1: facets PRIMERO para normalizar casing de filters.categories.
+    //
+    // Bug: el header del storefront genera URLs con `cat.toLowerCase()` desde
+    // el dashboard (header-editor.tsx, commit 2b015dc del 2026-02-10) y el
+    // panel de filtros tambien forzaba lowercase (commit 5994b17). Pero la
+    // columna products.categories preserva el casing original de la DB y el
+    // operador `&&` (overlaps) de Postgres es case-sensitive, asi que filtrar
+    // por "cuidado corporal" contra ["Cuidado Corporal"] devolvia 0.
+    //
+    // Fix: cruzar filters.categories contra facets.categories (que son las
+    // categorias REALES del catalogo) y reemplazar cada filtro con su
+    // version del casing canonico antes de mandar al overlaps. URLs legacy
+    // lowercase de tenants existentes siguen funcionando sin migracion.
+    //
+    // Tradeoff: secuencializa facets -> products (~50-100ms extra). Es
+    // aceptable por correctitud y porque facets ya esta optimizada (RPC
+    // agregada con SECURITY DEFINER).
+    const facetsRow = await supabase
         .rpc("storefront_facets", { p_organization_id: org.id })
         .then(({ data, error }) => {
             if (error) {
@@ -446,7 +449,32 @@ export async function getStorefrontProductsCatalog(
             return row
         })
 
-    const [productList, facetsRow] = await Promise.all([productsPromise, facetsPromise])
+    const realCategories: string[] = Array.isArray(facetsRow?.categories)
+        ? facetsRow.categories
+        : []
+
+    const normalizedCategories = filters.categories
+        ? filters.categories.map((filtered) => {
+              const match = realCategories.find(
+                  (real) => real.toLowerCase() === filtered.toLowerCase(),
+              )
+              return match ?? filtered
+          })
+        : null
+
+    const productList = await listProductsWithVariants({
+        organizationId: org.id,
+        client: supabase,
+        search: filters.search ?? null,
+        limit: sanitizedLimit,
+        orderBy,
+        minPrice: filters.minPrice ?? null,
+        maxPrice: filters.maxPrice ?? null,
+        categories: normalizedCategories,
+    }).catch((error) => {
+        console.error("[getStorefrontProductsCatalog] listProductsWithVariants failed:", error)
+        return [] as Awaited<ReturnType<typeof listProductsWithVariants>>
+    })
 
     const products = productList.map((product) => mapProductListItemToStorefrontProduct(product))
 
