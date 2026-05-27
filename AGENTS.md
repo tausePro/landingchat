@@ -15,6 +15,7 @@
 7. **Guía operativa detallada** → `docs/AGENTS_GUIDE.md`
 8. **Steering Kiro** → `.kiro/steering/`
 9. **Specs vivos** → `.kiro/specs/` (los `_done/` y `_archive/` son consulta histórica)
+10. **Referencias arquitectónicas externas** (lectura previa para slices nuevos) → `docs-private/REFERENCIAS_ARQUITECTONICAS.md`
 
 > Si una regla en este archivo entra en conflicto con #1-#6, manda la doc autoridad.
 
