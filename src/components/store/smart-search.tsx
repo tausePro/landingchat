@@ -21,6 +21,12 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { buildHighlightSegments } from "@/lib/storefront/highlight-match"
 import type { VariantPriceRange } from "@/types/product"
 
+import styles from "./smart-search.module.css"
+
+type DropdownState = "closed" | "opening" | "open" | "closing"
+
+const DROPDOWN_CLOSE_DURATION_MS = 150
+
 interface SmartSearchProps {
     slug: string
     onStartChat: (query?: string) => void
@@ -98,6 +104,44 @@ function ResultSkeleton() {
     )
 }
 
+/**
+ * Aplica la transicion text-states-swap del catalogo transitions-motion.
+ * Tres fases: is-exit (texto sale arriba con blur) -> swap text -> is-enter-start
+ * (jump abajo sin transition) -> reflow -> resting (anima de regreso a 0).
+ */
+function HeaderStatusText({ text, className }: { text: string; className?: string }) {
+    const elRef = useRef<HTMLSpanElement>(null)
+    const [displayedText, setDisplayedText] = useState(text)
+    const previousTextRef = useRef(text)
+
+    useEffect(() => {
+        if (text === previousTextRef.current) return
+        const el = elRef.current
+        if (!el) return // unreachable en practica: useEffect corre post-mount.
+        const computedDur = parseFloat(
+            getComputedStyle(el).getPropertyValue("--text-swap-dur"),
+        )
+        const dur = Number.isFinite(computedDur) && computedDur > 0 ? computedDur : 150
+        el.classList.add(styles.textSwapExit)
+        const timer = window.setTimeout(() => {
+            setDisplayedText(text)
+            el.classList.remove(styles.textSwapExit)
+            el.classList.add(styles.textSwapEnterStart)
+            // Force reflow para que el cambio a resting (sin la clase enter-start) anime.
+            void el.offsetHeight
+            el.classList.remove(styles.textSwapEnterStart)
+            previousTextRef.current = text
+        }, dur)
+        return () => window.clearTimeout(timer)
+    }, [text])
+
+    return (
+        <span ref={elRef} className={`${styles.textSwap} ${className ?? ""}`.trim()}>
+            {displayedText}
+        </span>
+    )
+}
+
 export function SmartSearch({
     slug,
     onStartChat,
@@ -110,6 +154,7 @@ export function SmartSearch({
     const [suggestions, setSuggestions] = useState<SuggestionRow[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [showResults, setShowResults] = useState(false)
+    const [dropdownState, setDropdownState] = useState<DropdownState>("closed")
     const [selectedIndex, setSelectedIndex] = useState(-1)
     const [hasSearchedOnce, setHasSearchedOnce] = useState(false)
 
@@ -233,6 +278,42 @@ export function SmartSearch({
             document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    // Orquesta la transición menu-dropdown del catálogo transitions-motion.
+    // Effect 1: TRIGGER. Reacciona al cambio de showResults para iniciar el ciclo.
+    //   closed/closing + showResults=true -> "opening"
+    //   open/opening + showResults=false -> "closing"
+    useEffect(() => {
+        if (showResults) {
+            if (dropdownState === "closed" || dropdownState === "closing") {
+                setDropdownState("opening")
+            }
+            return
+        }
+        if (dropdownState === "open" || dropdownState === "opening") {
+            setDropdownState("closing")
+        }
+    }, [showResults, dropdownState])
+
+    // Effect 2: ADVANCE. Separado para evitar race del cleanup cancelando el rAF
+    //   antes de que avance. Depende solo de dropdownState.
+    //   "opening" -> rAF -> "open" (next frame, despues del paint inicial)
+    //   "closing" -> setTimeout(--dropdown-close-dur) -> "closed" (desmonta)
+    useEffect(() => {
+        if (dropdownState === "opening") {
+            const rafId = requestAnimationFrame(() => {
+                setDropdownState("open")
+            })
+            return () => cancelAnimationFrame(rafId)
+        }
+        if (dropdownState === "closing") {
+            const timer = window.setTimeout(() => {
+                setDropdownState("closed")
+            }, DROPDOWN_CLOSE_DURATION_MS)
+            return () => window.clearTimeout(timer)
+        }
+        return undefined
+    }, [dropdownState])
+
     const closeAndReset = useCallback(() => {
         setShowResults(false)
         setQuery("")
@@ -337,8 +418,41 @@ export function SmartSearch({
         results.length === 0 &&
         suggestions.length === 0
 
+    // Modo del panel para orquestar card-resize (max-height) y text-states-swap.
+    const panelMode: "loading" | "results" | "empty-with-sugg" | "empty-no-sugg" =
+        isLoading
+            ? "loading"
+            : showEmptyWithSuggestions
+                ? "empty-with-sugg"
+                : showEmptyNoSuggestions
+                    ? "empty-no-sugg"
+                    : "results"
+
+    // Alturas calibradas por estado: el panel "crece y encoge" suave entre modos.
+    const panelMaxHeight =
+        panelMode === "loading"
+            ? "180px"
+            : panelMode === "empty-no-sugg"
+                ? "160px"
+                : panelMode === "empty-with-sugg"
+                    ? "260px"
+                    : "28rem"
+
+    // Texto del header del panel para el text-states-swap. Cambia solo entre modos,
+    // NO en cada keystroke (results.length cambia por modo, no se usa aqui).
+    const headerStatusText =
+        panelMode === "loading"
+            ? "Buscando..."
+            : panelMode === "empty-with-sugg"
+                ? "Sin resultados exactos"
+                : panelMode === "empty-no-sugg"
+                    ? "Sin resultados"
+                    : results.length === SEARCH_LIMIT
+                        ? `Mas de ${SEARCH_LIMIT} resultados`
+                        : `${results.length} ${results.length === 1 ? "producto encontrado" : "productos encontrados"}`
+
     return (
-        <div ref={searchRef} className="relative flex-1 max-w-md mx-4">
+        <div ref={searchRef} className={`${styles.container} relative flex-1 max-w-md mx-4`}>
             <form
                 onSubmit={(event) => {
                     event.preventDefault()
@@ -391,27 +505,32 @@ export function SmartSearch({
                 </div>
             </form>
 
-            {showResults && (
+            {dropdownState !== "closed" && (
                 <div
                     id="smart-search-results"
                     role="listbox"
-                    className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-[28rem] overflow-y-auto"
+                    data-state={dropdownState}
+                    aria-hidden={dropdownState === "closing"}
+                    style={{ maxHeight: panelMaxHeight }}
+                    className={`${styles.dropdown} ${styles.cardResize} absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-y-auto`}
                 >
+                    {/* Header status: SIEMPRE montado para que text-states-swap pueda animar entre modos. */}
+                    <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                            <HeaderStatusText text={headerStatusText} />
+                        </p>
+                        {!isLoading && results.length > 0 && (
+                            <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-400">
+                                <span className="font-mono">↑↓</span>
+                                para navegar
+                            </kbd>
+                        )}
+                    </div>
+
                     {isLoading && <ResultSkeleton />}
 
                     {!isLoading && results.length > 0 && (
                         <>
-                            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                                    {results.length === SEARCH_LIMIT
-                                        ? `Más de ${SEARCH_LIMIT} resultados`
-                                        : `${results.length} ${results.length === 1 ? "producto encontrado" : "productos encontrados"}`}
-                                </p>
-                                <kbd className="hidden sm:inline-flex items-center gap-1 text-[10px] text-slate-400">
-                                    <span className="font-mono">↑↓</span>
-                                    para navegar
-                                </kbd>
-                            </div>
                             <div className="p-2">
                                 {results.map((product, idx) => {
                                     const productUrl = getStoreLink(
