@@ -32,12 +32,18 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- =============================================================================
--- 2. Wrapper IMMUTABLE para unaccent
+-- 2. Wrappers IMMUTABLE
 -- =============================================================================
--- Postgres marca unaccent() como STABLE por default. Las columnas generadas
--- y los indices funcionales requieren funciones IMMUTABLE. Este wrapper fija
--- el diccionario explicitamente y se declara IMMUTABLE.
+-- Postgres marca unaccent() y to_tsvector(regconfig, text) como STABLE por
+-- default (los diccionarios pueden cambiar en runtime). Las columnas generadas
+-- y los indices funcionales requieren funciones IMMUTABLE. Estos wrappers
+-- fijan el diccionario explicitamente y se declaran IMMUTABLE.
+--
+-- Es seguro en Supabase porque los diccionarios FTS instalados no se modifican
+-- en runtime. Si alguna vez se cambian, la columna search_tsv quedaria
+-- desactualizada hasta hacer un UPDATE products SET name = name (force regen).
 
+-- 2.1 Wrapper de unaccent (usado por f_unaccent en indices y dentro del tsv)
 CREATE OR REPLACE FUNCTION public.f_unaccent(text)
 RETURNS text
 LANGUAGE sql
@@ -49,41 +55,59 @@ $function$;
 COMMENT ON FUNCTION public.f_unaccent(text) IS
 $comment$Wrapper IMMUTABLE de unaccent para uso en columnas generadas e indices funcionales.$comment$;
 
--- =============================================================================
--- 3. Columna generada products.search_tsv
--- =============================================================================
+-- 2.2 Wrapper que arma el tsvector completo de productos
+-- Encapsula la expresion completa con setweight + to_tsvector('spanish') para
+-- poder marcarla IMMUTABLE y usarla en una columna GENERATED STORED.
 -- Pesos:
 --   A (maximo): nombre del producto
 --   B: descripcion
 --   C: categorias (array convertido a string separado por espacios)
---
--- Usa diccionario espanol para stemming ("perros" -> "perro", "comidas" ->
--- "comida") y f_unaccent para tolerancia a acentos ("champu" matchea "champu").
-
-ALTER TABLE public.products
-    ADD COLUMN IF NOT EXISTS search_tsv tsvector
-    GENERATED ALWAYS AS (
+CREATE OR REPLACE FUNCTION public.products_build_search_tsv(
+    p_name text,
+    p_description text,
+    p_categories text[]
+)
+RETURNS tsvector
+LANGUAGE sql
+IMMUTABLE PARALLEL SAFE
+AS $function$
+    SELECT
         setweight(
             to_tsvector(
                 'spanish',
-                coalesce(public.f_unaccent(name), '')
+                coalesce(public.f_unaccent(p_name), '')
             ),
             'A'
         ) ||
         setweight(
             to_tsvector(
                 'spanish',
-                coalesce(public.f_unaccent(description), '')
+                coalesce(public.f_unaccent(p_description), '')
             ),
             'B'
         ) ||
         setweight(
             to_tsvector(
                 'spanish',
-                coalesce(public.f_unaccent(array_to_string(categories, ' ')), '')
+                coalesce(public.f_unaccent(array_to_string(p_categories, ' ')), '')
             ),
             'C'
         )
+$function$;
+
+COMMENT ON FUNCTION public.products_build_search_tsv(text, text, text[]) IS
+$comment$Construye el tsvector ponderado (A name, B description, C categories) para products.search_tsv. Marcada IMMUTABLE para permitir uso en columna GENERATED STORED.$comment$;
+
+-- =============================================================================
+-- 3. Columna generada products.search_tsv
+-- =============================================================================
+-- Usa diccionario espanol para stemming ("perros" -> "perro", "comidas" ->
+-- "comida") y f_unaccent para tolerancia a acentos ("champu" matchea "champu").
+
+ALTER TABLE public.products
+    ADD COLUMN IF NOT EXISTS search_tsv tsvector
+    GENERATED ALWAYS AS (
+        public.products_build_search_tsv(name, description, categories)
     ) STORED;
 
 COMMENT ON COLUMN public.products.search_tsv IS
@@ -194,7 +218,8 @@ BEGIN
 
     -- Paso 2: fallback fuzzy con pg_trgm
     -- El operador % usa el threshold configurado por show_limit() (default 0.3)
-    -- similarity() devuelve el score real para ranking.
+    -- similarity() devuelve real, pero el "* 0.5" promociona a double precision;
+    -- por eso casteamos el GREATEST a real para casar con el RETURNS TABLE.
     RETURN QUERY
     SELECT
         p.id AS product_id,
@@ -205,7 +230,7 @@ BEGIN
                 public.f_unaccent(lower(coalesce(p.description, ''))),
                 v_query_lower
             ) * 0.5
-        ) AS similarity
+        )::real AS similarity
     FROM public.products p
     WHERE p.organization_id = p_organization_id
       AND p.is_active = true
@@ -256,15 +281,15 @@ BEGIN
 
     RETURN QUERY
     WITH active_products AS (
-        SELECT p.price, p.categories
+        SELECT p.price AS prod_price, p.categories AS prod_categories
         FROM public.products p
         WHERE p.organization_id = p_organization_id
           AND p.is_active = true
     ),
     flat_categories AS (
         SELECT DISTINCT trim(cat) AS cat
-        FROM active_products,
-             LATERAL unnest(categories) AS cat
+        FROM active_products ap,
+             LATERAL unnest(ap.prod_categories) AS cat
         WHERE cat IS NOT NULL AND length(trim(cat)) > 0
     )
     SELECT
@@ -272,8 +297,8 @@ BEGIN
             (SELECT array_agg(cat ORDER BY cat) FROM flat_categories),
             ARRAY[]::text[]
         ) AS categories,
-        (SELECT MIN(price) FROM active_products) AS min_price,
-        (SELECT MAX(price) FROM active_products) AS max_price,
+        (SELECT MIN(prod_price) FROM active_products) AS min_price,
+        (SELECT MAX(prod_price) FROM active_products) AS max_price,
         (SELECT COUNT(*)::integer FROM active_products) AS product_count;
 END;
 $function$;
