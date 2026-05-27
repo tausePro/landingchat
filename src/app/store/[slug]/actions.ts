@@ -10,6 +10,11 @@ import {
 } from "@/lib/commerce/storefrontProduct"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { isRealEstateIndustry } from "@/lib/storefront-templates"
+import {
+    normalizeCategoryCounts,
+    type StorefrontCategoryCount,
+    type StorefrontFacetsRow,
+} from "@/lib/storefront/facets-normalizer"
 import type { ProductData } from "@/types/product"
 import {
     getStorefrontCustomerSession,
@@ -377,8 +382,13 @@ export interface StorefrontCatalogFilters {
     limit?: number
 }
 
+// StorefrontCategoryCount NO se re-exporta aqui: este archivo es "use server"
+// y Turbopack rechaza re-exports de tipos. Consumidores deben importar
+// directamente desde "@/lib/storefront/facets-normalizer".
+
 export interface StorefrontCatalogFacets {
     categories: string[]
+    categoryCounts: StorefrontCategoryCount[]
     minPrice: number | null
     maxPrice: number | null
     productCount: number
@@ -387,13 +397,6 @@ export interface StorefrontCatalogFacets {
 export interface StorefrontCatalogResult {
     products: StorefrontProduct[]
     facets: StorefrontCatalogFacets
-}
-
-interface StorefrontFacetsRow {
-    categories?: string[] | null
-    min_price?: number | null
-    max_price?: number | null
-    product_count?: number | null
 }
 
 export async function getStorefrontProductsCatalog(
@@ -449,6 +452,7 @@ export async function getStorefrontProductsCatalog(
 
     const facets: StorefrontCatalogFacets = {
         categories: Array.isArray(facetsRow?.categories) ? facetsRow.categories : [],
+        categoryCounts: normalizeCategoryCounts(facetsRow?.category_counts),
         minPrice: typeof facetsRow?.min_price === "number" ? facetsRow.min_price : null,
         maxPrice: typeof facetsRow?.max_price === "number" ? facetsRow.max_price : null,
         productCount: typeof facetsRow?.product_count === "number" ? facetsRow.product_count : 0,
