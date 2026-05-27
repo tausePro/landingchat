@@ -8,13 +8,19 @@ Carpeta con configuración específica del agente Cascade que vive en Windsurf I
 .windsurf/
 ├── README.md           # este archivo
 ├── rules/              # reglas que Cascade aplica automáticamente
-│   ├── analytics-discipline.md   # glob: src/**/analytics/**
-│   ├── tenant-isolation.md       # always-on
-│   └── typescript-strict.md      # glob: **/*.ts, **/*.tsx
+│   ├── analytics-discipline.md         # glob: src/**/analytics/**
+│   ├── storefront-ui-taste.md          # glob: src/components/store/**, chat/**, marketing (port de Leonxlnx/taste-skill)
+│   ├── tenant-isolation.md             # always-on
+│   ├── transitions-motion.md           # glob: src/components/{store,chat,ui}/**, app/{store,chat,marketing}/** (port de transitions.dev)
+│   ├── typescript-strict.md            # glob: **/*.ts, **/*.tsx
+│   └── verification-before-commit.md   # always-on (port de obra/superpowers)
 ├── workflows/          # workflows operativos invocables vía slash command
-│   ├── release-hotfix.md         # /release-hotfix
-│   ├── analytics-validation.md   # /analytics-validation
-│   └── migrate-evolution-to-cloud.md  # /migrate-wpp-cloud
+│   ├── analytics-validation.md         # /analytics-validation
+│   ├── brainstorm-slice.md             # /brainstorm-slice (port de obra/superpowers)
+│   ├── finishing-slice.md              # /finishing-slice (port de obra/superpowers)
+│   ├── migrate-evolution-to-cloud.md   # /migrate-wpp-cloud
+│   ├── release-hotfix.md               # /release-hotfix
+│   └── systematic-debugging.md         # /systematic-debugging (port de obra/superpowers)
 └── mcp.example.json    # template MCP servers (Supabase, GitHub, Vercel, Meta Ads)
 ```
 
