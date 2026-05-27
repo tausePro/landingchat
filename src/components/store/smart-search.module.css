@@ -36,16 +36,24 @@
 .dropdown[data-state="opening"] {
     opacity: 0;
     transform: scale(var(--dropdown-pre-scale));
+    /* Sin pointer-events durante apertura: evita clicks fantasma sobre area
+       semi-transparente y deja pasar hover/click a elementos detras (ej.
+       menu "Productos" del header que comparte z-index). */
+    pointer-events: none;
 }
 
 .dropdown[data-state="open"] {
     opacity: 1;
     transform: scale(1);
+    pointer-events: auto;
 }
 
 .dropdown[data-state="closing"] {
     opacity: 0;
     transform: scale(var(--dropdown-closing-scale));
+    /* Mismo motivo que opening: durante el fade-out de 150ms el panel no debe
+       capturar hover/clicks o se rompe el menu del header que esta cerca. */
+    pointer-events: none;
     transition:
         opacity var(--dropdown-close-dur) var(--dropdown-ease),
         transform var(--dropdown-close-dur) var(--dropdown-ease);

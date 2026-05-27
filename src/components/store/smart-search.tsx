@@ -279,28 +279,40 @@ export function SmartSearch({
     }, [])
 
     // Orquesta la transición menu-dropdown del catálogo transitions-motion.
-    // closed -> opening -> open al abrir (rAF para que el estilo inicial se aplique antes del transition).
-    // open -> closing -> closed al cerrar (timeout = --dropdown-close-dur del CSS).
+    // Effect 1: TRIGGER. Reacciona al cambio de showResults para iniciar el ciclo.
+    //   closed/closing + showResults=true -> "opening"
+    //   open/opening + showResults=false -> "closing"
     useEffect(() => {
         if (showResults) {
             if (dropdownState === "closed" || dropdownState === "closing") {
                 setDropdownState("opening")
-                const rafId = requestAnimationFrame(() => {
-                    setDropdownState("open")
-                })
-                return () => cancelAnimationFrame(rafId)
             }
-            return undefined
+            return
         }
         if (dropdownState === "open" || dropdownState === "opening") {
             setDropdownState("closing")
+        }
+    }, [showResults, dropdownState])
+
+    // Effect 2: ADVANCE. Separado para evitar race del cleanup cancelando el rAF
+    //   antes de que avance. Depende solo de dropdownState.
+    //   "opening" -> rAF -> "open" (next frame, despues del paint inicial)
+    //   "closing" -> setTimeout(--dropdown-close-dur) -> "closed" (desmonta)
+    useEffect(() => {
+        if (dropdownState === "opening") {
+            const rafId = requestAnimationFrame(() => {
+                setDropdownState("open")
+            })
+            return () => cancelAnimationFrame(rafId)
+        }
+        if (dropdownState === "closing") {
             const timer = window.setTimeout(() => {
                 setDropdownState("closed")
             }, DROPDOWN_CLOSE_DURATION_MS)
             return () => window.clearTimeout(timer)
         }
         return undefined
-    }, [showResults, dropdownState])
+    }, [dropdownState])
 
     const closeAndReset = useCallback(() => {
         setShowResults(false)
