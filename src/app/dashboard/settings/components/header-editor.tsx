@@ -71,9 +71,14 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                 if (res.ok) {
                     const data = await res.json()
                     if (data.categories && data.categories.length > 0) {
+                        // v1.15.1: preserva el casing real (NO toLowerCase) y
+                        // usa encodeURIComponent para escapar espacios y
+                        // caracteres especiales. El filtro overlaps() de
+                        // Postgres es case-sensitive, asi que la URL debe
+                        // llevar el casing canonico tal como esta en la DB.
                         const categoryLinks: QuickLink[] = data.categories.map((cat: string) => ({
                             label: cat,
-                            url: `/productos?categoria=${cat.toLowerCase()}`
+                            url: `/productos?categoria=${encodeURIComponent(cat)}`
                         }))
                         setQuickLinks([...STATIC_QUICK_LINKS, ...categoryLinks])
                     }
