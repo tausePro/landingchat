@@ -3,7 +3,6 @@ import {
   listProductsWithVariants,
   type ListProductsWithVariantsParams,
 } from "@/lib/commerce/listProductsWithVariants"
-import type { ProductWithVariantsClient } from "@/lib/commerce/getProductWithVariants"
 
 interface MockError {
   message: string
@@ -19,6 +18,9 @@ interface QueryCall {
   filters: Record<string, unknown>
   excludedFilters: Record<string, unknown>
   inFilters: Record<string, unknown[]>
+  greaterThanOrEqual: Record<string, unknown>
+  lessThanOrEqual: Record<string, unknown>
+  overlapsFilters: Record<string, unknown>
   selection: string
   limit?: number
   orders: Array<{
@@ -28,17 +30,38 @@ interface QueryCall {
   orExpression: string | null
 }
 
+interface RpcCall {
+  fn: string
+  args: Record<string, unknown>
+}
+
 function createMockClient(params: {
-  productsResult: MockQueryResult<unknown[] | null>
+  productsResults?: Array<MockQueryResult<unknown[] | null>>
+  productsResult?: MockQueryResult<unknown[] | null>
   variantsResult: MockQueryResult<unknown[] | null>
+  rpcResult?: MockQueryResult<unknown[] | null>
 }) {
   const calls: QueryCall[] = []
+  const rpcCalls: RpcCall[] = []
+  // Algunos paths llaman products dos veces (search -> select por IDs).
+  // Permite encolar resultados sucesivos; si no hay queue, usa productsResult.
+  const productsQueue = [...(params.productsResults ?? [])]
+
+  function nextProductsResult(): MockQueryResult<unknown[] | null> {
+    if (productsQueue.length > 0) {
+      return productsQueue.shift()!
+    }
+    return params.productsResult ?? { data: [], error: null }
+  }
 
   const client = {
     from(table: string) {
       const filters: Record<string, unknown> = {}
       const excludedFilters: Record<string, unknown> = {}
       const inFilters: Record<string, unknown[]> = {}
+      const greaterThanOrEqual: Record<string, unknown> = {}
+      const lessThanOrEqual: Record<string, unknown> = {}
+      const overlapsFilters: Record<string, unknown> = {}
       let selection = ""
       let limit: number | undefined
       const orders: QueryCall["orders"] = []
@@ -59,6 +82,18 @@ function createMockClient(params: {
         },
         in(column: string, values: unknown[]) {
           inFilters[column] = values
+          return builder
+        },
+        gte(column: string, value: unknown) {
+          greaterThanOrEqual[column] = value
+          return builder
+        },
+        lte(column: string, value: unknown) {
+          lessThanOrEqual[column] = value
+          return builder
+        },
+        overlaps(column: string, value: unknown) {
+          overlapsFilters[column] = value
           return builder
         },
         or(value: string) {
@@ -82,6 +117,9 @@ function createMockClient(params: {
             filters: { ...filters },
             excludedFilters: { ...excludedFilters },
             inFilters: { ...inFilters },
+            greaterThanOrEqual: { ...greaterThanOrEqual },
+            lessThanOrEqual: { ...lessThanOrEqual },
+            overlapsFilters: { ...overlapsFilters },
             selection,
             limit,
             orders: [...orders],
@@ -89,7 +127,7 @@ function createMockClient(params: {
           })
 
           if (table === "products") {
-            return Promise.resolve(params.productsResult).then(...args)
+            return Promise.resolve(nextProductsResult()).then(...args)
           }
 
           if (table === "product_variants") {
@@ -105,14 +143,18 @@ function createMockClient(params: {
 
       return builder
     },
-  } as unknown as ProductWithVariantsClient
+    async rpc(fn: string, args: Record<string, unknown>) {
+      rpcCalls.push({ fn, args })
+      return params.rpcResult ?? { data: [], error: null }
+    },
+  } as unknown as Parameters<typeof listProductsWithVariants>[0]["client"]
 
-  return { client, calls }
+  return { client, calls, rpcCalls }
 }
 
 describe("listProductsWithVariants", () => {
-  it("construye el listado variant-centric preservando fallback legacy", async () => {
-    const { client, calls } = createMockClient({
+  it("construye el listado variant-centric (path B sin search) preservando fallback legacy", async () => {
+    const { client, calls, rpcCalls } = createMockClient({
       productsResult: {
         data: [
           {
@@ -193,7 +235,6 @@ describe("listProductsWithVariants", () => {
     const result = await listProductsWithVariants({
       organizationId: "org-1",
       client,
-      search: "camiseta",
       limit: 10,
     })
 
@@ -226,6 +267,7 @@ describe("listProductsWithVariants", () => {
       badge_id: null,
     })
 
+    expect(rpcCalls).toHaveLength(0)
     expect(calls).toHaveLength(2)
     expect(calls[0]).toMatchObject({
       table: "products",
@@ -240,7 +282,7 @@ describe("listProductsWithVariants", () => {
         column: "created_at",
         ascending: false,
       }],
-      orExpression: "name.ilike.%camiseta%,description.ilike.%camiseta%",
+      orExpression: null,
     })
     expect(calls[1]).toMatchObject({
       table: "product_variants",
@@ -250,6 +292,183 @@ describe("listProductsWithVariants", () => {
       inFilters: {
         product_id: ["product-1", "product-2"],
       },
+    })
+  })
+
+  it("con search llama la RPC search_products y respeta el orden de relevancia", async () => {
+    const { client, calls, rpcCalls } = createMockClient({
+      rpcResult: {
+        data: [
+          { product_id: "product-2", rank: 0.82, similarity: 0 },
+          { product_id: "product-1", rank: 0.41, similarity: 0 },
+        ],
+        error: null,
+      },
+      productsResults: [
+        {
+          // SELECT por IDs viene DESORDENADO (Postgres no preserva el orden
+          // del IN clause). El código debe reordenar usando el ranking RPC.
+          data: [
+            {
+              id: "product-1",
+              organization_id: "org-1",
+              slug: "camiseta-premium",
+              name: "Camiseta Premium",
+              description: null,
+              image_url: null,
+              images: [],
+              categories: ["ropa"],
+              is_active: true,
+              has_quantity_pricing: false,
+              price_tiers: null,
+              price: 80000,
+              sale_price: null,
+              stock: 5,
+              variants: [],
+              badge_id: null,
+              created_at: "2026-01-01T00:00:00Z",
+            },
+            {
+              id: "product-2",
+              organization_id: "org-1",
+              slug: "camiseta-basica",
+              name: "Camiseta Básica",
+              description: null,
+              image_url: null,
+              images: [],
+              categories: ["ropa"],
+              is_active: true,
+              has_quantity_pricing: false,
+              price_tiers: null,
+              price: 30000,
+              sale_price: null,
+              stock: 12,
+              variants: [],
+              badge_id: null,
+              created_at: "2026-01-02T00:00:00Z",
+            },
+          ],
+          error: null,
+        },
+      ],
+      variantsResult: { data: [], error: null },
+    })
+
+    const result = await listProductsWithVariants({
+      organizationId: "org-1",
+      client,
+      search: "camiseta",
+      limit: 10,
+      minPrice: 1000,
+      maxPrice: 100000,
+      categories: ["ropa"],
+    })
+
+    expect(rpcCalls).toHaveLength(1)
+    expect(rpcCalls[0]).toEqual({
+      fn: "search_products",
+      args: {
+        p_organization_id: "org-1",
+        p_query: "camiseta",
+        p_min_price: 1000,
+        p_max_price: 100000,
+        p_categories: ["ropa"],
+        p_limit: 10,
+      },
+    })
+
+    // El orden devuelto debe ser product-2 (rank mayor) antes que product-1
+    expect(result.map((p) => p.id)).toEqual(["product-2", "product-1"])
+
+    // Tras la RPC se hace SELECT por IDs y luego variants
+    expect(calls).toHaveLength(2)
+    expect(calls[0]).toMatchObject({
+      table: "products",
+      inFilters: { id: ["product-2", "product-1"] },
+    })
+    expect(calls[1]).toMatchObject({
+      table: "product_variants",
+      inFilters: { product_id: expect.arrayContaining(["product-1", "product-2"]) },
+    })
+  })
+
+  it("con search sin resultados de la RPC devuelve arreglo vacío sin tocar products", async () => {
+    const { client, calls, rpcCalls } = createMockClient({
+      rpcResult: { data: [], error: null },
+      variantsResult: { data: [], error: null },
+    })
+
+    const result = await listProductsWithVariants({
+      organizationId: "org-1",
+      client,
+      search: "shampu",
+      limit: 10,
+    })
+
+    expect(result).toEqual([])
+    expect(rpcCalls).toHaveLength(1)
+    expect(calls).toEqual([])
+  })
+
+  it("propaga errores de la RPC search_products", async () => {
+    const { client } = createMockClient({
+      rpcResult: { data: null, error: { message: "rpc broke" } },
+      variantsResult: { data: [], error: null },
+    })
+
+    await expect(
+      listProductsWithVariants({
+        organizationId: "org-1",
+        client,
+        search: "camiseta",
+      }),
+    ).rejects.toThrow("Error searching products for organization org-1: rpc broke")
+  })
+
+  it("aplica filtros gte/lte/overlaps en el path sin search", async () => {
+    const { client, calls, rpcCalls } = createMockClient({
+      productsResult: { data: [], error: null },
+      variantsResult: { data: [], error: null },
+    })
+
+    await listProductsWithVariants({
+      organizationId: "org-1",
+      client,
+      minPrice: 5000,
+      maxPrice: 50000,
+      categories: ["ropa", "accesorios"],
+    })
+
+    expect(rpcCalls).toEqual([])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      table: "products",
+      filters: { organization_id: "org-1" },
+      excludedFilters: { is_active: false },
+      greaterThanOrEqual: { price: 5000 },
+      lessThanOrEqual: { price: 50000 },
+      overlapsFilters: { categories: ["ropa", "accesorios"] },
+    })
+  })
+
+  it("ignora filtros invalidos (precio negativo, categorías vacías)", async () => {
+    const { client, calls } = createMockClient({
+      productsResult: { data: [], error: null },
+      variantsResult: { data: [], error: null },
+    })
+
+    await listProductsWithVariants({
+      organizationId: "org-1",
+      client,
+      minPrice: -100,
+      maxPrice: undefined,
+      categories: ["", "   "],
+    })
+
+    expect(calls[0]).toMatchObject({
+      greaterThanOrEqual: {},
+      lessThanOrEqual: {},
+      overlapsFilters: {},
     })
   })
 

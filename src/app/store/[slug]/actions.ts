@@ -361,6 +361,102 @@ export async function getStoreData(slug: string, limit?: number) {
     }
 }
 
+/**
+ * v1.14.5: lectura de catalogo del storefront /productos con filtros
+ * (search, categorias, rango precio) y facets para el panel de filtros.
+ *
+ * Llama por separado a `listProductsWithVariants` (que internamente usa la RPC
+ * `search_products` cuando hay search) y a la RPC `storefront_facets`. Las
+ * dos consultas se ejecutan en paralelo.
+ */
+export interface StorefrontCatalogFilters {
+    search?: string | null
+    categories?: string[] | null
+    minPrice?: number | null
+    maxPrice?: number | null
+    limit?: number
+}
+
+export interface StorefrontCatalogFacets {
+    categories: string[]
+    minPrice: number | null
+    maxPrice: number | null
+    productCount: number
+}
+
+export interface StorefrontCatalogResult {
+    products: StorefrontProduct[]
+    facets: StorefrontCatalogFacets
+}
+
+interface StorefrontFacetsRow {
+    categories?: string[] | null
+    min_price?: number | null
+    max_price?: number | null
+    product_count?: number | null
+}
+
+export async function getStorefrontProductsCatalog(
+    slug: string,
+    filters: StorefrontCatalogFilters,
+): Promise<StorefrontCatalogResult | null> {
+    const supabase = await createClient()
+
+    const { data: org, error: orgError } = await supabase
+        .from("organizations")
+        .select("id, settings")
+        .eq("slug", slug)
+        .single()
+
+    if (orgError || !org) {
+        return null
+    }
+
+    const productConfig = org.settings?.storefront?.products
+    const orderBy = resolveStorefrontProductOrder(productConfig?.orderBy)
+    const sanitizedLimit = filters.limit && Number.isFinite(filters.limit) && filters.limit > 0
+        ? Math.min(Math.trunc(filters.limit), 100)
+        : 100
+
+    const productsPromise = listProductsWithVariants({
+        organizationId: org.id,
+        client: supabase,
+        search: filters.search ?? null,
+        limit: sanitizedLimit,
+        orderBy,
+        minPrice: filters.minPrice ?? null,
+        maxPrice: filters.maxPrice ?? null,
+        categories: filters.categories ?? null,
+    }).catch((error) => {
+        console.error("[getStorefrontProductsCatalog] listProductsWithVariants failed:", error)
+        return [] as Awaited<ReturnType<typeof listProductsWithVariants>>
+    })
+
+    const facetsPromise = supabase
+        .rpc("storefront_facets", { p_organization_id: org.id })
+        .then(({ data, error }) => {
+            if (error) {
+                console.error("[getStorefrontProductsCatalog] storefront_facets RPC failed:", error)
+                return null
+            }
+            const row = (Array.isArray(data) ? data[0] : data) as StorefrontFacetsRow | null
+            return row
+        })
+
+    const [productList, facetsRow] = await Promise.all([productsPromise, facetsPromise])
+
+    const products = productList.map((product) => mapProductListItemToStorefrontProduct(product))
+
+    const facets: StorefrontCatalogFacets = {
+        categories: Array.isArray(facetsRow?.categories) ? facetsRow.categories : [],
+        minPrice: typeof facetsRow?.min_price === "number" ? facetsRow.min_price : null,
+        maxPrice: typeof facetsRow?.max_price === "number" ? facetsRow.max_price : null,
+        productCount: typeof facetsRow?.product_count === "number" ? facetsRow.product_count : 0,
+    }
+
+    return { products, facets }
+}
+
 export async function getProductDetails(slug: string, slugOrId: string) {
     const supabase = await createClient()
 
