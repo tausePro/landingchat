@@ -21,6 +21,8 @@ import {
     appendStorefrontAccessParam,
     createStorefrontOrderAccessToken,
 } from "@/lib/storefrontAccess"
+import { getProviderInfo } from "@/lib/payments/registry"
+import { paymentService } from "@/lib/payments/payment-service"
 
 const log = logger("ai/tool-executor")
 
@@ -1368,19 +1370,13 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         customerId: chat?.customer_id || null,
     })
 
-    // Resolver provider de checkout. Hoy soportamos como link directo desde el agente:
-    //   - "manual" / "contraentrega": muestra la página de orden con instrucciones
-    //   - "wompi" / "epayco": envía a la página /checkout/{provider}/{orderId}
-    // Los proveedores hosted_redirect (Bold, Addi) requieren generar la URL externa
-    // server-side; cuando se habiliten habrá que pasar por paymentService.initiatePayment.
-    const SUPPORTED_GATEWAY_PROVIDERS = ["wompi", "epayco"] as const
-    type SupportedGatewayProvider = (typeof SUPPORTED_GATEWAY_PROVIDERS)[number]
-
+    // Resolver provider de checkout según el PROVIDER_REGISTRY. Soportamos 3 modos:
+    //   - "manual" / "contraentrega": muestra la página de orden con instrucciones offline.
+    //   - embedded_widget (Wompi/ePayco): URL a página interna /checkout/{provider}/{orderId}
+    //     que carga el widget JS del proveedor en el storefront.
+    //   - hosted_redirect (Bold/Addi): paymentService.initiatePayment genera la sesión externa
+    //     server-side y el cliente sale del storefront al sitio del gateway.
     const isManual = payment_method === "manual" || payment_method === "contraentrega"
-    const requestedProvider = (payment_method ?? "").toLowerCase() as SupportedGatewayProvider
-    const gatewayProvider: SupportedGatewayProvider = SUPPORTED_GATEWAY_PROVIDERS.includes(requestedProvider)
-        ? requestedProvider
-        : "epayco"
 
     let paymentUrl: string
     let paymentInstructions: string
@@ -1389,11 +1385,64 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         paymentUrl = appendStorefrontAccessParam(`${storeBaseUrl}/order/${order.id}`, orderAccessToken)
         paymentInstructions = "Tu pedido ha sido registrado. Puedes pagar contra entrega o por transferencia."
     } else {
-        paymentUrl = appendStorefrontAccessParam(
-            `${storeBaseUrl}/checkout/${gatewayProvider}/${order.id}`,
-            orderAccessToken,
-        )
-        paymentInstructions = "Haz clic en el enlace para completar tu pago de forma segura."
+        const requestedProvider = (payment_method ?? "epayco").toLowerCase()
+        const providerInfo = getProviderInfo(requestedProvider)
+
+        if (!providerInfo || !providerInfo.enabled) {
+            payLog.warn("Payment provider not available in registry", {
+                requested: requestedProvider,
+                exists: !!providerInfo,
+                enabled: providerInfo?.enabled ?? false,
+            })
+            return {
+                success: false,
+                error: `El método de pago "${requestedProvider}" no está disponible. Pide al cliente que elija otro.`,
+            }
+        }
+
+        if (providerInfo.checkoutMode === "embedded_widget") {
+            // Wompi/ePayco: el cliente abre página interna que carga el widget JS embebido.
+            paymentUrl = appendStorefrontAccessParam(
+                `${storeBaseUrl}/checkout/${providerInfo.id}/${order.id}`,
+                orderAccessToken,
+            )
+            paymentInstructions = "Haz clic en el enlace para completar tu pago de forma segura."
+        } else {
+            // Bold/Addi: hosted_redirect. Generamos la sesión externa server-side y
+            // devolvemos la URL del proveedor para que el cliente la abra.
+            const returnUrl = appendStorefrontAccessParam(
+                `${storeBaseUrl}/order/${order.id}`,
+                orderAccessToken,
+            )
+
+            const paymentResult = await paymentService.initiatePayment({
+                orderId: order.id,
+                organizationId: context.organizationId,
+                amount: Math.round(total * 100),
+                currency: "COP",
+                customerEmail: shippingInfo.email || "",
+                customerName: shippingInfo.customer_name || "",
+                customerDocument: shippingInfo.document_number || "",
+                customerDocumentType: shippingInfo.document_type || "CC",
+                customerPhone: shippingInfo.phone,
+                returnUrl,
+                paymentMethod: providerInfo.id,
+            })
+
+            if (!paymentResult.success || !paymentResult.paymentUrl) {
+                payLog.error("hosted_redirect initiatePayment failed", {
+                    provider: providerInfo.id,
+                    error: paymentResult.error,
+                })
+                return {
+                    success: false,
+                    error: paymentResult.error || `Error al generar enlace con ${providerInfo.displayName}.`,
+                }
+            }
+
+            paymentUrl = paymentResult.paymentUrl
+            paymentInstructions = `Te dirigimos a ${providerInfo.displayName} para completar tu pago de forma segura.`
+        }
     }
 
     return {
