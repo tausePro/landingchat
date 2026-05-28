@@ -3,6 +3,7 @@ import { createMessage } from "./anthropic"
 import { getOrgMode, getToolsForMode, getModePromptAddendum } from "./agent-factory"
 import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
 import { executeTool } from "./tool-executor"
+import { calculateCostCents } from "./pricing"
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { formatBogotaDate } from "@/lib/utils/date"
@@ -14,6 +15,20 @@ import {
 import type { ProductVariantRow } from "@/types/product"
 
 const AI_MODEL = "claude-haiku-4-5-20251001"
+
+// Feature flags (default OFF). Encender por env var en Vercel para activar
+// gradualmente. Lectura una sola vez en module-load → no impacto en runtime.
+//
+//  - AI_PROMPT_CACHING_ENABLED: pasa el system prompt y tools como bloques
+//    con cache_control. En turnos repetidos del mismo agente, Anthropic cobra
+//    ~10% del costo de input por la parte cacheada. Sin flag, comportamiento
+//    idéntico al legacy (string plano).
+//
+//  - AI_USAGE_TRACKING_ENABLED: emite una fila en ai_usage_events por cada
+//    llamada a Claude (fire-and-forget). Si el insert falla, el chat sigue
+//    respondiendo al usuario. Sin flag, no se inserta nada.
+const AI_PROMPT_CACHING_ENABLED = process.env.AI_PROMPT_CACHING_ENABLED === "true"
+const AI_USAGE_TRACKING_ENABLED = process.env.AI_USAGE_TRACKING_ENABLED === "true"
 
 function buildVariantOptionsForPrompt(variants: ProductVariantRow[]) {
     const optionValues = new Map<string, Set<string>>()
@@ -491,27 +506,63 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             }
         }
 
-        // Add customer and cart context to system prompt
-        let fullSystemPrompt = systemPrompt
-        if (customer) {
-            fullSystemPrompt += "\n\n" + buildCustomerContext(customer, customerOrders || [])
-        } else {
-            fullSystemPrompt += "\n\n" + buildCustomerContext(undefined, undefined)
-        }
+        // Separamos la parte estable (systemPrompt, ~95% del tamaño) de la
+        // parte dinámica per-conversation (customer/cart/cross-channel) para
+        // que el prompt caching de Anthropic funcione: el breakpoint cachea
+        // todo lo que va ANTES y DENTRO del bloque marcado con cache_control.
+        const dynamicContextParts: string[] = [
+            customer
+                ? buildCustomerContext(customer, customerOrders || [])
+                : buildCustomerContext(undefined, undefined),
+        ]
+        if (cart) dynamicContextParts.push(buildCartContext(cart))
+        if (crossChannelContext) dynamicContextParts.push(crossChannelContext)
+        const dynamicSystemPrompt = dynamicContextParts.join("\n\n")
 
-        if (cart) {
-            fullSystemPrompt += "\n\n" + buildCartContext(cart)
-        }
+        // Retrocompatibilidad: si el flag de caching está OFF mandamos string plano.
+        const fullSystemPrompt = dynamicSystemPrompt
+            ? `${systemPrompt}\n\n${dynamicSystemPrompt}`
+            : systemPrompt
 
-        if (crossChannelContext) {
-            fullSystemPrompt += "\n\n" + crossChannelContext
-        }
+        // Construir system con cache_control sobre el bloque stable.
+        // Cuando el flag está OFF, queda string plano (comportamiento legacy).
+        type AnthropicSystemBlock = { type: "text"; text: string; cache_control?: { type: "ephemeral" } }
+        const systemParam: string | AnthropicSystemBlock[] = AI_PROMPT_CACHING_ENABLED
+            ? (dynamicSystemPrompt
+                ? [
+                    { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+                    { type: "text", text: dynamicSystemPrompt },
+                ]
+                : [
+                    { type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } },
+                ])
+            : fullSystemPrompt
+
+        // Tools cache: cache_control en el último tool cachea el array completo
+        // (las descripciones de tools son ~3000-3500 tokens estables por mode).
+        const baseTools = getToolsForMode(orgMode) as unknown as Array<Record<string, unknown>>
+        const tools = AI_PROMPT_CACHING_ENABLED && baseTools.length > 0
+            ? baseTools.map((tool, idx) =>
+                idx === baseTools.length - 1
+                    ? { ...tool, cache_control: { type: "ephemeral" as const } }
+                    : tool)
+            : baseTools
 
         // 8. Prepare message history
         const currentMessages: Anthropic.MessageParam[] = [
             ...conversationHistory,
             { role: 'user' as const, content: input.message }
         ]
+
+        // Acumulador de usage agregado a través del loop (para messages.metadata).
+        // Cada turno además dispara un insert fire-and-forget en ai_usage_events.
+        const usageTotals = {
+            input_tokens: 0,
+            output_tokens: 0,
+            cache_creation_input_tokens: 0,
+            cache_read_input_tokens: 0,
+            cost_usd_cents: 0,
+        }
 
         let finalResponseText = ""
         let loopCount = 0
@@ -522,14 +573,27 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             loopCount++
             log.debug(`Loop ${loopCount}, calling Claude`)
 
+            const loopStartedAt = Date.now()
+            const turnToolsUsed: string[] = []
+
             const response = await createMessage({
                 model: AI_MODEL,
                 max_tokens: 1024,
-                system: fullSystemPrompt,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK acepta string|TextBlockParam[]; tipos parciales aún no exponen cache_control.
+                system: systemParam as any,
                 messages: currentMessages,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic SDK type incompatibility
-                tools: getToolsForMode(orgMode) as any
+                tools: tools as any
             })
+
+            // Acumular usage del turno (agregado para messages.metadata).
+            const usage = response.usage
+            usageTotals.input_tokens += usage.input_tokens
+            usageTotals.output_tokens += usage.output_tokens
+            usageTotals.cache_creation_input_tokens += usage.cache_creation_input_tokens ?? 0
+            usageTotals.cache_read_input_tokens += usage.cache_read_input_tokens ?? 0
+            const turnCostCents = calculateCostCents(AI_MODEL, usage)
+            usageTotals.cost_usd_cents += turnCostCents
 
             // Add assistant response to history
             currentMessages.push({
@@ -545,42 +609,82 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
                 finalResponseText += textBlocks.map(b => (b as Anthropic.TextBlock).text).join("\n")
             }
 
-            if (toolUseBlocks.length === 0) {
-                // No more tools, we are done
-                break
-            }
+            // Process tool calls (si hay)
+            let toolResults: Anthropic.ToolResultBlockParam[] | null = null
+            if (toolUseBlocks.length > 0) {
+                toolResults = []
+                for (const toolBlock of toolUseBlocks) {
+                    const toolUse = toolBlock as Anthropic.ToolUseBlock
+                    turnToolsUsed.push(toolUse.name)
+                    toolsUsed.push(toolUse.name)
+                    log.info("Executing tool", { tool: toolUse.name })
 
-            // Process tool calls
-            const toolResults: Anthropic.ToolResultBlockParam[] = []
+                    const toolResult = await executeTool(
+                        toolUse.name,
+                        toolUse.input,
+                        {
+                            chatId: input.chatId,
+                            organizationId: input.organizationId,
+                            customerId: input.customerId
+                        }
+                    )
 
-            for (const toolBlock of toolUseBlocks) {
-                const toolUse = toolBlock as Anthropic.ToolUseBlock
-                toolsUsed.push(toolUse.name)
-                log.info("Executing tool", { tool: toolUse.name })
-
-                const toolResult = await executeTool(
-                    toolUse.name,
-                    toolUse.input,
-                    {
-                        chatId: input.chatId,
-                        organizationId: input.organizationId,
-                        customerId: input.customerId
+                    // Add to actions list for frontend
+                    if (toolResult.success && toolResult.data) {
+                        actions.push({
+                            type: toolUse.name,
+                            data: toolResult.data
+                        })
                     }
-                )
 
-                // Add to actions list for frontend
-                if (toolResult.success && toolResult.data) {
-                    actions.push({
-                        type: toolUse.name,
-                        data: toolResult.data
+                    toolResults.push({
+                        type: "tool_result",
+                        tool_use_id: toolUse.id,
+                        content: JSON.stringify(toolResult)
                     })
                 }
+            }
 
-                toolResults.push({
-                    type: "tool_result",
-                    tool_use_id: toolUse.id,
-                    content: JSON.stringify(toolResult)
-                })
+            // Emit telemetry event per Claude call (fire-and-forget).
+            // Si el insert falla, el chat sigue respondiendo. No bloqueamos en ningún caso.
+            if (AI_USAGE_TRACKING_ENABLED) {
+                const turnLatencyMs = Date.now() - loopStartedAt
+                const turnCacheCreate = usage.cache_creation_input_tokens ?? 0
+                const turnCacheRead = usage.cache_read_input_tokens ?? 0
+                void (async () => {
+                    try {
+                        const { error } = await supabase.from("ai_usage_events").insert({
+                            organization_id: input.organizationId,
+                            agent_id: input.agentId,
+                            chat_id: input.chatId,
+                            model: AI_MODEL,
+                            input_tokens: usage.input_tokens,
+                            output_tokens: usage.output_tokens,
+                            cache_creation_input_tokens: turnCacheCreate,
+                            cache_read_input_tokens: turnCacheRead,
+                            cost_usd_cents: turnCostCents,
+                            mode: orgMode,
+                            channel: input.channel ?? null,
+                            tools_used: turnToolsUsed,
+                            tool_count: turnToolsUsed.length,
+                            loop_count: loopCount,
+                            latency_ms: turnLatencyMs,
+                        })
+                        if (error) {
+                            log.warn("ai_usage_events insert failed", {
+                                code: error.code,
+                                message: error.message,
+                            })
+                        }
+                    } catch (err) {
+                        log.warn("ai_usage_events insert threw", { error: (err as Error).message })
+                    }
+                })()
+            }
+
+            if (toolResults === null) {
+                // No more tools, we are done
+                break
             }
 
             // Add tool results to history for next iteration
@@ -599,7 +703,9 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             metadata: {
                 model: AI_MODEL,
                 tools_used: toolsUsed,
-                latency_ms: Date.now() - startTime
+                latency_ms: Date.now() - startTime,
+                loop_count: loopCount,
+                usage: usageTotals,
             }
         })
 
