@@ -3,6 +3,7 @@
 import { headers } from "next/headers"
 import { createServiceClient } from "@/lib/supabase/server"
 import { paymentService } from "@/lib/payments/payment-service"
+import type { PaymentProvider } from "@/types/payment"
 import { sendSaleNotification } from "@/lib/notifications/whatsapp"
 import { sendOrderConfirmationEmail, sendOrderNotificationToOwner } from "@/lib/notifications/email"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
@@ -745,7 +746,7 @@ export async function createOrder(params: CreateOrderParams) {
         // Skip for offline methods: manual (bank transfer/Nequi) and contraentrega (cash on delivery)
         const offlinePaymentMethods = ['manual', 'contraentrega', 'cash_on_delivery']
         if (!offlinePaymentMethods.includes(params.paymentMethod)) {
-            const provider = params.paymentMethod as "wompi" | "epayco"
+            const provider = params.paymentMethod as PaymentProvider
             const amountInCents = Math.round(finalTotal * 100)
 
             // Obtener el dominio personalizado de la organización si existe
