@@ -479,25 +479,64 @@ function resolveCatalogPricing(input: {
     }
 }
 
+interface SearchProductsRpcRow {
+    product_id: string
+    rank: number | null
+    similarity: number | null
+}
+
 const searchProducts: ToolHandler = async (supabase, input, context) => {
     const { query, category, max_price, limit = 15 } = input
     const maxPrice = parseFiniteNumber(max_price)
+    const trimmedQuery = typeof query === "string" ? query.trim() : ""
+
+    // Cuando hay query textual delegamos en el RPC `search_products`, que ya
+    // resuelve accent + case-insensitive (f_unaccent + websearch_to_tsquery
+    // 'spanish') con fallback fuzzy via pg_trgm. Antes el executor usaba
+    // `ilike '%word%'` con removeAccents() solo sobre el query, lo que dejaba
+    // productos acentuados (ej. "RENOVACIÓN") sin matchear. Es el mismo path
+    // que usa el storefront via listProductsBySearch (lib/commerce/
+    // listProductsWithVariants.ts).
+    let candidateIds: string[] | null = null
+
+    if (trimmedQuery.length >= 1) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc("search_products", {
+            p_organization_id: context.organizationId,
+            p_query: trimmedQuery,
+            p_min_price: null,
+            p_max_price: null,
+            p_categories: category ? [category] : null,
+            p_limit: limit,
+        })
+
+        if (rpcError) {
+            return { success: false, error: rpcError.message }
+        }
+
+        const rpcRows = Array.isArray(rpcData) ? (rpcData as SearchProductsRpcRow[]) : []
+        candidateIds = rpcRows
+            .map((row) => (typeof row.product_id === "string" ? row.product_id : null))
+            .filter((id): id is string => id !== null)
+
+        if (candidateIds.length === 0) {
+            return {
+                success: true,
+                data: { products: [], totalFound: 0 },
+            }
+        }
+    }
 
     let dbQuery = supabase
         .from("products")
         .select("id, name, description, price, sale_price, image_url, images, stock, categories, variants")
         .eq("organization_id", context.organizationId)
         .eq("is_active", true)
-        .order("stock", { ascending: false })
 
-    if (query) {
-        const words = removeAccents(query)
-            .split(/\s+/)
-            .filter((w: string) => w.length >= 2)
-
-        for (const word of words) {
-            dbQuery = dbQuery.or(`name.ilike.%${word}%,description.ilike.%${word}%`)
-        }
+    if (candidateIds) {
+        dbQuery = dbQuery.in("id", candidateIds)
+    } else {
+        // Modo browse (sin texto): orden por stock como antes.
+        dbQuery = dbQuery.order("stock", { ascending: false })
     }
 
     if (category) {
@@ -510,10 +549,25 @@ const searchProducts: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: error.message }
     }
 
+    // Preservar el orden de relevancia que retorna el RPC. El `select().in(...)`
+    // no garantiza orden, así que reordenamos manualmente.
+    const relevanceIndex = candidateIds
+        ? new Map(candidateIds.map((id, idx) => [id, idx]))
+        : null
+
     const productRows = (products || []).flatMap((product) => {
         const normalizedProduct = normalizeProductSearchRow(product)
         return normalizedProduct ? [normalizedProduct] : []
     })
+
+    if (relevanceIndex) {
+        productRows.sort((a, b) => {
+            const ai = relevanceIndex.get(a.id) ?? Number.POSITIVE_INFINITY
+            const bi = relevanceIndex.get(b.id) ?? Number.POSITIVE_INFINITY
+            return ai - bi
+        })
+    }
+
     const variantsByProductId = await getSellableVariantsForProducts(
         supabase,
         context.organizationId,

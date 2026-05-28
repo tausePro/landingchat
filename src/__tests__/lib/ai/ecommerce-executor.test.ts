@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  ecommerceToolHandlers,
   normalizeAiCartLineItem,
   resolveAgentSearchProduct,
 } from "@/lib/ai/executors/ecommerce"
@@ -157,6 +158,288 @@ describe("AI ecommerce executor variant contracts", () => {
       image_url: "https://example.com/second.jpg",
       quantity: 2,
       categories: ["categoria"],
+    })
+  })
+})
+
+// =============================================================================
+// Regresión bug add_to_cart: el executor search_products debe delegar la
+// búsqueda textual en el RPC search_products (FTS + f_unaccent + fuzzy).
+// Antes usaba ilike sobre nombres acentuados y fallaba con queries normalizadas
+// (ej. "renovacion" no matcheaba "RENOVACIÓN").
+// =============================================================================
+
+interface MockQueryResult<T> {
+  data: T
+  error: { message: string } | null
+}
+
+interface RpcCall {
+  fn: string
+  args: Record<string, unknown>
+}
+
+interface SelectCall {
+  table: string
+  filters: Record<string, unknown>
+  inFilters: Record<string, unknown[]>
+  containsFilters: Record<string, unknown>
+  selection: string
+  limit?: number
+  orders: Array<{ column: string; ascending: boolean }>
+}
+
+function createSearchMockClient(params: {
+  rpcResult?: MockQueryResult<unknown[] | null>
+  productsResult?: MockQueryResult<unknown[] | null>
+  variantsResult?: MockQueryResult<unknown[] | null>
+}) {
+  const rpcCalls: RpcCall[] = []
+  const selectCalls: SelectCall[] = []
+
+  const client = {
+    from(table: string) {
+      const filters: Record<string, unknown> = {}
+      const inFilters: Record<string, unknown[]> = {}
+      const containsFilters: Record<string, unknown> = {}
+      let selection = ""
+      let limit: number | undefined
+      const orders: SelectCall["orders"] = []
+
+      const builder = {
+        select(value: string) {
+          selection = value
+          return builder
+        },
+        eq(column: string, value: unknown) {
+          filters[column] = value
+          return builder
+        },
+        in(column: string, values: unknown[]) {
+          inFilters[column] = values
+          return builder
+        },
+        contains(column: string, value: unknown) {
+          containsFilters[column] = value
+          return builder
+        },
+        order(column: string, options?: { ascending?: boolean }) {
+          orders.push({ column, ascending: options?.ascending ?? true })
+          return builder
+        },
+        limit(value: number) {
+          limit = value
+          return builder
+        },
+        then(...args: Parameters<Promise<MockQueryResult<unknown[] | null>>["then"]>) {
+          selectCalls.push({
+            table,
+            filters: { ...filters },
+            inFilters: { ...inFilters },
+            containsFilters: { ...containsFilters },
+            selection,
+            limit,
+            orders: [...orders],
+          })
+
+          if (table === "products") {
+            return Promise.resolve(
+              params.productsResult ?? { data: [], error: null },
+            ).then(...args)
+          }
+
+          if (table === "product_variants") {
+            return Promise.resolve(
+              params.variantsResult ?? { data: [], error: null },
+            ).then(...args)
+          }
+
+          return Promise.resolve({
+            data: null,
+            error: { message: `Unexpected query on ${table}` },
+          }).then(...args)
+        },
+      }
+
+      return builder
+    },
+    async rpc(fn: string, args: Record<string, unknown>) {
+      rpcCalls.push({ fn, args })
+      return params.rpcResult ?? { data: [], error: null }
+    },
+  }
+
+  return { client, rpcCalls, selectCalls }
+}
+
+describe("AI ecommerce executor search_products (regresión bug add_to_cart)", () => {
+  const context = {
+    chatId: "chat-1",
+    organizationId: "org-1",
+  }
+
+  it("delega en RPC search_products con query trimmed cuando hay texto", async () => {
+    const { client, rpcCalls } = createSearchMockClient({
+      rpcResult: { data: [{ product_id: "p1", rank: 0.5, similarity: 0 }], error: null },
+      productsResult: {
+        data: [
+          {
+            id: "p1",
+            name: "RENOVACIÓN energética",
+            description: null,
+            price: 100000,
+            sale_price: null,
+            image_url: null,
+            images: [],
+            stock: 10,
+            categories: ["servicios"],
+            variants: [],
+          },
+        ],
+        error: null,
+      },
+      variantsResult: { data: [], error: null },
+    })
+
+    const handler = ecommerceToolHandlers["search_products"]!
+    const result = await handler(
+      client as never,
+      { query: "  renovacion  ", limit: 10 },
+      context,
+    )
+
+    expect(rpcCalls).toHaveLength(1)
+    expect(rpcCalls[0]).toEqual({
+      fn: "search_products",
+      args: {
+        p_organization_id: "org-1",
+        p_query: "renovacion",
+        p_min_price: null,
+        p_max_price: null,
+        p_categories: null,
+        p_limit: 10,
+      },
+    })
+
+    expect(result.success).toBe(true)
+    expect(result.data?.totalFound).toBe(1)
+    expect(result.data?.products[0]).toMatchObject({
+      id: "p1",
+      name: "RENOVACIÓN energética",
+    })
+  })
+
+  it("preserva el orden de relevancia del RPC aunque el SELECT regrese desordenado", async () => {
+    const { client } = createSearchMockClient({
+      rpcResult: {
+        data: [
+          { product_id: "p2", rank: 0.9, similarity: 0 },
+          { product_id: "p1", rank: 0.3, similarity: 0 },
+        ],
+        error: null,
+      },
+      productsResult: {
+        // Postgres no garantiza orden con IN, simulamos respuesta invertida
+        data: [
+          {
+            id: "p1",
+            name: "Producto uno",
+            description: null,
+            price: 1000,
+            sale_price: null,
+            image_url: null,
+            images: [],
+            stock: 5,
+            categories: [],
+            variants: [],
+          },
+          {
+            id: "p2",
+            name: "Producto dos",
+            description: null,
+            price: 2000,
+            sale_price: null,
+            image_url: null,
+            images: [],
+            stock: 5,
+            categories: [],
+            variants: [],
+          },
+        ],
+        error: null,
+      },
+      variantsResult: { data: [], error: null },
+    })
+
+    const handler = ecommerceToolHandlers["search_products"]!
+    const result = await handler(
+      client as never,
+      { query: "producto" },
+      context,
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.data?.products.map((p: { id: string }) => p.id)).toEqual(["p2", "p1"])
+  })
+
+  it("propaga categoría al RPC como array de un elemento", async () => {
+    const { client, rpcCalls } = createSearchMockClient({
+      rpcResult: { data: [], error: null },
+    })
+
+    const handler = ecommerceToolHandlers["search_products"]!
+    await handler(
+      client as never,
+      { query: "camisa", category: "ropa", limit: 5 },
+      context,
+    )
+
+    expect(rpcCalls[0]?.args).toMatchObject({
+      p_categories: ["ropa"],
+      p_limit: 5,
+    })
+  })
+
+  it("retorna lista vacía sin consultar products cuando el RPC no encuentra coincidencias", async () => {
+    const { client, selectCalls } = createSearchMockClient({
+      rpcResult: { data: [], error: null },
+    })
+
+    const handler = ecommerceToolHandlers["search_products"]!
+    const result = await handler(client as never, { query: "noexiste" }, context)
+
+    expect(result).toEqual({
+      success: true,
+      data: { products: [], totalFound: 0 },
+    })
+    expect(selectCalls).toEqual([])
+  })
+
+  it("propaga error del RPC al agente", async () => {
+    const { client } = createSearchMockClient({
+      rpcResult: { data: null, error: { message: "rpc broke" } },
+    })
+
+    const handler = ecommerceToolHandlers["search_products"]!
+    const result = await handler(client as never, { query: "test" }, context)
+
+    expect(result).toEqual({ success: false, error: "rpc broke" })
+  })
+
+  it("no llama al RPC cuando no hay query (modo browse), ordena por stock", async () => {
+    const { client, rpcCalls, selectCalls } = createSearchMockClient({
+      productsResult: { data: [], error: null },
+    })
+
+    const handler = ecommerceToolHandlers["search_products"]!
+    await handler(client as never, { category: "ropa" }, context)
+
+    expect(rpcCalls).toEqual([])
+    expect(selectCalls).toHaveLength(1)
+    expect(selectCalls[0]).toMatchObject({
+      table: "products",
+      containsFilters: { categories: ["ropa"] },
+      orders: [{ column: "stock", ascending: false }],
     })
   })
 })
