@@ -12,6 +12,7 @@ import {
     PRODUCT_WITH_VARIANTS_VARIANT_SELECT,
     normalizeVariantRow,
 } from "@/lib/commerce/getProductWithVariants"
+import { buildContextProductCardData } from "./contextProductCard"
 import type { ProductVariantRow } from "@/types/product"
 
 const AI_MODEL = "claude-haiku-4-5-20251001"
@@ -251,6 +252,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
 
         // 3.1 Load current product context if available
         let currentProduct = null
+        let currentProductSellableVariants: ProductVariantRow[] = []
         if (input.currentProductId) {
             log.debug("Loading current product", { productId: input.currentProductId })
             const { data: product, error: productError } = await supabase
@@ -279,6 +281,8 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
                         .map((variant) => normalizeVariantRow(variant))
                         .filter((variant) => variant.is_active)
 
+                    currentProductSellableVariants = variants
+
                     currentProduct = {
                         ...product,
                         variant_options: buildVariantOptionsForPrompt(variants),
@@ -288,6 +292,23 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             }
         } else {
             log.debug("No currentProductId provided")
+        }
+
+        // 3.2 Determinar si es el primer turno de este producto en el chat.
+        // La ruta /api/ai-chat persiste el mensaje del usuario con
+        // metadata.product_context = currentProductId ANTES de invocar este
+        // processMessage. Si solo existe ese mensaje (count === 1) es el primer
+        // turno y mostramos la card; si hay más, ya se conversó del producto y
+        // evitamos repetir la tarjeta en cada respuesta (bug preexistente).
+        let isFirstProductTurn = false
+        if (currentProduct && input.currentProductId) {
+            const { count: productContextCount } = await supabase
+                .from("messages")
+                .select("id", { count: "exact", head: true })
+                .eq("chat_id", input.chatId)
+                .eq("sender_type", "user")
+                .eq("metadata->>product_context", input.currentProductId)
+            isFirstProductTurn = (productContextCount ?? 0) <= 1
         }
 
         // 4. Load conversation history
@@ -709,20 +730,14 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
             }
         })
 
-        // Si hay un producto en contexto y es el primer mensaje, agregar acción show_product
-        if (currentProduct && !actions.some(a => a.type === 'show_product')) {
+        // Si hay un producto en contexto y es el primer turno del producto en
+        // el chat, agregar acción show_product. El precio se resuelve desde la
+        // variante default (variant-centric) para que coincida con el carrito.
+        if (currentProduct && isFirstProductTurn && !actions.some(a => a.type === 'show_product')) {
             actions.unshift({
                 type: 'show_product',
                 data: {
-                    product: {
-                        id: currentProduct.id,
-                        name: currentProduct.name,
-                        description: currentProduct.description,
-                        price: currentProduct.price,
-                        image_url: currentProduct.image_url || currentProduct.images?.[0],
-                        stock: currentProduct.stock,
-                        variants: currentProduct.variants
-                    }
+                    product: buildContextProductCardData(currentProduct, currentProductSellableVariants),
                 }
             })
         }
