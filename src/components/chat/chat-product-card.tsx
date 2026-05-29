@@ -84,6 +84,9 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
 
     const quickActions = getContextualActions()
 
+    const hasDiscount =
+        product.sale_price != null && product.sale_price < product.price
+
     return (
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden group hover:border-primary/40 transition-all max-w-md w-full">
             <div className="flex flex-col sm:flex-row h-full">
@@ -113,9 +116,20 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
                         <div className="flex justify-between items-start mb-1">
                             <h4 className="text-base font-bold text-slate-900 dark:text-white leading-tight line-clamp-2">{product.name}</h4>
                             <div className="text-right shrink-0 ml-2">
-                                <span className="block text-base font-bold" style={{ color: primaryColor }}>
-                                    {formatPrice(product.price)}
-                                </span>
+                                {hasDiscount ? (
+                                    <>
+                                        <span className="block text-base font-bold" style={{ color: primaryColor }}>
+                                            {formatPrice(product.sale_price as number)}
+                                        </span>
+                                        <span className="block text-xs font-medium text-slate-400 line-through">
+                                            {formatPrice(product.price)}
+                                        </span>
+                                    </>
+                                ) : (
+                                    <span className="block text-base font-bold" style={{ color: primaryColor }}>
+                                        {formatPrice(product.price)}
+                                    </span>
+                                )}
                             </div>
                         </div>
                         
