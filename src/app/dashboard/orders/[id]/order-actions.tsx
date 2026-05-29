@@ -20,6 +20,8 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
     const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
     const [isReconcilingPayment, setIsReconcilingPayment] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showRefInput, setShowRefInput] = useState(false)
+    const [refPaycoInput, setRefPaycoInput] = useState("")
     const canConfirmPayment = paymentStatus !== "paid"
     const canReconcilePayment = paymentStatus !== "paid" && (paymentMethod === "wompi" || paymentMethod === "epayco")
 
@@ -56,17 +58,25 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
         }
     }
 
-    const handleReconcilePayment = async () => {
+    const handleReconcilePayment = async (providerTransactionId?: string) => {
         setIsReconcilingPayment(true)
         try {
-            const result = await reconcileOrderPaymentFromGateway(orderId)
+            const result = await reconcileOrderPaymentFromGateway(orderId, providerTransactionId)
             if (!result.success) {
                 toast.warning(result.error || `No se pudo conciliar el pago (${result.reason})`)
+                // ePayco no permite consultar por factura: si la consulta automática
+                // falló (sin x_ref_payco), revelamos el input para que el merchant pegue
+                // el x_ref_payco interno desde el dashboard de ePayco y reintente.
+                if (paymentMethod === "epayco" && !providerTransactionId) {
+                    setShowRefInput(true)
+                }
                 return
             }
 
             const provider = result.provider === "wompi" ? "Wompi" : "ePayco"
             toast.success(result.sideEffectsRan ? `Pago conciliado con ${provider} y eventos procesados` : `Pago conciliado con ${provider}: ${result.status}`)
+            setShowRefInput(false)
+            setRefPaycoInput("")
             router.refresh()
         } catch (error) {
             toast.error("Error al consultar la pasarela")
@@ -124,7 +134,7 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
 
                 {canReconcilePayment && (
                     <button
-                        onClick={handleReconcilePayment}
+                        onClick={() => handleReconcilePayment()}
                         disabled={isReconcilingPayment}
                         title={`Consultar estado en ${paymentMethod}`}
                         className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-4 text-blue-700 dark:text-blue-300 text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
@@ -142,6 +152,25 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
                     <span className="hidden sm:inline">Eliminar</span>
                 </button>
             </div>
+
+            {showRefInput && paymentMethod === "epayco" && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-2">
+                    <input
+                        type="text"
+                        value={refPaycoInput}
+                        onChange={(e) => setRefPaycoInput(e.target.value)}
+                        placeholder="x_ref_payco (cópialo del dashboard ePayco)"
+                        className="h-9 flex-1 rounded-md border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-3 text-sm text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <button
+                        onClick={() => handleReconcilePayment(refPaycoInput)}
+                        disabled={isReconcilingPayment || refPaycoInput.trim().length === 0}
+                        className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 text-blue-700 dark:text-blue-300 text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
+                    >
+                        {isReconcilingPayment ? "Conciliando..." : "Conciliar con referencia"}
+                    </button>
+                </div>
+            )}
 
             <DeleteOrderModal
                 orderId={orderId}

@@ -421,7 +421,7 @@ export async function confirmOrderPayment(orderId: string) {
     return markOrderAsPaid(orderId)
 }
 
-export async function reconcileOrderPaymentFromGateway(orderId: string) {
+export async function reconcileOrderPaymentFromGateway(orderId: string, providerTransactionId?: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -435,9 +435,19 @@ export async function reconcileOrderPaymentFromGateway(orderId: string) {
 
     if (!profile?.organization_id) throw new Error("No organization found")
 
+    // ePayco no permite consultar por factura: si el merchant pega el x_ref_payco
+    // interno (desde el dashboard de ePayco), lo reenviamos para que el
+    // reconciliador use getTransaction(x_ref_payco) en lugar de la consulta por
+    // reference que lanza error. Trim defensivo; blanco → undefined.
+    const trimmedProviderTransactionId =
+        typeof providerTransactionId === "string" && providerTransactionId.trim().length > 0
+            ? providerTransactionId.trim()
+            : undefined
+
     const result = await reconcileOrderPayment({
         organizationId: profile.organization_id,
         orderId,
+        providerTransactionId: trimmedProviderTransactionId,
     })
 
     revalidatePath("/dashboard/orders")
