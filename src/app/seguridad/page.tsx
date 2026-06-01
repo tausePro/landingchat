@@ -3,7 +3,7 @@ import Link from "next/link"
 import { ArrowLeft, Shield, Lock, Server, Eye, Bell, CheckCircle } from "lucide-react"
 
 export const metadata: Metadata = {
-    title: "Seguridad | LandingChat",
+    title: "Seguridad",
     description: "Conoce las medidas de seguridad que protegen tu negocio y los datos de tus clientes en LandingChat",
 }
 

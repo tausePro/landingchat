@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 export const dynamic = "force-dynamic"
 
 export const metadata = {
-    title: "Founding Members | LandingChat - Solo 100 Cupos",
+    title: "Founding Members - Solo 100 Cupos",
     description: "Acceso exclusivo para los primeros 100 Early Adopters. Precio congelado de por vida. Domina el Chat-Commerce antes que tu competencia.",
     openGraph: {
         title: "Founding Members | LandingChat",

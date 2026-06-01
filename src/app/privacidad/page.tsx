@@ -3,7 +3,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata: Metadata = {
-    title: "Política de Privacidad | LandingChat",
+    title: "Política de Privacidad",
     description: "Política de privacidad y tratamiento de datos personales de LandingChat",
 }
 

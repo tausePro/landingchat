@@ -6,7 +6,7 @@ import { FoundingCheckout } from "./components/founding-checkout"
 export const dynamic = "force-dynamic"
 
 export const metadata = {
-    title: "Checkout Founding Member | LandingChat",
+    title: "Checkout Founding Member",
     description: "Completa tu pago para asegurar tu cupo como Founding Member",
 }
 

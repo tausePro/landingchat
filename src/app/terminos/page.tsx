@@ -3,7 +3,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 export const metadata: Metadata = {
-    title: "Términos de Servicio | LandingChat",
+    title: "Términos de Servicio",
     description: "Términos y condiciones de uso de la plataforma LandingChat",
 }
 

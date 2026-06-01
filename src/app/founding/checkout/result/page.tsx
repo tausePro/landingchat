@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react"
 export const dynamic = "force-dynamic"
 
 export const metadata = {
-    title: "Resultado del Pago | LandingChat",
+    title: "Resultado del Pago",
     description: "Resultado de tu pago como Founding Member",
 }
 
