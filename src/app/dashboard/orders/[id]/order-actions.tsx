@@ -12,9 +12,13 @@ interface OrderActionsProps {
     currentStatus: string
     paymentStatus: string
     paymentMethod: string
+    /** Si el provider de la orden es reconciliable (registry-driven, computado en el server). */
+    canReconcile: boolean
+    /** Nombre visible del provider (p.ej. "Bold") para los toasts. */
+    providerLabel: string
 }
 
-export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatus, paymentMethod }: OrderActionsProps) {
+export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatus, paymentMethod, canReconcile, providerLabel }: OrderActionsProps) {
     const router = useRouter()
     const [isUpdating, setIsUpdating] = useState(false)
     const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
@@ -23,7 +27,7 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
     const [showRefInput, setShowRefInput] = useState(false)
     const [refPaycoInput, setRefPaycoInput] = useState("")
     const canConfirmPayment = paymentStatus !== "paid"
-    const canReconcilePayment = paymentStatus !== "paid" && (paymentMethod === "wompi" || paymentMethod === "epayco")
+    const canReconcilePayment = paymentStatus !== "paid" && canReconcile
 
     const handleStatusChange = async (newStatus: string) => {
         if (newStatus === currentStatus) return
@@ -73,8 +77,7 @@ export function OrderActions({ orderId, orderNumber, currentStatus, paymentStatu
                 return
             }
 
-            const provider = result.provider === "wompi" ? "Wompi" : "ePayco"
-            toast.success(result.sideEffectsRan ? `Pago conciliado con ${provider} y eventos procesados` : `Pago conciliado con ${provider}: ${result.status}`)
+            toast.success(result.sideEffectsRan ? `Pago conciliado con ${providerLabel} y eventos procesados` : `Pago conciliado con ${providerLabel}: ${result.status}`)
             setShowRefInput(false)
             setRefPaycoInput("")
             router.refresh()

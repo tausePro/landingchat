@@ -110,8 +110,8 @@ async function validateOrderPaymentData(
 }
 
 /** Indica si este provider requiere validar monto/moneda contra la orden. */
-function requiresAmountValidation(provider: PaymentProvider): boolean {
-    return provider === "epayco"
+export function requiresAmountValidation(provider: PaymentProvider): boolean {
+    return provider === "epayco" || provider === "bold"
 }
 
 /**

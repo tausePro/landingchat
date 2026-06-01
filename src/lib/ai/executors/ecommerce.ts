@@ -1494,6 +1494,34 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
                 }
             }
 
+            // Gap C: persistir store_transactions pending para hosted_redirect (Bold/Addi),
+            // con el provider_transaction_id (p.ej. LNK_xxx de Bold) necesario para reconciliar
+            // por id. Error no bloqueante: el cliente igual puede pagar y el webhook/reconcile
+            // recrea la fila si falta.
+            const { error: txError } = await supabase
+                .from("store_transactions")
+                .insert({
+                    organization_id: context.organizationId,
+                    order_id: order.id,
+                    customer_id: chat?.customer_id ?? null,
+                    amount: Math.round(total * 100),
+                    currency: "COP",
+                    status: "pending",
+                    provider: providerInfo.id,
+                    provider_transaction_id: paymentResult.transactionId ?? null,
+                    provider_reference: order.id,
+                    provider_response: { paymentUrl: paymentResult.paymentUrl },
+                    payment_method: null,
+                })
+
+            if (txError) {
+                payLog.warn("hosted_redirect: store_transactions pending insert failed (no bloqueante)", {
+                    provider: providerInfo.id,
+                    orderId: order.id,
+                    error: txError.message,
+                })
+            }
+
             paymentUrl = paymentResult.paymentUrl
             paymentInstructions = `Te dirigimos a ${providerInfo.displayName} para completar tu pago de forma segura.`
         }

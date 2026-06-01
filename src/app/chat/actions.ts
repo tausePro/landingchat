@@ -803,7 +803,7 @@ export async function createOrder(params: CreateOrderParams) {
                     currency: "COP",
                     status: "pending",
                     provider,
-                    provider_transaction_id: null,
+                    provider_transaction_id: paymentResult.transactionId ?? null,
                     provider_reference: order.id,
                     provider_response: {
                         paymentUrl: paymentResult.paymentUrl,

@@ -56,7 +56,7 @@ export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
         displayName: "Bold",
         checkoutMode: "hosted_redirect",
         create: (config) => new BoldGateway(config),
-        enabled: false, // pendiente de credenciales y prueba en producción
+        enabled: true, // gateway completo (Slice 1 Bold end-to-end); activación por tenant via payment_gateway_configs
     },
     addi: {
         id: "addi",

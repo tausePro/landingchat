@@ -15,7 +15,7 @@ import {
 import { CartCleaner } from "./components/cart-cleaner"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
-import { reconcileOrderPayment } from "@/lib/payments/epayco-reconciliation"
+import { reconcileOrderPayment, resolveReconcilableProvider } from "@/lib/payments/epayco-reconciliation"
 import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 import { formatCurrency } from "@/lib/utils"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
@@ -44,19 +44,19 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
     let { order, organization } = result
 
     // Auto-reconciliación al aterrizar en el seguimiento del pedido.
-    // Aplica a Wompi y ePayco: cuando el webhook no llega o se atrasa
-    // (común en sandbox), consultamos a la pasarela el estado real y
-    // sincronizamos la orden + transacción + side effects (stock, etc).
-    // Para ePayco aprovechamos el `ref_payco` del query string como hint;
-    // para Wompi el gateway resuelve la transacción por reference=orderId.
-    const supportsAutoReconcile =
-        order.payment_method === "wompi" || order.payment_method === "epayco"
+    // Registry-driven: aplica a cualquier provider habilitado (Wompi, ePayco, Bold).
+    // Cuando el webhook no llega o se atrasa (común en sandbox / Vercel WAF),
+    // consultamos a la pasarela el estado real y sincronizamos la orden +
+    // transacción + side effects (stock, etc). Para ePayco aprovechamos el
+    // `ref_payco` del query string como hint; para Bold el id (LNK_xxx) viene del
+    // store_transaction persistido; para Wompi el gateway resuelve por reference.
+    const reconcilableProvider = resolveReconcilableProvider(order.payment_method)
 
-    if (supportsAutoReconcile && order.payment_status === "pending") {
+    if (reconcilableProvider && order.payment_status === "pending") {
         const reconciliation = await reconcileOrderPayment({
             organizationId: organization.id,
             orderId: order.id,
-            expectedProvider: order.payment_method,
+            expectedProvider: reconcilableProvider,
             providerTransactionId: order.payment_method === "epayco" ? refPayco : undefined,
         })
 

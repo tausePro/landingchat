@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger"
 import { applyPaymentStatusToOrder } from "@/lib/payments/payment-confirmation"
 import { createPaymentGateway } from "@/lib/payments/factory"
+import { getProviderInfo } from "@/lib/payments/registry"
 import { createServiceClient } from "@/lib/supabase/server"
 import type { TransactionDetails } from "@/lib/payments/types"
 import type { PaymentGatewayConfig, PaymentProvider, TransactionStatus } from "@/types/payment"
@@ -107,25 +108,31 @@ async function getExistingProviderTransaction(params: {
     return transactionByReference ? transactionByReference as StoreTransactionRow : null
 }
 
-async function getProviderTransaction(params: {
+/**
+ * Resuelve el provider reconciliable de una orden vía el registry.
+ * Acepta solo providers con integración lista (`enabled`). Devuelve el
+ * `PaymentProvider` resuelto o `null` si no es reconciliable (desconocido o
+ * deshabilitado, p.ej. addi stub).
+ */
+export function resolveReconcilableProvider(
+    paymentMethod: string | null | undefined,
+): PaymentProvider | null {
+    if (!paymentMethod) return null
+    const info = getProviderInfo(paymentMethod)
+    return info && info.enabled ? info.id : null
+}
+
+export async function getProviderTransaction(params: {
     gateway: ReturnType<typeof createPaymentGateway>
     provider: PaymentProvider
     orderId: string
     providerTransactionId?: string | null
 }): Promise<TransactionDetails> {
-    if (params.provider === "epayco" && isUsableProviderTransactionId(params.providerTransactionId, params.orderId)) {
+    if (isUsableProviderTransactionId(params.providerTransactionId, params.orderId)) {
         return params.gateway.getTransaction(params.providerTransactionId)
     }
 
-    try {
-        return await params.gateway.getTransactionByReference(params.orderId)
-    } catch (referenceError) {
-        if (!isUsableProviderTransactionId(params.providerTransactionId, params.orderId)) {
-            throw referenceError
-        }
-
-        return params.gateway.getTransaction(params.providerTransactionId)
-    }
+    return params.gateway.getTransactionByReference(params.orderId)
 }
 
 async function findEpaycoProviderTransactionIdFromWebhookLogs(orderId: string): Promise<string | null> {
@@ -171,9 +178,7 @@ export async function reconcileOrderPayment(
         }
 
         const order = orderData as OrderForReconciliation
-        const provider = order.payment_method === "wompi" || order.payment_method === "epayco"
-            ? order.payment_method
-            : null
+        const provider = resolveReconcilableProvider(order.payment_method)
 
         if (!provider) {
             return { reconciled: false, orderUpdated: false, transactionUpdated: false, reason: "unsupported_provider" }

@@ -8,6 +8,7 @@ import { OrderStatusBadge } from "./order-status-badge"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { OrderActions } from "./order-actions"
 import { CustomerJourney } from "./customer-journey"
+import { getProviderInfo } from "@/lib/payments/registry"
 
 export const dynamic = 'force-dynamic'
 
@@ -44,6 +45,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         }).format(amount)
     }
 
+    // Gap A.2: el provider reconciliable se resuelve en el server (registry-driven)
+    // y se pasa al client component, que no puede importar el registry (node-only).
+    const reconcileProviderInfo = getProviderInfo(order.payment_method)
+
     return (
         <DashboardLayout>
             <div className="space-y-6 p-8">
@@ -71,6 +76,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                         currentStatus={order.status}
                         paymentStatus={order.payment_status}
                         paymentMethod={order.payment_method}
+                        canReconcile={!!reconcileProviderInfo?.enabled}
+                        providerLabel={reconcileProviderInfo?.displayName ?? order.payment_method}
                     />
                 </div>
 
