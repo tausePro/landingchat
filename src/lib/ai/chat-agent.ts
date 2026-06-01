@@ -31,6 +31,21 @@ const AI_MODEL = "claude-haiku-4-5-20251001"
 const AI_PROMPT_CACHING_ENABLED = process.env.AI_PROMPT_CACHING_ENABLED === "true"
 const AI_USAGE_TRACKING_ENABLED = process.env.AI_USAGE_TRACKING_ENABLED === "true"
 
+// Diagnóstico TEMPORAL (debug/ai-usage-flag-log): imprime el valor literal
+// de los env vars en el cold start del lambda para confirmar qué ve el runtime
+// de Vercel. Quitar este bloque (rollback) una vez que confirmemos el origen
+// del problema de telemetría en ai_usage_events.
+logger("ai/chat-agent").info("AI feature flags module loaded", {
+    ai_usage_tracking_enabled: AI_USAGE_TRACKING_ENABLED,
+    raw_tracking_value: process.env.AI_USAGE_TRACKING_ENABLED ?? null,
+    raw_tracking_type: typeof process.env.AI_USAGE_TRACKING_ENABLED,
+    raw_tracking_length: (process.env.AI_USAGE_TRACKING_ENABLED ?? "").length,
+    ai_prompt_caching_enabled: AI_PROMPT_CACHING_ENABLED,
+    raw_caching_value: process.env.AI_PROMPT_CACHING_ENABLED ?? null,
+    node_env: process.env.NODE_ENV,
+    vercel_env: process.env.VERCEL_ENV ?? null,
+})
+
 function buildVariantOptionsForPrompt(variants: ProductVariantRow[]) {
     const optionValues = new Map<string, Set<string>>()
 
@@ -665,6 +680,14 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
                     })
                 }
             }
+
+            // Diagnóstico TEMPORAL (debug/ai-usage-flag-log): registramos el
+            // valor del flag en cada iteración del loop para descartar
+            // discrepancia entre el module-load y el request-time.
+            log.info("ai_usage flag eval at request time", {
+                enabled: AI_USAGE_TRACKING_ENABLED,
+                loop_count: loopCount,
+            })
 
             // Emit telemetry event per Claude call (fire-and-forget).
             // Si el insert falla, el chat sigue respondiendo. No bloqueamos en ningún caso.
