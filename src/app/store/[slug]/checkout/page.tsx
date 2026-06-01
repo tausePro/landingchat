@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const locale = tenantLocale.locale
     const name = data?.organization?.name ?? t("store.checkout.fallback_org_name", locale)
     return {
-        title: `${t("store.checkout.meta_title", locale)} — ${name}`,
+        title: { absolute: `${t("store.checkout.meta_title", locale)} — ${name}` },
         description: t("store.checkout.meta_description", locale, { name }),
         robots: { index: false, follow: false },
     }

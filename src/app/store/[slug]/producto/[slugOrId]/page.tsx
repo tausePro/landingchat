@@ -68,7 +68,7 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
     const productUrl = `${baseUrl}/producto/${product.slug || slugOrId}`
 
     return {
-        title,
+        title: { absolute: title },
         description,
         keywords: product.keywords?.join(", ") || product.categories?.join(", "),
         openGraph: {

@@ -67,7 +67,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     const { org, page } = data
 
     return {
-        title: page.seo_title || `${page.title} | ${org.name}`,
+        title: { absolute: page.seo_title || `${page.title} | ${org.name}` },
         description: page.seo_description || `${page.title} - ${org.name}`,
         openGraph: {
             title: page.seo_title || page.title,

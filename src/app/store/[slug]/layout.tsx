@@ -31,7 +31,7 @@ export async function generateMetadata(
     const { name, favicon_url, seo_title, seo_description, seo_keywords } = organization
 
     return {
-        title: seo_title || name,
+        title: { absolute: seo_title || name },
         description: seo_description || `Bienvenido a la tienda de ${name}.`,
         keywords: seo_keywords ? seo_keywords.split(",") : undefined,
         icons: {
