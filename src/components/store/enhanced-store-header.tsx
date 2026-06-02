@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getStoreLink } from "@/lib/utils/store-urls"
 import { useCartStore } from "@/store/cart-store"
-import { ShoppingBag, User, MessageCircle, Menu, X, ChevronDown as ChevronDownIcon } from "lucide-react"
+import { ShoppingBag, User, MessageCircle, Menu, X, Search, ChevronDown as ChevronDownIcon } from "lucide-react"
 import { useEffect, useState, useRef } from "react"
 import { AnnouncementBar } from "./announcement-bar"
 import { SmartSearch } from "./smart-search"
@@ -74,10 +74,21 @@ export function EnhancedStoreHeader({
     // Prevent hydration mismatch for cart count
     const [mounted, setMounted] = useState(false)
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const [searchOpen, setSearchOpen] = useState(false)
     useEffect(() => {
         const frameId = window.requestAnimationFrame(() => setMounted(true))
         return () => window.cancelAnimationFrame(frameId)
     }, [])
+
+    // Cerrar el overlay de busqueda (desktop) con la tecla Escape.
+    useEffect(() => {
+        if (!searchOpen) return
+        function handleKey(event: KeyboardEvent) {
+            if (event.key === "Escape") setSearchOpen(false)
+        }
+        document.addEventListener("keydown", handleKey)
+        return () => document.removeEventListener("keydown", handleKey)
+    }, [searchOpen])
 
     const cartCount = items.reduce((acc, item) => acc + item.quantity, 0)
 
@@ -117,7 +128,7 @@ export function EnhancedStoreHeader({
 
             {/* Header principal */}
             <header className="w-full border-b bg-white/95 backdrop-blur-md">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4 gap-4">
+                <div className="container relative mx-auto flex h-16 items-center justify-between px-4 gap-4">
                     {/* Logo y nombre de la tienda */}
                     <div className="flex items-center gap-3 cursor-pointer flex-shrink-0" onClick={() => router.push(homeLink)}>
                         {organization.logo_url ? (
@@ -176,19 +187,10 @@ export function EnhancedStoreHeader({
                         </nav>
                     )}
 
-                    {/* Buscador inteligente - Solo en desktop */}
-                    {!hideSearch && (
-                        <div className={cn(
-                            "hidden md:flex flex-1 justify-center",
-                            hasMenuItems ? "max-w-sm" : ""
-                        )}>
-                            <SmartSearch
-                                slug={slug}
-                                onStartChat={onStartChat}
-                                primaryColor={primaryColor}
-                            />
-                        </div>
-                    )}
+                    {/* Espaciador desktop: empuja las acciones a la derecha y deja
+                        el menu de navegacion pegado al logo. El buscador ya no ocupa
+                        espacio fijo aqui — se expande desde el icono de lupa. */}
+                    <div className="hidden md:block flex-1" aria-hidden="true" />
 
                     {/* Acciones del usuario */}
                     <div className="flex items-center gap-2 md:gap-3">
@@ -213,6 +215,18 @@ export function EnhancedStoreHeader({
                             >
                                 {t("store.header.ask_ai")}
                             </Button>
+                        )}
+
+                        {/* Buscador (desktop): icono de lupa que abre el overlay.
+                            Colapsado libera ancho horizontal para el menu. */}
+                        {!hideSearch && (
+                            <button
+                                onClick={() => setSearchOpen(true)}
+                                className="hidden md:flex p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                                aria-label={t("store.header.search_aria")}
+                            >
+                                <Search className="w-5 h-5" />
+                            </button>
                         )}
 
                         {/* Profile Button */}
@@ -254,6 +268,28 @@ export function EnhancedStoreHeader({
                             </Button>
                         )}
                     </div>
+
+                    {/* Overlay de busqueda desktop: el buscador se expande sobre la
+                        fila del header desde el icono de lupa, sin reflujo del menu.
+                        Se cierra con la X o con la tecla Escape. */}
+                    {!hideSearch && searchOpen && (
+                        <div className="hidden md:flex absolute inset-0 z-50 items-center justify-center gap-2 bg-white/95 backdrop-blur-md px-4 animate-in fade-in duration-150">
+                            <SmartSearch
+                                slug={slug}
+                                onStartChat={onStartChat}
+                                primaryColor={primaryColor}
+                                onClose={() => setSearchOpen(false)}
+                                autoFocus
+                            />
+                            <button
+                                onClick={() => setSearchOpen(false)}
+                                className="flex-shrink-0 p-2 text-slate-600 hover:text-slate-900 transition-colors"
+                                aria-label={t("store.header.close_search")}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Menú mobile desplegable */}

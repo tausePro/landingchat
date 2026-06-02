@@ -32,6 +32,10 @@ interface SmartSearchProps {
     onStartChat: (query?: string) => void
     primaryColor: string
     placeholder?: string
+    autoFocus?: boolean
+    /** Callback invocado cuando la busqueda se resuelve/cierra (selecciona
+     *  producto, navega o inicia chat). Usado por el overlay del header. */
+    onClose?: () => void
 }
 
 interface Product {
@@ -147,6 +151,8 @@ export function SmartSearch({
     onStartChat,
     primaryColor,
     placeholder = "¿Qué estás buscando hoy?",
+    autoFocus = false,
+    onClose,
 }: SmartSearchProps) {
     const [query, setQuery] = useState("")
     const [debouncedQuery] = useDebounce(query, 250)
@@ -165,7 +171,6 @@ export function SmartSearch({
     const { trackSearch } = useTracking()
 
     const trimmedQuery = debouncedQuery.trim()
-    const isQueryActionable = trimmedQuery.length >= MIN_QUERY_LENGTH
 
     const productsResultsLink = useMemo(() => {
         if (!trimmedQuery) return ""
@@ -278,6 +283,14 @@ export function SmartSearch({
             document.removeEventListener("mousedown", handleClickOutside)
     }, [])
 
+    // Auto-focus al montar cuando el contenedor lo solicita (ej. el overlay de
+    // busqueda del header que se expande desde el icono de lupa).
+    useEffect(() => {
+        if (autoFocus) {
+            inputRef.current?.focus()
+        }
+    }, [autoFocus])
+
     // Orquesta la transición menu-dropdown del catálogo transitions-motion.
     // Effect 1: TRIGGER. Reacciona al cambio de showResults para iniciar el ciclo.
     //   closed/closing + showResults=true -> "opening"
@@ -318,7 +331,8 @@ export function SmartSearch({
         setShowResults(false)
         setQuery("")
         setSelectedIndex(-1)
-    }, [])
+        onClose?.()
+    }, [onClose])
 
     const handleChatWithQuery = useCallback(() => {
         onStartChat(query)
