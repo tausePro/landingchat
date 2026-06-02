@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 import { PaymentMethodsHub, type PaymentView } from "./payment-methods-hub"
 import { WompiSettings } from "@/app/dashboard/settings/wompi/components/wompi-settings"
 import { EpaycoSettings } from "@/app/dashboard/settings/epayco/components/epayco-settings"
+import { BoldSettings } from "@/app/dashboard/settings/bold/components/bold-settings"
 import { ManualPaymentForm } from "./manual-payment-form"
 
 export function PaymentSettingsPanel() {
@@ -29,6 +30,7 @@ export function PaymentSettingsPanel() {
 
             {activeView === "wompi" && <WompiSettings />}
             {activeView === "epayco" && <EpaycoSettings />}
+            {activeView === "bold" && <BoldSettings />}
             {activeView === "manual" && <ManualPaymentForm />}
         </div>
     )
