@@ -15,7 +15,7 @@ interface HeaderEditorProps {
         id: string
         name: string
         slug: string
-        settings: any
+        settings: HeaderEditorOrganizationSettings
     }
 }
 
@@ -25,6 +25,20 @@ interface MenuItem {
     url: string
     openInNewTab?: boolean
     children?: MenuItem[]
+}
+
+// Forma minima de settings que necesita el editor de header. Se mantiene
+// flexible con index signatures para no acoplar a todo OrganizationSettings.
+interface HeaderEditorOrganizationSettings {
+    storefront?: {
+        header?: {
+            showStoreName?: boolean
+            menuItems?: MenuItem[]
+            [key: string]: unknown
+        }
+        [key: string]: unknown
+    }
+    [key: string]: unknown
 }
 
 interface QuickLink {
@@ -217,16 +231,37 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
     const handleSave = async () => {
         setLoading(true)
         try {
-            // Filtrar items vacíos antes de guardar (y sus children)
-            const validMenuItems = menuItems
-                .filter(item => item.label.trim() && item.url.trim())
+            // Normalizar items antes de guardar:
+            // 1) Limpiar sub-enlaces incompletos de cada item.
+            const cleanedMenuItems = menuItems.map(item => {
+                const validChildren = (item.children || []).filter(
+                    c => c.label.trim() && c.url.trim()
+                )
+                return {
+                    ...item,
+                    children: validChildren.length > 0 ? validChildren : undefined,
+                }
+            })
+
+            // 2) Un item es valido si tiene etiqueta y (URL propia O al menos un
+            //    sub-enlace). Asi un item principal puede ser solo contenedor de
+            //    submenu, sin URL propia (antes se descartaba en silencio).
+            const isValidMenuItem = (item: MenuItem) =>
+                Boolean(item.label.trim() && (item.url.trim() || item.children))
+
+            // Contar items que el usuario lleno parcialmente pero no se pueden
+            // guardar, para avisarle en vez de descartarlos en silencio.
+            const droppedCount = cleanedMenuItems.filter(
+                item => (item.label.trim() || item.url.trim()) && !isValidMenuItem(item)
+            ).length
+
+            // 3) A los contenedores de submenu sin URL propia se les asigna "#"
+            //    para que el trigger del dropdown no navegue a otra pagina.
+            const validMenuItems = cleanedMenuItems
+                .filter(isValidMenuItem)
                 .map(item => ({
                     ...item,
-                    children: item.children?.filter(c => c.label.trim() && c.url.trim()) || undefined
-                }))
-                .map(item => ({
-                    ...item,
-                    children: item.children && item.children.length > 0 ? item.children : undefined
+                    url: item.url.trim() ? item.url : "#",
                 }))
 
             await updateOrganization({
@@ -245,8 +280,13 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
             })
             setMenuItems(validMenuItems.length > 0 ? validMenuItems : DEFAULT_MENU_ITEMS)
             toast.success("Configuración guardada correctamente")
-        } catch (error: any) {
-            toast.error(`Error: ${error.message}`)
+            if (droppedCount > 0) {
+                toast.warning(
+                    `Se omitió ${droppedCount} enlace${droppedCount > 1 ? "s" : ""} incompleto${droppedCount > 1 ? "s" : ""}: falta la etiqueta o la URL.`
+                )
+            }
+        } catch (error) {
+            toast.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
         } finally {
             setLoading(false)
         }
