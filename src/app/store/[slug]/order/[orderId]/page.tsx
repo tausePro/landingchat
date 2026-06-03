@@ -16,6 +16,7 @@ import { CartCleaner } from "./components/cart-cleaner"
 import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { formatBogotaDateTime } from "@/lib/utils/date"
 import { reconcileOrderPayment, resolveReconcilableProvider } from "@/lib/payments/epayco-reconciliation"
+import { getStoreLinkServer } from "@/lib/utils/store-urls-server"
 import { PurchaseTracker } from "@/components/analytics/purchase-tracker"
 import { formatCurrency } from "@/lib/utils"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
@@ -42,6 +43,8 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
     if (!result) return notFound()
 
     let { order, organization } = result
+
+    const storeHref = await getStoreLinkServer("/", slug)
 
     // Auto-reconciliación al aterrizar en el seguimiento del pedido.
     // Registry-driven: aplica a cualquier provider habilitado (Wompi, ePayco, Bold).
@@ -148,7 +151,7 @@ export default async function OrderTrackingPage({ params, searchParams }: OrderP
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <Link
-                        href={`/store/${slug}`}
+                        href={storeHref}
                         className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4 mr-2" />
