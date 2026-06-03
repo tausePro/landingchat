@@ -8,9 +8,14 @@
  * (`checkout-flow.tsx`) tiene el state y maneja transiciones.
  */
 
+import type { PaymentProvider } from "@/types/payment"
+
 export type CheckoutStepKey = "contact" | "payment" | "success"
 
-export type PaymentMethod = "wompi" | "epayco" | "manual" | "contraentrega"
+// Incluye todos los providers del registry (wompi, epayco, bold, addi...) más
+// los métodos offline. Derivar de PaymentProvider evita que el checkout deje
+// fuera una pasarela nueva (Bold ya no se castea a la fuerza).
+export type PaymentMethod = PaymentProvider | "manual" | "contraentrega"
 
 export interface CheckoutFormData {
     name: string

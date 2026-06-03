@@ -2,13 +2,13 @@
 
 import { useEffect, useRef } from "react"
 import { useTracking } from "./tracking-provider"
-import type { AnalyticsEventName } from "@/lib/analytics/first-party-events"
+import type { AnalyticsEventName, AnalyticsEventProperties } from "@/lib/analytics/first-party-events"
 
 interface OrderStatusTrackerProps {
     eventName: AnalyticsEventName
     orderId: string
     orderTotal: number
-    paymentMethod?: "wompi" | "epayco" | "manual" | "contraentrega" | "cash_on_delivery"
+    paymentMethod?: AnalyticsEventProperties["paymentMethod"]
     failureReason?: string
     currency?: string
 }
