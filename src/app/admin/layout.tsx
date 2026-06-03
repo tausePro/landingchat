@@ -65,6 +65,18 @@ export default async function AdminLayout({
                         Usuarios
                     </Link>
 
+                    <Link href="/admin/ai-usage" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                        <svg className="size-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span className="flex items-center gap-2">
+                            Consumo IA
+                            <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">
+                                NUEVO
+                            </span>
+                        </span>
+                    </Link>
+
                     <div className="mt-6 mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-indigo-400">
                         Marketplace
                     </div>
