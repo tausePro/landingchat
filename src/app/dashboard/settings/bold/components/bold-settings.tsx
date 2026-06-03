@@ -222,7 +222,8 @@ export function BoldSettings() {
                         <div className="space-y-0.5">
                             <Label>Modo de Pruebas</Label>
                             <p className="text-sm text-slate-500">
-                                Activa para usar las llaves de pruebas de Bold (sin cobros reales)
+                                Marca esta opción si configuraste llaves de pruebas de Bold. El ambiente
+                                lo define la llave de tu comercio: Bold no usa una URL distinta para pruebas.
                             </p>
                         </div>
                         <Switch

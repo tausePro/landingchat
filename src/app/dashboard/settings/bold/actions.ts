@@ -151,7 +151,7 @@ export async function saveBoldConfig(
 
 /**
  * Prueba la conexión con Bold consultando los métodos de pago disponibles
- * (GET /online/methods/v1, autenticado con la llave de identidad).
+ * (GET /online/link/v1/payment_methods, autenticado con la llave de identidad).
  */
 export async function testBoldConnection(): Promise<
     ActionResult<{ success: boolean; message: string }>
@@ -204,7 +204,7 @@ export async function testBoldConnection(): Promise<
         return success({
             success: false,
             message:
-                "No se pudo conectar. Verifica la llave de identidad y el modo (pruebas/producción).",
+                "No se pudo conectar. Verifica que la llave de identidad sea la del Botón de pagos de tu comercio Bold.",
         })
     } catch (error) {
         return failure(
