@@ -170,6 +170,7 @@ describe("Webhook Idempotency - Property Tests", () => {
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateWompiWebhookPayload(

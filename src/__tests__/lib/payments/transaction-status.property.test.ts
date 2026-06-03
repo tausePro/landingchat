@@ -131,6 +131,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateWompiWebhookPayload(
@@ -156,7 +157,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     // Verificar que se llamó a update para la transacción
                     expect(mockSupabase.mocks.update).toHaveBeenCalledWith({
                         status: "approved",
-                        provider_response: payload.data,
+                        provider_response: payload,
                         completed_at: expect.any(String), // Debe tener completed_at para APPROVED
                         updated_at: expect.any(String),
                     })
@@ -221,6 +222,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateWompiWebhookPayload(
@@ -246,7 +248,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     // Verificar que se llamó a update para la transacción
                     expect(mockSupabase.mocks.update).toHaveBeenCalledWith({
                         status: "declined",
-                        provider_response: payload.data,
+                        provider_response: payload,
                         completed_at: null, // NO debe tener completed_at para DECLINED
                         updated_at: expect.any(String),
                     })
@@ -300,6 +302,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateWompiWebhookPayload(
@@ -368,6 +371,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateWompiWebhookPayload(
@@ -393,7 +397,7 @@ describe("Transaction Status Handling - Property Tests", () => {
                     // Verificar que se llamó a update para la transacción
                     expect(mockSupabase.mocks.update).toHaveBeenCalledWith({
                         status: "voided",
-                        provider_response: payload.data,
+                        provider_response: payload,
                         completed_at: null, // NO debe tener completed_at para VOIDED
                         updated_at: expect.any(String),
                     })

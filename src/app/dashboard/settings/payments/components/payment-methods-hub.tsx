@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { getAllPaymentConfigs, toggleGateway } from "../actions"
 
-export type PaymentView = "hub" | "wompi" | "epayco" | "manual"
+export type PaymentView = "hub" | "wompi" | "epayco" | "bold" | "manual"
 
 interface PaymentMethodCard {
     key: string
@@ -49,6 +49,16 @@ const PAYMENT_METHODS: PaymentMethodCard[] = [
         icon: <CreditCard className="h-5 w-5" />,
         provider: "epayco",
         color: "from-blue-500 to-indigo-600",
+        isGateway: true,
+    },
+    {
+        key: "bold",
+        view: "bold",
+        name: "Bold",
+        description: "Link de pago — tarjetas, PSE, Nequi",
+        icon: <CreditCard className="h-5 w-5" />,
+        provider: "bold",
+        color: "from-slate-700 to-slate-900",
         isGateway: true,
     },
     {
@@ -108,7 +118,12 @@ export function PaymentMethodsHub({ onConfigure }: PaymentMethodsHubProps) {
                         provider: config.provider,
                         is_active: config.is_active,
                         is_test_mode: config.is_test_mode,
-                        has_credentials: !!config.public_key && !!config.private_key_encrypted,
+                        // Bold no usa llave pública: su credencial mínima es la
+                        // llave de identidad (private_key_encrypted).
+                        has_credentials:
+                            config.provider === "bold"
+                                ? !!config.private_key_encrypted
+                                : !!config.public_key && !!config.private_key_encrypted,
                     })
                 }
                 setGatewayStatuses(statuses)
