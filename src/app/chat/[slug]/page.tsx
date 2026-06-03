@@ -13,6 +13,7 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { getStoreProducts } from "./actions"
 import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
+import { ChatPayBar } from "@/components/chat/chat-pay-bar"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
 import ReactMarkdown from 'react-markdown'
@@ -68,6 +69,11 @@ interface ChatOrganizationSettings {
             showStoreName?: boolean
             [key: string]: unknown
         }
+        [key: string]: unknown
+    }
+    chat?: {
+        // 'conversational' activa el rediseño de una sola columna (mockup Alejandra/Tez)
+        layout?: 'classic' | 'conversational'
         [key: string]: unknown
     }
     agent?: {
@@ -153,13 +159,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { addItem, items, toggleCart, setIsOpen: setCartOpen } = useCartStore()
+    const { addItem, items, toggleCart, setIsOpen: setCartOpen, total } = useCartStore()
+    // Override de layout por querystring (?layout=conversational|classic) para validar/demostrar
+    // en cualquier tenant sin tocar DB. Se aplica tras montar para no romper hidratación.
+    const [layoutOverride, setLayoutOverride] = useState<'classic' | 'conversational' | null>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
     const processedProductIdRef = useRef<string | null>(null)
     const trackedProactiveNudgeChatRef = useRef<string | null>(null)
 
     useTrackingParams(slug)
+
+    useEffect(() => {
+        try {
+            const param = new URLSearchParams(window.location.search).get('layout')
+            if (param === 'conversational' || param === 'classic') {
+                setLayoutOverride(param)
+            }
+        } catch { /* ignore */ }
+    }, [])
 
     const resetStorefrontState = useCallback(() => {
         try {
@@ -700,6 +718,67 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const agentName = agentSettings.name || agent?.name || 'Asistente'
     const agentAvatar = agentSettings.avatar || agent?.avatar_url || 'https://lh3.googleusercontent.com/aida-public/AB6AXuC8bCAgEiNHMf7yLmgdo4Eurg3eWJYu2kbW3T_0NLJkhwPKQI0uBc2hI9DkwLseU3GBIQ3lZQaj7qqDrKE7OFoirx0C0Nlw8Poynk2naibQQ89RPvWM6n4FfDGwa9GMOHSZ6lURVzS1xH3d1b50c4xMLJk7A8NEUEvc0NiU58K6fetJ-LfldTWwYYb1b-2Sob5l4enhIUtGqOD0ePBgGiFmcz-jGyKBAq38346mulOzBOTu-juxtWlkXg3R2sT96vVBL2L0RkJPe2o'
 
+    // Variante de layout: override por URL > config del tenant > 'classic' (default seguro)
+    const configLayout: 'classic' | 'conversational' =
+        organization.settings?.chat?.layout === 'conversational' ? 'conversational' : 'classic'
+    const layoutVariant: 'classic' | 'conversational' = layoutOverride ?? configLayout
+    const isConversational = layoutVariant === 'conversational'
+
+    const cartTotal = total()
+    const freeShippingRemaining =
+        shippingConfig?.free_shipping_enabled && shippingConfig.free_shipping_min_amount
+            ? Math.max(0, shippingConfig.free_shipping_min_amount - cartTotal)
+            : null
+
+    // Navegación a checkout reutilizando el flujo existente del chat
+    const goToCheckout = () => {
+        setCartOpen(false)
+        const params = new URLSearchParams({ from: 'chat' })
+        if (chatId) params.set('chatId', chatId)
+        router.push(`${getStoreLink('/checkout', isSubdomain, slug)}?${params.toString()}`)
+    }
+
+    // Header de persona limpio (modo conversacional, todos los breakpoints)
+    const personaHeader = (
+        <header className="sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/90">
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={() => router.push(getStoreLink('/', isSubdomain, slug))}
+                    aria-label="Volver a la tienda"
+                    className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                    <span className="material-symbols-outlined text-xl">arrow_back</span>
+                </button>
+                <div
+                    className="aspect-square w-9 rounded-full bg-cover bg-center shadow-sm"
+                    style={{ backgroundImage: `url("${agentAvatar}")` }}
+                />
+                <div className="flex flex-col">
+                    <h2 className="text-sm font-bold leading-tight tracking-tight text-slate-900 dark:text-white">{agentName}</h2>
+                    <span className="flex items-center gap-1 text-[11px] font-medium text-green-500">
+                        <span className="size-1.5 rounded-full bg-green-500" />
+                        En línea
+                    </span>
+                </div>
+            </div>
+            <button
+                onClick={toggleCart}
+                aria-label="Ver carrito"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 dark:bg-gray-800 dark:text-gray-200"
+            >
+                <span className="material-symbols-outlined text-xl">shopping_cart</span>
+                {items.length > 0 && (
+                    <span
+                        className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white"
+                        style={{ backgroundColor: primaryColor }}
+                    >
+                        {items.length > 9 ? '9+' : items.length}
+                    </span>
+                )}
+            </button>
+        </header>
+    )
+
     // Handler to delete a chat
     const handleDeleteChat = async (deleteChatId: string) => {
         if (!customerId || !confirm('¿Estás seguro de eliminar esta conversación?')) return
@@ -737,19 +816,22 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             activeProducts={activeProducts} // Living Sidebar Data
             recommendedProducts={recommendedProducts}
             shippingConfig={shippingConfig}
+            layoutVariant={layoutVariant}
             customHeader={
-                <StoreHeader
-                    slug={slug}
-                    organization={organization}
-                    onStartChat={() => { }} // No-op in chat
-                    primaryColor={primaryColor}
-                    showStoreName={showStoreName}
-                    isChatMode={true}
-                    onCloseChat={() => {
-                        const storeUrl = getStoreLink('/', isSubdomain, slug)
-                        router.push(storeUrl)
-                    }}
-                />
+                isConversational ? personaHeader : (
+                    <StoreHeader
+                        slug={slug}
+                        organization={organization}
+                        onStartChat={() => { }} // No-op in chat
+                        primaryColor={primaryColor}
+                        showStoreName={showStoreName}
+                        isChatMode={true}
+                        onCloseChat={() => {
+                            const storeUrl = getStoreLink('/', isSubdomain, slug)
+                            router.push(storeUrl)
+                        }}
+                    />
+                )
             }
             onChatSelect={(selectedChatId) => {
                 // Navigate to selected chat or reload messages
@@ -780,11 +862,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     slug={slug}
                     primaryColor={primaryColor}
                     recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
-                    onCheckout={() => {
-                        const params = new URLSearchParams({ from: 'chat' })
-                        if (chatId) params.set('chatId', chatId)
-                        router.push(`${getStoreLink('/checkout', isSubdomain, slug)}?${params.toString()}`)
-                    }}
+                    onCheckout={goToCheckout}
                     shippingConfig={shippingConfig}
                 />
             }
@@ -793,8 +871,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             {/* Main Chat Container - Now simplified as it's inside layout */}
             <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-gray-950 md:bg-white md:dark:bg-gray-950 relative">
 
-                {/* Mobile Header (Only visible on mobile, Layout sidebar handles desktop) */}
-                <div className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md md:hidden">
+                {/* Mobile Header (classic: solo mobile; conversational: oculto, el personaHeader cubre todo) */}
+                <div className={`sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md ${isConversational ? 'hidden' : 'md:hidden'}`}>
                     <div className="container mx-auto flex h-14 items-center justify-between px-4">
                         <div className="flex items-center gap-3">
                             <div
@@ -827,16 +905,62 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                     {messages.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-50">
-                            <div
-                                className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-                                style={{ backgroundColor: `${primaryColor}20` }}
-                            >
-                                <span className="material-symbols-outlined text-4xl" style={{ color: primaryColor }}>chat_bubble_outline</span>
+                        isConversational ? (
+                            /* Apertura proactiva: saludo + cards de productos reales recomendados */
+                            <div className="flex items-end gap-2.5">
+                                <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center shadow-sm"
+                                    style={{ backgroundImage: `url("${agentAvatar}")` }} />
+                                <div className="flex flex-1 flex-col items-start gap-1">
+                                    <p className="ml-1 text-xs font-normal leading-normal text-gray-500 dark:text-gray-400">{agentName}</p>
+                                    <div className="max-w-[85%] space-y-2">
+                                        <div className="rounded-2xl rounded-bl-none border border-slate-200 bg-white px-4 py-3 text-sm font-normal leading-normal text-slate-800 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                            ¡Hola! Soy {agentName}. ¿Buscas algo en particular o te muestro lo más recomendado?
+                                        </div>
+                                        {recommendedProducts.length > 0 && (
+                                            <div className="flex max-w-[85vw] space-x-3 overflow-x-auto rounded-xl border border-gray-200 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800 md:max-w-lg">
+                                                {recommendedProducts.slice(0, 5).map((product) => (
+                                                    <div key={product.id} className="flex w-40 flex-none flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700">
+                                                        <div
+                                                            className="aspect-video w-full rounded-md bg-cover bg-center bg-no-repeat"
+                                                            style={{ backgroundImage: `url("${product.image_url}")` }}
+                                                        />
+                                                        <div className="flex flex-col gap-0.5">
+                                                            <h3 className="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-white">{product.name}</h3>
+                                                            <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.sale_price || product.price)}</p>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => addItem({
+                                                                id: product.id,
+                                                                name: product.name,
+                                                                price: product.sale_price || product.price,
+                                                                image_url: product.image_url
+                                                            })}
+                                                            disabled={product.stock <= 0}
+                                                            className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 overflow-hidden rounded-md text-xs font-bold leading-normal tracking-[0.015em] transition-colors disabled:opacity-50"
+                                                            style={{ backgroundColor: `${primaryColor}20`, color: primaryColor }}
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">add_shopping_cart</span>
+                                                            <span>Agregar</span>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <h3 className="text-lg font-bold">¡Hola! Soy {agentName}</h3>
-                            <p className="max-w-xs mt-2">Estoy aquí para ayudarte a encontrar los mejores productos.</p>
-                        </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-50">
+                                <div
+                                    className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
+                                    style={{ backgroundColor: `${primaryColor}20` }}
+                                >
+                                    <span className="material-symbols-outlined text-4xl" style={{ color: primaryColor }}>chat_bubble_outline</span>
+                                </div>
+                                <h3 className="text-lg font-bold">¡Hola! Soy {agentName}</h3>
+                                <p className="max-w-xs mt-2">Estoy aquí para ayudarte a encontrar los mejores productos.</p>
+                            </div>
+                        )
                     ) : (
                         messages.map((msg) => (
                             <div
@@ -1043,6 +1167,21 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         ))}
                     </div>
 
+                    {/* Barra de pago persistente (solo modo conversacional, visible si hay ítems) */}
+                    {isConversational && (
+                        <div className="mb-3">
+                            <ChatPayBar
+                                itemCount={items.length}
+                                total={cartTotal}
+                                primaryColor={primaryColor}
+                                formatPrice={formatPrice}
+                                onPay={goToCheckout}
+                                onViewCart={toggleCart}
+                                freeShippingRemaining={freeShippingRemaining}
+                            />
+                        </div>
+                    )}
+
                     <div className="max-w-4xl mx-auto relative">
                         {/* Magic Glow Effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-100 via-purple-50 to-indigo-100 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 rounded-2xl opacity-50 blur-sm pointer-events-none"></div>
@@ -1098,14 +1237,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 slug={slug}
                 primaryColor={primaryColor}
                 recommendations={products.filter(p => !items.find(i => i.id === p.id)).slice(0, 3)}
-                onlyMobile={true}
+                onlyMobile={!isConversational}
                 shippingConfig={shippingConfig}
-                onCheckout={() => {
-                    setCartOpen(false)
-                    const params = new URLSearchParams({ from: 'chat' })
-                    if (chatId) params.set('chatId', chatId)
-                    router.push(`${getStoreLink('/checkout', isSubdomain, slug)}?${params.toString()}`)
-                }}
+                onCheckout={goToCheckout}
             />
         </ChatLayout>
     )

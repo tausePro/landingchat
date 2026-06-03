@@ -30,6 +30,8 @@ interface ChatLayoutProps {
     recommendedProducts?: any[]
     rightSidebar?: React.ReactNode
     primaryColor?: string
+    // 'classic' = layout actual de 3 columnas; 'conversational' = una sola columna (mockup Alejandra/Tez)
+    layoutVariant?: 'classic' | 'conversational'
     shippingConfig?: {
         free_shipping_enabled: boolean
         free_shipping_min_amount?: number | null
@@ -55,9 +57,11 @@ export function ChatLayout({
     recommendedProducts = [],
     rightSidebar,
     primaryColor = "#3B82F6",
+    layoutVariant = 'classic',
     shippingConfig
 }: ChatLayoutProps) {
     const [activeTab, setActiveTab] = React.useState<'para-ti' | 'historial'>('para-ti')
+    const isConversational = layoutVariant === 'conversational'
 
     // Payment methods logos (can be made dynamic later)
     const paymentMethods = [
@@ -136,7 +140,7 @@ export function ChatLayout({
 
             <main className="flex flex-1 overflow-hidden">
                 {/* Sidebar Left (Tabs: Para ti / Historial) */}
-                {showHistory && (
+                {showHistory && !isConversational && (
                     <aside className="w-72 flex flex-col border-r border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shrink-0 hidden md:flex">
                         {/* Tab Header */}
                         <div className="p-4 border-b border-border-light dark:border-border-dark flex items-center justify-between">
@@ -353,12 +357,16 @@ export function ChatLayout({
                 )}
 
                 {/* Main Content Area - Now full width since cart is a modal */}
-                <div className="flex flex-col flex-1 bg-background-light dark:bg-background-dark relative min-w-0">
+                <div className={cn(
+                    "flex flex-col flex-1 bg-background-light dark:bg-background-dark relative min-w-0",
+                    // En modo conversacional, centramos la conversación en una columna con respiración
+                    isConversational && "mx-auto w-full max-w-3xl"
+                )}>
                     {children}
                 </div>
 
-                {/* Right Sidebar (Cart) - Desktop Only (3-column layout) */}
-                {rightSidebar && (
+                {/* Right Sidebar (Cart) - Desktop Only (3-column layout, solo en modo classic) */}
+                {rightSidebar && !isConversational && (
                     <aside className="hidden lg:flex flex-col w-[30%] xl:w-[25%] border-l border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark shrink-0 z-20 h-full">
                         {rightSidebar}
                     </aside>
