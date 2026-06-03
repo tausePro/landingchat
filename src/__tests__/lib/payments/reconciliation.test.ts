@@ -91,6 +91,32 @@ describe("getProviderTransaction (Gap A — usa el id cuando es usable)", () => 
         expect(getTransaction).not.toHaveBeenCalled()
     })
 
+    it("REGRESIÓN Wompi (qp): con provider_transaction_id usable IGNORA el id y consulta por reference", async () => {
+        // Escenario real (qp): el cliente reintentó el pago. El primer intento quedó
+        // guardado como provider_transaction_id (status declined); el segundo intento
+        // (approved) comparte la MISMA reference=orderId. Wompi debe resolverse SIEMPRE
+        // por reference para traer el intento aprobado, no por el id del intento viejo.
+        // Antes de v1.17.0 Wompi siempre consultaba por reference; la generalización
+        // registry-driven (Gap A) lo rompió al consultar por id. Este test fija el
+        // contrato: la estrategia de conciliación es metadata del provider (registry).
+        const declinedById = { ...FAKE_TX, providerTransactionId: "wompi-old-attempt", status: "declined" } as unknown as TransactionDetails
+        const approvedByReference = { ...FAKE_TX, providerTransactionId: "wompi-paid-attempt", status: "approved" } as unknown as TransactionDetails
+        const getTransaction = vi.fn().mockResolvedValue(declinedById)
+        const getTransactionByReference = vi.fn().mockResolvedValue(approvedByReference)
+        const gateway = makeGatewayMock({ getTransaction, getTransactionByReference })
+
+        const tx = await getProviderTransaction({
+            gateway,
+            provider: "wompi",
+            orderId: "order-1",
+            providerTransactionId: "wompi-old-attempt",
+        })
+
+        expect(getTransactionByReference).toHaveBeenCalledWith("order-1")
+        expect(getTransaction).not.toHaveBeenCalled()
+        expect(tx.status).toBe("approved")
+    })
+
     it("id === orderId no se considera usable → cae a by-reference", async () => {
         const getTransaction = vi.fn().mockResolvedValue(FAKE_TX)
         const getTransactionByReference = vi.fn().mockResolvedValue(FAKE_TX)

@@ -128,6 +128,18 @@ export async function getProviderTransaction(params: {
     orderId: string
     providerTransactionId?: string | null
 }): Promise<TransactionDetails> {
+    // La estrategia de consulta es metadata del provider (registry) para que
+    // agregar pasarelas no altere el comportamiento de las existentes.
+    // - Wompi (`reference`): la consulta por reference es la fuente de verdad;
+    //   soporta múltiples intentos que comparten la misma reference (reintentos).
+    // - ePayco / Bold (`transaction_id`): deben consultarse por su id
+    //   (x_ref_payco / LNK); la consulta por reference no aporta o no existe.
+    const reconcileBy = getProviderInfo(params.provider)?.reconcileBy ?? "transaction_id"
+
+    if (reconcileBy === "reference") {
+        return params.gateway.getTransactionByReference(params.orderId)
+    }
+
     if (isUsableProviderTransactionId(params.providerTransactionId, params.orderId)) {
         return params.gateway.getTransaction(params.providerTransactionId)
     }

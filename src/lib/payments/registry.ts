@@ -34,6 +34,17 @@ export interface ProviderInfo {
      * desde el UI hasta que estén implementados.
      */
     enabled: boolean
+    /**
+     * Estrategia de conciliación: cómo `getProviderTransaction` resuelve la
+     * transacción contra el proveedor (dashboard "Consultar pasarela" y
+     * auto-reconcile del storefront).
+     * - 'reference': consulta por la reference (orderId). Fuente de verdad para
+     *   Wompi: soporta múltiples intentos que comparten la misma reference.
+     * - 'transaction_id': consulta por el id del proveedor (x_ref_payco / LNK).
+     *   Necesario para ePayco (no permite consulta por factura) y Bold (solo
+     *   expone consulta por payment_link id).
+     */
+    reconcileBy: "reference" | "transaction_id"
 }
 
 export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
@@ -43,6 +54,7 @@ export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
         checkoutMode: "embedded_widget",
         create: (config) => new WompiGateway(config),
         enabled: true,
+        reconcileBy: "reference",
     },
     epayco: {
         id: "epayco",
@@ -50,6 +62,7 @@ export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
         checkoutMode: "embedded_widget",
         create: (config) => new EpaycoGateway(config),
         enabled: true,
+        reconcileBy: "transaction_id",
     },
     bold: {
         id: "bold",
@@ -57,6 +70,7 @@ export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
         checkoutMode: "hosted_redirect",
         create: (config) => new BoldGateway(config),
         enabled: true, // gateway completo (Slice 1 Bold end-to-end); activación por tenant via payment_gateway_configs
+        reconcileBy: "transaction_id",
     },
     addi: {
         id: "addi",
@@ -64,6 +78,7 @@ export const PROVIDER_REGISTRY: Record<PaymentProvider, ProviderInfo> = {
         checkoutMode: "hosted_redirect",
         create: (config) => new AddiGateway(config),
         enabled: false, // requiere onboarding directo con Addi
+        reconcileBy: "transaction_id",
     },
 }
 
