@@ -367,6 +367,7 @@ describe("ePayco Webhook - Property Tests", () => {
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateEpaycoWebhookPayload(
@@ -452,11 +453,20 @@ describe("ePayco Webhook - Property Tests", () => {
                             data: createPaymentValidationOrder(orderId, amountStr),
                             error: null,
                         })
+                        .mockResolvedValueOnce({
+                            // applyPaymentStatusToOrder vuelve a leer la orden con
+                            // .maybeSingle() (ePayco consumió el lookup anterior en
+                            // la validación de monto). Sin este 5º valor, la orden
+                            // no se encuentra y no se aplica el estado.
+                            data: { id: orderId, status: "pending", payment_status: "pending" },
+                            error: null,
+                        })
 
                     // Mock para los updates
                     mockSupabase.mocks.eq.mockReturnValue({
                         single: mockSupabase.mocks.single,
                         eq: mockSupabase.mocks.eq,
+                        maybeSingle: mockSupabase.mocks.single,
                     })
 
                     const payload = generateEpaycoWebhookPayload(
