@@ -15,6 +15,7 @@ import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
+import { ChatPayBar } from "@/components/chat/chat-pay-bar"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
@@ -153,7 +154,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const { addItem, items, toggleCart, setIsOpen: setCartOpen } = useCartStore()
+    const { addItem, items, toggleCart, setIsOpen: setCartOpen, total } = useCartStore()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const initializationRef = useRef(false)
     const processedProductIdRef = useRef<string | null>(null)
@@ -628,6 +629,13 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }).format(price)
     }
 
+    // Navegación a checkout reutilizando el flujo existente del chat
+    const goToCheckout = useCallback(() => {
+        const params = new URLSearchParams({ from: 'chat' })
+        if (chatId) params.set('chatId', chatId)
+        router.push(`${getStoreLink('/checkout', isSubdomain, slug)}?${params.toString()}`)
+    }, [chatId, isSubdomain, slug, router])
+
     // Calcular productos activos en la conversación para el Living Sidebar
     const activeProducts = messages
         .filter(m => m.product || (m.products && m.products.length > 0))
@@ -1012,6 +1020,16 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                     <div ref={messagesEndRef} />
                 </div>
+
+                {/* Barra de pago persistente (aditiva: lee el carrito compartido) */}
+                <ChatPayBar
+                    itemCount={items.length}
+                    total={total()}
+                    formatPrice={formatPrice}
+                    primaryColor={primaryColor}
+                    onCheckout={goToCheckout}
+                    onExpand={toggleCart}
+                />
 
                 {/* Magic Input Area */}
                 <div className="w-full shrink-0 p-5 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 relative z-30">
