@@ -209,6 +209,10 @@ export function createMockSupabase() {
         select: mockSelect,
         eq: mockEq,
         single: mockSingle,
+        // `maybeSingle` comparte la cola de `single`: el código de producción
+        // (applyPaymentStatusToOrder, decrementOrderStock) lee la orden con
+        // `.maybeSingle()`, y los tests encolan respuestas vía `mockSingle`.
+        maybeSingle: mockSingle,
         insert: mockInsert,
         update: mockUpdate,
     }
@@ -227,6 +231,7 @@ export function createMockSupabase() {
             select: mockSelect,
             eq: mockEq,
             single: mockSingle,
+            maybeSingle: mockSingle,
             insert: mockInsert,
             update: mockUpdate,
         }
