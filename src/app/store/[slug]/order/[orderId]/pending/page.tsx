@@ -7,6 +7,7 @@ import { OrderStatusTracker } from "@/components/analytics/order-status-tracker"
 import { formatCurrency } from "@/lib/utils"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import { t } from "@/lib/i18n/storefront-strings"
+import { getStoreLinkServer } from "@/lib/utils/store-urls-server"
 
 interface PendingPageProps {
     params: Promise<{ slug: string; orderId: string }>
@@ -21,6 +22,8 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
     if (!result) notFound()
 
     const { order, organization } = result
+
+    const storeHref = await getStoreLinkServer("/", slug)
 
     // i18n Fase 1 (T1.2 + T1.3): contexto del tenant para moneda y strings.
     const tenantLocale = getTenantLocale(organization)
@@ -114,7 +117,7 @@ export default async function OrderPendingPage({ params, searchParams }: Pending
                     <div className="flex flex-col sm:flex-row gap-3 justify-center">
                         <CheckStatusButton />
                         <Link
-                            href={`/store/${slug}`}
+                            href={storeHref}
                             className="px-6 py-3 rounded-lg border border-border-light dark:border-border-dark text-text-light-primary dark:text-text-dark-primary font-medium hover:bg-background-light dark:hover:bg-background-dark transition-colors"
                         >
                             {t("order.common.back_to_store", locale)}

@@ -34,7 +34,7 @@ const analyticsAttributionSchema = z.object({
 
 const analyticsPropertiesSchema = z.object({
     contentName: z.string().min(1).max(200).optional(),
-    paymentMethod: z.enum(["wompi", "epayco", "manual", "contraentrega", "cash_on_delivery"]).optional(),
+    paymentMethod: z.enum(["wompi", "epayco", "bold", "manual", "contraentrega", "cash_on_delivery"]).optional(),
     gateway: z.enum(["wompi", "epayco"]).optional(),
     couponCode: z.string().min(1).max(80).optional(),
     failureReason: z.string().min(1).max(160).optional(),

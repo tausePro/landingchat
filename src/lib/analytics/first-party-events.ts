@@ -2,6 +2,7 @@
 
 import { getTrackingParams } from "@/hooks/use-tracking-params"
 import type { AnalyticsEventName } from "@/lib/analytics/event-names"
+import type { PaymentProvider } from "@/types/payment"
 
 export type { AnalyticsEventName }
 
@@ -30,7 +31,7 @@ export type AnalyticsEventAttribution = {
 
 export type AnalyticsEventProperties = {
     contentName?: string
-    paymentMethod?: "wompi" | "epayco" | "manual" | "contraentrega" | "cash_on_delivery"
+    paymentMethod?: PaymentProvider | "manual" | "contraentrega" | "cash_on_delivery"
     gateway?: "wompi" | "epayco"
     couponCode?: string
     failureReason?: string

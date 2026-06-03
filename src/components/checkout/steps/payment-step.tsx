@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { AppliedCoupon, CartItem } from "@/store/cart-store"
 import { cn } from "@/lib/utils"
+import { getProviderDisplay } from "@/lib/payments/provider-display"
 import { useT } from "@/lib/i18n/use-tenant-strings"
 import { OrderSummary } from "../components/order-summary"
 import type { ManualPaymentInfo, PaymentGatewayOption, PaymentMethod } from "../types"
@@ -147,8 +148,9 @@ export function PaymentStep({
                         <div className="grid grid-cols-2 gap-3">
                             {availableGateways.map((gateway) => {
                                 const logoUrl = getPaymentGatewayLogoUrl(gateway)
-                                const providerName = gateway.provider === "wompi" ? "Wompi" : "ePayco"
-                                const providerDescription = gateway.provider === "wompi" ? "Tarjetas, PSE, Nequi" : "Tarjetas y PSE"
+                                const display = getProviderDisplay(gateway.provider)
+                                const providerName = display.label
+                                const providerDescription = display.description
 
                                 return (
                                     <div
