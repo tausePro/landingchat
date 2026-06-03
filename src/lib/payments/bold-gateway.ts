@@ -1,19 +1,24 @@
 /**
  * Implementación de PaymentGateway para Bold.
  *
- * Bold tiene flujo de "hosted_redirect": creamos un payment link via API
- * y redirigimos al cliente a `https://checkout.bold.co/LNK_xxx`.
+ * Bold tiene flujo de "hosted_redirect": creamos un payment link via la
+ * API Link de pagos y redirigimos al cliente a `https://checkout.bold.co/LNK_xxx`.
  *
  * Documentación:
- *   - API: https://developers.bold.co/pagos-en-linea/api-integration
+ *   - API Link de pagos: https://developers.bold.co/pagos-en-linea/api-link-de-pagos
  *   - Webhooks: https://developers.bold.co/webhook
+ *
+ * Autenticación API: header `Authorization: x-api-key {llave_de_identidad}`.
+ * La API Link de pagos reutiliza la llave de identidad del "Botón de pagos".
+ *
+ * IMPORTANTE: la API Link de pagos SOLO expone el host de producción
+ * (`https://integrations.api.bold.co`). No hay host sandbox: el ambiente de
+ * pruebas lo determina la llave/configuración del comercio (la respuesta de
+ * consulta trae `is_sandbox`), no la URL.
  *
  * Webhook security:
  *   - Header `x-bold-signature` con HMAC-SHA256(base64(body), secret) en hex.
  *   - Bold reintenta hasta 5 veces si no recibe HTTP 200.
- *
- * Estado: integración funcional pero deshabilitada en `registry.ts`
- * (`enabled: false`) hasta que se prueben credenciales en producción.
  */
 
 import crypto from "crypto"
@@ -32,10 +37,10 @@ import type {
 
 const log = logger("payments/bold")
 
-const BOLD_API_URL = {
-    sandbox: "https://integrations-sandbox.api.bold.co",
-    production: "https://integrations.api.bold.co",
-}
+// La API Link de pagos solo expone el host de producción. El "modo prueba"
+// lo determina la llave del comercio, NO un host distinto.
+// Docs: https://developers.bold.co/pagos-en-linea/api-link-de-pagos (URL base)
+const BOLD_API_URL = "https://integrations.api.bold.co"
 
 interface BoldPaymentLinkResponse {
     payload?: {
@@ -77,7 +82,8 @@ export class BoldGateway implements PaymentGateway {
 
     constructor(config: GatewayConfig) {
         this.config = config
-        this.baseUrl = config.isTestMode ? BOLD_API_URL.sandbox : BOLD_API_URL.production
+        // Host único: Bold no tiene sandbox por URL para link de pagos.
+        this.baseUrl = BOLD_API_URL
     }
 
     private getHeaders(): HeadersInit {
@@ -96,18 +102,20 @@ export class BoldGateway implements PaymentGateway {
     async createTransaction(input: TransactionInput): Promise<TransactionResult> {
         try {
             const totalAmount = Math.round(input.amount / 100)
+            // `reference` va top-level (doc API Link de pagos). Bold la propaga y
+            // la devuelve en el webhook como `data.metadata.reference`, que es lo
+            // que usamos para reconciliar. NO enviar la reference dentro de
+            // `metadata` al crear: ese campo no existe en la creación y Bold lo ignora.
             const body = {
                 amount_type: "CLOSE",
                 amount: {
                     currency: input.currency,
                     total_amount: totalAmount,
                 },
+                reference: input.reference,
                 description: input.reference,
                 callback_url: input.redirectUrl,
                 payer_email: input.customerEmail,
-                metadata: {
-                    reference: input.reference,
-                },
             }
 
             const response = await fetch(`${this.baseUrl}/online/link/v1`, {
@@ -197,14 +205,14 @@ export class BoldGateway implements PaymentGateway {
     }
 
     async getBanks(): Promise<Bank[]> {
-        // Bold expone /online/methods/v1 con métodos y bancos. Si lo necesitamos
-        // para PSE, extender este método. Por ahora retorna vacío.
+        // Bold expone /online/link/v1/payment_methods con métodos y límites. Si lo
+        // necesitamos para PSE, extender este método. Por ahora retorna vacío.
         return []
     }
 
     async testConnection(): Promise<boolean> {
         try {
-            const response = await fetch(`${this.baseUrl}/online/methods/v1`, {
+            const response = await fetch(`${this.baseUrl}/online/link/v1/payment_methods`, {
                 headers: this.getHeaders(),
             })
             return response.ok
