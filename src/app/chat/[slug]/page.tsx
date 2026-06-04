@@ -731,6 +731,13 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             ? shippingConfig.free_shipping_min_amount
             : null
 
+    // Chips por intención (compartidos: flotantes en clásico, en fila bajo la barra en conversacional)
+    const quickReplies = [
+        { text: "Recomiéndame un producto para...", icon: "auto_awesome" },
+        { text: "Quiero ver ofertas disponibles", icon: "local_offer" },
+        { text: "¿Qué métodos de pago aceptan?", icon: "credit_card" },
+    ]
+
     // Navegación a checkout reutilizando el flujo existente del chat
     const goToCheckout = () => {
         setCartOpen(false)
@@ -750,10 +757,13 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 >
                     <span className="material-symbols-outlined text-xl">arrow_back</span>
                 </button>
-                <div
-                    className="aspect-square w-9 rounded-full bg-cover bg-center shadow-sm"
-                    style={{ backgroundImage: `url("${agentAvatar}")` }}
-                />
+                <div className="relative shrink-0">
+                    <div
+                        className="aspect-square w-9 rounded-full bg-cover bg-center shadow-sm ring-2"
+                        style={{ backgroundImage: `url("${agentAvatar}")`, "--tw-ring-color": `${primaryColor}33` } as CssWithVariables}
+                    />
+                    <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white bg-green-500 dark:border-gray-900" />
+                </div>
                 <div className="flex flex-col">
                     <h2 className="text-sm font-bold leading-tight tracking-tight text-slate-900 dark:text-white">{agentName}</h2>
                     <span className="flex items-center gap-1 text-[11px] font-medium text-green-500">
@@ -905,6 +915,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    {isConversational && (
+                        <div className="flex justify-center">
+                            <span className="rounded-full bg-slate-200/70 px-3 py-1 text-[11px] font-medium text-slate-500 dark:bg-gray-800 dark:text-gray-400">Hoy</span>
+                        </div>
+                    )}
                     {messages.length === 0 ? (
                         isConversational ? (
                             /* Apertura proactiva: saludo + cards de productos reales recomendados */
@@ -1155,13 +1170,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                 {/* Magic Input Area */}
                 <div className="w-full shrink-0 p-5 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 relative z-30">
-                    {/* Quick Replies - Floating above input */}
+                    {/* Quick Replies - Floating above input (solo clásico; en conversacional van debajo de la barra de pago) */}
+                    {!isConversational && (
                     <div className="absolute -top-12 left-6 flex gap-2 overflow-x-auto max-w-[95%] pb-2 scrollbar-hide mask-fade-right z-10">
-                        {[
-                            { text: "Recomiéndame un producto para...", icon: "auto_awesome" },
-                            { text: "Quiero ver ofertas disponibles", icon: "local_offer" },
-                            { text: "¿Qué métodos de pago aceptan?", icon: "credit_card" }
-                        ].map((qr, i) => (
+                        {quickReplies.map((qr, i) => (
                             <button
                                 key={i}
                                 onClick={() => handleSend(qr.text)}
@@ -1182,6 +1194,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             </button>
                         ))}
                     </div>
+                    )}
 
                     {/* Barra de pago persistente (solo modo conversacional, visible si hay ítems) */}
                     {isConversational && (
@@ -1200,6 +1213,23 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                 onPay={goToCheckout}
                                 freeShippingThreshold={freeShippingThreshold}
                             />
+                        </div>
+                    )}
+
+                    {/* Chips por intención debajo de la barra de pago (conversacional, como el mockup) */}
+                    {isConversational && (
+                        <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {quickReplies.map((qr, i) => (
+                                <button
+                                    key={i}
+                                    onClick={() => handleSend(qr.text)}
+                                    className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border bg-white px-4 py-2 text-xs font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-transform hover:-translate-y-0.5 dark:bg-gray-800"
+                                    style={{ color: primaryColor, borderColor: `${primaryColor}30` }}
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">{qr.icon}</span>
+                                    {qr.text}
+                                </button>
+                            ))}
                         </div>
                     )}
 

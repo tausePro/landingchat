@@ -87,8 +87,8 @@ export function ChatLayout({
         }
     }
 
-    return (
-        <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+    const layoutInner = (
+        <>
             {/* Header */}
             {customHeader ? customHeader : (
                 <header className="flex items-center justify-between whitespace-nowrap border-b border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark px-6 py-3 shrink-0">
@@ -358,9 +358,9 @@ export function ChatLayout({
 
                 {/* Main Content Area - Now full width since cart is a modal */}
                 <div className={cn(
-                    "flex flex-col flex-1 bg-background-light dark:bg-background-dark relative min-w-0",
-                    // En modo conversacional, centramos la conversación en una columna con respiración
-                    isConversational && "mx-auto w-full max-w-3xl"
+                    "flex flex-col flex-1 relative min-w-0",
+                    // En conversacional el panel exterior define el ancho; aquí transparente para que se vea el panel blanco
+                    isConversational ? "w-full bg-transparent" : "bg-background-light dark:bg-background-dark"
                 )}>
                     {children}
                 </div>
@@ -372,6 +372,24 @@ export function ChatLayout({
                     </aside>
                 )}
             </main>
+        </>
+    )
+
+    // En conversacional, enmarcamos toda la app (header + chat) como un panel
+    // centrado y contenido sobre un fondo gris, para que no se vea "flotando".
+    if (isConversational) {
+        return (
+            <div className="relative flex h-screen w-full flex-col overflow-hidden bg-slate-100 dark:bg-gray-950">
+                <div className="mx-auto flex h-full w-full max-w-lg flex-col overflow-hidden bg-white dark:bg-gray-900 sm:my-4 sm:h-[calc(100dvh-2rem)] sm:rounded-3xl sm:shadow-[0_8px_40px_rgba(0,0,0,0.08)] sm:ring-1 sm:ring-slate-200/70 dark:sm:ring-gray-800">
+                    {layoutInner}
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="relative flex h-screen w-full flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+            {layoutInner}
         </div>
     )
 }
