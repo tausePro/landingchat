@@ -13,6 +13,7 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { getStoreProducts } from "./actions"
 import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
+import { ChatRecommendationCard } from "@/components/chat/chat-recommendation-card"
 import { ChatPayBar } from "@/components/chat/chat-pay-bar"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
@@ -725,9 +726,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const isConversational = layoutVariant === 'conversational'
 
     const cartTotal = total()
-    const freeShippingRemaining =
+    const freeShippingThreshold =
         shippingConfig?.free_shipping_enabled && shippingConfig.free_shipping_min_amount
-            ? Math.max(0, shippingConfig.free_shipping_min_amount - cartTotal)
+            ? shippingConfig.free_shipping_min_amount
             : null
 
     // Navegación a checkout reutilizando el flujo existente del chat
@@ -869,7 +870,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             primaryColor={primaryColor}
         >
             {/* Main Chat Container - Now simplified as it's inside layout */}
-            <div className="flex-1 flex flex-col h-full bg-slate-50 dark:bg-gray-950 md:bg-white md:dark:bg-gray-950 relative">
+            <div className={`flex-1 flex flex-col h-full relative ${isConversational ? 'bg-slate-50 dark:bg-gray-950' : 'bg-slate-50 dark:bg-gray-950 md:bg-white md:dark:bg-gray-950'}`}>
 
                 {/* Mobile Header (classic: solo mobile; conversational: oculto, el personaHeader cubre todo) */}
                 <div className={`sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md ${isConversational ? 'hidden' : 'md:hidden'}`}>
@@ -910,43 +911,34 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             <div className="flex items-end gap-2.5">
                                 <div className="aspect-square w-8 shrink-0 rounded-full bg-cover bg-center shadow-sm"
                                     style={{ backgroundImage: `url("${agentAvatar}")` }} />
-                                <div className="flex flex-1 flex-col items-start gap-1">
+                                <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
                                     <p className="ml-1 text-xs font-normal leading-normal text-gray-500 dark:text-gray-400">{agentName}</p>
-                                    <div className="max-w-[85%] space-y-2">
-                                        <div className="rounded-2xl rounded-bl-none border border-slate-200 bg-white px-4 py-3 text-sm font-normal leading-normal text-slate-800 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                                            ¡Hola! Soy {agentName}. ¿Buscas algo en particular o te muestro lo más recomendado?
-                                        </div>
-                                        {recommendedProducts.length > 0 && (
-                                            <div className="flex max-w-[85vw] space-x-3 overflow-x-auto rounded-xl border border-gray-200 bg-white p-3 shadow-md dark:border-gray-700 dark:bg-gray-800 md:max-w-lg">
-                                                {recommendedProducts.slice(0, 5).map((product) => (
-                                                    <div key={product.id} className="flex w-40 flex-none flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-700">
-                                                        <div
-                                                            className="aspect-video w-full rounded-md bg-cover bg-center bg-no-repeat"
-                                                            style={{ backgroundImage: `url("${product.image_url}")` }}
-                                                        />
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <h3 className="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-white">{product.name}</h3>
-                                                            <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.sale_price || product.price)}</p>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => addItem({
-                                                                id: product.id,
-                                                                name: product.name,
-                                                                price: product.sale_price || product.price,
-                                                                image_url: product.image_url
-                                                            })}
-                                                            disabled={product.stock <= 0}
-                                                            className="flex h-8 w-full cursor-pointer items-center justify-center gap-1 overflow-hidden rounded-md text-xs font-bold leading-normal tracking-[0.015em] transition-colors disabled:opacity-50"
-                                                            style={{ backgroundColor: `${primaryColor}20`, color: primaryColor }}
-                                                        >
-                                                            <span className="material-symbols-outlined text-sm">add_shopping_cart</span>
-                                                            <span>Agregar</span>
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                    <div className="max-w-[85%] rounded-2xl rounded-bl-none border border-slate-200 bg-white px-4 py-3 text-sm font-normal leading-relaxed text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                        ¡Hola! Soy {agentName}. ¿Buscas algo en particular o te muestro lo más recomendado?
                                     </div>
+                                    {recommendedProducts.length > 0 && (
+                                        <div className="flex w-full gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                            {recommendedProducts.slice(0, 5).map((product) => (
+                                                <ChatRecommendationCard
+                                                    key={product.id}
+                                                    name={product.name}
+                                                    description={product.description}
+                                                    price={product.price}
+                                                    salePrice={product.sale_price}
+                                                    imageUrl={product.image_url}
+                                                    stock={product.stock}
+                                                    primaryColor={primaryColor}
+                                                    formatPrice={formatPrice}
+                                                    onAdd={() => addItem({
+                                                        id: product.id,
+                                                        name: product.name,
+                                                        price: product.sale_price || product.price,
+                                                        image_url: product.image_url
+                                                    })}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -1075,6 +1067,29 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                                         {/* Carousel for multiple products */}
                                         {msg.products && msg.products.length > 0 && (
+                                            isConversational ? (
+                                                <div className="flex w-full max-w-[85vw] gap-3 overflow-x-auto pb-1 md:max-w-lg [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                                                    {msg.products.map((product) => (
+                                                        <ChatRecommendationCard
+                                                            key={product.id}
+                                                            name={product.name}
+                                                            description={product.description}
+                                                            price={product.price}
+                                                            salePrice={product.sale_price}
+                                                            imageUrl={product.image_url}
+                                                            stock={product.stock}
+                                                            primaryColor={primaryColor}
+                                                            formatPrice={formatPrice}
+                                                            onAdd={() => addItem({
+                                                                id: product.id,
+                                                                name: product.name,
+                                                                price: product.sale_price || product.price,
+                                                                image_url: product.image_url
+                                                            })}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            ) : (
                                             <div className="flex overflow-x-auto space-x-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md max-w-[85vw] md:max-w-lg">
                                                 {msg.products.map((product) => (
                                                     <div key={product.id} className="flex-none w-40 flex flex-col gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
@@ -1106,6 +1121,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                                     </div>
                                                 ))}
                                             </div>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -1173,18 +1189,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             <ChatPayBar
                                 itemCount={items.length}
                                 total={cartTotal}
+                                items={items.map((it, idx) => ({
+                                    id: `${it.id}-${idx}`,
+                                    name: it.name,
+                                    unit_price: it.unit_price,
+                                    quantity: it.quantity,
+                                }))}
                                 primaryColor={primaryColor}
                                 formatPrice={formatPrice}
                                 onPay={goToCheckout}
-                                onViewCart={toggleCart}
-                                freeShippingRemaining={freeShippingRemaining}
+                                freeShippingThreshold={freeShippingThreshold}
                             />
                         </div>
                     )}
 
                     <div className="max-w-4xl mx-auto relative">
-                        {/* Magic Glow Effect */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-blue-100 via-purple-50 to-indigo-100 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 rounded-2xl opacity-50 blur-sm pointer-events-none"></div>
+                        {/* Magic Glow Effect (solo modo clásico; en conversacional el look es limpio) */}
+                        {!isConversational && (
+                            <div className="absolute inset-0 bg-gradient-to-r from-blue-100 via-purple-50 to-indigo-100 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-indigo-900/20 rounded-2xl opacity-50 blur-sm pointer-events-none"></div>
+                        )}
 
                         <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] p-2 flex items-center gap-2 focus-within:ring-2 transition-all"
                             style={{ '--tw-ring-color': `${primaryColor}30` } as CssWithVariables}

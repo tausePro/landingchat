@@ -3,16 +3,16 @@ import { describe, expect, it } from "vitest"
 import { ChatPayBar } from "@/components/chat/chat-pay-bar"
 
 /**
- * Rediseño conversacional — Barra de pago persistente del chat.
+ * Rediseño conversacional — Barra de pago persistente del chat (mockup Alejandra/Tez).
  * Contrato aditivo: oculta con carrito vacío, muestra total + CTA cuando hay
- * ítems, respeta copy por superficie y muestra el nudge de envío gratis.
+ * ítems, respeta copy por superficie y singular/plural.
  */
 const baseProps = {
     total: 50000,
+    items: [{ id: "p1", name: "Toalla Facial Tez", unit_price: 25000, quantity: 2 }],
     formatPrice: (price: number) => `$${price.toLocaleString("es-CO")}`,
     primaryColor: "#0FBCC9",
     onPay: () => {},
-    onViewCart: () => {},
 }
 
 describe("ChatPayBar", () => {
@@ -25,7 +25,7 @@ describe("ChatPayBar", () => {
         const html = renderToStaticMarkup(<ChatPayBar itemCount={2} {...baseProps} />)
         expect(html).toContain("$50.000")
         expect(html).toContain("Pagar ahora")
-        expect(html).toContain("productos")
+        expect(html).toContain("ítems")
     })
 
     it("usa singular y copy custom según la superficie", () => {
@@ -33,15 +33,13 @@ describe("ChatPayBar", () => {
             <ChatPayBar itemCount={1} {...baseProps} ctaLabel="Generar link de pago" />,
         )
         expect(html).toContain("Generar link de pago")
-        expect(html).toContain("producto")
+        expect(html).toContain("ítem")
         expect(html).not.toContain("Pagar ahora")
     })
 
-    it("muestra el nudge de envío gratis cuando falta monto", () => {
-        const html = renderToStaticMarkup(
-            <ChatPayBar itemCount={1} {...baseProps} freeShippingRemaining={20000} />,
-        )
-        expect(html).toContain("envío gratis")
-        expect(html).toContain("$20.000")
+    it("renderiza la barra con el badge de cantidad de ítems", () => {
+        const html = renderToStaticMarkup(<ChatPayBar itemCount={3} {...baseProps} />)
+        expect(html).toContain("shopping_bag")
+        expect(html).toContain(">3<")
     })
 })
