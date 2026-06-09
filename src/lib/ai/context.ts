@@ -355,6 +355,26 @@ export function buildProductContext(products: Product[]): string {
     return `Productos disponibles:\n\n${productList}`
 }
 
+// Resume los productos comprados a partir del historial de órdenes, agregando
+// cantidades por nombre. Las órdenes llegan ordenadas de más reciente a más
+// antigua, así que el Map preserva ese orden (lo más reciente primero).
+function summarizePurchasedProducts(orders: Order[]): Array<{ name: string; totalQuantity: number }> {
+    const byName = new Map<string, number>()
+
+    for (const order of orders) {
+        for (const item of order.items || []) {
+            const name = item.name?.trim()
+            if (!name) continue
+            const quantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1
+            byName.set(name, (byName.get(name) ?? 0) + quantity)
+        }
+    }
+
+    return [...byName.entries()]
+        .map(([name, totalQuantity]) => ({ name, totalQuantity }))
+        .slice(0, 8)
+}
+
 // Build customer context
 export function buildCustomerContext(customer?: Customer, orders?: Order[]): string {
     if (!customer) return "Cliente no identificado. Si proporciona nombre y contacto, usa identify_customer."
@@ -373,6 +393,16 @@ export function buildCustomerContext(customer?: Customer, orders?: Order[]): str
 
         if (orders.length > 1) {
             context += `- Total de órdenes: ${orders.length}\n`
+        }
+
+        // Productos ya comprados → base para personalizar recomendaciones
+        const purchased = summarizePurchasedProducts(orders)
+        if (purchased.length > 0) {
+            context += `\nPRODUCTOS QUE YA HA COMPRADO (más reciente/frecuente primero):\n`
+            purchased.forEach(p => {
+                context += `- ${p.name}${p.totalQuantity > 1 ? ` (x${p.totalQuantity} en total)` : ''}\n`
+            })
+            context += `\nUSA ESTE HISTORIAL PARA PERSONALIZAR LAS RECOMENDACIONES: sugiere de forma proactiva productos complementarios o la recompra de consumibles relacionados con lo que ya compró. Cuando recomiendes, usa 'search_products' para encontrar productos reales del catálogo relacionados con sus compras previas y muéstralos con 'show_product'. No recomiendes artículos que no tengan relación con su historial.\n`
         }
     } else {
         context += `\nEs un cliente nuevo o sin compras previas.\n`
