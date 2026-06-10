@@ -95,6 +95,8 @@ export async function GET(request: NextRequest) {
         return buildTextResponse(buildPlatformLlmsTxt(resolveBaseUrlFromHost(host)))
     }
 
-    const products = await listDiscoveryProducts(supabase, organization.id, 25)
+    // Paridad con el sitemap (500): los AI engines deben ver el catálogo
+    // completo, no una muestra (antes 25 → catálogos truncados en llms.txt)
+    const products = await listDiscoveryProducts(supabase, organization.id, 500)
     return buildTextResponse(buildStoreLlmsTxt(organization, products))
 }

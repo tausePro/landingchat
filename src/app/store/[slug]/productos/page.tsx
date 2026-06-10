@@ -9,6 +9,7 @@ import { ProductFiltersPanel } from "./product-filters-panel"
 import type { Metadata } from "next"
 import { createServiceClient } from "@/lib/supabase/server"
 import { buildStoreCanonicalUrl, resolveDiscoveryOrganization } from "@/lib/seo/site-discovery"
+import { buildCatalogItemListJsonLd } from "@/lib/seo/catalog-json-ld"
 
 // Canónica del catálogo: apunta siempre a /productos limpio en el origen
 // preferido del tenant — consolida los duplicados por origen (custom domain /
@@ -134,8 +135,20 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
             ? activeCategories[0]
             : "all-products"
 
+    // ItemList JSON-LD solo en la vista limpia del catálogo (sin filtros):
+    // es la versión que indexan buscadores/AI engines (la canónica apunta aquí)
+    const itemListJsonLd = !hasActiveFilters && filteredProducts.length > 0
+        ? buildCatalogItemListJsonLd(organization, filteredProducts)
+        : null
+
     return (
         <StoreLayoutClient slug={slug} organization={organization} products={allProducts} badges={badges}>
+            {itemListJsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListJsonLd) }}
+                />
+            )}
             <CategoryTracker
                 categoryId={trackerCategoryId}
                 categoryName={headingTitle}

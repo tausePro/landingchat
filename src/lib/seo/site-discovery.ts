@@ -90,7 +90,7 @@ export function isPlatformHost(host: string | null | undefined): boolean {
     return !normalizedHost || normalizedHost === LANDINGCHAT_DOMAIN || isLocalHost(normalizedHost)
 }
 
-export function buildOrganizationBaseUrl(organization: Pick<DiscoveryOrganization, "slug" | "custom_domain">): string {
+export function buildOrganizationBaseUrl(organization: { slug: string; custom_domain?: string | null }): string {
     return organization.custom_domain
         ? `https://${normalizeDiscoveryHost(organization.custom_domain) ?? organization.custom_domain}`
         : `https://${organization.slug}.${LANDINGCHAT_DOMAIN}`
@@ -106,7 +106,7 @@ export function buildOrganizationBaseUrl(organization: Pick<DiscoveryOrganizatio
  * el subdominio.
  */
 export function buildStoreCanonicalUrl(
-    organization: Pick<DiscoveryOrganization, "slug" | "custom_domain">,
+    organization: { slug: string; custom_domain?: string | null },
     path = "/"
 ): string {
     const baseUrl = buildOrganizationBaseUrl(organization)

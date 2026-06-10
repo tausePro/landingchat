@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { getStoreData } from "../../store/[slug]/actions"
+import { buildStoreCanonicalUrl } from "@/lib/seo/site-discovery"
 import { MetaPixel } from "@/components/analytics/meta-pixel"
 import { TrackingProvider } from "@/components/analytics/tracking-provider"
 
@@ -27,6 +28,11 @@ export async function generateMetadata(
     return {
         title: `Chat con ${name} | LandingChat`,
         description: `Chatea con ${name} para obtener ayuda personalizada.`,
+        // El chat se sirve por dominio custom, subdominio y /chat/[slug]:
+        // misma consolidación de duplicados que el storefront (v1.21.1)
+        alternates: {
+            canonical: buildStoreCanonicalUrl(organization, "/chat"),
+        },
     }
 }
 

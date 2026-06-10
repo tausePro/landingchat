@@ -140,7 +140,6 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
 
     const headersList = await headers()
     const host = headersList.get("host") || ""
-    const protocol = host.includes("localhost") ? "http" : "https"
     const initialIsSubdomain = isSubdomain(host)
 
     const data = await getProductDetails(slug, slugOrId)
@@ -166,10 +165,12 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
         getShippingConfig(organization.slug),
     ])
 
-    // Construir URL canónica del producto
-    const productUrl = organization.custom_domain
-        ? `https://${organization.custom_domain}/producto/${product.slug || product.id}`
-        : `${protocol}://${host}/producto/${product.slug || product.id}`
+    // URL canónica del producto (mismo helper que generateMetadata/sitemap;
+    // la versión anterior con `host` emitía URLs rotas al servir por /store/[slug])
+    const productUrl = buildStoreCanonicalUrl(organization, `/producto/${product.slug || product.id}`)
+
+    // Moneda/país del tenant para el JSON-LD (antes COP/CO hardcodeado)
+    const jsonLdLocale = getTenantLocale(organization)
 
     return (
         <>
@@ -180,6 +181,9 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
                 productWithVariants={productWithVariants}
                 reviews={reviews}
                 reviewSummary={reviewSummary}
+                currency={jsonLdLocale.currency}
+                countryCode={jsonLdLocale.country}
+                shipping={shippingConfig}
             />
             {productDetailCRO?.urgencyBanner && (
                 <ProductUrgencyBanner
