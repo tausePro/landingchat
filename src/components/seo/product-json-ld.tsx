@@ -35,6 +35,62 @@ interface ProductJsonLdProps {
     productWithVariants?: ProductWithVariantsReadModel | null
     reviews?: ProductReview[] | null
     reviewSummary?: ProductReviewSummary | null
+    /** Moneda del tenant (i18n Fase 1). Default COP para no romper callers existentes. */
+    currency?: string
+    /** País del tenant — destino de envío en OfferShippingDetails. */
+    countryCode?: string
+    /** Config real de envíos del tenant (shipping_settings). `null` omite shippingDetails. */
+    shipping?: ProductJsonLdShipping | null
+}
+
+export interface ProductJsonLdShipping {
+    free_shipping_enabled?: boolean | null
+    free_shipping_min_amount?: number | null
+    default_shipping_rate?: number | null
+    estimated_delivery_days?: number | null
+}
+
+/**
+ * OfferShippingDetails con datos reales del tenant. Mejora elegibilidad en
+ * rich results de Shopping y en experiencias de compra con AI (AEO/GEO).
+ * Envío gratis incondicional → rate 0; si es condicional (mínimo de compra),
+ * se declara la tarifa base (dato veraz para el caso general).
+ */
+function buildShippingDetails(
+    shipping: ProductJsonLdShipping | null | undefined,
+    currency: string,
+    countryCode: string
+) {
+    if (!shipping) return undefined
+
+    const isUnconditionalFreeShipping =
+        shipping.free_shipping_enabled === true && !shipping.free_shipping_min_amount
+    const rate = isUnconditionalFreeShipping ? 0 : shipping.default_shipping_rate
+
+    if (typeof rate !== "number") return undefined
+
+    return {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+            "@type": "MonetaryAmount",
+            value: rate,
+            currency,
+        },
+        shippingDestination: {
+            "@type": "DefinedRegion",
+            addressCountry: countryCode,
+        },
+        ...(shipping.estimated_delivery_days && shipping.estimated_delivery_days > 0 && {
+            deliveryTime: {
+                "@type": "ShippingDeliveryTime",
+                transitTime: {
+                    "@type": "QuantitativeValue",
+                    value: shipping.estimated_delivery_days,
+                    unitCode: "DAY",
+                },
+            },
+        }),
+    }
 }
 
 function buildSellerSchema(organization: ProductJsonLdProps["organization"]) {
@@ -84,11 +140,15 @@ function buildVariantSchemas({
     organization,
     url,
     productWithVariants,
+    currency = "COP",
+    countryCode = "CO",
+    shipping,
 }: ProductJsonLdProps) {
     const activeVariants = productWithVariants?.variants.filter(variant => variant.is_active) ?? []
     if (activeVariants.length < 2) return undefined
 
     const seller = buildSellerSchema(organization)
+    const shippingDetails = buildShippingDetails(shipping, currency, countryCode)
 
     return activeVariants.map(variant => ({
         "@type": "Product",
@@ -106,10 +166,11 @@ function buildVariantSchemas({
         offers: {
             "@type": "Offer",
             url,
-            priceCurrency: "COP",
+            priceCurrency: currency,
             price: variant.price,
             availability: buildAvailability(variant.stock_quantity),
             seller,
+            ...(shippingDetails && { shippingDetails }),
         },
         ...(variant.option_values.length > 0 && {
             additionalProperty: variant.option_values.map(optionValue => ({
@@ -126,8 +187,12 @@ function buildOffersSchema({
     organization,
     url,
     productWithVariants,
+    currency = "COP",
+    countryCode = "CO",
+    shipping,
 }: ProductJsonLdProps) {
     const seller = buildSellerSchema(organization)
+    const shippingDetails = buildShippingDetails(shipping, currency, countryCode)
 
     if (productWithVariants?.price_range.has_range) {
         const activeVariants = productWithVariants.variants.filter(variant => variant.is_active)
@@ -136,12 +201,13 @@ function buildOffersSchema({
         return {
             "@type": "AggregateOffer",
             url,
-            priceCurrency: "COP",
+            priceCurrency: currency,
             lowPrice: productWithVariants.price_range.min_price,
             highPrice: productWithVariants.price_range.max_price,
             offerCount: activeVariants.length || productWithVariants.variants.length,
             availability: buildAvailability(hasAvailableStock ? 1 : 0),
-            seller
+            seller,
+            ...(shippingDetails && { shippingDetails }),
         }
     }
 
@@ -152,17 +218,18 @@ function buildOffersSchema({
     return {
         "@type": "Offer",
         url,
-        priceCurrency: "COP",
+        priceCurrency: currency,
         price: resolvedPrice,
         priceValidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         availability: buildAvailability(resolvedStock),
-        seller
+        seller,
+        ...(shippingDetails && { shippingDetails }),
     }
 }
 
-export function buildProductJsonLdData({ product, organization, url, productWithVariants, reviews, reviewSummary }: ProductJsonLdProps) {
+export function buildProductJsonLdData({ product, organization, url, productWithVariants, reviews, reviewSummary, currency, countryCode, shipping }: ProductJsonLdProps) {
     const defaultVariant = productWithVariants?.default_variant
-    const variantSchemas = buildVariantSchemas({ product, organization, url, productWithVariants, reviews, reviewSummary })
+    const variantSchemas = buildVariantSchemas({ product, organization, url, productWithVariants, reviews, reviewSummary, currency, countryCode, shipping })
     const variesBy = buildVariesBy(productWithVariants)
     const images = product.images?.length
         ? product.images
@@ -217,7 +284,7 @@ export function buildProductJsonLdData({ product, organization, url, productWith
             "@type": "Brand",
             name: organization.name
         },
-        offers: buildOffersSchema({ product, organization, url, productWithVariants }),
+        offers: buildOffersSchema({ product, organization, url, productWithVariants, currency, countryCode, shipping }),
         ...(product.categories?.length && {
             category: product.categories.join(" > ")
         }),
@@ -289,7 +356,7 @@ export function buildProductJsonLdData({ product, organization, url, productWith
     }
 }
 
-export function ProductJsonLd({ product, organization, url, productWithVariants, reviews, reviewSummary }: ProductJsonLdProps) {
+export function ProductJsonLd({ product, organization, url, productWithVariants, reviews, reviewSummary, currency, countryCode, shipping }: ProductJsonLdProps) {
     const { productSchema, faqSchema, breadcrumbSchema } = buildProductJsonLdData({
         product,
         organization,
@@ -297,6 +364,9 @@ export function ProductJsonLd({ product, organization, url, productWithVariants,
         productWithVariants,
         reviews,
         reviewSummary,
+        currency,
+        countryCode,
+        shipping,
     })
 
     return (
