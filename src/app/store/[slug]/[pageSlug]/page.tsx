@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 import { Metadata } from "next"
+import { buildStoreCanonicalUrl } from "@/lib/seo/site-discovery"
 import { StoreLayoutClient } from "../store-layout-client"
 import { PageTemplateRenderer } from "@/components/store/page-templates/page-template-renderer"
 import { parsePageContent } from "@/lib/page-content-parser"
@@ -73,7 +74,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
             title: page.seo_title || page.title,
             description: page.seo_description || "",
             images: org.logo_url ? [org.logo_url] : []
-        }
+        },
+        alternates: {
+            canonical: buildStoreCanonicalUrl(org, `/${pageSlug}`),
+        },
     }
 }
 

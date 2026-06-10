@@ -96,6 +96,24 @@ export function buildOrganizationBaseUrl(organization: Pick<DiscoveryOrganizatio
         : `https://${organization.slug}.${LANDINGCHAT_DOMAIN}`
 }
 
+/**
+ * URL canónica de una página del storefront para `alternates.canonical`.
+ *
+ * La misma tienda se sirve por hasta 3 orígenes (dominio custom, subdominio
+ * y `/store/[slug]` por path) — sin canónica, Google las indexa como
+ * contenido duplicado y diluye el ranking del tenant. El origen preferido
+ * es siempre `buildOrganizationBaseUrl`: dominio custom si existe, si no
+ * el subdominio.
+ */
+export function buildStoreCanonicalUrl(
+    organization: Pick<DiscoveryOrganization, "slug" | "custom_domain">,
+    path = "/"
+): string {
+    const baseUrl = buildOrganizationBaseUrl(organization)
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`
+    return normalizedPath === "/" ? baseUrl : `${baseUrl}${normalizedPath}`
+}
+
 export async function resolveDiscoveryOrganization(
     supabase: SupabaseClient,
     input: ResolveDiscoveryOrganizationInput

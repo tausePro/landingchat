@@ -7,6 +7,7 @@ import { ProductJsonLd } from "@/components/seo/product-json-ld"
 import { headers } from "next/headers"
 import { isSubdomain } from "@/lib/utils/store-urls"
 import { createServiceClient } from "@/lib/supabase/server"
+import { buildStoreCanonicalUrl } from "@/lib/seo/site-discovery"
 import { ProductUrgencyBanner } from "@/components/store/product-urgency-banner"
 import { resolveProductDetailCROConfig, type ProductDetailCROSearchParams } from "@/lib/storefront/product-detail-cro"
 import type { ProductReview, ProductReviewSummary } from "@/types/product"
@@ -61,11 +62,9 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
                 ? [product.image_url]
                 : []
 
-    // Construir URL canónica del producto
-    const baseUrl = organization.custom_domain
-        ? `https://${organization.custom_domain}`
-        : `https://${organization.slug}.landingchat.co`
-    const productUrl = `${baseUrl}/producto/${product.slug || slugOrId}`
+    // Construir URL canónica del producto (helper compartido: normaliza www
+    // en dominios custom y mantiene la misma regla que robots/sitemap)
+    const productUrl = buildStoreCanonicalUrl(organization, `/producto/${product.slug || slugOrId}`)
 
     return {
         title: { absolute: title },

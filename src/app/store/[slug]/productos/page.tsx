@@ -6,6 +6,23 @@ import { isSubdomain, getStoreLink } from "@/lib/utils/store-urls"
 import { ProductCard } from "@/components/store/product-card"
 import { CategoryTracker } from "@/components/analytics/category-tracker"
 import { ProductFiltersPanel } from "./product-filters-panel"
+import type { Metadata } from "next"
+import { createServiceClient } from "@/lib/supabase/server"
+import { buildStoreCanonicalUrl, resolveDiscoveryOrganization } from "@/lib/seo/site-discovery"
+
+// Canónica del catálogo: apunta siempre a /productos limpio en el origen
+// preferido del tenant — consolida los duplicados por origen (custom domain /
+// subdominio / path) y por query params de filtros (?q=, ?categorias=).
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+    const { slug } = await params
+    const organization = await resolveDiscoveryOrganization(createServiceClient(), { slug })
+
+    if (!organization) return {}
+
+    return {
+        alternates: { canonical: buildStoreCanonicalUrl(organization, "/productos") },
+    }
+}
 
 interface ProductsPageProps {
     params: Promise<{ slug: string }>
