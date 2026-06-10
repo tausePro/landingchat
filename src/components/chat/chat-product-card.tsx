@@ -25,6 +25,7 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
     const { addItem } = useCartStore()
     const [isLoading, setIsLoading] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
+    const [showDetails, setShowDetails] = useState(false)
 
     const handleAddToCart = async () => {
         if (isLoading || isSuccess) return
@@ -50,39 +51,11 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
         }, 2000)
     }
 
-    // Determine dynamic actions based on product context (name, categories, etc.)
-    const getContextualActions = () => {
-        const text = (product.name + " " + (product.description || "")).toLowerCase()
-        const categories = (product.categories || []).map(c => c.toLowerCase())
-        
-        const isClothing = categories.some(c => ['ropa', 'moda', 'calzado', 'zapatos', 'tenis', 'camisa', 'pantalon'].includes(c)) || 
-                          /talla|camisa|pantalon|zapato|calzado|tenis|blusa|vestido|sueter|jacket/.test(text)
-        
-        const isBeauty = categories.some(c => ['belleza', 'cosmetica', 'piel', 'facial', 'capilar', 'cuerpo'].includes(c)) || 
-                        /crema|serum|mascarilla|aceite|shampoo|jabon|kit|rutina|piel|facial|hidratante|exfoliante/.test(text)
-
-        const actions = []
-
-        // Primary Context Action
-        if (isClothing) {
-            actions.push({ icon: "straighten", label: "Guía de tallas", action: () => alert("Abrir modal de guía de tallas") })
-        } else if (isBeauty) {
-            actions.push({ icon: "menu_book", label: "Modo de uso", action: () => alert("Abrir modal de modo de uso") })
-        } else {
-            actions.push({ icon: "info", label: "Detalles", action: () => alert("Ver detalles completos") })
-        }
-
-        // Secondary Action (Always Reviews for social proof, or Ingredients for beauty)
-        if (isBeauty) {
-             actions.push({ icon: "spa", label: "Ingredientes", action: () => alert("Ver lista de ingredientes") })
-        } else {
-             actions.push({ icon: "reviews", label: "Reseñas", action: () => alert("Ver reseñas de clientes") })
-        }
-
-        return actions
-    }
-
-    const quickActions = getContextualActions()
+    // Fase 0: solo mostramos acciones que tienen contenido real. Hoy la única
+    // fuente de contenido por producto es la descripción → botón "Detalles".
+    // Los demás (guía de tallas, modo de uso, ingredientes, reseñas) llegarán
+    // en Fase 1 cuando sean editables desde la ficha del producto.
+    const hasDescription = Boolean(product.description && product.description.trim().length > 0)
 
     const hasDiscount =
         product.sale_price != null && product.sale_price < product.price
@@ -170,16 +143,12 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
                 </div>
             </div>
             
-            {/* Quick Actions Footer - Dynamic */}
-             <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700">
-                {quickActions.map((action, idx) => (
-                    <button 
-                        key={idx}
-                        onClick={action.action}
-                        className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 hover:text-white text-gray-600 dark:text-gray-300 text-[10px] font-medium rounded-full shadow-sm transition-all flex items-center gap-1 group/btn"
-                        style={{ 
-                            // Hover effect handled via style to use dynamic primary color
-                        }}
+            {/* Quick Actions Footer - solo si hay contenido real (Fase 0) */}
+            {hasDescription && (
+                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700">
+                    <button
+                        onClick={() => setShowDetails(true)}
+                        className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 text-[10px] font-medium rounded-full shadow-sm transition-all flex items-center gap-1"
                         onMouseEnter={(e) => {
                             e.currentTarget.style.borderColor = primaryColor
                             e.currentTarget.style.color = primaryColor
@@ -189,11 +158,42 @@ export function ChatProductCard({ product, formatPrice, primaryColor = "#3B82F6"
                             e.currentTarget.style.color = ''
                         }}
                     >
-                        <span className="material-symbols-outlined text-[14px]">{action.icon}</span>
-                        {action.label}
+                        <span className="material-symbols-outlined text-[14px]">info</span>
+                        Detalles
                     </button>
-                ))}
-            </div>
+                </div>
+            )}
+
+            {/* Modal de detalles: muestra la descripción completa del producto */}
+            {showDetails && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`Detalles de ${product.name}`}
+                    onClick={() => setShowDetails(false)}
+                >
+                    <div
+                        className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-start justify-between gap-3 p-4 border-b border-gray-100 dark:border-gray-700">
+                            <h3 className="text-base font-bold text-slate-900 dark:text-white leading-tight">{product.name}</h3>
+                            <button
+                                onClick={() => setShowDetails(false)}
+                                aria-label="Cerrar"
+                                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                            >
+                                <span className="material-symbols-outlined text-xl">close</span>
+                            </button>
+                        </div>
+                        <div
+                            className="p-4 overflow-y-auto text-sm text-slate-600 dark:text-gray-300 leading-relaxed prose prose-sm dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{ __html: product.description }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
