@@ -48,6 +48,46 @@ export interface ProductJsonLdShipping {
     free_shipping_min_amount?: number | null
     default_shipping_rate?: number | null
     estimated_delivery_days?: number | null
+    /** NULL = política de devoluciones no configurada → no se emite. */
+    returns_accepted?: boolean | null
+    return_window_days?: number | null
+    return_fees?: "free" | "customer" | null
+}
+
+/**
+ * MerchantReturnPolicy con la política real configurada por el merchant
+ * (GSC "Fichas de comerciantes" pide hasMerchantReturnPolicy en offers).
+ * Sin configuración (`returns_accepted` NULL) no se emite — no se inventan
+ * políticas. Aceptada pero sin ventana de días → config incompleta, se omite.
+ */
+function buildReturnPolicy(
+    shipping: ProductJsonLdShipping | null | undefined,
+    countryCode: string
+) {
+    if (!shipping || shipping.returns_accepted == null) return undefined
+
+    if (shipping.returns_accepted === false) {
+        return {
+            "@type": "MerchantReturnPolicy",
+            applicableCountry: countryCode,
+            returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+        }
+    }
+
+    if (!shipping.return_window_days || shipping.return_window_days <= 0) return undefined
+
+    return {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: countryCode,
+        returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+        merchantReturnDays: shipping.return_window_days,
+        ...(shipping.return_fees === "free" && {
+            returnFees: "https://schema.org/FreeReturn",
+        }),
+        ...(shipping.return_fees === "customer" && {
+            returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+        }),
+    }
 }
 
 /**
@@ -149,6 +189,7 @@ function buildVariantSchemas({
 
     const seller = buildSellerSchema(organization)
     const shippingDetails = buildShippingDetails(shipping, currency, countryCode)
+    const returnPolicy = buildReturnPolicy(shipping, countryCode)
 
     return activeVariants.map(variant => ({
         "@type": "Product",
@@ -171,6 +212,7 @@ function buildVariantSchemas({
             availability: buildAvailability(variant.stock_quantity),
             seller,
             ...(shippingDetails && { shippingDetails }),
+            ...(returnPolicy && { hasMerchantReturnPolicy: returnPolicy }),
         },
         ...(variant.option_values.length > 0 && {
             additionalProperty: variant.option_values.map(optionValue => ({
@@ -193,6 +235,7 @@ function buildOffersSchema({
 }: ProductJsonLdProps) {
     const seller = buildSellerSchema(organization)
     const shippingDetails = buildShippingDetails(shipping, currency, countryCode)
+    const returnPolicy = buildReturnPolicy(shipping, countryCode)
 
     if (productWithVariants?.price_range.has_range) {
         const activeVariants = productWithVariants.variants.filter(variant => variant.is_active)
@@ -208,6 +251,7 @@ function buildOffersSchema({
             availability: buildAvailability(hasAvailableStock ? 1 : 0),
             seller,
             ...(shippingDetails && { shippingDetails }),
+            ...(returnPolicy && { hasMerchantReturnPolicy: returnPolicy }),
         }
     }
 
@@ -224,6 +268,7 @@ function buildOffersSchema({
         availability: buildAvailability(resolvedStock),
         seller,
         ...(shippingDetails && { shippingDetails }),
+        ...(returnPolicy && { hasMerchantReturnPolicy: returnPolicy }),
     }
 }
 
