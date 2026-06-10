@@ -1003,13 +1003,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                             <div className="flex overflow-x-auto space-x-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md max-w-[85vw] md:max-w-lg">
                                                 {msg.products.map((product) => (
                                                     <div key={product.id} className="flex-none w-40 flex flex-col gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-                                                        <div
-                                                            className="bg-center bg-no-repeat aspect-video bg-cover rounded-md w-full"
-                                                            style={{ backgroundImage: `url("${product.image_url}")` }}
-                                                        />
+                                                        <div className="relative w-full">
+                                                            <div
+                                                                className="bg-center bg-no-repeat aspect-video bg-cover rounded-md w-full"
+                                                                style={{ backgroundImage: `url("${product.image_url}")` }}
+                                                            />
+                                                            {product.sale_price != null && product.sale_price < product.price && (
+                                                                <span className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">Oferta</span>
+                                                            )}
+                                                        </div>
                                                         <div className="flex flex-col gap-0.5">
                                                             <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-1">{product.name}</h3>
-                                                            <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.price)}</p>
+                                                            {product.sale_price != null && product.sale_price < product.price ? (
+                                                                <div className="flex items-baseline gap-1.5">
+                                                                    <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.sale_price)}</p>
+                                                                    <p className="text-[10px] font-medium text-slate-400 line-through">{formatPrice(product.price)}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.price)}</p>
+                                                            )}
                                                         </div>
                                                         <button
                                                             onClick={() => addItem({
