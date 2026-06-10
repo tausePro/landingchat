@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { getShippingSettings, updateShippingSettings, ShippingSettings } from "./actions"
+import { getShippingSettings, updateShippingSettings } from "./actions"
 
 export default function ShippingConfigPage() {
     const router = useRouter()
     const [loading, setLoading] = useState(false)
-    const [settings, setSettings] = useState<ShippingSettings | null>(null)
+
 
     // Form state
     const [freeShippingEnabled, setFreeShippingEnabled] = useState(false)
@@ -18,13 +18,16 @@ export default function ShippingConfigPage() {
     const [expressShippingRate, setExpressShippingRate] = useState("")
     const [estimatedDeliveryDays, setEstimatedDeliveryDays] = useState("3")
     const [expressDeliveryDays, setExpressDeliveryDays] = useState("1")
+    // Política de devoluciones: "" = no configurada (no se publica en el SEO de productos)
+    const [returnsAccepted, setReturnsAccepted] = useState<"" | "yes" | "no">("")
+    const [returnWindowDays, setReturnWindowDays] = useState("5")
+    const [returnFees, setReturnFees] = useState<"" | "free" | "customer">("")
 
     useEffect(() => {
         async function loadSettings() {
             try {
                 const data = await getShippingSettings()
                 if (data) {
-                    setSettings(data)
                     setFreeShippingEnabled(data.free_shipping_enabled)
                     setFreeShippingMinAmount(data.free_shipping_min_amount?.toString() || "")
                     setFreeShippingZones(data.free_shipping_zones?.join(", ") || "")
@@ -32,6 +35,9 @@ export default function ShippingConfigPage() {
                     setExpressShippingRate(data.express_shipping_rate?.toString() || "")
                     setEstimatedDeliveryDays(data.estimated_delivery_days?.toString() || "3")
                     setExpressDeliveryDays(data.express_delivery_days?.toString() || "1")
+                    setReturnsAccepted(data.returns_accepted == null ? "" : data.returns_accepted ? "yes" : "no")
+                    setReturnWindowDays(data.return_window_days?.toString() || "5")
+                    setReturnFees(data.return_fees || "")
                 }
             } catch (error) {
                 console.error("Error loading settings:", error)
@@ -52,7 +58,10 @@ export default function ShippingConfigPage() {
                 default_shipping_rate: parseFloat(defaultShippingRate) || 0,
                 express_shipping_rate: expressShippingRate ? parseFloat(expressShippingRate) : null,
                 estimated_delivery_days: parseInt(estimatedDeliveryDays) || 3,
-                express_delivery_days: parseInt(expressDeliveryDays) || 1
+                express_delivery_days: parseInt(expressDeliveryDays) || 1,
+                returns_accepted: returnsAccepted === "" ? null : returnsAccepted === "yes",
+                return_window_days: returnsAccepted === "yes" && returnWindowDays ? parseInt(returnWindowDays) : null,
+                return_fees: returnsAccepted === "yes" && returnFees ? returnFees : null
             })
 
             alert("Configuración guardada exitosamente")
@@ -222,6 +231,68 @@ export default function ShippingConfigPage() {
                                 required
                             />
                         </div>
+                    </div>
+                </div>
+
+                {/* Return Policy Section */}
+                <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
+                    <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary mb-2">
+                        Política de Devoluciones
+                    </h2>
+                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mb-6">
+                        Se publica en el SEO de tus productos (Google Fichas de comerciantes) y permite al agente AI responder preguntas sobre devoluciones.
+                        En Colombia, la ley da al cliente 5 días hábiles de retracto en ventas a distancia.
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                ¿Aceptas devoluciones?
+                            </label>
+                            <select
+                                value={returnsAccepted}
+                                onChange={e => setReturnsAccepted(e.target.value as "" | "yes" | "no")}
+                                className="form-select mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent"
+                            >
+                                <option value="">Sin configurar (no se publica)</option>
+                                <option value="yes">Sí, acepto devoluciones</option>
+                                <option value="no">No acepto devoluciones</option>
+                            </select>
+                        </div>
+
+                        {returnsAccepted === "yes" && (
+                            <>
+                                <div>
+                                    <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                        Ventana de devolución (días)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        placeholder="5"
+                                        value={returnWindowDays}
+                                        onChange={e => setReturnWindowDays(e.target.value)}
+                                        className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                        Envío de la devolución
+                                    </label>
+                                    <select
+                                        value={returnFees}
+                                        onChange={e => setReturnFees(e.target.value as "" | "free" | "customer")}
+                                        className="form-select mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent"
+                                    >
+                                        <option value="">Sin especificar</option>
+                                        <option value="free">Lo asumo yo (gratis para el cliente)</option>
+                                        <option value="customer">Lo paga el cliente</option>
+                                    </select>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
 

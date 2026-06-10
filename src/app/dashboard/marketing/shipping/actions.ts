@@ -13,6 +13,10 @@ export interface ShippingSettings {
     express_shipping_rate: number | null
     estimated_delivery_days: number
     express_delivery_days: number
+    // Política de devoluciones (NULL = no configurada → no se emite en JSON-LD)
+    returns_accepted: boolean | null
+    return_window_days: number | null
+    return_fees: "free" | "customer" | null
     created_at: string
     updated_at: string
 }

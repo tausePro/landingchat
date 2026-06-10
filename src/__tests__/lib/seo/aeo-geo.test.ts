@@ -124,6 +124,63 @@ describe("buildProductJsonLdData — OfferShippingDetails", () => {
     })
 })
 
+describe("buildProductJsonLdData — hasMerchantReturnPolicy", () => {
+    const baseShipping = {
+        free_shipping_enabled: false,
+        free_shipping_min_amount: null,
+        default_shipping_rate: 5,
+        estimated_delivery_days: null,
+    }
+
+    function getOffers(shipping: Record<string, unknown>) {
+        const { productSchema } = buildProductJsonLdData({
+            product: baseProduct,
+            organization: usOrganization,
+            url: "https://tantors.landingchat.co/producto/serum-facial",
+            countryCode: "US",
+            shipping: { ...baseShipping, ...shipping },
+        })
+        return productSchema.offers as Record<string, unknown>
+    }
+
+    it("sin configurar (NULL) no emite política — no se inventan datos", () => {
+        expect(getOffers({ returns_accepted: null }).hasMerchantReturnPolicy).toBeUndefined()
+    })
+
+    it("no acepta devoluciones → MerchantReturnNotPermitted", () => {
+        expect(getOffers({ returns_accepted: false }).hasMerchantReturnPolicy).toMatchObject({
+            "@type": "MerchantReturnPolicy",
+            applicableCountry: "US",
+            returnPolicyCategory: "https://schema.org/MerchantReturnNotPermitted",
+        })
+    })
+
+    it("acepta con ventana y envío gratis → FiniteReturnWindow + FreeReturn", () => {
+        expect(
+            getOffers({ returns_accepted: true, return_window_days: 5, return_fees: "free" }).hasMerchantReturnPolicy
+        ).toMatchObject({
+            returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
+            merchantReturnDays: 5,
+            returnFees: "https://schema.org/FreeReturn",
+        })
+    })
+
+    it("acepta con envío a cargo del cliente → ReturnFeesCustomerResponsibility", () => {
+        expect(
+            getOffers({ returns_accepted: true, return_window_days: 30, return_fees: "customer" }).hasMerchantReturnPolicy
+        ).toMatchObject({
+            merchantReturnDays: 30,
+            returnFees: "https://schema.org/ReturnFeesCustomerResponsibility",
+        })
+    })
+
+    it("acepta pero sin ventana de días → config incompleta, no emite", () => {
+        expect(
+            getOffers({ returns_accepted: true, return_window_days: null }).hasMerchantReturnPolicy
+        ).toBeUndefined()
+    })
+})
+
 describe("buildCatalogItemListJsonLd", () => {
     it("construye ItemList con URLs canónicas (dominio custom preferido)", () => {
         const jsonLd = buildCatalogItemListJsonLd(

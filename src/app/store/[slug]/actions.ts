@@ -703,12 +703,13 @@ export async function getShippingConfig(slug: string) {
     // 2. Obtener configuración de envío de la tabla shipping_settings
     const { data: shippingSettings, error: shippingError } = await supabase
         .from("shipping_settings")
-        .select("free_shipping_enabled, free_shipping_min_amount, free_shipping_zones, default_shipping_rate, estimated_delivery_days, express_delivery_days")
+        .select("free_shipping_enabled, free_shipping_min_amount, free_shipping_zones, default_shipping_rate, estimated_delivery_days, express_delivery_days, returns_accepted, return_window_days, return_fees")
         .eq("organization_id", org.id)
         .single()
 
     if (shippingError) {
         // Si no hay configuración específica, devolver valores por defecto
+        // (returns_* en null = política de devoluciones no configurada)
         return {
             free_shipping_enabled: false,
             free_shipping_min_amount: null,
@@ -716,6 +717,9 @@ export async function getShippingConfig(slug: string) {
             default_shipping_rate: 0,
             estimated_delivery_days: null,
             express_delivery_days: null,
+            returns_accepted: null,
+            return_window_days: null,
+            return_fees: null,
         }
     }
 
