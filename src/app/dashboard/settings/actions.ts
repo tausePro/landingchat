@@ -3,7 +3,9 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import type { OrganizationSettingsOverrides, OrganizationTrackingConfig, Organization } from "@/types"
+import { type ActionResult, success, failure } from "@/types"
 import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
+import { localeSettingsSchema, type LocaleSettingsInput } from "@/lib/i18n/locale-settings"
 
 export interface SettingsData {
     profile: {
@@ -103,9 +105,59 @@ export async function getSettingsData(): Promise<SettingsData> {
             // Tax settings
             tax_enabled: organization.tax_enabled || false,
             tax_rate: organization.tax_rate || 0,
-            prices_include_tax: organization.prices_include_tax || false
+            prices_include_tax: organization.prices_include_tax || false,
+            // i18n Fase 1 (single-locale-per-tenant)
+            currency_code: organization.currency_code || "COP",
+            locale: organization.locale || "es-CO",
+            country_code: organization.country_code || "CO"
         } as unknown as SettingsData["organization"], // Force cast to avoid strict null checks issues for now
         hasCustomDomainFeature
+    }
+}
+
+/**
+ * Actualiza moneda/idioma/país de la organización del usuario autenticado.
+ *
+ * Usa el cliente con sesión (RLS limita el UPDATE a la org del usuario vía
+ * `get_my_org_id()`), igual que el resto de settings del dashboard.
+ *
+ * Nota Fase 1 i18n: cambiar la moneda NO convierte precios — los precios
+ * existentes se interpretan en la nueva moneda (single-locale-per-tenant).
+ */
+export async function updateLocaleSettings(input: LocaleSettingsInput): Promise<ActionResult<void>> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return failure("No autorizado")
+
+        const validation = localeSettingsSchema.safeParse(input)
+        if (!validation.success) {
+            return failure(validation.error.issues[0]?.message || "Datos inválidos")
+        }
+
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single()
+
+        if (!profile?.organization_id) return failure("Organización no encontrada")
+
+        const { error } = await supabase
+            .from("organizations")
+            .update(validation.data)
+            .eq("id", profile.organization_id)
+
+        if (error) {
+            console.error("Error updating locale settings:", error)
+            return failure("Error al guardar idioma y moneda")
+        }
+
+        revalidatePath("/dashboard/settings")
+        return success(undefined)
+    } catch (error) {
+        console.error("Error in updateLocaleSettings:", error)
+        return failure("Error inesperado al guardar idioma y moneda")
     }
 }
 
