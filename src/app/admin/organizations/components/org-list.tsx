@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { OrganizationData, updateOrganizationStatus, deleteOrganization } from "../actions"
 import { AssignPlanDialog } from "../../subscriptions/components/assign-plan-dialog"
+import { LocaleDialog } from "./locale-dialog"
 import { toast } from "sonner"
 import { formatBogotaDate } from "@/lib/utils/date"
 // import { useDebounce } from "@/hooks/use-debounce" // We might need to create this hook or implement debounce manually
@@ -56,6 +57,7 @@ export function OrgList({ initialData }: OrgListProps) {
     const debouncedSearch = useDebounceValue(searchTerm, 500)
     const [loading, setLoading] = useState(false)
     const [assigningPlanFor, setAssigningPlanFor] = useState<OrganizationData | null>(null)
+    const [editingLocaleFor, setEditingLocaleFor] = useState<OrganizationData | null>(null)
 
     // Effect to trigger search on debounce
     useEffect(() => {
@@ -72,7 +74,7 @@ export function OrgList({ initialData }: OrgListProps) {
             try {
                 await updateOrganizationStatus(id, status)
                 router.refresh()
-            } catch (error) {
+            } catch {
                 alert("Error al actualizar estado")
             } finally {
                 setLoading(false)
@@ -121,6 +123,7 @@ export function OrgList({ initialData }: OrgListProps) {
                         <TableRow>
                             <TableHead>Organización</TableHead>
                             <TableHead>Estado</TableHead>
+                            <TableHead>Moneda / Idioma</TableHead>
                             <TableHead>Usuarios</TableHead>
                             <TableHead>Chats</TableHead>
                             <TableHead>Fecha Registro</TableHead>
@@ -145,6 +148,11 @@ export function OrgList({ initialData }: OrgListProps) {
                                             org.status === 'suspended' ? 'Suspendido' : 'Archivado'}
                                     </Badge>
                                 </TableCell>
+                                <TableCell>
+                                    <span className="text-xs text-muted-foreground">
+                                        {org.currency_code || "COP"} · {org.locale || "es-CO"}
+                                    </span>
+                                </TableCell>
                                 <TableCell>{org.users_count}</TableCell>
                                 <TableCell>{org.chats_count}</TableCell>
                                 <TableCell>{formatBogotaDate(org.created_at)}</TableCell>
@@ -163,6 +171,9 @@ export function OrgList({ initialData }: OrgListProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => setAssigningPlanFor(org)}>
                                                 Asignar plan
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setEditingLocaleFor(org)}>
+                                                Idioma y moneda
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={() => handleStatusChange(org.id, 'active')}>
@@ -186,7 +197,7 @@ export function OrgList({ initialData }: OrgListProps) {
                         ))}
                         {initialData.organizations.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">
+                                <TableCell colSpan={7} className="h-24 text-center">
                                     No se encontraron resultados.
                                 </TableCell>
                             </TableRow>
@@ -202,6 +213,21 @@ export function OrgList({ initialData }: OrgListProps) {
                     open={!!assigningPlanFor}
                     onOpenChange={(open) => {
                         if (!open) setAssigningPlanFor(null)
+                    }}
+                    onSuccess={() => router.refresh()}
+                />
+            )}
+
+            {editingLocaleFor && (
+                <LocaleDialog
+                    organizationId={editingLocaleFor.id}
+                    organizationName={editingLocaleFor.name}
+                    currentCurrency={editingLocaleFor.currency_code}
+                    currentLocale={editingLocaleFor.locale}
+                    currentCountry={editingLocaleFor.country_code}
+                    open={!!editingLocaleFor}
+                    onOpenChange={(open) => {
+                        if (!open) setEditingLocaleFor(null)
                     }}
                     onSuccess={() => router.refresh()}
                 />
