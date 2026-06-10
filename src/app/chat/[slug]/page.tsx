@@ -15,6 +15,9 @@ import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
+import { formatCurrency } from "@/lib/utils"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { TenantLocaleProvider } from "@/lib/i18n/use-tenant-strings"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
@@ -669,13 +672,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }
     }
 
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(price)
-    }
+    const tenantLocale = getTenantLocale(organization)
+    const formatPrice = (price: number) =>
+        formatCurrency(price, { locale: tenantLocale.locale, currency: tenantLocale.currency })
 
     // Calcular productos activos en la conversación para el Living Sidebar
     const activeProducts = messages
@@ -777,6 +776,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     }
 
     return (
+        <TenantLocaleProvider
+            locale={tenantLocale.locale}
+            currencyCode={tenantLocale.currency}
+            country={tenantLocale.country}
+        >
         <ChatLayout
             organizationName={organization.name || "LandingChat"}
             logoUrl={organization.settings?.branding?.logoUrl}
@@ -1169,6 +1173,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 }}
             />
         </ChatLayout>
+        </TenantLocaleProvider>
     )
 
 }
