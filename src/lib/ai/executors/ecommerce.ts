@@ -1021,6 +1021,16 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
         cityNorm.includes(normalize(zone))
     )
 
+    const { data: cart } = await supabase
+        .from("carts")
+        .select("items")
+        .eq("chat_id", context.chatId)
+        .eq("status", "active")
+        .single()
+    const subtotal = calculateCartSubtotal(normalizeAiCartLineItems(cart?.items))
+    const meetsFreeShippingMinimum = !freeShippingMinAmount || subtotal >= freeShippingMinAmount
+    const remainingForFreeShipping = meetsFreeShippingMinimum ? 0 : freeShippingMinAmount - subtotal
+
     if (hasZones && !cityMatchesZone && defaultRate === 0) {
         return {
             success: true,
@@ -1034,18 +1044,16 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
         }
     }
 
-    if (freeShippingEnabled && cityMatchesZone) {
+    if (freeShippingEnabled && cityMatchesZone && meetsFreeShippingMinimum) {
         options.push({
             id: "free",
-            name: freeShippingMinAmount
-                ? `Envío Gratis (compras desde $${freeShippingMinAmount.toLocaleString()})`
-                : "Envío Gratis",
+            name: "Envío Gratis",
             price: 0,
             days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
         })
     }
 
-    if (defaultRate > 0 && (!cityMatchesZone || !freeShippingEnabled)) {
+    if (defaultRate > 0 && (!cityMatchesZone || !freeShippingEnabled || !meetsFreeShippingMinimum)) {
         options.push({
             id: "standard",
             name: "Envío Estándar",
@@ -1069,8 +1077,11 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
             available: true,
             options,
             city,
+            subtotal,
             freeShippingEnabled,
             freeShippingMinAmount,
+            meetsFreeShippingMinimum,
+            remainingForFreeShipping,
             freeShippingZones
         }
     }

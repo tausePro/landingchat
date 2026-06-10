@@ -15,6 +15,9 @@ import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
+import { formatCurrency } from "@/lib/utils"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { TenantLocaleProvider } from "@/lib/i18n/use-tenant-strings"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import Image from 'next/image'
@@ -105,13 +108,56 @@ interface AddedToCartActionData {
     categories?: string[]
 }
 
+// Forma de cada producto que devuelve el tool `search_products`
+// (resolveAgentSearchProduct en el executor de ecommerce).
+interface SearchResultProduct {
+    id: string
+    name: string
+    description?: string
+    price: number
+    originalPrice?: number
+    onSale?: boolean
+    image_url?: string
+    stock?: number
+}
+
 interface ChatAction {
     type: string
     data?: {
         product?: Product
+        products?: SearchResultProduct[]
         added?: AddedToCartActionData
         media?: MediaAttachment
     } & Record<string, unknown>
+}
+
+// Mapea los resultados de `search_products` al modelo de card del chat,
+// preservando la semántica de precio (price = regular, sale_price = oferta)
+// igual que `show_product`.
+function mapSearchResultsToProducts(items: SearchResultProduct[]): Product[] {
+    return items.map((item) => {
+        const onSale = Boolean(item.onSale) && typeof item.originalPrice === 'number' && item.originalPrice > item.price
+        return {
+            id: item.id,
+            name: item.name,
+            description: item.description ?? '',
+            price: onSale ? (item.originalPrice as number) : item.price,
+            sale_price: onSale ? item.price : null,
+            image_url: item.image_url ?? '',
+            stock: item.stock ?? 0,
+        }
+    })
+}
+
+// Quita duplicados por id preservando el orden (un mismo producto puede llegar
+// por `show_product` y `search_products` en el mismo turno).
+function dedupeProductsById(items: Product[]): Product[] {
+    const seen = new Set<string>()
+    return items.filter((item) => {
+        if (seen.has(item.id)) return false
+        seen.add(item.id)
+        return true
+    })
 }
 
 interface ChatInitResponse {
@@ -365,17 +411,20 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             for (const action of aiData.actions) {
                                 if (action.type === 'show_product' && action.data?.product) {
                                     collectedProducts.push(action.data.product)
+                                } else if (action.type === 'search_products' && action.data?.products && action.data.products.length > 0) {
+                                    collectedProducts.push(...mapSearchResultsToProducts(action.data.products))
                                 }
                             }
                         }
 
-                        if (collectedProducts.length > 0) {
+                        const initProducts = dedupeProductsById(collectedProducts)
+                        if (initProducts.length > 0) {
                             const productMsg: Message = {
                                 id: "product-" + Date.now(),
                                 role: 'assistant',
                                 content: aiData.message,
-                                products: collectedProducts.length > 1 ? collectedProducts : undefined,
-                                product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
+                                products: initProducts.length > 1 ? initProducts : undefined,
+                                product: initProducts.length === 1 ? initProducts[0] : undefined,
                                 timestamp: new Date()
                             }
                             setMessages(prev => [...prev, productMsg])
@@ -544,6 +593,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 for (const action of data.actions) {
                     if (action.type === 'show_product' && action.data?.product) {
                         collectedProducts.push(action.data.product)
+                    } else if (action.type === 'search_products' && action.data?.products && action.data.products.length > 0) {
+                        collectedProducts.push(...mapSearchResultsToProducts(action.data.products))
                     } else if (action.type === 'add_to_cart' && action.data?.added) {
                         // Producto agregado al carrito
                         const addedProduct = action.data.added
@@ -574,13 +625,14 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             }
 
             // If we collected products, create a single message with them
-            if (collectedProducts.length > 0) {
+            const uniqueProducts = dedupeProductsById(collectedProducts)
+            if (uniqueProducts.length > 0) {
                 const productMsg: Message = {
                     id: (Date.now() + Math.random()).toString(),
                     role: 'assistant',
                     content: data.message,
-                    products: collectedProducts.length > 1 ? collectedProducts : undefined,
-                    product: collectedProducts.length === 1 ? collectedProducts[0] : undefined,
+                    products: uniqueProducts.length > 1 ? uniqueProducts : undefined,
+                    product: uniqueProducts.length === 1 ? uniqueProducts[0] : undefined,
                     mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
                     timestamp: new Date()
                 }
@@ -588,7 +640,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             }
 
             // Solo agregar mensaje de texto si NO hubo productos (para evitar duplicados)
-            if (collectedProducts.length === 0) {
+            if (uniqueProducts.length === 0) {
                 const aiMsg: Message = {
                     id: (Date.now() + 1).toString(),
                     role: 'assistant',
@@ -620,13 +672,9 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         }
     }
 
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(price)
-    }
+    const tenantLocale = getTenantLocale(organization)
+    const formatPrice = (price: number) =>
+        formatCurrency(price, { locale: tenantLocale.locale, currency: tenantLocale.currency })
 
     // Calcular productos activos en la conversación para el Living Sidebar
     const activeProducts = messages
@@ -728,6 +776,11 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     }
 
     return (
+        <TenantLocaleProvider
+            locale={tenantLocale.locale}
+            currencyCode={tenantLocale.currency}
+            country={tenantLocale.country}
+        >
         <ChatLayout
             organizationName={organization.name || "LandingChat"}
             logoUrl={organization.settings?.branding?.logoUrl}
@@ -954,13 +1007,25 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                             <div className="flex overflow-x-auto space-x-3 p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-md max-w-[85vw] md:max-w-lg">
                                                 {msg.products.map((product) => (
                                                     <div key={product.id} className="flex-none w-40 flex flex-col gap-2 p-2 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-                                                        <div
-                                                            className="bg-center bg-no-repeat aspect-video bg-cover rounded-md w-full"
-                                                            style={{ backgroundImage: `url("${product.image_url}")` }}
-                                                        />
+                                                        <div className="relative w-full">
+                                                            <div
+                                                                className="bg-center bg-no-repeat aspect-video bg-cover rounded-md w-full"
+                                                                style={{ backgroundImage: `url("${product.image_url}")` }}
+                                                            />
+                                                            {product.sale_price != null && product.sale_price < product.price && (
+                                                                <span className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">Oferta</span>
+                                                            )}
+                                                        </div>
                                                         <div className="flex flex-col gap-0.5">
                                                             <h3 className="text-sm font-semibold text-slate-900 dark:text-white line-clamp-1">{product.name}</h3>
-                                                            <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.price)}</p>
+                                                            {product.sale_price != null && product.sale_price < product.price ? (
+                                                                <div className="flex items-baseline gap-1.5">
+                                                                    <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.sale_price)}</p>
+                                                                    <p className="text-[10px] font-medium text-slate-400 line-through">{formatPrice(product.price)}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-xs font-bold" style={{ color: primaryColor }}>{formatPrice(product.price)}</p>
+                                                            )}
                                                         </div>
                                                         <button
                                                             onClick={() => addItem({
@@ -1108,6 +1173,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 }}
             />
         </ChatLayout>
+        </TenantLocaleProvider>
     )
 
 }

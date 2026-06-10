@@ -88,8 +88,8 @@ Variables completas y comandos detallados en `docs/AGENTS_GUIDE.md`.
 
 - `CLAUDE.md` → alias a este archivo (estándar agents.md)
 - `.antigravity/rules.md` → directivas Antigravity (alineadas con este archivo)
-- `.windsurf/rules/` → reglas específicas Windsurf/Cascade
-- `.windsurf/workflows/` → workflows operativos automatizables
+- `.devin/rules/` → reglas específicas Devin/Windsurf/Cascade (antes `.windsurf/`)
+- `.devin/workflows/` → workflows operativos automatizables
 - `.cursorrules` → redirige aquí
 - `.agents/skills/` → skills AI instaladas vía `npx autoskills`
 

@@ -443,3 +443,99 @@ describe("AI ecommerce executor search_products (regresión bug add_to_cart)", (
     })
   })
 })
+
+// =============================================================================
+// Regresión bug envío gratis: get_shipping_options ofrecía "Envío Gratis"
+// (price 0) cuando free_shipping_enabled estaba activo, SIN exigir que el
+// subtotal del carrito alcanzara free_shipping_min_amount. Resultado: clientes
+// por debajo del mínimo (ej. 13.500 con mínimo 15.000) recibían envío gratis.
+// =============================================================================
+
+function createShippingMockClient(params: {
+  shippingSettings: Record<string, unknown> | null
+  cartItems: unknown[]
+}) {
+  const client = {
+    from(table: string) {
+      const builder = {
+        select() {
+          return builder
+        },
+        eq() {
+          return builder
+        },
+        single() {
+          if (table === "shipping_settings") {
+            return Promise.resolve({ data: params.shippingSettings, error: null })
+          }
+          if (table === "carts") {
+            return Promise.resolve({ data: { items: params.cartItems }, error: null })
+          }
+          return Promise.resolve({
+            data: null,
+            error: { message: `Unexpected query on ${table}` },
+          })
+        },
+      }
+      return builder
+    },
+  }
+  return { client }
+}
+
+describe("AI ecommerce executor get_shipping_options (regresión bug envío gratis)", () => {
+  const context = { chatId: "chat-1", organizationId: "org-1" }
+  const cartLine = (unitPrice: number) => ({
+    product_id: "p1",
+    product_name: "Producto",
+    unit_price: unitPrice,
+    quantity: 1,
+  })
+
+  it("NO ofrece envío gratis cuando el subtotal está por debajo del mínimo", async () => {
+    const { client } = createShippingMockClient({
+      shippingSettings: {
+        default_shipping_rate: 8000,
+        free_shipping_enabled: true,
+        free_shipping_min_amount: 15000,
+        free_shipping_zones: null,
+        estimated_delivery_days: 3,
+      },
+      cartItems: [cartLine(13500)],
+    })
+
+    const handler = ecommerceToolHandlers["get_shipping_options"]!
+    const result = await handler(client as never, { city: "Bogotá" }, context)
+
+    expect(result.success).toBe(true)
+    expect(result.data?.meetsFreeShippingMinimum).toBe(false)
+    expect(result.data?.remainingForFreeShipping).toBe(1500)
+    const ids = result.data?.options.map((o: { id: string }) => o.id)
+    expect(ids).not.toContain("free")
+    expect(ids).toContain("standard")
+    const standard = result.data?.options.find((o: { id: string }) => o.id === "standard")
+    expect(standard?.price).toBe(8000)
+  })
+
+  it("ofrece envío gratis cuando el subtotal alcanza el mínimo", async () => {
+    const { client } = createShippingMockClient({
+      shippingSettings: {
+        default_shipping_rate: 8000,
+        free_shipping_enabled: true,
+        free_shipping_min_amount: 15000,
+        free_shipping_zones: null,
+        estimated_delivery_days: 3,
+      },
+      cartItems: [cartLine(20000)],
+    })
+
+    const handler = ecommerceToolHandlers["get_shipping_options"]!
+    const result = await handler(client as never, { city: "Bogotá" }, context)
+
+    expect(result.success).toBe(true)
+    expect(result.data?.meetsFreeShippingMinimum).toBe(true)
+    expect(result.data?.remainingForFreeShipping).toBe(0)
+    const free = result.data?.options.find((o: { id: string }) => o.id === "free")
+    expect(free?.price).toBe(0)
+  })
+})
