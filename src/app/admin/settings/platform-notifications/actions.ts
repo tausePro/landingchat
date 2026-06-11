@@ -10,7 +10,8 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createEvolutionClient } from "@/lib/evolution"
-import { encrypt } from "@/lib/utils/encryption"
+import { MetaCloudClient } from "@/lib/whatsapp/meta-client"
+import { encrypt, decrypt } from "@/lib/utils/encryption"
 import { type ActionResult, success, failure } from "@/types"
 import { PLATFORM_INSTANCE_NAME } from "@/lib/whatsapp/reconcileInstances"
 import {
@@ -107,6 +108,7 @@ const saveConfigSchema = z.object({
     enabled: z.boolean(),
     provider: z.enum(["evolution", "meta"]),
     metaPhoneNumberId: z.string().trim().optional(),
+    metaWabaId: z.string().trim().optional(),
     /** Solo cuando el admin escribe un token nuevo; vacío = conservar el actual. */
     metaAccessToken: z.string().trim().optional(),
     metaTemplateName: z.string().trim().optional(),
@@ -141,6 +143,7 @@ export async function savePlatformChannelConfig(input: SavePlatformConfigInput):
             provider: data.provider,
             instance_name: PLATFORM_INSTANCE_NAME,
             meta_phone_number_id: data.metaPhoneNumberId || current.meta_phone_number_id || null,
+            meta_waba_id: data.metaWabaId || current.meta_waba_id || null,
             meta_access_token_encrypted: data.metaAccessToken
                 ? encrypt(data.metaAccessToken)
                 : current.meta_access_token_encrypted || null,
@@ -207,4 +210,71 @@ export async function sendTestNotification(phone: string): Promise<ActionResult<
         return failure(result.error || "No se pudo enviar")
     }
     return success(undefined)
+}
+
+export interface MetaVerificationResult {
+    phoneNumber: string | null
+    verifiedName: string | null
+    qualityRating: string | null
+    /** Templates APROBADOS con al menos un body — los únicos usables por el canal. */
+    approvedTemplates: Array<{ name: string; language: string; bodyPreview: string | null; hasBodyParam: boolean }>
+}
+
+/**
+ * Verifica las credenciales del WABA contra la Graph API de Meta y carga
+ * los templates aprobados (para seleccionar en vez de tipear a ciegas).
+ * Usa las credenciales guardadas; los inputs opcionales permiten verificar
+ * ANTES de guardar.
+ */
+export async function verifyMetaCredentials(input?: {
+    metaWabaId?: string
+    metaPhoneNumberId?: string
+    metaAccessToken?: string
+}): Promise<ActionResult<MetaVerificationResult>> {
+    if (!(await checkSuperAdmin())) return failure("No autorizado")
+
+    try {
+        const current = await getPlatformNotificationsConfig()
+        const wabaId = input?.metaWabaId?.trim() || current.meta_waba_id
+        const phoneNumberId = input?.metaPhoneNumberId?.trim() || current.meta_phone_number_id
+        const token = input?.metaAccessToken?.trim()
+            || (current.meta_access_token_encrypted ? decrypt(current.meta_access_token_encrypted) : null)
+
+        if (!wabaId || !token) {
+            return failure("Necesitas WABA ID y Access Token para verificar")
+        }
+
+        const client = new MetaCloudClient()
+
+        const [phoneNumbers, templates] = await Promise.all([
+            client.getPhoneNumbers(wabaId, token),
+            client.getMessageTemplates(wabaId, token),
+        ])
+
+        const configuredPhone = phoneNumberId
+            ? phoneNumbers.find((phone) => phone.id === phoneNumberId) ?? null
+            : phoneNumbers[0] ?? null
+
+        const approvedTemplates = templates
+            .filter((template) => template.status === "APPROVED")
+            .map((template) => {
+                const body = template.components.find((component) => component.type === "BODY")
+                return {
+                    name: template.name,
+                    language: template.language,
+                    bodyPreview: body?.text?.slice(0, 120) ?? null,
+                    hasBodyParam: Boolean(body?.text?.includes("{{1}}")),
+                }
+            })
+
+        return success({
+            phoneNumber: configuredPhone?.display_phone_number ?? null,
+            verifiedName: configuredPhone?.verified_name ?? null,
+            qualityRating: configuredPhone?.quality_rating ?? null,
+            approvedTemplates,
+        })
+    } catch (error) {
+        console.error("[platform-notifications] Verify error:", error)
+        return failure(error instanceof Error ? error.message : "Error verificando credenciales")
+    }
 }

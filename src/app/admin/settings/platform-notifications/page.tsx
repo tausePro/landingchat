@@ -16,7 +16,9 @@ import {
     savePlatformChannelConfig,
     connectPlatformInstance,
     sendTestNotification,
+    verifyMetaCredentials,
     type PlatformChannelStatus,
+    type MetaVerificationResult,
 } from "./actions"
 
 const STATUS_BADGE: Record<PlatformChannelStatus["instanceStatus"], { label: string; className: string }> = {
@@ -39,9 +41,36 @@ export default function PlatformNotificationsPage() {
     const [sendingTest, setSendingTest] = useState(false)
     const [provider, setProvider] = useState<"evolution" | "meta">("evolution")
     const [metaPhoneNumberId, setMetaPhoneNumberId] = useState("")
+    const [metaWabaId, setMetaWabaId] = useState("")
     const [metaAccessToken, setMetaAccessToken] = useState("")
     const [metaTemplateName, setMetaTemplateName] = useState("")
     const [saving, setSaving] = useState(false)
+    const [verifying, setVerifying] = useState(false)
+    const [verification, setVerification] = useState<MetaVerificationResult | null>(null)
+
+    const handleVerifyMeta = async () => {
+        setVerifying(true)
+        try {
+            const result = await verifyMetaCredentials({
+                metaWabaId: metaWabaId || undefined,
+                metaPhoneNumberId: metaPhoneNumberId || undefined,
+                metaAccessToken: metaAccessToken || undefined,
+            })
+            if (result.success) {
+                setVerification(result.data)
+                toast.success(
+                    result.data.phoneNumber
+                        ? `Verificado: ${result.data.phoneNumber} (${result.data.verifiedName ?? "sin nombre"})`
+                        : "Credenciales válidas, pero no se encontró el número"
+                )
+            } else {
+                setVerification(null)
+                toast.error(result.error)
+            }
+        } finally {
+            setVerifying(false)
+        }
+    }
 
     const loadStatus = useCallback(async () => {
         const result = await getPlatformChannelStatus()
@@ -66,6 +95,7 @@ export default function PlatformNotificationsPage() {
                 enabled,
                 provider,
                 metaPhoneNumberId: metaPhoneNumberId || undefined,
+                metaWabaId: metaWabaId || undefined,
                 metaAccessToken: metaAccessToken || undefined,
                 metaTemplateName: metaTemplateName || undefined,
             })
@@ -203,16 +233,61 @@ export default function PlatformNotificationsPage() {
 
                     {provider === "meta" && (
                         <div className="space-y-3 rounded-lg border p-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="metaPhoneId">Phone Number ID</Label>
-                                <Input id="metaPhoneId" value={metaPhoneNumberId} onChange={(event) => setMetaPhoneNumberId(event.target.value)} placeholder={status?.metaConfigured ? "(configurado — escribe para reemplazar)" : "1234567890"} className="font-mono" />
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                    <Label htmlFor="metaWabaId">WABA ID</Label>
+                                    <Input id="metaWabaId" value={metaWabaId} onChange={(event) => setMetaWabaId(event.target.value)} placeholder="(WhatsApp Business Account ID)" className="font-mono" />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="metaPhoneId">Phone Number ID</Label>
+                                    <Input id="metaPhoneId" value={metaPhoneNumberId} onChange={(event) => setMetaPhoneNumberId(event.target.value)} placeholder={status?.metaConfigured ? "(configurado — escribe para reemplazar)" : "1234567890"} className="font-mono" />
+                                </div>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="metaToken">Access Token</Label>
                                 <Input id="metaToken" type="password" value={metaAccessToken} onChange={(event) => setMetaAccessToken(event.target.value)} placeholder={status?.metaConfigured ? "(guardado encriptado — escribe para reemplazar)" : "EAAG..."} className="font-mono" />
                             </div>
+
+                            <Button variant="outline" onClick={handleVerifyMeta} disabled={verifying}>
+                                {verifying ? "Verificando..." : "Verificar credenciales y cargar templates"}
+                            </Button>
+
+                            {verification && (
+                                <div className="rounded-lg bg-slate-50 dark:bg-slate-900 p-3 space-y-2 text-sm">
+                                    {verification.phoneNumber && (
+                                        <p>
+                                            📞 <span className="font-mono">{verification.phoneNumber}</span>
+                                            {verification.verifiedName && <span className="ml-2 text-slate-500">({verification.verifiedName})</span>}
+                                            {verification.qualityRating && <Badge className="ml-2">{verification.qualityRating}</Badge>}
+                                        </p>
+                                    )}
+                                    <p className="font-medium">Templates aprobados ({verification.approvedTemplates.length}):</p>
+                                    {verification.approvedTemplates.length === 0 ? (
+                                        <p className="text-slate-500">
+                                            Ninguno. Crea uno en Meta Business Manager con body <code>{"{{1}}"}</code> (categoría Utility) y espera la aprobación.
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-1">
+                                            {verification.approvedTemplates.map((template) => (
+                                                <button
+                                                    key={`${template.name}-${template.language}`}
+                                                    type="button"
+                                                    onClick={() => setMetaTemplateName(template.name)}
+                                                    className={`block w-full text-left rounded border px-2 py-1.5 text-xs ${metaTemplateName === template.name ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-slate-200 dark:border-slate-700"}`}
+                                                >
+                                                    <span className="font-mono font-medium">{template.name}</span>
+                                                    <span className="ml-2 text-slate-400">{template.language}</span>
+                                                    {!template.hasBodyParam && <span className="ml-2 text-amber-600">⚠ sin {"{{1}}"}</span>}
+                                                    {template.bodyPreview && <span className="block text-slate-500 truncate">{template.bodyPreview}</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="space-y-1">
-                                <Label htmlFor="metaTemplate">Template aprobado (body con {"{{1}}"})</Label>
+                                <Label htmlFor="metaTemplate">Template seleccionado (body con {"{{1}}"})</Label>
                                 <Input id="metaTemplate" value={metaTemplateName} onChange={(event) => setMetaTemplateName(event.target.value)} placeholder="platform_notification" className="font-mono" />
                             </div>
                         </div>
