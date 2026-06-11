@@ -438,6 +438,97 @@ export async function sendOrderPaidEmail(data: OrderPaidEmailData): Promise<bool
     }
 }
 
+interface ReviewRequestEmailData {
+    customerName: string
+    customerEmail: string
+    organizationName: string
+    /** Link tokenizado a la página pública de reseña (/resena/[orderId]?t=...) */
+    reviewUrl: string
+    locale?: SupportedLocale
+}
+
+/**
+ * Email de solicitud de reseña post-compra (cron review-requests).
+ * Mismo contrato que los demás: sin API key o sin email → no-op true;
+ * solo retorna false en errores reales de envío.
+ */
+export async function sendReviewRequestEmail(data: ReviewRequestEmailData): Promise<boolean> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping review request to ${data.customerEmail}`)
+            return true
+        }
+
+        if (!data.customerEmail || data.customerEmail.trim() === '') {
+            console.log(`[EMAIL] Customer email is empty, skipping review request`)
+            return true
+        }
+
+        const locale: SupportedLocale = data.locale ?? "es-CO"
+        const subject = t("email.review_request.subject", locale, {
+            organizationName: data.organizationName,
+        })
+
+        console.log(`[EMAIL] Sending review request to ${data.customerEmail} (locale=${locale})`)
+
+        const response = await resend.emails.send({
+            from: `${data.organizationName} <noreply@landingchat.co>`,
+            to: data.customerEmail,
+            subject,
+            html: generateReviewRequestEmailHTML(data, locale),
+        })
+
+        if (response.error) {
+            console.error('[EMAIL] Resend error (review request):', response.error)
+            return false
+        }
+
+        return true
+    } catch (error) {
+        console.error('[EMAIL] Error sending review request:', error)
+        return false
+    }
+}
+
+function generateReviewRequestEmailHTML(data: ReviewRequestEmailData, locale: SupportedLocale): string {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${t("email.review_request.subject", locale, { organizationName: data.organizationName })}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px;">
+
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
+            <h1 style="color: #1f2937; margin: 0; font-size: 28px;">${data.organizationName}</h1>
+        </div>
+
+        <!-- Hero -->
+        <div style="background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 24px; margin-bottom: 30px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 10px;">⭐</div>
+            <h2 style="color: #92400e; margin: 0 0 8px 0;">${t("email.review_request.heading", locale, { customerName: data.customerName })}</h2>
+            <p style="color: #92400e; margin: 0;">${t("email.review_request.body", locale, { organizationName: data.organizationName })}</p>
+        </div>
+
+        <!-- CTA -->
+        <div style="text-align: center; margin-bottom: 30px;">
+            <a href="${data.reviewUrl}" style="display: inline-block; background: #059669; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                ${t("email.review_request.cta", locale)}
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <p style="text-align: center; color: #6b7280; font-size: 14px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            ${t("email.review_request.footer", locale, { organizationName: data.organizationName })}
+        </p>
+    </body>
+    </html>
+    `
+}
+
 /**
  * Genera el HTML del email order-paid.
  *

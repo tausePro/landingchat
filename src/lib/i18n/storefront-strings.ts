@@ -625,6 +625,33 @@ export const storefrontStrings = {
     "email.order_paid.view_order_cta": "Ver mi pedido",
     "email.order_paid.thanks_footer": "Gracias por confiar en {{organizationName}}.",
     // ========================================================================
+    // Email + página de solicitud de reseña post-compra (review requests)
+    // ========================================================================
+    "email.review_request.subject": "¿Cómo te fue con tu compra en {{organizationName}}?",
+    "email.review_request.heading": "¡Hola {{customerName}}!",
+    "email.review_request.body": "Gracias por tu compra en {{organizationName}}. Nos encantaría saber cómo te fue con tus productos — tu opinión ayuda a otros clientes a decidir.",
+    "email.review_request.cta": "Dejar mi reseña",
+    "email.review_request.footer": "Solo toma un minuto. Gracias por confiar en {{organizationName}}.",
+    "store.review_request.whatsapp_message": "¡Hola {{customerName}}! Gracias por tu compra en {{organizationName}}. ¿Nos cuentas cómo te fue con tus productos? Deja tu reseña aquí: {{reviewUrl}}",
+    "store.review_request.title": "Cuéntanos cómo te fue",
+    "store.review_request.subtitle": "Tu opinión sobre los productos de tu pedido ayuda a otros clientes.",
+    "store.review_request.name_label": "Tu nombre",
+    "store.review_request.rating_label": "Calificación",
+    "store.review_request.title_label": "Título (opcional)",
+    "store.review_request.comment_label": "Tu reseña",
+    "store.review_request.comment_placeholder": "¿Qué te pareció el producto?",
+    "store.review_request.submit": "Enviar reseñas",
+    "store.review_request.submitting": "Enviando...",
+    "store.review_request.skip_product": "Omitir este producto",
+    "store.review_request.thanks_title": "¡Gracias por tu reseña!",
+    "store.review_request.thanks_body": "Tu reseña fue recibida y será publicada después de una revisión rápida.",
+    "store.review_request.invalid_link_title": "Link no válido",
+    "store.review_request.invalid_link_body": "Este link de reseña no es válido o la orden no existe.",
+    "store.review_request.already_reviewed": "Ya dejaste reseñas para este pedido. ¡Gracias!",
+    "store.review_request.back_to_store": "Volver a la tienda",
+    "store.review_request.error_generic": "No pudimos guardar tus reseñas. Inténtalo de nuevo.",
+    "store.review_request.error_empty": "Califica al menos un producto para enviar.",
+    // ========================================================================
     // Dashboard payments — manual payment form (T1.5)
     // ========================================================================
     // Account types (CO + US)
@@ -1242,6 +1269,33 @@ export const storefrontStrings = {
     "email.order_paid.next_steps_body": "We'll prepare your order and notify you once it's ready to ship. If you have any questions, reply to this email.",
     "email.order_paid.view_order_cta": "View my order",
     "email.order_paid.thanks_footer": "Thank you for choosing {{organizationName}}.",
+    // ========================================================================
+    // Email + public page for post-purchase review requests
+    // ========================================================================
+    "email.review_request.subject": "How was your purchase at {{organizationName}}?",
+    "email.review_request.heading": "Hi {{customerName}}!",
+    "email.review_request.body": "Thank you for shopping at {{organizationName}}. We'd love to hear how it went with your products — your feedback helps other customers decide.",
+    "email.review_request.cta": "Leave my review",
+    "email.review_request.footer": "It only takes a minute. Thank you for choosing {{organizationName}}.",
+    "store.review_request.whatsapp_message": "Hi {{customerName}}! Thanks for your purchase at {{organizationName}}. How did it go with your products? Leave your review here: {{reviewUrl}}",
+    "store.review_request.title": "Tell us how it went",
+    "store.review_request.subtitle": "Your feedback on the products in your order helps other customers.",
+    "store.review_request.name_label": "Your name",
+    "store.review_request.rating_label": "Rating",
+    "store.review_request.title_label": "Title (optional)",
+    "store.review_request.comment_label": "Your review",
+    "store.review_request.comment_placeholder": "What did you think of the product?",
+    "store.review_request.submit": "Submit reviews",
+    "store.review_request.submitting": "Submitting...",
+    "store.review_request.skip_product": "Skip this product",
+    "store.review_request.thanks_title": "Thanks for your review!",
+    "store.review_request.thanks_body": "Your review was received and will be published after a quick check.",
+    "store.review_request.invalid_link_title": "Invalid link",
+    "store.review_request.invalid_link_body": "This review link is not valid or the order does not exist.",
+    "store.review_request.already_reviewed": "You already left reviews for this order. Thank you!",
+    "store.review_request.back_to_store": "Back to store",
+    "store.review_request.error_generic": "We couldn't save your reviews. Please try again.",
+    "store.review_request.error_empty": "Rate at least one product to submit.",
     // ========================================================================
     // Dashboard payments — manual payment form (T1.5)
     // ========================================================================
