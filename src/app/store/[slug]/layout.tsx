@@ -8,6 +8,7 @@ import { OrganizationJsonLd } from "@/components/seo/organization-json-ld"
 import { ForceLightTheme } from "@/components/store/force-light-theme"
 import { TenantLocaleProvider } from "@/lib/i18n/use-tenant-strings"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { buildStoreFallbackDescription } from "@/lib/seo/store-description"
 
 type Props = {
     params: Promise<{ slug: string }>
@@ -30,9 +31,16 @@ export async function generateMetadata(
     const { organization } = data
     const { name, favicon_url, seo_title, seo_description, seo_keywords } = organization
 
+    // Fallback data-driven: con seo_description vacío, Google descartaba el
+    // genérico "Bienvenido a la tienda de X." y rellenaba el Knowledge Panel
+    // con copy ajeno (caso Goldcaps). Construimos uno con las categorías
+    // reales del catálogo, locale-aware.
+    const description = seo_description
+        || buildStoreFallbackDescription(name, data.products ?? [], getTenantLocale(organization).locale)
+
     return {
         title: { absolute: seo_title || name },
-        description: seo_description || `Bienvenido a la tienda de ${name}.`,
+        description,
         keywords: seo_keywords ? seo_keywords.split(",") : undefined,
         icons: {
             icon: favicon_url || "/favicon.ico",
@@ -41,7 +49,7 @@ export async function generateMetadata(
         },
         openGraph: {
             title: seo_title || name,
-            description: seo_description || `Bienvenido a la tienda de ${name}.`,
+            description,
             images: organization.logo_url ? [organization.logo_url] : [],
             siteName: name,
         }
