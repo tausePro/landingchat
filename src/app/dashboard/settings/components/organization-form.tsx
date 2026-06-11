@@ -20,6 +20,7 @@ interface OrganizationFormProps {
         name: string
         slug: string
         contact_email: string | null
+        notification_phone?: string | null
         industry: string | null
         logo_url: string | null
         favicon_url: string | null
@@ -61,6 +62,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         name: organization.name,
         slug: organization.slug,
         contact_email: organization.contact_email || "",
+        notification_phone: organization.notification_phone || "",
         industry: organization.industry || "",
         logo_url: organization.logo_url || "",
         favicon_url: organization.favicon_url || "",
@@ -199,6 +201,19 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         value={formData.contact_email}
                                         onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="notificationPhone">WhatsApp para Notificaciones</Label>
+                                    <Input
+                                        id="notificationPhone"
+                                        type="tel"
+                                        placeholder="573001234567"
+                                        value={formData.notification_phone}
+                                        onChange={(e) => setFormData({ ...formData, notification_phone: e.target.value })}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Aquí te llegan las notificaciones de LandingChat (ventas, reportes del copilot) si no tienes WhatsApp personal conectado en Canales. Con código de país, sin +.
+                                    </p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="industry">Industria</Label>

@@ -47,28 +47,38 @@ export async function GET(request: Request) {
     const supabase = createServiceClient()
     const isoWeek = computeIsoWeek(new Date())
 
-    // Orgs candidatas: WhatsApp Personal conectado con el canal de insights activo
+    // Elegibilidad v2 (platform-notifier T4): orgs con ACTIVIDAD en la
+    // semana (≥1 orden o conversación) y onboarding completo. Ya NO se
+    // exige WhatsApp conectado: la entrega pasa por la cadena notifyMerchant
+    // (personal → platform → solo dashboard) y el feed de /dashboard/copilot
+    // es la fuente de verdad. Nota: sin JOIN embebido — la FK de
+    // whatsapp_instances no existe en el schema cache de prod (T0b).
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const [ordersRes, chatsRes] = await Promise.all([
+        supabase.from("orders").select("organization_id").gte("created_at", weekAgo),
+        supabase.from("chats").select("organization_id").gte("created_at", weekAgo),
+    ])
+
+    if (ordersRes.error || chatsRes.error) {
+        const error = ordersRes.error?.message ?? chatsRes.error?.message ?? "unknown"
+        log.error("failed to load weekly activity", { error })
+        return NextResponse.json({ error: "Failed to load activity" }, { status: 500 })
+    }
+
+    const activeOrgIds = [...new Set([
+        ...(ordersRes.data ?? []).map((row) => row.organization_id),
+        ...(chatsRes.data ?? []).map((row) => row.organization_id),
+    ])]
+
+    if (activeOrgIds.length === 0) {
+        return NextResponse.json({ message: "No eligible orgs", generated: 0, skipped: 0, errors: [] })
+    }
+
     const { data: orgs, error: orgsError } = await supabase
         .from("organizations")
-        .select(`
-            id,
-            slug,
-            locale,
-            currency_code,
-            country_code,
-            copilot_autonomy_level,
-            whatsapp_instances!inner(
-                phone_number,
-                notifications_enabled,
-                notify_on_copilot_insight,
-                instance_type,
-                status
-            )
-        `)
-        .eq("whatsapp_instances.instance_type", "personal")
-        .eq("whatsapp_instances.status", "connected")
-        .eq("whatsapp_instances.notifications_enabled", true)
-        .eq("whatsapp_instances.notify_on_copilot_insight", true)
+        .select("id, slug, locale, currency_code, country_code, copilot_autonomy_level")
+        .in("id", activeOrgIds)
+        .eq("onboarding_completed", true)
 
     if (orgsError) {
         log.error("failed to load eligible orgs", { error: orgsError.message })

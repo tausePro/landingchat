@@ -7,6 +7,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
+const mockOrdersResult = vi.fn()
+const mockChatsResult = vi.fn()
 const mockOrgsResult = vi.fn()
 const mockExistingMaybeSingle = vi.fn()
 const mockInsertSingle = vi.fn()
@@ -15,12 +17,14 @@ const mockCompose = vi.fn()
 const mockEmit = vi.fn()
 const mockSendInsight = vi.fn()
 
-function orgsChain() {
+// T4 platform-notifier: elegibilidad por ACTIVIDAD semanal (orders/chats),
+// sin exigir WhatsApp (la entrega va por la cadena notifyMerchant)
+function thenableChain(resultFn: () => unknown) {
     const chain: Record<string, unknown> = {}
-    for (const method of ["select", "eq"]) {
+    for (const method of ["select", "eq", "in", "gte"]) {
         chain[method] = vi.fn(() => chain)
     }
-    chain.then = (resolve: (value: unknown) => void) => resolve(mockOrgsResult())
+    chain.then = (resolve: (value: unknown) => void) => resolve(resultFn())
     return chain
 }
 
@@ -37,7 +41,9 @@ function insightsChain() {
 vi.mock("@/lib/supabase/server", () => ({
     createServiceClient: vi.fn(() => ({
         from: (table: string) => {
-            if (table === "organizations") return orgsChain()
+            if (table === "orders") return thenableChain(mockOrdersResult)
+            if (table === "chats") return thenableChain(mockChatsResult)
+            if (table === "organizations") return thenableChain(mockOrgsResult)
             if (table === "copilot_insights") return insightsChain()
             throw new Error(`Tabla inesperada: ${table}`)
         },
@@ -75,6 +81,8 @@ beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv("CRON_SECRET", "cron-secret")
 
+    mockOrdersResult.mockReturnValue({ data: [{ organization_id: "org-1" }], error: null })
+    mockChatsResult.mockReturnValue({ data: [], error: null })
     mockOrgsResult.mockReturnValue({ data: [ORG], error: null })
     mockExistingMaybeSingle.mockResolvedValue({ data: null })
     mockInsertSingle.mockResolvedValue({ data: { id: "insight-1" }, error: null })
@@ -101,7 +109,8 @@ describe("GET /api/cron/copilot/weekly-insights", () => {
     })
 
     it("200 sin orgs elegibles", async () => {
-        mockOrgsResult.mockReturnValue({ data: [], error: null })
+        mockOrdersResult.mockReturnValue({ data: [], error: null })
+        mockChatsResult.mockReturnValue({ data: [], error: null })
 
         const response = await GET(buildRequest("Bearer cron-secret"))
         const body = await response.json()
@@ -139,6 +148,10 @@ describe("GET /api/cron/copilot/weekly-insights", () => {
     })
 
     it("error en una org no bloquea las demás", async () => {
+        mockOrdersResult.mockReturnValue({
+            data: [{ organization_id: "org-1" }, { organization_id: "org-2" }],
+            error: null,
+        })
         mockOrgsResult.mockReturnValue({
             data: [ORG, { ...ORG, id: "org-2", slug: "qp" }],
             error: null,

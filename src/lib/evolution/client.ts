@@ -3,6 +3,8 @@
  * Documentación: https://doc.evolution-api.com/
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js"
+
 import type {
     EvolutionConfig,
     CreateInstanceRequest,
@@ -297,6 +299,34 @@ export class EvolutionClient {
     }
 
     /**
+     * Lista TODAS las instancias del server, normalizando los formatos de
+     * Evolution v1 ({ instance: { instanceName, status, owner } }) y
+     * v2 ({ name, connectionStatus, ownerJid }).
+     */
+    async listInstances(): Promise<Array<{ name: string; status: string; number: string | null }>> {
+        const response = await fetch(`${this.config.baseUrl}/instance/fetchInstances`, {
+            method: "GET",
+            headers: this.getHeaders(),
+        })
+
+        if (!response.ok) {
+            throw new Error(`Evolution API error: failed to list instances (${response.status})`)
+        }
+
+        const data = await response.json()
+        const items: Array<Record<string, unknown>> = Array.isArray(data) ? data : []
+
+        return items.map((item) => {
+            const nested = (item.instance ?? {}) as Record<string, unknown>
+            const name = String(item.name ?? nested.instanceName ?? item.instanceName ?? "").trim()
+            const status = String(item.connectionStatus ?? nested.status ?? item.status ?? "close")
+            const ownerJid = String(item.ownerJid ?? nested.owner ?? "")
+            const number = ownerJid ? ownerJid.split("@")[0] : null
+            return { name, status, number }
+        }).filter((instance) => instance.name.length > 0)
+    }
+
+    /**
      * Verifica la conexión con Evolution API
      */
     async testConnection(): Promise<boolean> {
@@ -316,7 +346,7 @@ export class EvolutionClient {
  * Crea una instancia del cliente Evolution con configuración del sistema
  */
 export async function createEvolutionClient(
-    supabase: any
+    supabase: SupabaseClient
 ): Promise<EvolutionClient | null> {
     const { data: settings, error } = await supabase
         .from("system_settings")

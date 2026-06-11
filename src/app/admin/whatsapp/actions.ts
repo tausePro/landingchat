@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { reconcileEvolutionInstances, type ReconcileResult } from "@/lib/whatsapp/reconcileInstances"
 import {
     type ActionResult,
     success,
@@ -149,5 +150,26 @@ export async function disconnectInstance(
         return failure(
             error instanceof Error ? error.message : "Error al desconectar instancia"
         )
+    }
+}
+
+/**
+ * Reconcilia whatsapp_instances con el estado real del server Evolution
+ * (Platform Notifier v0 — T0). Solo super admin.
+ */
+export async function reconcileInstances(): Promise<
+    { success: true; data: ReconcileResult } | { success: false; error: string }
+> {
+    const isSuperAdmin = await checkSuperAdmin()
+    if (!isSuperAdmin) {
+        return { success: false, error: "No autorizado" }
+    }
+
+    try {
+        const result = await reconcileEvolutionInstances()
+        return { success: true, data: result }
+    } catch (error) {
+        console.error("[admin/whatsapp] Reconcile error:", error)
+        return { success: false, error: "Error inesperado al reconciliar" }
     }
 }
