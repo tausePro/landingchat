@@ -66,8 +66,8 @@ export default function ReviewRequestsConfigPage() {
             <form onSubmit={handleSubmit} className="space-y-8">
                 <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
+                        <div className="flex items-start justify-between gap-6">
+                            <div className="max-w-2xl">
                                 <h3 className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
                                     Habilitar solicitudes automáticas
                                 </h3>
@@ -91,21 +91,28 @@ export default function ReviewRequestsConfigPage() {
                         </div>
 
                         {enabled && (
-                            <div>
-                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                            <div className="border-t border-border-light dark:border-border-dark pt-6">
+                                <label
+                                    htmlFor="review-delay-days"
+                                    className="block text-sm font-medium text-text-light-primary dark:text-text-dark-primary mb-2"
+                                >
                                     Días después del pago para enviar la solicitud
                                 </label>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="60"
-                                    placeholder="7"
-                                    value={delayDays}
-                                    onChange={e => setDelayDays(e.target.value)}
-                                    className="form-input mt-2 w-full max-w-xs rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent"
-                                    required
-                                />
-                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        id="review-delay-days"
+                                        type="number"
+                                        min="1"
+                                        max="60"
+                                        placeholder="7"
+                                        value={delayDays}
+                                        onChange={e => setDelayDays(e.target.value)}
+                                        className="w-24 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-background-dark px-3 py-2 text-sm text-text-light-primary dark:text-text-dark-primary text-center focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        required
+                                    />
+                                    <span className="text-sm text-text-light-secondary dark:text-text-dark-secondary">días</span>
+                                </div>
+                                <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-2">
                                     Recomendado: 7 días — el cliente ya recibió y probó el producto
                                 </p>
                             </div>
