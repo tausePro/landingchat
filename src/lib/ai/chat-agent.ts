@@ -217,7 +217,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
         // responde en inglés. Tenants legacy CO siguen con es-CO sin cambios.
         const { data: organization } = await supabase
             .from("organizations")
-            .select("name, industry, locale, currency_code, country_code")
+            .select("name, industry, locale, currency_code, country_code, enabled_modules")
             .eq("id", input.organizationId)
             .single()
 
@@ -438,7 +438,7 @@ INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción
         })
         const agentSkillsConfig = agent.configuration?.skills || null
         log.info("Org mode resolved", { mode: orgMode, industry: organization?.industry, products: productCount, properties: propertyCount })
-        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig, tenantLocale.locale)
+        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig, tenantLocale.locale, organization?.enabled_modules ?? null)
 
         // Add channel-specific instructions
         const channel = input.channel || "web"

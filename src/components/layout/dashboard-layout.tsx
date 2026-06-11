@@ -212,8 +212,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             ? enabledModules
             : ["conversations", "products", "orders", "customers", "agent"]
 
-        // Detectar si es vertical inmobiliaria
-        const isRealEstate = modules.includes("properties") || modules.includes("appointments") || modules.includes("leads")
+        // Detectar si es vertical inmobiliaria. `appointments` ya NO implica
+        // inmobiliaria: un ecommerce puede tener booking de servicios
+        // (ej: Tantor's House — estadías + venta de productos).
+        const isRealEstate = modules.includes("properties") || modules.includes("leads")
 
         // Agregar items según módulos habilitados
         for (const mod of modules) {
