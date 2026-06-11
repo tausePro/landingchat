@@ -203,6 +203,27 @@ export const ManualPaymentMethodsInputSchema = z.object({
     cod_enabled: z.boolean().default(false),
     cod_additional_cost: z.number().int().min(0).default(0),
     cod_zones: z.array(z.string()).default([]),
+}).superRefine((data, ctx) => {
+    // El checkout solo muestra el pago instantáneo (Zelle, Nequi, CashApp...)
+    // cuando AMBOS campos existen. Guardar uno solo producía una config rota
+    // silenciosa (caso real: Tantor guardó "Zelle" sin el correo y nada
+    // aparecía en el checkout). Ambos o ninguno.
+    const label = data.instant_payment_label?.trim()
+    const value = data.instant_payment_value?.trim()
+    if (label && !value) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["instant_payment_value"],
+            message: `Falta el dato de la cuenta de ${label} (correo, teléfono o usuario). Complétalo o borra la etiqueta.`,
+        })
+    }
+    if (value && !label) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["instant_payment_label"],
+            message: "Falta el nombre del método de pago instantáneo (ej: Zelle, Nequi). Complétalo o borra el dato de la cuenta.",
+        })
+    }
 })
 
 export type ManualPaymentMethodsInput = z.infer<typeof ManualPaymentMethodsInputSchema>
