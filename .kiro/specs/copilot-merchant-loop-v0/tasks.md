@@ -84,35 +84,35 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `migrations/20260526b_copilot_insights.sql` con shape de `design.md §1.2`:
-  - [ ] Tabla con CHECK constraints en `scope` y `status`
-  - [ ] `expires_at` con DEFAULT `now() + INTERVAL '7 days'`
-  - [ ] Idempotencia UNIQUE `(organization_id, scope, iso_week)` WHERE iso_week IS NOT NULL
-  - [ ] Índice `idx_copilot_insights_org_status_time`
-  - [ ] RLS habilitada con 2 policies: SELECT y UPDATE (ambas USING `organization_id = get_my_org_id()` + UPDATE con WITH CHECK)
-  - [ ] Sin policy de INSERT (sólo service role escribe en v0)
-- [ ] Crear `migrations/20260526c_organizations_copilot_autonomy.sql`:
-  - [ ] `ADD COLUMN IF NOT EXISTS copilot_autonomy_level TEXT NOT NULL DEFAULT 'level_1_propose'`
-  - [ ] `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` para CHECK los 3 valores
-  - [ ] COMMENT ON COLUMN
-- [ ] Crear `migrations/20260526d_whatsapp_instances_copilot_notify.sql`:
-  - [ ] `ADD COLUMN IF NOT EXISTS notify_on_copilot_insight BOOLEAN NOT NULL DEFAULT true`
-  - [ ] COMMENT ON COLUMN aclarando que sólo aplica a `instance_type='personal'`
-- [ ] Extender `src/types/organization.ts`:
-  - [ ] `CopilotAutonomyLevel` type
-  - [ ] `Organization` interface gana `copilot_autonomy_level`
-- [ ] Crear `src/lib/copilot/types.ts` con shape de `design.md §2.2`:
-  - [ ] `CopilotActionKindSchema`
-  - [ ] `CopilotProposedActionSchema`
-  - [ ] `CopilotInsightPayloadSchema`
-  - [ ] `COPILOT_INSIGHT_STATUSES`, `COPILOT_AUTONOMY_LEVELS`
-- [ ] Tests `src/__tests__/lib/copilot/types.test.ts`:
-  - [ ] Schema rechaza acción fuera de whitelist
-  - [ ] Schema acepta `proposed_actions` vacío
-  - [ ] Schema rechaza body > 4000 chars
-  - [ ] Schema rechaza más de 5 proposed_actions
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.2 copilot_insights schema + autonomy level + whatsapp toggle`
+- [x] Crear `migrations/20260526b_copilot_insights.sql` con shape de `design.md §1.2`:
+  - [x] Tabla con CHECK constraints en `scope` y `status`
+  - [x] `expires_at` con DEFAULT `now() + INTERVAL '7 days'`
+  - [x] Idempotencia UNIQUE `(organization_id, scope, iso_week)` WHERE iso_week IS NOT NULL
+  - [x] Índice `idx_copilot_insights_org_status_time`
+  - [x] RLS habilitada con 2 policies: SELECT y UPDATE (ambas USING `organization_id = get_my_org_id()` + UPDATE con WITH CHECK)
+  - [x] Sin policy de INSERT (sólo service role escribe en v0)
+- [x] Crear `migrations/20260526c_organizations_copilot_autonomy.sql`:
+  - [x] `ADD COLUMN IF NOT EXISTS copilot_autonomy_level TEXT NOT NULL DEFAULT 'level_1_propose'`
+  - [x] `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` para CHECK los 3 valores
+  - [x] COMMENT ON COLUMN
+- [x] Crear `migrations/20260526d_whatsapp_instances_copilot_notify.sql`:
+  - [x] `ADD COLUMN IF NOT EXISTS notify_on_copilot_insight BOOLEAN NOT NULL DEFAULT true`
+  - [x] COMMENT ON COLUMN aclarando que sólo aplica a `instance_type='personal'`
+- [x] Extender `src/types/organization.ts`:
+  - [x] `CopilotAutonomyLevel` type
+  - [x] `Organization` interface gana `copilot_autonomy_level`
+- [x] Crear `src/lib/copilot/types.ts` con shape de `design.md §2.2`:
+  - [x] `CopilotActionKindSchema`
+  - [x] `CopilotProposedActionSchema`
+  - [x] `CopilotInsightPayloadSchema`
+  - [x] `COPILOT_INSIGHT_STATUSES`, `COPILOT_AUTONOMY_LEVELS`
+- [x] Tests `src/__tests__/lib/copilot/types.test.ts`:
+  - [x] Schema rechaza acción fuera de whitelist
+  - [x] Schema acepta `proposed_actions` vacío
+  - [x] Schema rechaza body > 4000 chars
+  - [x] Schema rechaza más de 5 proposed_actions
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.2 copilot_insights schema + autonomy level + whatsapp toggle`
 
 ### Criterios de aceptación T4.2
 
