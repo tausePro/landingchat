@@ -183,37 +183,37 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `src/app/api/cron/copilot/weekly-insights/route.ts` con shape de `design.md §4.1`:
-  - [ ] Auth `CRON_SECRET` (Bearer header)
-  - [ ] SELECT orgs candidatas: WhatsApp Personal connected + `notifications_enabled=true` + `notify_on_copilot_insight=true`
-  - [ ] Para cada org:
-    - [ ] Computar `iso_week` (helper nuevo `src/lib/utils/iso-week.ts`)
-    - [ ] Idempotency check: ¿ya existe `copilot_insights` con (org, weekly, iso_week)?
-    - [ ] Skip si existe (registrar en `results.skipped`)
-    - [ ] `loadWeeklyMetrics(orgId)`
-    - [ ] `composeWeeklyInsight({ orgId, locale, metrics })`
-    - [ ] INSERT en `copilot_insights` con `status='proposed'`
-    - [ ] `emitPlatformEvent(COPILOT_INSIGHT_PROPOSED, idempotencyKey: 'copilot.weekly.${iso_week}.${orgId}')`
-    - [ ] `sendCopilotInsight({ orgId, insightId })` (T4.5)
-  - [ ] Try/catch por org: errores no rompen otras orgs
-  - [ ] Response JSON con `{ generated, skipped, errors[] }`
-  - [ ] Logger `[copilot/weekly]` con prefix
-  - [ ] Soporta GET y POST (GET es lo que Vercel Cron llama)
-- [ ] Crear `src/lib/utils/iso-week.ts`:
-  - [ ] `computeIsoWeek(date: Date): string` retorna `'YYYY-Www'` formato ISO 8601
-  - [ ] Tests específicos para edge cases (semana 1 que cruza año, etc.)
-- [ ] Actualizar `vercel.json`:
-  - [ ] Agregar entry `{ "path": "/api/cron/copilot/weekly-insights", "schedule": "0 14 * * 1" }`
-- [ ] Tests `src/__tests__/app/api/cron/copilot/weekly-insights.test.ts`:
-  - [ ] 401 sin auth header
-  - [ ] 401 con auth incorrecto
-  - [ ] 200 con `{ message: 'No eligible orgs' }` cuando lista vacía
-  - [ ] 200 con `{ generated: 1 }` cuando 1 org elegible y composer mockeado
-  - [ ] Idempotency: segunda ejecución no duplica insights
-  - [ ] Error en 1 org no bloquea las demás
-- [ ] Tests `src/__tests__/lib/utils/iso-week.test.ts` (4+ tests)
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.4 weekly insights cron worker`
+- [x] Crear `src/app/api/cron/copilot/weekly-insights/route.ts` con shape de `design.md §4.1`:
+  - [x] Auth `CRON_SECRET` (Bearer header)
+  - [x] SELECT orgs candidatas: WhatsApp Personal connected + `notifications_enabled=true` + `notify_on_copilot_insight=true`
+  - [x] Para cada org:
+    - [x] Computar `iso_week` (helper nuevo `src/lib/utils/iso-week.ts`)
+    - [x] Idempotency check: ¿ya existe `copilot_insights` con (org, weekly, iso_week)?
+    - [x] Skip si existe (registrar en `results.skipped`)
+    - [x] `loadWeeklyMetrics(orgId)`
+    - [x] `composeWeeklyInsight({ orgId, locale, metrics })`
+    - [x] INSERT en `copilot_insights` con `status='proposed'`
+    - [x] `emitPlatformEvent(COPILOT_INSIGHT_PROPOSED, idempotencyKey: 'copilot.weekly.${iso_week}.${orgId}')`
+    - [x] `sendCopilotInsight({ orgId, insightId })` (T4.5)
+  - [x] Try/catch por org: errores no rompen otras orgs
+  - [x] Response JSON con `{ generated, skipped, errors[] }`
+  - [x] Logger `[copilot/weekly]` con prefix
+  - [x] Soporta GET y POST (GET es lo que Vercel Cron llama)
+- [x] Crear `src/lib/utils/iso-week.ts`:
+  - [x] `computeIsoWeek(date: Date): string` retorna `'YYYY-Www'` formato ISO 8601
+  - [x] Tests específicos para edge cases (semana 1 que cruza año, etc.)
+- [x] Actualizar `vercel.json`:
+  - [x] Agregar entry `{ "path": "/api/cron/copilot/weekly-insights", "schedule": "0 14 * * 1" }`
+- [x] Tests `src/__tests__/app/api/cron/copilot/weekly-insights.test.ts`:
+  - [x] 401 sin auth header
+  - [x] 401 con auth incorrecto
+  - [x] 200 con `{ message: 'No eligible orgs' }` cuando lista vacía
+  - [x] 200 con `{ generated: 1 }` cuando 1 org elegible y composer mockeado
+  - [x] Idempotency: segunda ejecución no duplica insights
+  - [x] Error en 1 org no bloquea las demás
+- [x] Tests `src/__tests__/lib/utils/iso-week.test.ts` (4+ tests)
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.4 weekly insights cron worker`
 
 ### Criterios de aceptación T4.4
 
@@ -233,28 +233,28 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Extender `src/lib/notifications/whatsapp.ts`:
-  - [ ] Función nueva `sendCopilotInsight({ organizationId, insightId })` con shape de `design.md §5.1`
-  - [ ] Reusa `sendNotification(organizationId, phone, message)` interno existente
-  - [ ] Respeta `notifications_enabled` y `notify_on_copilot_insight`
-  - [ ] Helper `formatInsightForWhatsApp(insight)` privado:
-    - [ ] Title + body resumido a 800 chars max
-    - [ ] Numerar `proposed_actions` `1.`, `2.`, `3.`
-    - [ ] Link al dashboard via `getStoreLink()` o equivalente para `/dashboard/copilot`
-- [ ] Tests `src/__tests__/lib/notifications/whatsapp-copilot.test.ts`:
-  - [ ] Personal connected + `notify_on_copilot_insight=true` → envía mensaje
-  - [ ] Personal disconnected → no envía, retorna `false` sin error
-  - [ ] `notifications_enabled=false` → no envía
-  - [ ] `notify_on_copilot_insight=false` → no envía
-  - [ ] Insight con 0 proposed_actions → mensaje formateado sin sección de acciones
-  - [ ] Body > 800 chars → truncado correctamente con "..."
-- [ ] **E2E manual smoke test** (validación pre-merge, no en CI):
-  - [ ] Tenant QA con WhatsApp Personal connected
-  - [ ] Trigger manual del cron con `curl -H "Authorization: Bearer $CRON_SECRET" ...`
-  - [ ] WhatsApp del owner recibe mensaje formateado
-  - [ ] Insight aparece en `/dashboard/copilot` (T4.6)
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.5 sendCopilotInsight WhatsApp Personal channel`
+- [x] Extender `src/lib/notifications/whatsapp.ts`:
+  - [x] Función nueva `sendCopilotInsight({ organizationId, insightId })` con shape de `design.md §5.1`
+  - [x] Reusa `sendNotification(organizationId, phone, message)` interno existente
+  - [x] Respeta `notifications_enabled` y `notify_on_copilot_insight`
+  - [x] Helper `formatInsightForWhatsApp(insight)` privado:
+    - [x] Title + body resumido a 800 chars max
+    - [x] Numerar `proposed_actions` `1.`, `2.`, `3.`
+    - [x] Link al dashboard via `getStoreLink()` o equivalente para `/dashboard/copilot`
+- [x] Tests `src/__tests__/lib/notifications/whatsapp-copilot.test.ts`:
+  - [x] Personal connected + `notify_on_copilot_insight=true` → envía mensaje
+  - [x] Personal disconnected → no envía, retorna `false` sin error
+  - [x] `notifications_enabled=false` → no envía
+  - [x] `notify_on_copilot_insight=false` → no envía
+  - [x] Insight con 0 proposed_actions → mensaje formateado sin sección de acciones
+  - [x] Body > 800 chars → truncado correctamente con "..."
+- [x] **E2E manual smoke test** (validación pre-merge, no en CI):
+  - [x] Tenant QA con WhatsApp Personal connected
+  - [x] Trigger manual del cron con `curl -H "Authorization: Bearer $CRON_SECRET" ...`
+  - [x] WhatsApp del owner recibe mensaje formateado
+  - [x] Insight aparece en `/dashboard/copilot` (T4.6)
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.5 sendCopilotInsight WhatsApp Personal channel`
 
 ### Criterios de aceptación T4.5
 
