@@ -10,7 +10,8 @@ import {
     ScheduleAppointmentSchema,
     SendMediaSchema,
 } from "@/lib/ai/tools"
-import type { ToolHandler } from "./types"
+import type { ToolHandler, ToolSupabaseClient } from "./types"
+import { getProviderDisplay } from "@/lib/payments/provider-display"
 
 const log = logger("ai/tool-executor")
 
@@ -235,6 +236,85 @@ const identifyCustomer: ToolHandler = async (supabase, input, context) => {
     }
 }
 
+/**
+ * Métodos de pago REALES del tenant: pasarelas activas + métodos manuales
+ * (transferencia, pago instantáneo tipo Zelle solo si está completo, COD).
+ * Caso real que motivó esto (2026-06-11): el agente de Tantor inventó una
+ * plantilla de datos Zelle con placeholders porque este tool devolvía
+ * defaults hardcodeados que no eran del tenant.
+ */
+async function loadRealPaymentMethods(
+    supabase: ToolSupabaseClient,
+    organizationId: string
+): Promise<Record<string, unknown>> {
+    const [gatewaysRes, manualRes] = await Promise.all([
+        supabase
+            .from("payment_gateway_configs")
+            .select("provider")
+            .eq("organization_id", organizationId)
+            .eq("is_active", true),
+        supabase
+            .from("manual_payment_methods")
+            .select("bank_transfer_enabled, bank_name, account_type, account_number, account_holder, instant_payment_label, instant_payment_value, nequi_number, instructions, cod_enabled, cod_additional_cost")
+            .eq("organization_id", organizationId)
+            .maybeSingle(),
+    ])
+
+    const methods: Array<Record<string, unknown>> = []
+
+    for (const row of (gatewaysRes.data ?? []) as Array<{ provider: string }>) {
+        const display = getProviderDisplay(row.provider)
+        methods.push({ type: "online", name: display.label, accepts: display.description })
+    }
+
+    const manual = manualRes.data
+    if (manual?.bank_transfer_enabled) {
+        const transfer: Record<string, unknown> = {
+            type: "bank_transfer",
+            bank: manual.bank_name,
+            account_type: manual.account_type,
+            account_number: manual.account_number,
+            account_holder: manual.account_holder,
+        }
+        // Pago instantáneo (Zelle, Nequi, CashApp...): SOLO si está completo
+        if (manual.instant_payment_label && manual.instant_payment_value) {
+            transfer.instant_payment = {
+                service: manual.instant_payment_label,
+                account: manual.instant_payment_value,
+            }
+        } else if (manual.nequi_number) {
+            transfer.instant_payment = { service: "Nequi", account: manual.nequi_number }
+        }
+        if (manual.instructions) transfer.merchant_instructions = manual.instructions
+        methods.push(transfer)
+    }
+
+    if (manual?.cod_enabled) {
+        methods.push({
+            type: "cash_on_delivery",
+            additional_cost: manual.cod_additional_cost ?? 0,
+        })
+    }
+
+    return {
+        methods,
+        configured: methods.length > 0,
+        instructions: methods.length > 0
+            ? "Usa SOLO estos datos de pago. Si el cliente pide un dato que no aparece aquí (ej. cuenta de Zelle no listada), di honestamente que no lo tienes configurado y ofrece confirmarlo con el equipo. NUNCA inventes números de cuenta, correos ni nombres de titular."
+            : "No hay métodos de pago configurados en el sistema. Dile al cliente que el equipo le confirmará los medios de pago disponibles. NUNCA inventes datos de pago.",
+    }
+}
+
+/** Envíos y devoluciones REALES desde shipping_settings (misma fuente que el storefront). */
+async function loadRealShippingSettings(supabase: ToolSupabaseClient, organizationId: string) {
+    const { data } = await supabase
+        .from("shipping_settings")
+        .select("free_shipping_enabled, free_shipping_min_amount, default_shipping_rate, estimated_delivery_days, express_delivery_days, returns_accepted, return_window_days, return_fees")
+        .eq("organization_id", organizationId)
+        .maybeSingle()
+    return data
+}
+
 const getStoreInfo: ToolHandler = async (supabase, input, context) => {
     const { topic } = GetStoreInfoSchema.parse(input)
 
@@ -252,35 +332,55 @@ const getStoreInfo: ToolHandler = async (supabase, input, context) => {
     }
 
     switch (topic) {
-        case "shipping":
-            info.shipping = settings.shipping || {
-                description: "Envíos a toda Colombia. Tiempo estimado: 3-5 días hábiles.",
-                freeShippingThreshold: 100000
+        case "shipping": {
+            const shipping = await loadRealShippingSettings(supabase, context.organizationId)
+            info.shipping = shipping
+                ? {
+                    standard_rate: shipping.default_shipping_rate,
+                    estimated_delivery_days: shipping.estimated_delivery_days,
+                    express_delivery_days: shipping.express_delivery_days,
+                    free_shipping: shipping.free_shipping_enabled
+                        ? { enabled: true, min_amount: shipping.free_shipping_min_amount }
+                        : { enabled: false },
+                }
+                : { configured: false, instructions: "Envíos no configurados — dile al cliente que el equipo le confirmará tiempos y costos. No inventes tarifas ni tiempos." }
+            break
+        }
+        case "returns": {
+            const shipping = await loadRealShippingSettings(supabase, context.organizationId)
+            if (shipping?.returns_accepted === true && shipping.return_window_days) {
+                info.returns = {
+                    accepted: true,
+                    window_days: shipping.return_window_days,
+                    return_shipping_paid_by: shipping.return_fees === "free" ? "la tienda" : shipping.return_fees === "customer" ? "el cliente" : null,
+                }
+            } else if (shipping?.returns_accepted === false) {
+                info.returns = { accepted: false }
+            } else {
+                info.returns = { configured: false, instructions: "Política de devoluciones no configurada — dile al cliente que el equipo le confirmará. No inventes plazos ni condiciones." }
             }
             break
-        case "returns":
-            info.returns = settings.returns || {
-                description: "30 días para devoluciones. Producto sin usar y con etiquetas originales."
-            }
-            break
+        }
         case "payment_methods":
-            info.paymentMethods = settings.paymentMethods || [
-                "Tarjeta de crédito/débito",
-                "PSE",
-                "Efectivo contra entrega (algunas ciudades)"
-            ]
+            info.paymentMethods = await loadRealPaymentMethods(supabase, context.organizationId)
             break
         case "hours":
             info.hours = settings.hours || {
-                description: "Atención por chat: Lunes a Viernes 8am-6pm, Sábados 9am-1pm"
+                configured: false,
+                instructions: "Horario de atención no configurado — no inventes horarios; el chat AI responde 24/7 y el equipo humano confirma su disponibilidad."
             }
             break
-        default:
+        default: {
+            const [paymentMethods, shipping] = await Promise.all([
+                loadRealPaymentMethods(supabase, context.organizationId),
+                loadRealShippingSettings(supabase, context.organizationId),
+            ])
             info.general = {
-                shipping: "Envíos a toda Colombia",
-                returns: "30 días para devoluciones",
-                paymentMethods: ["Tarjeta", "PSE", "Efectivo"]
+                paymentMethods,
+                shipping: shipping ?? { configured: false },
+                instructions: "Usa SOLO los datos configurados. Lo que no esté aquí, confírmalo con el equipo en vez de inventarlo.",
             }
+        }
     }
 
     return { success: true, data: info }
