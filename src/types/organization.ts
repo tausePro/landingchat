@@ -125,7 +125,19 @@ export interface Organization {
   currency_code?: SupportedCurrency
   locale?: SupportedLocale
   country_code?: SupportedCountry
+  // Copilot Merchant Loop v0 — nivel de autonomía declarativo
+  copilot_autonomy_level?: CopilotAutonomyLevel
 }
+
+/**
+ * Nivel de autonomía del copilot por organización. Default level_1_propose.
+ * v0 ejecuta level_3 como level_2 (reservado por contrato).
+ * Fuente canónica de valores: src/lib/copilot/types.ts (COPILOT_AUTONOMY_LEVELS).
+ */
+export type CopilotAutonomyLevel =
+  | "level_1_propose"
+  | "level_2_act_with_whitelist"
+  | "level_3_full_autonomy"
 
 // ============================================================================
 // Organization Settings Interface

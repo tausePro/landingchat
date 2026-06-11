@@ -1,12 +1,12 @@
 # Copilot Merchant Loop v0 — Requirements
 
-> **Estado**: Draft (pending review @tause)
+> **Estado**: En ejecución (aprobado por @tause 2026-06-10; T4.1 iniciado)
 > **Branch destino**: `feat/copilot-merchant-loop-v0`
 > **Documento estratégico**: `docs-private/ATLAS_VALUE_FIRST_PLAN_2026-05-21.md` §8 (Slice A4)
 > **Fase plan**: Ola 1 — Slice A4 (post Fase 0.5)
 > **Iniciado**: 2026-05-21
 > **Esfuerzo estimado**: ~8.5 días (1 dev) o ~5 días (2 devs)
-> **Release objetivo**: `v1.15.0` (minor por feature nuevo)
+> **Release objetivo**: `v1.26.0` (minor por feature nuevo; el spec original decía v1.15.0 — la plataforma avanzó a v1.25.x antes de arrancar este slice)
 
 ---
 
