@@ -32,6 +32,8 @@ export interface PlatformNotificationsConfig {
     provider: PlatformProvider
     instance_name?: string
     meta_phone_number_id?: string
+    /** WABA ID — permite verificar credenciales y listar templates aprobados. */
+    meta_waba_id?: string
     /** Access token del WABA, encriptado con encrypt() (NUNCA en claro). */
     meta_access_token_encrypted?: string
     /** Template aprobado en Meta con un parámetro de body ({{1}}). */
@@ -58,6 +60,7 @@ export async function getPlatformNotificationsConfig(): Promise<PlatformNotifica
         provider: value.provider === "meta" ? "meta" : "evolution",
         instance_name: value.instance_name || PLATFORM_INSTANCE_NAME,
         meta_phone_number_id: value.meta_phone_number_id,
+        meta_waba_id: value.meta_waba_id,
         meta_access_token_encrypted: value.meta_access_token_encrypted,
         meta_template_name: value.meta_template_name,
         meta_template_language: value.meta_template_language || "es",
