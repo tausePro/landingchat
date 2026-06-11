@@ -131,40 +131,40 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `src/lib/copilot/weeklyMetrics.ts`:
-  - [ ] `loadWeeklyMetrics(orgId): Promise<WeeklyMetrics>` con queries SQL contra:
+- [x] Crear `src/lib/copilot/weeklyMetrics.ts`:
+  - [x] `loadWeeklyMetrics(orgId): Promise<WeeklyMetrics>` con queries SQL contra:
     - `orders` (count, revenue, ticket avg para semana actual y previa, filtrado por `organization_id`)
     - `chats` (count, % whatsapp para ambas semanas)
     - Carritos abandonados (heurística: `chats` con `events` de cart_added sin `purchase` en 24h, top 10)
     - Clientes inactivos (`customers` sin order >21d, top 10)
     - Top 5 productos viewed (vía `analytics_events.event_name='view_content'`)
     - Top 5 productos converted (vía `orders.items` jsonb)
-  - [ ] Service role client con `organization_id` filtrado en cada query
-  - [ ] Edge case: org con 0 datos → retorna shape vacío con `weekStart/weekEnd` calculados
-- [ ] Crear `src/lib/copilot/prompts/weeklyInsightPrompt.ts`:
-  - [ ] `buildWeeklyInsightPrompt(metrics, locale)` con template de `design.md §3.3`
-  - [ ] Locale `'es-CO' | 'en-US'` afecta el idioma del LLM response
-- [ ] Crear `src/lib/copilot/insightComposer.ts`:
-  - [ ] `composeWeeklyInsight({ orgId, locale, metrics }): Promise<CopilotInsightPayload>`
-  - [ ] Llama Anthropic Claude Haiku 4.5 vía `src/lib/ai/anthropic.ts` existente
-  - [ ] Config: `max_tokens: 1500`, `temperature: 0.4`
-  - [ ] Parsea JSON de la respuesta
-  - [ ] Valida con `CopilotInsightPayloadSchema.parse()`
-  - [ ] Filtra `proposed_actions` cuyo `kind` no esté en whitelist v0
-  - [ ] Fallback a insight mínimo (sin acciones) si LLM falla o JSON inválido
-  - [ ] Logger `[copilot/composer]` con costo estimado por call
-- [ ] Tests `src/__tests__/lib/copilot/insightComposer.test.ts`:
-  - [ ] Metrics ricas + LLM mockeado → insight con 3 actions
-  - [ ] 0 orders → insight de "necesito más contexto", 0 actions
-  - [ ] LLM responde JSON inválido → fallback a payload mínimo
-  - [ ] LLM propone `kind='ban_user'` (fuera whitelist) → drop esa acción + warning log
-  - [ ] Locale `'en-US'` produce prompt en inglés
-- [ ] Tests `src/__tests__/lib/copilot/weeklyMetrics.test.ts`:
-  - [ ] Mock Supabase → shape correcto
-  - [ ] Org sin datos → shape vacío válido
-  - [ ] Filtros por `organization_id` siempre presentes (security check)
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.3 weekly metrics loader + insight composer (Claude Haiku)`
+  - [x] Service role client con `organization_id` filtrado en cada query
+  - [x] Edge case: org con 0 datos → retorna shape vacío con `weekStart/weekEnd` calculados
+- [x] Crear `src/lib/copilot/prompts/weeklyInsightPrompt.ts`:
+  - [x] `buildWeeklyInsightPrompt(metrics, locale)` con template de `design.md §3.3`
+  - [x] Locale `'es-CO' | 'en-US'` afecta el idioma del LLM response
+- [x] Crear `src/lib/copilot/insightComposer.ts`:
+  - [x] `composeWeeklyInsight({ orgId, locale, metrics }): Promise<CopilotInsightPayload>`
+  - [x] Llama Anthropic Claude Haiku 4.5 vía `src/lib/ai/anthropic.ts` existente
+  - [x] Config: `max_tokens: 1500`, `temperature: 0.4`
+  - [x] Parsea JSON de la respuesta
+  - [x] Valida con `CopilotInsightPayloadSchema.parse()`
+  - [x] Filtra `proposed_actions` cuyo `kind` no esté en whitelist v0
+  - [x] Fallback a insight mínimo (sin acciones) si LLM falla o JSON inválido
+  - [x] Logger `[copilot/composer]` con costo estimado por call
+- [x] Tests `src/__tests__/lib/copilot/insightComposer.test.ts`:
+  - [x] Metrics ricas + LLM mockeado → insight con 3 actions
+  - [x] 0 orders → insight de "necesito más contexto", 0 actions
+  - [x] LLM responde JSON inválido → fallback a payload mínimo
+  - [x] LLM propone `kind='ban_user'` (fuera whitelist) → drop esa acción + warning log
+  - [x] Locale `'en-US'` produce prompt en inglés
+- [x] Tests `src/__tests__/lib/copilot/weeklyMetrics.test.ts`:
+  - [x] Mock Supabase → shape correcto
+  - [x] Org sin datos → shape vacío válido
+  - [x] Filtros por `organization_id` siempre presentes (security check)
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.3 weekly metrics loader + insight composer (Claude Haiku)`
 
 ### Criterios de aceptación T4.3
 
