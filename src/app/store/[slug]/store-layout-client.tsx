@@ -70,6 +70,8 @@ interface StoreOrganization extends StorefrontTemplateContext {
     name: string
     logo_url?: string | null
     settings?: OrganizationSettings | null
+    /** Módulos habilitados del tenant (booking de servicios agrega "Reservas" al menú). */
+    enabled_modules?: string[] | null
 }
 
 interface StoreProduct extends Record<string, unknown> {
@@ -167,6 +169,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
 
     // Defaults de menú según vertical (el admin puede personalizar).
     // i18n Fase 1 (T1.3c): labels desde el diccionario para que Tantor (en-US) vea "Home/Products".
+    const hasBookingModule = (organization.enabled_modules ?? []).includes("appointments")
     const defaultMenuItems = isRealEstate
         ? [
             { id: "home", label: t("store.nav.home"), url: "/" },
@@ -176,7 +179,13 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
             { id: "home", label: t("store.nav.home"), url: "/" },
             { id: "products", label: t("store.nav.products"), url: "/productos" }
         ]
-    const menuItems = headerSettings.menuItems || defaultMenuItems
+    const baseMenuItems = headerSettings.menuItems || defaultMenuItems
+    // Booking de servicios (Fase 2): con el módulo activo, "Reservas" se
+    // agrega también a menús personalizados (descubribilidad), sin duplicar
+    // si el merchant ya tiene un item apuntando a /reservas.
+    const menuItems = hasBookingModule && !baseMenuItems.some((item) => item.url?.startsWith("/reservas"))
+        ? [...baseMenuItems, { id: "bookings", label: t("store.nav.bookings"), url: "/reservas" }]
+        : baseMenuItems
 
     // Typography
     const fontFamily = typographySettings.fontFamily || "Inter"

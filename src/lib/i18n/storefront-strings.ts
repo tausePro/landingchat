@@ -652,6 +652,26 @@ export const storefrontStrings = {
     "store.review_request.error_generic": "No pudimos guardar tus reseñas. Inténtalo de nuevo.",
     "store.review_request.error_empty": "Califica al menos un producto para enviar.",
     // ========================================================================
+    // Booking de servicios en el storefront (Fase 2)
+    // ========================================================================
+    "store.nav.bookings": "Reservas",
+    "store.booking.title": "Reserva tu cita",
+    "store.booking.subtitle": "Elige el día y la hora que prefieras — te confirmamos enseguida.",
+    "store.booking.service_label": "¿Qué servicio necesitas?",
+    "store.booking.service_placeholder": "Ej: valoración, estadía, sesión...",
+    "store.booking.pick_slot": "Elige fecha y hora",
+    "store.booking.no_slots": "No hay horarios disponibles en los próximos días. Escríbenos por el chat y coordinamos uno.",
+    "store.booking.name_label": "Tu nombre",
+    "store.booking.phone_label": "Tu teléfono (WhatsApp)",
+    "store.booking.email_label": "Tu correo (opcional)",
+    "store.booking.submit": "Reservar",
+    "store.booking.submitting": "Reservando...",
+    "store.booking.success_title": "¡Reserva registrada!",
+    "store.booking.success_body": "Tu cita quedó agendada para el {{date}} a las {{time}}. El equipo la confirmará en breve.",
+    "store.booking.back_to_store": "Volver a la tienda",
+    "store.booking.error_conflict": "Ese horario acaba de ocuparse. Elige otro, por favor.",
+    "store.booking.error_generic": "No pudimos registrar tu reserva. Inténtalo de nuevo.",
+    // ========================================================================
     // Dashboard payments — manual payment form (T1.5)
     // ========================================================================
     // Account types (CO + US)
@@ -1296,6 +1316,26 @@ export const storefrontStrings = {
     "store.review_request.back_to_store": "Back to store",
     "store.review_request.error_generic": "We couldn't save your reviews. Please try again.",
     "store.review_request.error_empty": "Rate at least one product to submit.",
+    // ========================================================================
+    // Storefront service booking (Phase 2)
+    // ========================================================================
+    "store.nav.bookings": "Bookings",
+    "store.booking.title": "Book your appointment",
+    "store.booking.subtitle": "Pick the day and time that works for you — we'll confirm right away.",
+    "store.booking.service_label": "What service do you need?",
+    "store.booking.service_placeholder": "E.g.: meet & greet, boarding stay, session...",
+    "store.booking.pick_slot": "Pick a date and time",
+    "store.booking.no_slots": "No slots available in the next few days. Message us in the chat and we'll arrange one.",
+    "store.booking.name_label": "Your name",
+    "store.booking.phone_label": "Your phone (WhatsApp)",
+    "store.booking.email_label": "Your email (optional)",
+    "store.booking.submit": "Book",
+    "store.booking.submitting": "Booking...",
+    "store.booking.success_title": "Booking received!",
+    "store.booking.success_body": "Your appointment is set for {{date}} at {{time}}. The team will confirm shortly.",
+    "store.booking.back_to_store": "Back to store",
+    "store.booking.error_conflict": "That slot was just taken. Please pick another one.",
+    "store.booking.error_generic": "We couldn't register your booking. Please try again.",
     // ========================================================================
     // Dashboard payments — manual payment form (T1.5)
     // ========================================================================
