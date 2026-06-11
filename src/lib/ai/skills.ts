@@ -18,6 +18,13 @@ export interface SkillDefinition {
     name: string
     description: string
     mode: OrgMode | "shared"
+    /**
+     * Si está presente, el skill solo se inyecta cuando la org tiene este
+     * módulo en `organizations.enabled_modules`. Permite funcionalidades
+     * opt-in por tenant (ej: booking de servicios en ecommerce) sin que
+     * todos los agentes empiecen a ofrecerlas.
+     */
+    requiresModule?: string
     defaultInstructions: string
 }
 
@@ -78,18 +85,43 @@ IMPORTANTE: NO uses search_products para buscar inmuebles. Usa search_properties
 - NO inventes datos — pregunta lo que falte.
 - FLUJO: 1) Cliente pide cita → 2) check_availability → 3) Presenta opciones → 4) Cliente elige → 5) schedule_appointment`,
     },
+
+    // ── Booking de servicios (ecommerce con módulo appointments) ──
+    {
+        id: "service_booking",
+        name: "Reserva de Servicios",
+        description: "Cómo agendar citas/reservas de servicios (estadías, valoraciones, sesiones) en tiendas que además venden productos",
+        mode: "ecommerce",
+        requiresModule: "appointments",
+        defaultInstructions: `RESERVAS DE SERVICIOS (citas, valoraciones, estadías, sesiones):
+- Este negocio también agenda servicios. Cuando el cliente quiera reservar, agendar o pedir una cita, usa las herramientas de agendamiento — NUNCA improvises fechas ni confirmaciones de palabra.
+- SIEMPRE usa 'check_availability' ANTES de proponer horarios: consulta el calendario real (Google Calendar + citas existentes). NO prometas un horario sin verificarlo.
+- schedule_appointment: agenda la cita. Recolecta: tipo de servicio (úsalo como título descriptivo, ej: "Meet & Greet", "Estadía"), fecha/hora, nombre y teléfono del cliente.
+- Si el cliente dice "mañana" o "el viernes", calcula la fecha real con base en la fecha actual.
+- Usa formato ISO 8601 para proposed_date (ej: 2026-06-15T10:00:00).
+- Si no hay disponibilidad en el horario pedido, ofrece los horarios libres más cercanos.
+- Al agendar, dile al cliente que la cita queda registrada y el equipo la confirmará.
+- FLUJO: 1) Cliente pide reserva → 2) check_availability → 3) Presenta horarios reales → 4) Cliente elige → 5) schedule_appointment → 6) Confirma el registro de la cita.`,
+    },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
 /**
  * Obtiene las skills aplicables para un modo dado.
+ *
+ * @param enabledModules `organizations.enabled_modules` — los skills con
+ *        `requiresModule` solo aplican si la org tiene ese módulo activo.
  */
-export function getSkillsForMode(mode: OrgMode): SkillDefinition[] {
+export function getSkillsForMode(mode: OrgMode, enabledModules?: string[] | null): SkillDefinition[] {
     return SKILL_DEFINITIONS.filter(s => {
-        if (s.mode === "shared") return true
-        if (mode === "hybrid") return s.mode === "ecommerce" || s.mode === "real_estate"
-        return s.mode === mode
+        const modeMatches = s.mode === "shared"
+            || (mode === "hybrid" ? (s.mode === "ecommerce" || s.mode === "real_estate") : s.mode === mode)
+        if (!modeMatches) return false
+        if (s.requiresModule) {
+            return enabledModules?.includes(s.requiresModule) === true
+        }
+        return true
     })
 }
 
@@ -103,9 +135,10 @@ export function getSkillsForMode(mode: OrgMode): SkillDefinition[] {
  */
 export function composeSkillsPrompt(
     mode: OrgMode,
-    agentSkillsConfig?: SkillsConfig | null
+    agentSkillsConfig?: SkillsConfig | null,
+    enabledModules?: string[] | null
 ): string {
-    const skills = getSkillsForMode(mode)
+    const skills = getSkillsForMode(mode, enabledModules)
     const parts: string[] = []
 
     for (const skill of skills) {
