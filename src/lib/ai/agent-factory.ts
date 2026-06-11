@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { tools } from "./tools"
 import { sharedTools } from "./modes/shared"
 import { ecommerceTools } from "./modes/ecommerce"
-import { realEstateTools, getRealEstatePromptAddendum } from "./modes/real-estate"
+import { realEstateTools } from "./modes/real-estate"
 import { composeSkillsPrompt, type SkillsConfig } from "./skills"
 
 // ═══════════════════════════════════════════════════════════════════
@@ -114,34 +114,44 @@ export function getModePromptAddendum(
     propertyCount: number,
     agentSkillsConfig?: SkillsConfig | null,
     locale: string = "es-CO",
+    enabledModules?: string[] | null,
 ): string {
     let addendum = ""
 
+    const hasBookingModule = enabledModules?.includes("appointments") === true
+
+    // T1.7 — formato + timezone basado en locale. Tenants US ven la fecha
+    // en inglés con TZ America/New_York; tenants CO siguen es-CO/Bogota.
+    const timeZone = locale === "en-US" ? "America/New_York" : "America/Bogota"
+    const now = new Date().toLocaleString(locale, {
+        timeZone,
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    })
+
     // Contexto inmobiliario (metadata que no es un skill)
     if (mode === "real_estate" || mode === "hybrid") {
-        // T1.7 — formato + timezone basado en locale. Tenants US ven la fecha
-        // en inglés con TZ America/New_York; tenants CO siguen es-CO/Bogota.
-        const timeZone = locale === "en-US" ? "America/New_York" : "America/Bogota"
-        const now = new Date().toLocaleString(locale, {
-            timeZone,
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        })
         if (locale === "en-US") {
             addendum += `\nREAL ESTATE MODE: This organization has ${propertyCount} active properties.\nCURRENT DATE AND TIME: ${now}\n`
         } else {
             addendum += `\nMODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.\nFECHA Y HORA ACTUAL: ${now}\n`
         }
+    } else if (hasBookingModule) {
+        // Booking de servicios en ecommerce: el skill service_booking necesita
+        // la fecha actual para resolver "mañana"/"el viernes" sin alucinar.
+        addendum += locale === "en-US"
+            ? `\nCURRENT DATE AND TIME: ${now}\n`
+            : `\nFECHA Y HORA ACTUAL: ${now}\n`
     }
 
     // Skills: instrucciones procedurales configurables (siguen en español;
     // el modelo los entiende y responde en el idioma instruido por
     // `buildLanguageInstruction` en context.ts).
-    addendum += composeSkillsPrompt(mode, agentSkillsConfig)
+    addendum += composeSkillsPrompt(mode, agentSkillsConfig, enabledModules)
 
     return addendum
 }
