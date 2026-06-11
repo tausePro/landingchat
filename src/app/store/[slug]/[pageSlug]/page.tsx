@@ -85,7 +85,7 @@ export default async function StorePageComponent({ params }: PageProps) {
     const { slug, pageSlug } = await params
 
     // Skip reserved routes
-    const reservedRoutes = ["producto", "productos", "checkout", "order", "profile", "chat", "maintenance"]
+    const reservedRoutes = ["producto", "productos", "checkout", "order", "profile", "chat", "maintenance", "resena"]
     if (reservedRoutes.includes(pageSlug)) {
         notFound()
     }

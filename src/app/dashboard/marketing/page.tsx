@@ -66,6 +66,23 @@ export default function MarketingPage() {
                         </div>
                     </Link>
 
+                    {/* Review Requests Card */}
+                    <Link href="/dashboard/marketing/reviews">
+                        <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                            <div className="flex items-center gap-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
+                                    <span className="material-symbols-outlined text-amber-500 text-2xl">star_rate</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Solicitud de Reseñas</h3>
+                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                        Pide reseñas automáticamente tras cada compra
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
+
                     {/* Promotions Card */}
                     <Link href="/dashboard/promotions">
                         <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6 hover:shadow-lg transition-shadow cursor-pointer">

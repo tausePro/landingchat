@@ -204,6 +204,12 @@ export interface OrganizationSettingsOverrides {
     free_shipping_threshold?: number
     [key: string]: unknown
   }
+  /** Solicitud de reseñas post-compra (opt-in del merchant). */
+  reviews?: {
+    request_enabled?: boolean
+    request_delay_days?: number
+    [key: string]: unknown
+  }
   whatsapp?: OrganizationStorefrontWhatsAppSettings
   whatsapp_operator?: OrganizationWhatsAppOperatorSettings
   [key: string]: unknown
