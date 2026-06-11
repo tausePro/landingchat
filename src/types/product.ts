@@ -111,6 +111,8 @@ export const createProductSchema = z.object({
   keywords: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   is_featured: z.boolean().optional(),
+  /** Booking Fase 2b: servicio reservable — el PDP muestra panel de cita. */
+  is_bookable: z.boolean().optional(),
   max_quantity_per_customer: z.number().int().positive().optional().nullable(),
   // Bundle/Combo fields
   is_bundle: z.boolean().default(false),
@@ -186,6 +188,8 @@ export interface ProductData {
   keywords?: string[]
   tags?: string[]
   is_featured?: boolean
+  /** Booking Fase 2b: servicio reservable — el PDP muestra panel de cita. */
+  is_bookable?: boolean
   max_quantity_per_customer?: number | null
   // Bundle/Combo fields
   is_bundle?: boolean
