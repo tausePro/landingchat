@@ -47,28 +47,32 @@ export async function GET(request: Request) {
     const supabase = createServiceClient()
     const isoWeek = computeIsoWeek(new Date())
 
-    // Orgs candidatas: WhatsApp Personal conectado con el canal de insights activo
+    // Orgs candidatas en 2 pasos: el JOIN embebido (!inner) NO funciona en
+    // prod — la FK whatsapp_instances→organizations no existe en el schema
+    // cache de PostgREST (hallazgo T0 platform-notifier; habría devuelto
+    // 500 en el primer cron real). Query directa + IN es robusta.
+    const { data: instances, error: instancesError } = await supabase
+        .from("whatsapp_instances")
+        .select("organization_id")
+        .eq("instance_type", "personal")
+        .eq("status", "connected")
+        .eq("notifications_enabled", true)
+        .eq("notify_on_copilot_insight", true)
+
+    if (instancesError) {
+        log.error("failed to load eligible instances", { error: instancesError.message })
+        return NextResponse.json({ error: "Failed to load instances" }, { status: 500 })
+    }
+
+    const eligibleOrgIds = [...new Set((instances ?? []).map((row) => row.organization_id))]
+    if (eligibleOrgIds.length === 0) {
+        return NextResponse.json({ message: "No eligible orgs", generated: 0, skipped: 0, errors: [] })
+    }
+
     const { data: orgs, error: orgsError } = await supabase
         .from("organizations")
-        .select(`
-            id,
-            slug,
-            locale,
-            currency_code,
-            country_code,
-            copilot_autonomy_level,
-            whatsapp_instances!inner(
-                phone_number,
-                notifications_enabled,
-                notify_on_copilot_insight,
-                instance_type,
-                status
-            )
-        `)
-        .eq("whatsapp_instances.instance_type", "personal")
-        .eq("whatsapp_instances.status", "connected")
-        .eq("whatsapp_instances.notifications_enabled", true)
-        .eq("whatsapp_instances.notify_on_copilot_insight", true)
+        .select("id, slug, locale, currency_code, country_code, copilot_autonomy_level")
+        .in("id", eligibleOrgIds)
 
     if (orgsError) {
         log.error("failed to load eligible orgs", { error: orgsError.message })
