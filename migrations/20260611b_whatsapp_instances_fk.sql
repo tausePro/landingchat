@@ -8,8 +8,9 @@
 --
 -- ⚠️ PASO 1 ES DESTRUCTIVO: elimina las instancias huérfanas (su org ya no
 --    existe — son datos muertos irrecuperables de orgs borradas).
---    Verificado antes de proponer: 2 filas huérfanas (instancias 'personal'
---    de orgs eliminadas).
+--    Verificado en prod 2026-06-11: 4 filas huérfanas (2 corporate +
+--    2 personal) pertenecientes a 2 organizaciones eliminadas
+--    (d5be4033..., dfee7229...). El resto de la tabla (11 filas) no se toca.
 -- =============================================================================
 
 BEGIN;

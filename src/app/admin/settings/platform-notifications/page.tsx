@@ -9,9 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
     getPlatformChannelStatus,
-    setPlatformChannelEnabled,
+    savePlatformChannelConfig,
     connectPlatformInstance,
     sendTestNotification,
     type PlatformChannelStatus,
@@ -35,11 +37,18 @@ export default function PlatformNotificationsPage() {
     const [connecting, setConnecting] = useState(false)
     const [testPhone, setTestPhone] = useState("")
     const [sendingTest, setSendingTest] = useState(false)
+    const [provider, setProvider] = useState<"evolution" | "meta">("evolution")
+    const [metaPhoneNumberId, setMetaPhoneNumberId] = useState("")
+    const [metaAccessToken, setMetaAccessToken] = useState("")
+    const [metaTemplateName, setMetaTemplateName] = useState("")
+    const [saving, setSaving] = useState(false)
 
     const loadStatus = useCallback(async () => {
         const result = await getPlatformChannelStatus()
         if (result.success) {
             setStatus(result.data)
+            setProvider(result.data.provider)
+            setMetaTemplateName(result.data.metaTemplateName ?? "")
         } else {
             toast.error(result.error)
         }
@@ -50,15 +59,29 @@ export default function PlatformNotificationsPage() {
         loadStatus()
     }, [loadStatus])
 
-    const handleToggle = async (enabled: boolean) => {
-        const result = await setPlatformChannelEnabled(enabled)
-        if (result.success) {
-            toast.success(enabled ? "Canal habilitado" : "Canal deshabilitado")
-            await loadStatus()
-        } else {
-            toast.error(result.error)
+    const saveConfig = async (enabled: boolean) => {
+        setSaving(true)
+        try {
+            const result = await savePlatformChannelConfig({
+                enabled,
+                provider,
+                metaPhoneNumberId: metaPhoneNumberId || undefined,
+                metaAccessToken: metaAccessToken || undefined,
+                metaTemplateName: metaTemplateName || undefined,
+            })
+            if (result.success) {
+                toast.success("Configuración guardada")
+                setMetaAccessToken("")
+                await loadStatus()
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setSaving(false)
         }
     }
+
+    const handleToggle = async (enabled: boolean) => saveConfig(enabled)
 
     const handleConnect = async () => {
         setConnecting(true)
@@ -152,6 +175,58 @@ export default function PlatformNotificationsPage() {
 
             <Card>
                 <CardHeader>
+                    <CardTitle>Proveedor del canal</CardTitle>
+                    <CardDescription>
+                        Desde qué número de LandingChat se envían las notificaciones.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <RadioGroup value={provider} onValueChange={(value) => setProvider(value as "evolution" | "meta")} className="space-y-3">
+                        <div className="flex items-start gap-3 rounded-lg border p-4">
+                            <RadioGroupItem value="evolution" id="prov-evolution" className="mt-1" />
+                            <div>
+                                <Label htmlFor="prov-evolution" className="font-medium cursor-pointer">Evolution (QR, no oficial)</Label>
+                                <p className="text-sm text-slate-500 mt-1">Rápido: escanea un QR con un número de la empresa. Mensajes libres, sin templates.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3 rounded-lg border p-4">
+                            <RadioGroupItem value="meta" id="prov-meta" className="mt-1" />
+                            <div>
+                                <Label htmlFor="prov-meta" className="font-medium cursor-pointer">Meta Cloud API (oficial)</Label>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    WABA propio de LandingChat. Requiere número registrado en Meta y un <strong>template aprobado</strong> con un parámetro de body ({"{{1}}"}).
+                                    {status?.metaConfigured && <span className="ml-1 text-green-600 font-medium">Credenciales configuradas ✓</span>}
+                                </p>
+                            </div>
+                        </div>
+                    </RadioGroup>
+
+                    {provider === "meta" && (
+                        <div className="space-y-3 rounded-lg border p-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="metaPhoneId">Phone Number ID</Label>
+                                <Input id="metaPhoneId" value={metaPhoneNumberId} onChange={(event) => setMetaPhoneNumberId(event.target.value)} placeholder={status?.metaConfigured ? "(configurado — escribe para reemplazar)" : "1234567890"} className="font-mono" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="metaToken">Access Token</Label>
+                                <Input id="metaToken" type="password" value={metaAccessToken} onChange={(event) => setMetaAccessToken(event.target.value)} placeholder={status?.metaConfigured ? "(guardado encriptado — escribe para reemplazar)" : "EAAG..."} className="font-mono" />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="metaTemplate">Template aprobado (body con {"{{1}}"})</Label>
+                                <Input id="metaTemplate" value={metaTemplateName} onChange={(event) => setMetaTemplateName(event.target.value)} placeholder="platform_notification" className="font-mono" />
+                            </div>
+                        </div>
+                    )}
+
+                    <Button onClick={() => saveConfig(status?.enabled ?? false)} disabled={saving}>
+                        {saving ? "Guardando..." : "Guardar configuración"}
+                    </Button>
+                </CardContent>
+            </Card>
+
+            {provider === "evolution" && (
+            <Card>
+                <CardHeader>
                     <CardTitle>Conexión</CardTitle>
                     <CardDescription>
                         Crea la instancia (si falta) y escanea el QR con el WhatsApp de LandingChat.
@@ -175,6 +250,7 @@ export default function PlatformNotificationsPage() {
                     )}
                 </CardContent>
             </Card>
+            )}
 
             <Card>
                 <CardHeader>
