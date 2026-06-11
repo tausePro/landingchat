@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
+type OrgScopedClient = Awaited<ReturnType<typeof createClient>>
+
 export interface Category {
     id: string
     organization_id: string
@@ -132,8 +134,8 @@ export async function createCategory(data: {
 
         revalidatePath("/dashboard/categories")
         return { success: true, category }
-    } catch (err: any) {
-        return { success: false, error: err.message }
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Error desconocido" }
     }
 }
 
@@ -146,6 +148,19 @@ export async function updateCategory(id: string, data: {
 }): Promise<{ success: boolean; error?: string }> {
     try {
         const { supabase } = await getOrgId()
+
+        // Capturar el nombre ANTERIOR antes del UPDATE: el sync a products
+        // necesita saber qué string reemplazar (bug histórico: se leía
+        // después del update y el rename nunca se propagaba al storefront)
+        let previousName: string | null = null
+        if (data.name !== undefined) {
+            const { data: current } = await supabase
+                .from("categories")
+                .select("name")
+                .eq("id", id)
+                .single()
+            previousName = current?.name ?? null
+        }
 
         const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
         if (data.name !== undefined) {
@@ -164,15 +179,15 @@ export async function updateCategory(id: string, data: {
 
         if (error) return { success: false, error: error.message }
 
-        // Si cambió el nombre, actualizar el array en products para compatibilidad
-        if (data.name !== undefined) {
-            await syncCategoryNameToProducts(supabase, id, data.name.trim())
+        // Si cambió el nombre, propagar el rename al array de products
+        if (data.name !== undefined && previousName && previousName !== data.name.trim()) {
+            await syncCategoryNameToProducts(supabase, previousName, data.name.trim())
         }
 
         revalidatePath("/dashboard/categories")
         return { success: true }
-    } catch (err: any) {
-        return { success: false, error: err.message }
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Error desconocido" }
     }
 }
 
@@ -202,8 +217,8 @@ export async function deleteCategory(id: string): Promise<{ success: boolean; er
 
         revalidatePath("/dashboard/categories")
         return { success: true }
-    } catch (err: any) {
-        return { success: false, error: err.message }
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Error desconocido" }
     }
 }
 
@@ -245,8 +260,8 @@ export async function addProductsToCategory(categoryId: string, productIds: stri
 
         revalidatePath("/dashboard/categories")
         return { success: true }
-    } catch (err: any) {
-        return { success: false, error: err.message }
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Error desconocido" }
     }
 }
 
@@ -283,8 +298,8 @@ export async function removeProductFromCategory(categoryId: string, productId: s
 
         revalidatePath("/dashboard/categories")
         return { success: true }
-    } catch (err: any) {
-        return { success: false, error: err.message }
+    } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : "Error desconocido" }
     }
 }
 
@@ -317,37 +332,32 @@ export async function getAvailableProducts(categoryId: string): Promise<Category
 
 // ─── Helpers de compatibilidad ──────────────────────────────────
 
-async function syncCategoryNameToProducts(supabase: any, categoryId: string, newName: string) {
-    const { data: oldCat } = await supabase
-        .from("categories")
-        .select("name")
-        .eq("id", categoryId)
-        .single()
+/**
+ * Propaga un rename de categoría al array `products.categories`.
+ *
+ * Busca por CONTENIDO (`contains` del nombre anterior), no por links de
+ * `product_categories`: muchos productos tienen el string puesto directo
+ * desde el editor de producto sin link (caso real Tantor: renombró
+ * "Hospedajes" → "Accommodations" y el storefront siguió mostrando el
+ * nombre viejo). El scoping por org lo garantiza RLS del cliente.
+ */
+async function syncCategoryNameToProducts(supabase: OrgScopedClient, previousName: string, newName: string) {
+    const { data: products } = await supabase
+        .from("products")
+        .select("id, categories")
+        .contains("categories", [previousName])
 
-    if (!oldCat) return
-
-    const { data: links } = await supabase
-        .from("product_categories")
-        .select("product_id")
-        .eq("category_id", categoryId)
-
-    for (const link of links || []) {
-        const { data: product } = await supabase
-            .from("products")
-            .select("categories")
-            .eq("id", link.product_id)
-            .single()
-
-        const cats = (product?.categories as string[]) || []
-        const updated = cats.map(c => c === oldCat.name ? newName : c)
+    for (const product of products || []) {
+        const cats = (product.categories as string[]) || []
+        const updated = cats.map((c: string) => c === previousName ? newName : c)
         await supabase
             .from("products")
             .update({ categories: [...new Set(updated)] })
-            .eq("id", link.product_id)
+            .eq("id", product.id)
     }
 }
 
-async function removeCategoryNameFromProducts(supabase: any, categoryName: string) {
+async function removeCategoryNameFromProducts(supabase: OrgScopedClient, categoryName: string) {
     const { data: products } = await supabase
         .from("products")
         .select("id, categories")
