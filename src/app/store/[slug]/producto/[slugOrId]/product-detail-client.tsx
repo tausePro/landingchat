@@ -20,6 +20,7 @@ import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel 
 import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
 import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
 import { useT, useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
+import { ProductBookingPanel } from "@/components/store/product-booking-panel"
 
 interface ProductDetailClientProps {
     product: ProductDetailProduct
@@ -35,6 +36,8 @@ interface ProductDetailClientProps {
     reviewSummary?: ProductReviewSummary | null
     shippingConfig?: StorefrontShippingConfig | null
     productDetailCRO?: ProductDetailCROConfig | null
+    /** Booking Fase 2b: muestra el panel de reserva del servicio en el PDP. */
+    isBookable?: boolean
 }
 
 interface ProductPriceTier {
@@ -868,7 +871,7 @@ function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeS
     )
 }
 
-export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null, isBookable = false }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -1998,6 +2001,17 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                                     </div>
                                 </div>
                             )}
+                        {/* Booking Fase 2b: panel de reserva del servicio (gated por
+                            producto reservable + módulo appointments del tenant) */}
+                        {isBookable && (
+                            <ProductBookingPanel
+                                slug={slug}
+                                serviceName={product.name}
+                                primaryColor={primaryColor}
+                                locale={locale}
+                            />
+                        )}
+
                         {/* Description */}
                         {product.description ? (
                             <ProductDescription

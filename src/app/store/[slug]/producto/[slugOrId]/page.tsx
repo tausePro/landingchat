@@ -212,6 +212,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
                     productWithVariants={productWithVariants}
                     viewModel={viewModel}
                     organization={organization}
+                    isBookable={Boolean(product.is_bookable) && ((organization.enabled_modules as string[] | null) ?? []).includes("appointments")}
                     badges={badges}
                     promotions={promotions}
                     relatedProducts={relatedProducts}

@@ -88,6 +88,8 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
     const [isConfigurable, setIsConfigurable] = useState(initialData?.is_configurable || false)
     const [isActive, setIsActive] = useState<boolean>(initialData?.is_active ?? true)
     const [isFeatured, setIsFeatured] = useState<boolean>(initialData?.is_featured ?? false)
+    // Booking Fase 2b: producto reservable (servicio con panel de cita en el PDP)
+    const [isBookable, setIsBookable] = useState<boolean>(initialData?.is_bookable ?? false)
     
     // Structured Content features (SEO, AEO)
     const [brand, setBrand] = useState(initialData?.brand || "")
@@ -208,6 +210,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                 tax_rate: taxRate !== "" ? parseFloat(taxRate) : null,
                 // UI Fields (Stitch Design)
                 is_featured: isFeatured,
+                is_bookable: isBookable,
                 brand: brand.trim() || undefined,
                 benefits: benefits.length > 0 ? benefits : undefined,
                 faq: faq.length > 0 ? faq : undefined,
@@ -972,6 +975,14 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                 >
                                     <span className="material-symbols-outlined text-primary text-xl">done</span>
                                     {isFeatured ? 'Marcado como destacado' : 'Marcar como destacado'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsBookable(!isBookable)}
+                                    className={`flex items-center gap-3 w-full p-3 rounded-lg border transition-colors text-sm font-medium ${isBookable ? 'border-primary/20 bg-primary/5 text-primary' : 'border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-text-light-primary dark:text-text-dark-primary'}`}
+                                >
+                                    <span className="material-symbols-outlined text-primary text-xl">event_available</span>
+                                    {isBookable ? 'Servicio reservable (con agenda)' : 'Marcar como servicio reservable'}
                                 </button>
                                 {productStoreUrl && (
                                     <a
