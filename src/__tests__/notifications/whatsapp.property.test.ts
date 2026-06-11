@@ -18,7 +18,9 @@ const mockFrom = vi.fn((table: string) => {
         eq: vi.fn(() => ({
           eq: vi.fn(() => ({
             eq: vi.fn(() => ({
-              single: mockWhatsAppInstanceSelect
+              single: mockWhatsAppInstanceSelect,
+              // Platform Notifier T2: notifyMerchant consulta con maybeSingle
+              maybeSingle: mockWhatsAppInstanceSelect
             }))
           }))
         }))
@@ -30,6 +32,17 @@ const mockFrom = vi.fn((table: string) => {
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           single: mockSystemSettingsSelect
+        }))
+      }))
+    }
+  }
+  if (table === "organizations") {
+    // Fallback platform de notifyMerchant: sin notification_phone en estos tests
+    return {
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(async () => ({ data: { notification_phone: null }, error: null })),
+          maybeSingle: vi.fn(async () => ({ data: { notification_phone: null }, error: null }))
         }))
       }))
     }

@@ -1,13 +1,16 @@
 /**
  * Servicio de Notificaciones por WhatsApp
- * 
- * Envía notificaciones al propietario de la tienda a través de su WhatsApp personal
+ *
+ * Construye los mensajes al propietario de la tienda. La ENTREGA pasa por
+ * la cadena `notifyMerchant` (Platform Notifier v0 — T2): instancia
+ * personal del tenant → fallback canal de la plataforma.
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
 import { formatAppointmentDateTime } from "@/lib/appointments/appointmentDateTime"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
 import { appendVariantToItemName } from "@/lib/utils/variantInfo"
+import { notifyMerchant } from "./notify-merchant"
 
 interface NotificationContext {
     organizationId: string
@@ -26,28 +29,6 @@ export async function sendSaleNotification(
     }
 ): Promise<boolean> {
     try {
-        const supabase = await createServiceClient()
-
-        // Verificar si las notificaciones de ventas están habilitadas
-        const { data: instance } = await supabase
-            .from("whatsapp_instances")
-            .select("phone_number, notifications_enabled, notify_on_sale")
-            .eq("organization_id", context.organizationId)
-            .eq("instance_type", "personal")
-            .eq("status", "connected")
-            .single()
-
-        if (!instance || instance.notifications_enabled === false || instance.notify_on_sale === false) {
-            console.log("[WhatsApp Notifications] Sale notifications disabled for org:", context.organizationId)
-            return false
-        }
-
-        if (!instance.phone_number) {
-            console.error("[WhatsApp Notifications] No phone number for personal instance")
-            return false
-        }
-
-        // Construir mensaje
         const itemsList = order.items
             .map((item) => `• ${item.quantity}x ${appendVariantToItemName(item.name, item.variant_title)}`)
             .join("\n")
@@ -64,8 +45,12 @@ ${itemsList}
 
 ¡Felicitaciones por tu venta! 🚀`
 
-        await sendNotification(context.organizationId, instance.phone_number, message)
-        return true
+        const result = await notifyMerchant({
+            organizationId: context.organizationId,
+            message,
+            kind: "sale",
+        })
+        return result.delivered
     } catch (error) {
         console.error("[WhatsApp Notifications] Error sending sale notification:", error)
         return false
@@ -244,27 +229,8 @@ export async function sendOwnerNotification(
     organizationId: string,
     message: string
 ): Promise<boolean> {
-    try {
-        const supabase = await createServiceClient()
-
-        const { data: instance } = await supabase
-            .from("whatsapp_instances")
-            .select("phone_number, notifications_enabled")
-            .eq("organization_id", organizationId)
-            .eq("instance_type", "personal")
-            .eq("status", "connected")
-            .single()
-
-        if (!instance?.phone_number || instance.notifications_enabled === false) {
-            return false
-        }
-
-        await sendNotification(organizationId, instance.phone_number, message)
-        return true
-    } catch (error) {
-        console.error("[WhatsApp Notifications] Error sending owner notification:", error)
-        return false
-    }
+    const result = await notifyMerchant({ organizationId, message, kind: "system" })
+    return result.delivered
 }
 
 /** Trunca el body del insight para WhatsApp (legibilidad móvil). */
@@ -309,24 +275,6 @@ export async function sendCopilotInsight(params: {
     try {
         const supabase = await createServiceClient()
 
-        const { data: instance } = await supabase
-            .from("whatsapp_instances")
-            .select("phone_number, notifications_enabled, notify_on_copilot_insight")
-            .eq("organization_id", params.organizationId)
-            .eq("instance_type", "personal")
-            .eq("status", "connected")
-            .single()
-
-        if (!instance || instance.notifications_enabled === false || instance.notify_on_copilot_insight === false) {
-            console.log("[WhatsApp Notifications] Copilot insights disabled for org:", params.organizationId)
-            return false
-        }
-
-        if (!instance.phone_number) {
-            console.error("[WhatsApp Notifications] No phone number for personal instance")
-            return false
-        }
-
         const { data: insight } = await supabase
             .from("copilot_insights")
             .select("title, body, proposed_actions")
@@ -345,8 +293,12 @@ export async function sendCopilotInsight(params: {
             proposed_actions: (insight.proposed_actions as Array<{ human_label: string }>) ?? [],
         })
 
-        await sendNotification(params.organizationId, instance.phone_number, message)
-        return true
+        const result = await notifyMerchant({
+            organizationId: params.organizationId,
+            message,
+            kind: "copilot_insight",
+        })
+        return result.delivered
     } catch (error) {
         console.error("[WhatsApp Notifications] Error sending copilot insight:", error)
         return false

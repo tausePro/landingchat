@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MessageSquare, Search, Filter } from "lucide-react"
+import { MessageSquare, Search, Filter, RefreshCw } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import type { WhatsAppInstance } from "@/types"
-import { getAllInstances, disconnectInstance } from "./actions"
+import { getAllInstances, disconnectInstance, reconcileInstances } from "./actions"
 
 export default function WhatsAppInstancesPage() {
     const [loading, setLoading] = useState(true)
@@ -22,6 +22,27 @@ export default function WhatsAppInstancesPage() {
     const [filteredInstances, setFilteredInstances] = useState<WhatsAppInstance[]>([])
     const [searchQuery, setSearchQuery] = useState("")
     const [statusFilter, setStatusFilter] = useState<string>("all")
+    const [reconciling, setReconciling] = useState(false)
+
+    const handleReconcile = async () => {
+        setReconciling(true)
+        try {
+            const result = await reconcileInstances()
+            if (result.success) {
+                const { created, updated, unchanged, unmatched, errors } = result.data
+                toast.success(`Reconciliado: ${created} creadas, ${updated} actualizadas, ${unchanged} sin cambios`)
+                if (unmatched.length > 0) toast.warning(`Sin org resoluble: ${unmatched.join(", ")}`)
+                for (const error of errors) toast.error(error)
+                await fetchInstances()
+            } else {
+                toast.error(result.error)
+            }
+        } catch {
+            toast.error("Error inesperado al reconciliar")
+        } finally {
+            setReconciling(false)
+        }
+    }
 
     useEffect(() => {
         fetchInstances()
@@ -124,6 +145,10 @@ export default function WhatsAppInstancesPage() {
                         </p>
                     </div>
                 </div>
+                <Button variant="outline" onClick={handleReconcile} disabled={reconciling}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${reconciling ? "animate-spin" : ""}`} />
+                    {reconciling ? "Reconciliando..." : "Reconciliar con servidor"}
+                </Button>
             </div>
 
             {/* Filtros */}
@@ -193,8 +218,7 @@ export default function WhatsAppInstancesPage() {
                                 filteredInstances.map((instance) => (
                                     <tr key={instance.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-4 text-sm">
-                                            {/* @ts-ignore - organizations viene del join */}
-                                            {instance.organizations?.name || "N/A"}
+                                            {(instance as WhatsAppInstance & { organizations?: { name?: string } }).organizations?.name || "N/A"}
                                         </td>
                                         <td className="px-6 py-4 text-sm font-mono">
                                             {instance.instance_name}
