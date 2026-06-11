@@ -495,7 +495,7 @@ export async function getProductDetails(slug: string, slugOrId: string) {
     // 1. Fetch Organization
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, industry, storefront_config, storefront_template, settings, tracking_config, custom_domain, logo_url, currency_code, locale, country_code")
+        .select("id, name, slug, industry, storefront_config, storefront_template, settings, tracking_config, custom_domain, logo_url, currency_code, locale, country_code, enabled_modules")
         .eq("slug", slug)
         .single()
 
