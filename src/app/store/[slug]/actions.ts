@@ -283,7 +283,7 @@ export async function getStoreData(slug: string, limit?: number) {
     // tenant. REQUIERE migración 20260519_organizations_locale_currency.sql aplicada.
     const { data: org, error: orgError } = await supabase
         .from("organizations")
-        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, industry, settings, tracking_config, custom_domain, currency_code, locale, country_code")
+        .select("id, name, slug, logo_url, favicon_url, seo_title, seo_description, seo_keywords, storefront_config, storefront_template, primary_color, secondary_color, contact_email, industry, settings, tracking_config, custom_domain, currency_code, locale, country_code, enabled_modules")
         .eq("slug", slug)
         .single()
 

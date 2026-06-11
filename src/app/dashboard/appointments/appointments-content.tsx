@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { AppointmentsTable } from "./appointments-table"
 import { CalendarView } from "./calendar-view"
+import { BookingHoursSettings } from "./booking-hours-settings"
 
 interface Appointment {
   id: string
@@ -38,6 +39,9 @@ export function AppointmentsContent({ appointments }: AppointmentsContentProps) 
           </p>
         </div>
 
+        <div className="flex items-center gap-3">
+        <BookingHoursSettings />
+
         {/* Toggle de vista */}
         <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
@@ -62,6 +66,7 @@ export function AppointmentsContent({ appointments }: AppointmentsContentProps) 
             <span className="material-symbols-outlined text-base">table_rows</span>
             Tabla
           </button>
+        </div>
         </div>
       </div>
 

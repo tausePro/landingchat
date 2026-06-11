@@ -5,6 +5,7 @@ import { assignAdvisor, getAdvisors, type Advisor, type WorkingHours } from "@/l
 import { createAppointment as createAppointmentRecord, getActiveAppointmentsInRange, getConflictingAppointments, updateAppointment as updateAppointmentRecord } from "@/lib/repositories/appointments"
 import { sendAppointmentNotification } from "@/lib/notifications/whatsapp"
 import { addDaysToAppointmentDateKey, createAppointmentDate, formatAppointmentDateTime, getAppointmentDateKey, getAppointmentWeekday } from "@/lib/appointments/appointmentDateTime"
+import { resolveBookingHours, DEFAULT_BOOKING_HOURS, type BookingHoursConfig } from "@/lib/appointments/booking-config"
 
 const log = logger("appointments/service")
 
@@ -25,8 +26,8 @@ const DEFAULT_STATUS_TRANSITIONS: Record<string, AppointmentStatus[]> = {
 }
 
 const DEFAULT_SLOT_STEP_MINUTES = 30
-const DEFAULT_DAY_START_HOUR = 9
-const DEFAULT_DAY_END_HOUR = 18
+// Horario default ahora vive en booking-config.ts (configurable por tenant
+// vía organizations.settings.booking)
 
 export type AppointmentStatus = "pending" | "confirmed" | "cancelled" | "completed" | "rescheduled"
 
@@ -190,7 +191,22 @@ export async function getAppointmentAvailability(
     const slotDurationMinutes = input.slotDurationMinutes ?? 60
     const slotStepMinutes = input.slotStepMinutes ?? DEFAULT_SLOT_STEP_MINUTES
     const includeEmptyDays = input.includeEmptyDays ?? false
-    const skipSundays = input.skipSundays ?? true
+
+    // Horario de atención del tenant (settings.booking). Si no hay advisors
+    // con working_hours, estos límites definen los slots; el caller puede
+    // sobreescribir skipSundays explícitamente.
+    let bookingHours = { ...DEFAULT_BOOKING_HOURS }
+    try {
+        const { data: orgRow } = await supabase
+            .from("organizations")
+            .select("settings")
+            .eq("id", input.organizationId)
+            .single()
+        bookingHours = resolveBookingHours(orgRow?.settings)
+    } catch {
+        // Default seguro: el booking no se cae por un fallo leyendo settings
+    }
+    const skipSundays = input.skipSundays ?? bookingHours.skipSundays
 
     const startDateKey = getAppointmentDateKey(input.date)
     const todayDateKey = getAppointmentDateKey(new Date())
@@ -266,7 +282,7 @@ export async function getAppointmentAvailability(
         }
 
         const dayBusy = busySlots.filter((busy) => getAppointmentDateKey(busy.start) === dayDateKey)
-        const workMinutes = buildWorkingMinutes(dayDateKey, relevantAdvisors, slotStepMinutes)
+        const workMinutes = buildWorkingMinutes(dayDateKey, relevantAdvisors, slotStepMinutes, bookingHours)
         const slots: AppointmentAvailabilitySlot[] = []
 
         for (const minutes of workMinutes) {
@@ -677,10 +693,15 @@ function getRelevantAdvisors(advisors: Advisor[], propertyType?: string): Adviso
     })
 }
 
-function buildWorkingMinutes(dayDateKey: string, advisors: Advisor[], slotStepMinutes: number): number[] {
+function buildWorkingMinutes(
+    dayDateKey: string,
+    advisors: Advisor[],
+    slotStepMinutes: number,
+    bookingHours: BookingHoursConfig = DEFAULT_BOOKING_HOURS,
+): number[] {
     if (advisors.length === 0) {
         const minutes: number[] = []
-        for (let minute = DEFAULT_DAY_START_HOUR * 60; minute < DEFAULT_DAY_END_HOUR * 60; minute += slotStepMinutes) {
+        for (let minute = bookingHours.dayStartHour * 60; minute < bookingHours.dayEndHour * 60; minute += slotStepMinutes) {
             minutes.push(minute)
         }
         return minutes
