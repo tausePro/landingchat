@@ -40,32 +40,32 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `migrations/20260526a_platform_events.sql` con:
-  - [ ] `CREATE TABLE IF NOT EXISTS platform_events` con shape de `design.md §1.1`
-  - [ ] Índices `idx_platform_events_org_idempotency` (UNIQUE WHERE NOT NULL) + `idx_platform_events_org_type_time` + `idx_platform_events_org_time`
-  - [ ] `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY platform_events_org_read` (SELECT only authenticated, USING `organization_id = get_my_org_id()`)
-  - [ ] `COMMENT ON TABLE` + `COMMENT ON COLUMN` para event_type e idempotency_key
-  - [ ] BEGIN/COMMIT explícito + `DROP POLICY IF EXISTS` antes del CREATE POLICY (idempotencia)
-- [ ] Crear `src/lib/events/platform-event-types.ts` con:
-  - [ ] `PLATFORM_EVENT_TYPES` const con los 12 tipos v0 (sec. 2.1 design)
-  - [ ] `PlatformEventType` derivado
-  - [ ] `ALL_PLATFORM_EVENT_TYPES` array para iteración / validación
-- [ ] Crear `src/lib/events/emit.ts` con:
-  - [ ] `emitPlatformEvent(input)` función con shape de `design.md §2.3`
-  - [ ] Service role client (`createServiceClient()`), justificado en comment del archivo
-  - [ ] Manejo de `error.code === '23505'` (idempotency conflict) como caso `ok: true`
-  - [ ] Logger structured con prefix `[platform_events]`
-  - [ ] No falla flow del caller en error (best-effort)
-- [ ] Tests `src/__tests__/lib/events/emit.test.ts`:
-  - [ ] Insert exitoso retorna `{ ok: true }`
-  - [ ] Idempotency conflict (23505) retorna `{ ok: true }` sin propagar error
-  - [ ] Error genérico retorna `{ ok: false, error }` con mensaje
-  - [ ] Defaults aplicados (`actor_id='system'`, `payload={}`, `occurred_at=now()`)
-- [ ] Validaciones:
-  - [ ] `npx tsc --noEmit` ✅
-  - [ ] `npx eslint src/lib/events/` ✅
-  - [ ] `npx vitest run src/__tests__/lib/events/` ✅
-- [ ] Commit: `feat(copilot): T4.1 platform_events schema + catálogo + emit helper`
+- [x] Crear `migrations/20260526a_platform_events.sql` con:
+  - [x] `CREATE TABLE IF NOT EXISTS platform_events` con shape de `design.md §1.1`
+  - [x] Índices `idx_platform_events_org_idempotency` (UNIQUE WHERE NOT NULL) + `idx_platform_events_org_type_time` + `idx_platform_events_org_time`
+  - [x] `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY platform_events_org_read` (SELECT only authenticated, USING `organization_id = get_my_org_id()`)
+  - [x] `COMMENT ON TABLE` + `COMMENT ON COLUMN` para event_type e idempotency_key
+  - [x] BEGIN/COMMIT explícito + `DROP POLICY IF EXISTS` antes del CREATE POLICY (idempotencia)
+- [x] Crear `src/lib/events/platform-event-types.ts` con:
+  - [x] `PLATFORM_EVENT_TYPES` const con los 12 tipos v0 (sec. 2.1 design)
+  - [x] `PlatformEventType` derivado
+  - [x] `ALL_PLATFORM_EVENT_TYPES` array para iteración / validación
+- [x] Crear `src/lib/events/emit.ts` con:
+  - [x] `emitPlatformEvent(input)` función con shape de `design.md §2.3`
+  - [x] Service role client (`createServiceClient()`), justificado en comment del archivo
+  - [x] Manejo de `error.code === '23505'` (idempotency conflict) como caso `ok: true`
+  - [x] Logger structured con prefix `[platform_events]`
+  - [x] No falla flow del caller en error (best-effort)
+- [x] Tests `src/__tests__/lib/events/emit.test.ts`:
+  - [x] Insert exitoso retorna `{ ok: true }`
+  - [x] Idempotency conflict (23505) retorna `{ ok: true }` sin propagar error
+  - [x] Error genérico retorna `{ ok: false, error }` con mensaje
+  - [x] Defaults aplicados (`actor_id='system'`, `payload={}`, `occurred_at=now()`)
+- [x] Validaciones:
+  - [x] `npx tsc --noEmit` ✅
+  - [x] `npx eslint src/lib/events/` ✅
+  - [x] `npx vitest run src/__tests__/lib/events/` ✅
+- [x] Commit: `feat(copilot): T4.1 platform_events schema + catálogo + emit helper`
 
 ### Criterios de aceptación T4.1
 
