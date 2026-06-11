@@ -184,6 +184,8 @@ interface UpdateOrganizationInput {
     name: string
     slug: string
     contact_email?: string
+    /** WhatsApp del dueño para notificaciones de la plataforma (Platform Notifier T2). */
+    notification_phone?: string
     industry?: string
     logo_url?: string
     favicon_url?: string
@@ -256,6 +258,7 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
             name: data.name,
             slug: data.slug,
             contact_email: data.contact_email,
+            notification_phone: data.notification_phone?.replace(/[^\d]/g, "") || null,
             industry: data.industry,
             logo_url: data.logo_url,
             favicon_url: data.favicon_url,

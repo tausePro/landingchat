@@ -47,32 +47,38 @@ export async function GET(request: Request) {
     const supabase = createServiceClient()
     const isoWeek = computeIsoWeek(new Date())
 
-    // Orgs candidatas en 2 pasos: el JOIN embebido (!inner) NO funciona en
-    // prod — la FK whatsapp_instances→organizations no existe en el schema
-    // cache de PostgREST (hallazgo T0 platform-notifier; habría devuelto
-    // 500 en el primer cron real). Query directa + IN es robusta.
-    const { data: instances, error: instancesError } = await supabase
-        .from("whatsapp_instances")
-        .select("organization_id")
-        .eq("instance_type", "personal")
-        .eq("status", "connected")
-        .eq("notifications_enabled", true)
-        .eq("notify_on_copilot_insight", true)
+    // Elegibilidad v2 (platform-notifier T4): orgs con ACTIVIDAD en la
+    // semana (≥1 orden o conversación) y onboarding completo. Ya NO se
+    // exige WhatsApp conectado: la entrega pasa por la cadena notifyMerchant
+    // (personal → platform → solo dashboard) y el feed de /dashboard/copilot
+    // es la fuente de verdad. Nota: sin JOIN embebido — la FK de
+    // whatsapp_instances no existe en el schema cache de prod (T0b).
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const [ordersRes, chatsRes] = await Promise.all([
+        supabase.from("orders").select("organization_id").gte("created_at", weekAgo),
+        supabase.from("chats").select("organization_id").gte("created_at", weekAgo),
+    ])
 
-    if (instancesError) {
-        log.error("failed to load eligible instances", { error: instancesError.message })
-        return NextResponse.json({ error: "Failed to load instances" }, { status: 500 })
+    if (ordersRes.error || chatsRes.error) {
+        const error = ordersRes.error?.message ?? chatsRes.error?.message ?? "unknown"
+        log.error("failed to load weekly activity", { error })
+        return NextResponse.json({ error: "Failed to load activity" }, { status: 500 })
     }
 
-    const eligibleOrgIds = [...new Set((instances ?? []).map((row) => row.organization_id))]
-    if (eligibleOrgIds.length === 0) {
+    const activeOrgIds = [...new Set([
+        ...(ordersRes.data ?? []).map((row) => row.organization_id),
+        ...(chatsRes.data ?? []).map((row) => row.organization_id),
+    ])]
+
+    if (activeOrgIds.length === 0) {
         return NextResponse.json({ message: "No eligible orgs", generated: 0, skipped: 0, errors: [] })
     }
 
     const { data: orgs, error: orgsError } = await supabase
         .from("organizations")
         .select("id, slug, locale, currency_code, country_code, copilot_autonomy_level")
-        .in("id", eligibleOrgIds)
+        .in("id", activeOrgIds)
+        .eq("onboarding_completed", true)
 
     if (orgsError) {
         log.error("failed to load eligible orgs", { error: orgsError.message })

@@ -21,30 +21,30 @@
 
 ## T1 — Canal platform (0.5d)
 
-- [ ] Config `platform_notifications_config` en system_settings
-- [ ] Creación/QR de instancia `platform_notifications` (server action admin)
-- [ ] `sendPlatformNotification()` per design §2 + tests (enabled=false,
+- [x] Config `platform_notifications_config` en system_settings
+- [x] Creación/QR de instancia `platform_notifications` (server action admin)
+- [x] `sendPlatformNotification()` per design §2 + tests (enabled=false,
       no conectada, envío feliz, error del server → delivered:false)
 
 ## T2 — Cadena notifyMerchant (0.5d)
 
-- [ ] Migración `organizations.notification_phone` (aditiva)
-- [ ] `notifyMerchant()` per design §3 + tests (personal primero, fallback
+- [x] Migración `organizations.notification_phone` (aditiva)
+- [x] `notifyMerchant()` per design §3 + tests (personal primero, fallback
       platform, sin canal, toggles por kind)
-- [ ] Refactor consumers (sendCopilotInsight/sendSaleNotification/
+- [x] Refactor consumers (sendCopilotInsight/sendSaleNotification/
       sendOwnerNotification) sin cambiar formato de mensajes
-- [ ] Campo teléfono de notificación en dashboard settings
+- [x] Campo teléfono de notificación en dashboard settings
 
 ## T3 — Super admin (0.5d)
 
-- [ ] Página `/admin/settings/platform-notifications` per design §4
+- [x] Página `/admin/settings/platform-notifications` per design §4
 - [ ] Test send real (smoke manual con número del super admin)
 
 ## T4 — Copilot sobre la cadena (0.5d)
 
-- [ ] Worker: elegibilidad por actividad (sin INNER JOIN whatsapp)
-- [ ] Entrega vía notifyMerchant; generated++ aunque no se entregue
-- [ ] Ajustar tests del worker + suite copilot completa
+- [x] Worker: elegibilidad por actividad (sin INNER JOIN whatsapp)
+- [x] Entrega vía notifyMerchant; generated++ aunque no se entregue
+- [x] Ajustar tests del worker + suite copilot completa
 
 ## Cierre
 
