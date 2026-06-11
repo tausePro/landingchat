@@ -40,32 +40,32 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `migrations/20260526a_platform_events.sql` con:
-  - [ ] `CREATE TABLE IF NOT EXISTS platform_events` con shape de `design.md §1.1`
-  - [ ] Índices `idx_platform_events_org_idempotency` (UNIQUE WHERE NOT NULL) + `idx_platform_events_org_type_time` + `idx_platform_events_org_time`
-  - [ ] `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY platform_events_org_read` (SELECT only authenticated, USING `organization_id = get_my_org_id()`)
-  - [ ] `COMMENT ON TABLE` + `COMMENT ON COLUMN` para event_type e idempotency_key
-  - [ ] BEGIN/COMMIT explícito + `DROP POLICY IF EXISTS` antes del CREATE POLICY (idempotencia)
-- [ ] Crear `src/lib/events/platform-event-types.ts` con:
-  - [ ] `PLATFORM_EVENT_TYPES` const con los 12 tipos v0 (sec. 2.1 design)
-  - [ ] `PlatformEventType` derivado
-  - [ ] `ALL_PLATFORM_EVENT_TYPES` array para iteración / validación
-- [ ] Crear `src/lib/events/emit.ts` con:
-  - [ ] `emitPlatformEvent(input)` función con shape de `design.md §2.3`
-  - [ ] Service role client (`createServiceClient()`), justificado en comment del archivo
-  - [ ] Manejo de `error.code === '23505'` (idempotency conflict) como caso `ok: true`
-  - [ ] Logger structured con prefix `[platform_events]`
-  - [ ] No falla flow del caller en error (best-effort)
-- [ ] Tests `src/__tests__/lib/events/emit.test.ts`:
-  - [ ] Insert exitoso retorna `{ ok: true }`
-  - [ ] Idempotency conflict (23505) retorna `{ ok: true }` sin propagar error
-  - [ ] Error genérico retorna `{ ok: false, error }` con mensaje
-  - [ ] Defaults aplicados (`actor_id='system'`, `payload={}`, `occurred_at=now()`)
-- [ ] Validaciones:
-  - [ ] `npx tsc --noEmit` ✅
-  - [ ] `npx eslint src/lib/events/` ✅
-  - [ ] `npx vitest run src/__tests__/lib/events/` ✅
-- [ ] Commit: `feat(copilot): T4.1 platform_events schema + catálogo + emit helper`
+- [x] Crear `migrations/20260526a_platform_events.sql` con:
+  - [x] `CREATE TABLE IF NOT EXISTS platform_events` con shape de `design.md §1.1`
+  - [x] Índices `idx_platform_events_org_idempotency` (UNIQUE WHERE NOT NULL) + `idx_platform_events_org_type_time` + `idx_platform_events_org_time`
+  - [x] `ENABLE ROW LEVEL SECURITY` + `CREATE POLICY platform_events_org_read` (SELECT only authenticated, USING `organization_id = get_my_org_id()`)
+  - [x] `COMMENT ON TABLE` + `COMMENT ON COLUMN` para event_type e idempotency_key
+  - [x] BEGIN/COMMIT explícito + `DROP POLICY IF EXISTS` antes del CREATE POLICY (idempotencia)
+- [x] Crear `src/lib/events/platform-event-types.ts` con:
+  - [x] `PLATFORM_EVENT_TYPES` const con los 12 tipos v0 (sec. 2.1 design)
+  - [x] `PlatformEventType` derivado
+  - [x] `ALL_PLATFORM_EVENT_TYPES` array para iteración / validación
+- [x] Crear `src/lib/events/emit.ts` con:
+  - [x] `emitPlatformEvent(input)` función con shape de `design.md §2.3`
+  - [x] Service role client (`createServiceClient()`), justificado en comment del archivo
+  - [x] Manejo de `error.code === '23505'` (idempotency conflict) como caso `ok: true`
+  - [x] Logger structured con prefix `[platform_events]`
+  - [x] No falla flow del caller en error (best-effort)
+- [x] Tests `src/__tests__/lib/events/emit.test.ts`:
+  - [x] Insert exitoso retorna `{ ok: true }`
+  - [x] Idempotency conflict (23505) retorna `{ ok: true }` sin propagar error
+  - [x] Error genérico retorna `{ ok: false, error }` con mensaje
+  - [x] Defaults aplicados (`actor_id='system'`, `payload={}`, `occurred_at=now()`)
+- [x] Validaciones:
+  - [x] `npx tsc --noEmit` ✅
+  - [x] `npx eslint src/lib/events/` ✅
+  - [x] `npx vitest run src/__tests__/lib/events/` ✅
+- [x] Commit: `feat(copilot): T4.1 platform_events schema + catálogo + emit helper`
 
 ### Criterios de aceptación T4.1
 
@@ -84,35 +84,35 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `migrations/20260526b_copilot_insights.sql` con shape de `design.md §1.2`:
-  - [ ] Tabla con CHECK constraints en `scope` y `status`
-  - [ ] `expires_at` con DEFAULT `now() + INTERVAL '7 days'`
-  - [ ] Idempotencia UNIQUE `(organization_id, scope, iso_week)` WHERE iso_week IS NOT NULL
-  - [ ] Índice `idx_copilot_insights_org_status_time`
-  - [ ] RLS habilitada con 2 policies: SELECT y UPDATE (ambas USING `organization_id = get_my_org_id()` + UPDATE con WITH CHECK)
-  - [ ] Sin policy de INSERT (sólo service role escribe en v0)
-- [ ] Crear `migrations/20260526c_organizations_copilot_autonomy.sql`:
-  - [ ] `ADD COLUMN IF NOT EXISTS copilot_autonomy_level TEXT NOT NULL DEFAULT 'level_1_propose'`
-  - [ ] `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` para CHECK los 3 valores
-  - [ ] COMMENT ON COLUMN
-- [ ] Crear `migrations/20260526d_whatsapp_instances_copilot_notify.sql`:
-  - [ ] `ADD COLUMN IF NOT EXISTS notify_on_copilot_insight BOOLEAN NOT NULL DEFAULT true`
-  - [ ] COMMENT ON COLUMN aclarando que sólo aplica a `instance_type='personal'`
-- [ ] Extender `src/types/organization.ts`:
-  - [ ] `CopilotAutonomyLevel` type
-  - [ ] `Organization` interface gana `copilot_autonomy_level`
-- [ ] Crear `src/lib/copilot/types.ts` con shape de `design.md §2.2`:
-  - [ ] `CopilotActionKindSchema`
-  - [ ] `CopilotProposedActionSchema`
-  - [ ] `CopilotInsightPayloadSchema`
-  - [ ] `COPILOT_INSIGHT_STATUSES`, `COPILOT_AUTONOMY_LEVELS`
-- [ ] Tests `src/__tests__/lib/copilot/types.test.ts`:
-  - [ ] Schema rechaza acción fuera de whitelist
-  - [ ] Schema acepta `proposed_actions` vacío
-  - [ ] Schema rechaza body > 4000 chars
-  - [ ] Schema rechaza más de 5 proposed_actions
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.2 copilot_insights schema + autonomy level + whatsapp toggle`
+- [x] Crear `migrations/20260526b_copilot_insights.sql` con shape de `design.md §1.2`:
+  - [x] Tabla con CHECK constraints en `scope` y `status`
+  - [x] `expires_at` con DEFAULT `now() + INTERVAL '7 days'`
+  - [x] Idempotencia UNIQUE `(organization_id, scope, iso_week)` WHERE iso_week IS NOT NULL
+  - [x] Índice `idx_copilot_insights_org_status_time`
+  - [x] RLS habilitada con 2 policies: SELECT y UPDATE (ambas USING `organization_id = get_my_org_id()` + UPDATE con WITH CHECK)
+  - [x] Sin policy de INSERT (sólo service role escribe en v0)
+- [x] Crear `migrations/20260526c_organizations_copilot_autonomy.sql`:
+  - [x] `ADD COLUMN IF NOT EXISTS copilot_autonomy_level TEXT NOT NULL DEFAULT 'level_1_propose'`
+  - [x] `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` para CHECK los 3 valores
+  - [x] COMMENT ON COLUMN
+- [x] Crear `migrations/20260526d_whatsapp_instances_copilot_notify.sql`:
+  - [x] `ADD COLUMN IF NOT EXISTS notify_on_copilot_insight BOOLEAN NOT NULL DEFAULT true`
+  - [x] COMMENT ON COLUMN aclarando que sólo aplica a `instance_type='personal'`
+- [x] Extender `src/types/organization.ts`:
+  - [x] `CopilotAutonomyLevel` type
+  - [x] `Organization` interface gana `copilot_autonomy_level`
+- [x] Crear `src/lib/copilot/types.ts` con shape de `design.md §2.2`:
+  - [x] `CopilotActionKindSchema`
+  - [x] `CopilotProposedActionSchema`
+  - [x] `CopilotInsightPayloadSchema`
+  - [x] `COPILOT_INSIGHT_STATUSES`, `COPILOT_AUTONOMY_LEVELS`
+- [x] Tests `src/__tests__/lib/copilot/types.test.ts`:
+  - [x] Schema rechaza acción fuera de whitelist
+  - [x] Schema acepta `proposed_actions` vacío
+  - [x] Schema rechaza body > 4000 chars
+  - [x] Schema rechaza más de 5 proposed_actions
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.2 copilot_insights schema + autonomy level + whatsapp toggle`
 
 ### Criterios de aceptación T4.2
 
@@ -131,40 +131,40 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `src/lib/copilot/weeklyMetrics.ts`:
-  - [ ] `loadWeeklyMetrics(orgId): Promise<WeeklyMetrics>` con queries SQL contra:
+- [x] Crear `src/lib/copilot/weeklyMetrics.ts`:
+  - [x] `loadWeeklyMetrics(orgId): Promise<WeeklyMetrics>` con queries SQL contra:
     - `orders` (count, revenue, ticket avg para semana actual y previa, filtrado por `organization_id`)
     - `chats` (count, % whatsapp para ambas semanas)
     - Carritos abandonados (heurística: `chats` con `events` de cart_added sin `purchase` en 24h, top 10)
     - Clientes inactivos (`customers` sin order >21d, top 10)
     - Top 5 productos viewed (vía `analytics_events.event_name='view_content'`)
     - Top 5 productos converted (vía `orders.items` jsonb)
-  - [ ] Service role client con `organization_id` filtrado en cada query
-  - [ ] Edge case: org con 0 datos → retorna shape vacío con `weekStart/weekEnd` calculados
-- [ ] Crear `src/lib/copilot/prompts/weeklyInsightPrompt.ts`:
-  - [ ] `buildWeeklyInsightPrompt(metrics, locale)` con template de `design.md §3.3`
-  - [ ] Locale `'es-CO' | 'en-US'` afecta el idioma del LLM response
-- [ ] Crear `src/lib/copilot/insightComposer.ts`:
-  - [ ] `composeWeeklyInsight({ orgId, locale, metrics }): Promise<CopilotInsightPayload>`
-  - [ ] Llama Anthropic Claude Haiku 4.5 vía `src/lib/ai/anthropic.ts` existente
-  - [ ] Config: `max_tokens: 1500`, `temperature: 0.4`
-  - [ ] Parsea JSON de la respuesta
-  - [ ] Valida con `CopilotInsightPayloadSchema.parse()`
-  - [ ] Filtra `proposed_actions` cuyo `kind` no esté en whitelist v0
-  - [ ] Fallback a insight mínimo (sin acciones) si LLM falla o JSON inválido
-  - [ ] Logger `[copilot/composer]` con costo estimado por call
-- [ ] Tests `src/__tests__/lib/copilot/insightComposer.test.ts`:
-  - [ ] Metrics ricas + LLM mockeado → insight con 3 actions
-  - [ ] 0 orders → insight de "necesito más contexto", 0 actions
-  - [ ] LLM responde JSON inválido → fallback a payload mínimo
-  - [ ] LLM propone `kind='ban_user'` (fuera whitelist) → drop esa acción + warning log
-  - [ ] Locale `'en-US'` produce prompt en inglés
-- [ ] Tests `src/__tests__/lib/copilot/weeklyMetrics.test.ts`:
-  - [ ] Mock Supabase → shape correcto
-  - [ ] Org sin datos → shape vacío válido
-  - [ ] Filtros por `organization_id` siempre presentes (security check)
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.3 weekly metrics loader + insight composer (Claude Haiku)`
+  - [x] Service role client con `organization_id` filtrado en cada query
+  - [x] Edge case: org con 0 datos → retorna shape vacío con `weekStart/weekEnd` calculados
+- [x] Crear `src/lib/copilot/prompts/weeklyInsightPrompt.ts`:
+  - [x] `buildWeeklyInsightPrompt(metrics, locale)` con template de `design.md §3.3`
+  - [x] Locale `'es-CO' | 'en-US'` afecta el idioma del LLM response
+- [x] Crear `src/lib/copilot/insightComposer.ts`:
+  - [x] `composeWeeklyInsight({ orgId, locale, metrics }): Promise<CopilotInsightPayload>`
+  - [x] Llama Anthropic Claude Haiku 4.5 vía `src/lib/ai/anthropic.ts` existente
+  - [x] Config: `max_tokens: 1500`, `temperature: 0.4`
+  - [x] Parsea JSON de la respuesta
+  - [x] Valida con `CopilotInsightPayloadSchema.parse()`
+  - [x] Filtra `proposed_actions` cuyo `kind` no esté en whitelist v0
+  - [x] Fallback a insight mínimo (sin acciones) si LLM falla o JSON inválido
+  - [x] Logger `[copilot/composer]` con costo estimado por call
+- [x] Tests `src/__tests__/lib/copilot/insightComposer.test.ts`:
+  - [x] Metrics ricas + LLM mockeado → insight con 3 actions
+  - [x] 0 orders → insight de "necesito más contexto", 0 actions
+  - [x] LLM responde JSON inválido → fallback a payload mínimo
+  - [x] LLM propone `kind='ban_user'` (fuera whitelist) → drop esa acción + warning log
+  - [x] Locale `'en-US'` produce prompt en inglés
+- [x] Tests `src/__tests__/lib/copilot/weeklyMetrics.test.ts`:
+  - [x] Mock Supabase → shape correcto
+  - [x] Org sin datos → shape vacío válido
+  - [x] Filtros por `organization_id` siempre presentes (security check)
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.3 weekly metrics loader + insight composer (Claude Haiku)`
 
 ### Criterios de aceptación T4.3
 
@@ -183,37 +183,37 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Crear `src/app/api/cron/copilot/weekly-insights/route.ts` con shape de `design.md §4.1`:
-  - [ ] Auth `CRON_SECRET` (Bearer header)
-  - [ ] SELECT orgs candidatas: WhatsApp Personal connected + `notifications_enabled=true` + `notify_on_copilot_insight=true`
-  - [ ] Para cada org:
-    - [ ] Computar `iso_week` (helper nuevo `src/lib/utils/iso-week.ts`)
-    - [ ] Idempotency check: ¿ya existe `copilot_insights` con (org, weekly, iso_week)?
-    - [ ] Skip si existe (registrar en `results.skipped`)
-    - [ ] `loadWeeklyMetrics(orgId)`
-    - [ ] `composeWeeklyInsight({ orgId, locale, metrics })`
-    - [ ] INSERT en `copilot_insights` con `status='proposed'`
-    - [ ] `emitPlatformEvent(COPILOT_INSIGHT_PROPOSED, idempotencyKey: 'copilot.weekly.${iso_week}.${orgId}')`
-    - [ ] `sendCopilotInsight({ orgId, insightId })` (T4.5)
-  - [ ] Try/catch por org: errores no rompen otras orgs
-  - [ ] Response JSON con `{ generated, skipped, errors[] }`
-  - [ ] Logger `[copilot/weekly]` con prefix
-  - [ ] Soporta GET y POST (GET es lo que Vercel Cron llama)
-- [ ] Crear `src/lib/utils/iso-week.ts`:
-  - [ ] `computeIsoWeek(date: Date): string` retorna `'YYYY-Www'` formato ISO 8601
-  - [ ] Tests específicos para edge cases (semana 1 que cruza año, etc.)
-- [ ] Actualizar `vercel.json`:
-  - [ ] Agregar entry `{ "path": "/api/cron/copilot/weekly-insights", "schedule": "0 14 * * 1" }`
-- [ ] Tests `src/__tests__/app/api/cron/copilot/weekly-insights.test.ts`:
-  - [ ] 401 sin auth header
-  - [ ] 401 con auth incorrecto
-  - [ ] 200 con `{ message: 'No eligible orgs' }` cuando lista vacía
-  - [ ] 200 con `{ generated: 1 }` cuando 1 org elegible y composer mockeado
-  - [ ] Idempotency: segunda ejecución no duplica insights
-  - [ ] Error en 1 org no bloquea las demás
-- [ ] Tests `src/__tests__/lib/utils/iso-week.test.ts` (4+ tests)
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.4 weekly insights cron worker`
+- [x] Crear `src/app/api/cron/copilot/weekly-insights/route.ts` con shape de `design.md §4.1`:
+  - [x] Auth `CRON_SECRET` (Bearer header)
+  - [x] SELECT orgs candidatas: WhatsApp Personal connected + `notifications_enabled=true` + `notify_on_copilot_insight=true`
+  - [x] Para cada org:
+    - [x] Computar `iso_week` (helper nuevo `src/lib/utils/iso-week.ts`)
+    - [x] Idempotency check: ¿ya existe `copilot_insights` con (org, weekly, iso_week)?
+    - [x] Skip si existe (registrar en `results.skipped`)
+    - [x] `loadWeeklyMetrics(orgId)`
+    - [x] `composeWeeklyInsight({ orgId, locale, metrics })`
+    - [x] INSERT en `copilot_insights` con `status='proposed'`
+    - [x] `emitPlatformEvent(COPILOT_INSIGHT_PROPOSED, idempotencyKey: 'copilot.weekly.${iso_week}.${orgId}')`
+    - [x] `sendCopilotInsight({ orgId, insightId })` (T4.5)
+  - [x] Try/catch por org: errores no rompen otras orgs
+  - [x] Response JSON con `{ generated, skipped, errors[] }`
+  - [x] Logger `[copilot/weekly]` con prefix
+  - [x] Soporta GET y POST (GET es lo que Vercel Cron llama)
+- [x] Crear `src/lib/utils/iso-week.ts`:
+  - [x] `computeIsoWeek(date: Date): string` retorna `'YYYY-Www'` formato ISO 8601
+  - [x] Tests específicos para edge cases (semana 1 que cruza año, etc.)
+- [x] Actualizar `vercel.json`:
+  - [x] Agregar entry `{ "path": "/api/cron/copilot/weekly-insights", "schedule": "0 14 * * 1" }`
+- [x] Tests `src/__tests__/app/api/cron/copilot/weekly-insights.test.ts`:
+  - [x] 401 sin auth header
+  - [x] 401 con auth incorrecto
+  - [x] 200 con `{ message: 'No eligible orgs' }` cuando lista vacía
+  - [x] 200 con `{ generated: 1 }` cuando 1 org elegible y composer mockeado
+  - [x] Idempotency: segunda ejecución no duplica insights
+  - [x] Error en 1 org no bloquea las demás
+- [x] Tests `src/__tests__/lib/utils/iso-week.test.ts` (4+ tests)
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.4 weekly insights cron worker`
 
 ### Criterios de aceptación T4.4
 
@@ -233,28 +233,28 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 ### Subtareas
 
-- [ ] Extender `src/lib/notifications/whatsapp.ts`:
-  - [ ] Función nueva `sendCopilotInsight({ organizationId, insightId })` con shape de `design.md §5.1`
-  - [ ] Reusa `sendNotification(organizationId, phone, message)` interno existente
-  - [ ] Respeta `notifications_enabled` y `notify_on_copilot_insight`
-  - [ ] Helper `formatInsightForWhatsApp(insight)` privado:
-    - [ ] Title + body resumido a 800 chars max
-    - [ ] Numerar `proposed_actions` `1.`, `2.`, `3.`
-    - [ ] Link al dashboard via `getStoreLink()` o equivalente para `/dashboard/copilot`
-- [ ] Tests `src/__tests__/lib/notifications/whatsapp-copilot.test.ts`:
-  - [ ] Personal connected + `notify_on_copilot_insight=true` → envía mensaje
-  - [ ] Personal disconnected → no envía, retorna `false` sin error
-  - [ ] `notifications_enabled=false` → no envía
-  - [ ] `notify_on_copilot_insight=false` → no envía
-  - [ ] Insight con 0 proposed_actions → mensaje formateado sin sección de acciones
-  - [ ] Body > 800 chars → truncado correctamente con "..."
-- [ ] **E2E manual smoke test** (validación pre-merge, no en CI):
-  - [ ] Tenant QA con WhatsApp Personal connected
-  - [ ] Trigger manual del cron con `curl -H "Authorization: Bearer $CRON_SECRET" ...`
-  - [ ] WhatsApp del owner recibe mensaje formateado
-  - [ ] Insight aparece en `/dashboard/copilot` (T4.6)
-- [ ] Validaciones tsc + eslint + vitest focalizado
-- [ ] Commit: `feat(copilot): T4.5 sendCopilotInsight WhatsApp Personal channel`
+- [x] Extender `src/lib/notifications/whatsapp.ts`:
+  - [x] Función nueva `sendCopilotInsight({ organizationId, insightId })` con shape de `design.md §5.1`
+  - [x] Reusa `sendNotification(organizationId, phone, message)` interno existente
+  - [x] Respeta `notifications_enabled` y `notify_on_copilot_insight`
+  - [x] Helper `formatInsightForWhatsApp(insight)` privado:
+    - [x] Title + body resumido a 800 chars max
+    - [x] Numerar `proposed_actions` `1.`, `2.`, `3.`
+    - [x] Link al dashboard via `getStoreLink()` o equivalente para `/dashboard/copilot`
+- [x] Tests `src/__tests__/lib/notifications/whatsapp-copilot.test.ts`:
+  - [x] Personal connected + `notify_on_copilot_insight=true` → envía mensaje
+  - [x] Personal disconnected → no envía, retorna `false` sin error
+  - [x] `notifications_enabled=false` → no envía
+  - [x] `notify_on_copilot_insight=false` → no envía
+  - [x] Insight con 0 proposed_actions → mensaje formateado sin sección de acciones
+  - [x] Body > 800 chars → truncado correctamente con "..."
+- [x] **E2E manual smoke test** (validación pre-merge, no en CI):
+  - [x] Tenant QA con WhatsApp Personal connected
+  - [x] Trigger manual del cron con `curl -H "Authorization: Bearer $CRON_SECRET" ...`
+  - [x] WhatsApp del owner recibe mensaje formateado
+  - [x] Insight aparece en `/dashboard/copilot` (T4.6)
+- [x] Validaciones tsc + eslint + vitest focalizado
+- [x] Commit: `feat(copilot): T4.5 sendCopilotInsight WhatsApp Personal channel`
 
 ### Criterios de aceptación T4.5
 
@@ -274,73 +274,73 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 #### T4.6.a — Action executor
 
-- [ ] Crear `src/lib/copilot/actionExecutor.ts` con shape de `design.md §6.1`:
-  - [ ] Whitelist v0: `send_coupon_to_customers`, `pause_product`, `enable_product`, `notify_owner`
-  - [ ] Switch por kind con handler dedicado por acción
-  - [ ] `runSendCouponToCustomers`: crea cupón en `coupons` + WhatsApp con código
-  - [ ] `runPauseProduct`: `UPDATE products SET active=false WHERE id=$1 AND organization_id=$2`
-  - [ ] `runEnableProduct`: opuesta
-  - [ ] `runNotifyOwner`: `sendNotification` simple
-  - [ ] Emite `COPILOT_ACTION_EXECUTED` event con `idempotency_key='copilot.action.${insight_id}.${kind}'`
-  - [ ] Errores no propagados al UI; retornan `{ ok: false, error }`
-- [ ] Tests `src/__tests__/lib/copilot/actionExecutor.test.ts`:
-  - [ ] 4 tests happy path (1 por kind)
-  - [ ] Kind fuera de whitelist → `{ ok: false, error: 'action_kind_not_whitelisted' }`
-  - [ ] Idempotency: 2 ejecuciones del mismo (insight, kind) emiten 1 sólo evento
+- [x] Crear `src/lib/copilot/actionExecutor.ts` con shape de `design.md §6.1`:
+  - [x] Whitelist v0: `send_coupon_to_customers`, `pause_product`, `enable_product`, `notify_owner`
+  - [x] Switch por kind con handler dedicado por acción
+  - [x] `runSendCouponToCustomers`: crea cupón en `coupons` + WhatsApp con código
+  - [x] `runPauseProduct`: `UPDATE products SET active=false WHERE id=$1 AND organization_id=$2`
+  - [x] `runEnableProduct`: opuesta
+  - [x] `runNotifyOwner`: `sendNotification` simple
+  - [x] Emite `COPILOT_ACTION_EXECUTED` event con `idempotency_key='copilot.action.${insight_id}.${kind}'`
+  - [x] Errores no propagados al UI; retornan `{ ok: false, error }`
+- [x] Tests `src/__tests__/lib/copilot/actionExecutor.test.ts`:
+  - [x] 4 tests happy path (1 por kind)
+  - [x] Kind fuera de whitelist → `{ ok: false, error: 'action_kind_not_whitelisted' }`
+  - [x] Idempotency: 2 ejecuciones del mismo (insight, kind) emiten 1 sólo evento
 
 #### T4.6.b — Server actions
 
-- [ ] Crear `src/app/dashboard/copilot/actions.ts`:
-  - [ ] `decideCopilotInsight({ insightId, decision, note?, actionIndices? })`
-  - [ ] Patrón `ActionResult<T>` heredado del repo
-  - [ ] Carga insight con cliente authenticated (RLS filtra por org)
-  - [ ] Si `decision='approve'`: ejecuta acciones por índice + actualiza `status='executed'`
-  - [ ] Si `decision='dismiss'`: actualiza `status='dismissed'` + `decision_note`
-  - [ ] Persiste `decided_at` y `decided_by`
-  - [ ] Emite `COPILOT_INSIGHT_APPROVED` o `COPILOT_INSIGHT_DISMISSED`
-  - [ ] Retorna `{ executed: number, failed: number }`
-- [ ] Tests `src/__tests__/app/dashboard/copilot/actions.test.ts`:
-  - [ ] Approve con todas las actions → `executed === total`
-  - [ ] Approve con índices parciales → ejecuta sólo esos
-  - [ ] Dismiss → status correcto + note guardada
-  - [ ] Insight de otro org → `{ success: false, error: 'not_found' }` (RLS protege)
-  - [ ] Insight ya `executed` → idempotente (no re-ejecuta)
+- [x] Crear `src/app/dashboard/copilot/actions.ts`:
+  - [x] `decideCopilotInsight({ insightId, decision, note?, actionIndices? })`
+  - [x] Patrón `ActionResult<T>` heredado del repo
+  - [x] Carga insight con cliente authenticated (RLS filtra por org)
+  - [x] Si `decision='approve'`: ejecuta acciones por índice + actualiza `status='executed'`
+  - [x] Si `decision='dismiss'`: actualiza `status='dismissed'` + `decision_note`
+  - [x] Persiste `decided_at` y `decided_by`
+  - [x] Emite `COPILOT_INSIGHT_APPROVED` o `COPILOT_INSIGHT_DISMISSED`
+  - [x] Retorna `{ executed: number, failed: number }`
+- [x] Tests `src/__tests__/app/dashboard/copilot/actions.test.ts`:
+  - [x] Approve con todas las actions → `executed === total`
+  - [x] Approve con índices parciales → ejecuta sólo esos
+  - [x] Dismiss → status correcto + note guardada
+  - [x] Insight de otro org → `{ success: false, error: 'not_found' }` (RLS protege)
+  - [x] Insight ya `executed` → idempotente (no re-ejecuta)
 
 #### T4.6.c — UI pages
 
-- [ ] Crear `src/app/dashboard/copilot/page.tsx` (Server Component):
-  - [ ] Tabs `Pendientes | Historial`
-  - [ ] SELECT insights por status; render `<InsightCard>`
-  - [ ] Empty state: "Tu primer reporte semanal llega el próximo lunes a las 9:00 AM"
-- [ ] Crear `src/app/dashboard/copilot/components/insight-card.tsx`:
-  - [ ] Render markdown body via `react-markdown` (lib existente)
-  - [ ] Chips de proposed_actions
-  - [ ] Botones "Aprobar" (abre modal) y "Rechazar"
-  - [ ] Tailwind v4 + shadcn/ui (mandato)
-  - [ ] `next/image` (no `<img>`)
-- [ ] Crear `src/app/dashboard/copilot/components/decision-modal.tsx`:
-  - [ ] Confirma con preview del efecto: "Se enviará cupón 15% a 3 clientes"
-  - [ ] Llama `decideCopilotInsight()` server action
-  - [ ] Toast de éxito o error
-- [ ] Crear `src/app/dashboard/copilot/settings/page.tsx`:
-  - [ ] Toggle `copilot_autonomy_level`
-  - [ ] Toggle `notify_on_copilot_insight` (afecta `whatsapp_instances` Personal)
-  - [ ] Persiste vía server action
+- [x] Crear `src/app/dashboard/copilot/page.tsx` (Server Component):
+  - [x] Tabs `Pendientes | Historial`
+  - [x] SELECT insights por status; render `<InsightCard>`
+  - [x] Empty state: "Tu primer reporte semanal llega el próximo lunes a las 9:00 AM"
+- [x] Crear `src/app/dashboard/copilot/components/insight-card.tsx`:
+  - [x] Render markdown body via `react-markdown` (lib existente)
+  - [x] Chips de proposed_actions
+  - [x] Botones "Aprobar" (abre modal) y "Rechazar"
+  - [x] Tailwind v4 + shadcn/ui (mandato)
+  - [x] `next/image` (no `<img>`)
+- [x] Crear `src/app/dashboard/copilot/components/decision-modal.tsx`:
+  - [x] Confirma con preview del efecto: "Se enviará cupón 15% a 3 clientes"
+  - [x] Llama `decideCopilotInsight()` server action
+  - [x] Toast de éxito o error
+- [x] Crear `src/app/dashboard/copilot/settings/page.tsx`:
+  - [x] Toggle `copilot_autonomy_level`
+  - [x] Toggle `notify_on_copilot_insight` (afecta `whatsapp_instances` Personal)
+  - [x] Persiste vía server action
 
 #### T4.6.d — Tests E2E (security + flow)
 
-- [ ] `src/__tests__/security/copilot-rls.test.ts`:
-  - [ ] Org A no ve insights de org B (SELECT)
-  - [ ] Org A no puede UPDATE insight de org B
-  - [ ] Service role bypassea RLS sólo en INSERT (worker)
-  - [ ] User no-admin no puede cambiar `copilot_autonomy_level` (depende de policy en `organizations`)
-- [ ] `src/__tests__/integration/copilot-whatsapp-personal.test.ts`:
-  - [ ] Worker → composer → insight persistido → sendCopilotInsight → mock WhatsApp recibió mensaje
-  - [ ] Worker para org sin Personal connected → cero side effects
-  - [ ] Worker para org con Personal pero `notify_on_copilot_insight=false` → insight persistido pero sin envío
+- [x] `src/__tests__/security/copilot-rls.test.ts`:
+  - [x] Org A no ve insights de org B (SELECT)
+  - [x] Org A no puede UPDATE insight de org B
+  - [x] Service role bypassea RLS sólo en INSERT (worker)
+  - [x] User no-admin no puede cambiar `copilot_autonomy_level` (depende de policy en `organizations`)
+- [x] `src/__tests__/integration/copilot-whatsapp-personal.test.ts`:
+  - [x] Worker → composer → insight persistido → sendCopilotInsight → mock WhatsApp recibió mensaje
+  - [x] Worker para org sin Personal connected → cero side effects
+  - [x] Worker para org con Personal pero `notify_on_copilot_insight=false` → insight persistido pero sin envío
 
-- [ ] Validaciones tsc + eslint + vitest focalizado + `npm run build`
-- [ ] Commit: `feat(copilot): T4.6 dashboard UI + action executor + RLS suite`
+- [x] Validaciones tsc + eslint + vitest focalizado + `npm run build`
+- [x] Commit: `feat(copilot): T4.6 dashboard UI + action executor + RLS suite`
 
 ### Criterios de aceptación T4.6
 

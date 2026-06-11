@@ -236,6 +236,124 @@ La cita queda pendiente de confirmación.`
 }
 
 /**
+ * Notificación genérica al WhatsApp Personal del owner (respeta
+ * `notifications_enabled`). Usada por el action executor del copilot
+ * (notify_owner, código de cupón creado).
+ */
+export async function sendOwnerNotification(
+    organizationId: string,
+    message: string
+): Promise<boolean> {
+    try {
+        const supabase = await createServiceClient()
+
+        const { data: instance } = await supabase
+            .from("whatsapp_instances")
+            .select("phone_number, notifications_enabled")
+            .eq("organization_id", organizationId)
+            .eq("instance_type", "personal")
+            .eq("status", "connected")
+            .single()
+
+        if (!instance?.phone_number || instance.notifications_enabled === false) {
+            return false
+        }
+
+        await sendNotification(organizationId, instance.phone_number, message)
+        return true
+    } catch (error) {
+        console.error("[WhatsApp Notifications] Error sending owner notification:", error)
+        return false
+    }
+}
+
+/** Trunca el body del insight para WhatsApp (legibilidad móvil). */
+function truncateInsightBody(body: string, maxLength = 800): string {
+    if (body.length <= maxLength) return body
+    return `${body.slice(0, maxLength - 1).trimEnd()}…`
+}
+
+/**
+ * Formatea un insight del copilot para WhatsApp Personal del owner.
+ * Exportada para tests (formato determinístico).
+ */
+export function formatInsightForWhatsApp(insight: {
+    title: string
+    body: string
+    proposed_actions: Array<{ human_label: string }>
+}): string {
+    const actionsSection = insight.proposed_actions.length > 0
+        ? `\n\n*¿Qué hacemos?*\n${insight.proposed_actions
+            .slice(0, 5)
+            .map((action, index) => `${index + 1}. ${action.human_label}`)
+            .join("\n")}\n\nAprueba o rechaza cada acción en tu dashboard:`
+        : "\n\nRevisa el detalle en tu dashboard:"
+
+    return `🌅 *Atlas Copilot — Reporte semanal*
+
+*${insight.title}*
+
+${truncateInsightBody(insight.body)}${actionsSection}
+https://landingchat.co/dashboard/copilot`
+}
+
+/**
+ * Envía el insight semanal del copilot al WhatsApp Personal del owner
+ * (Copilot Merchant Loop v0 — T4.5). Mismo patrón que sendSaleNotification;
+ * respeta `notifications_enabled` y `notify_on_copilot_insight`.
+ */
+export async function sendCopilotInsight(params: {
+    organizationId: string
+    insightId: string
+}): Promise<boolean> {
+    try {
+        const supabase = await createServiceClient()
+
+        const { data: instance } = await supabase
+            .from("whatsapp_instances")
+            .select("phone_number, notifications_enabled, notify_on_copilot_insight")
+            .eq("organization_id", params.organizationId)
+            .eq("instance_type", "personal")
+            .eq("status", "connected")
+            .single()
+
+        if (!instance || instance.notifications_enabled === false || instance.notify_on_copilot_insight === false) {
+            console.log("[WhatsApp Notifications] Copilot insights disabled for org:", params.organizationId)
+            return false
+        }
+
+        if (!instance.phone_number) {
+            console.error("[WhatsApp Notifications] No phone number for personal instance")
+            return false
+        }
+
+        const { data: insight } = await supabase
+            .from("copilot_insights")
+            .select("title, body, proposed_actions")
+            .eq("id", params.insightId)
+            .eq("organization_id", params.organizationId)
+            .single()
+
+        if (!insight) {
+            console.error("[WhatsApp Notifications] Copilot insight not found:", params.insightId)
+            return false
+        }
+
+        const message = formatInsightForWhatsApp({
+            title: insight.title,
+            body: insight.body,
+            proposed_actions: (insight.proposed_actions as Array<{ human_label: string }>) ?? [],
+        })
+
+        await sendNotification(params.organizationId, instance.phone_number, message)
+        return true
+    } catch (error) {
+        console.error("[WhatsApp Notifications] Error sending copilot insight:", error)
+        return false
+    }
+}
+
+/**
  * Función auxiliar para enviar notificación por WhatsApp
  * Usa el provider agnóstico (Meta Cloud API o Evolution API)
  */

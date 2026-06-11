@@ -32,6 +32,7 @@ import {
     ImageIcon,
     UserCog,
     Store,
+    Sparkles,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -89,6 +90,7 @@ interface NavSection {
 const BASE_NAV_ITEMS: NavItem[] = [
     { slug: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { slug: "analytics", label: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+    { slug: "copilot", label: "Copilot", href: "/dashboard/copilot", icon: Sparkles },
     { slug: "storefront", label: "Storefront", href: "/dashboard/storefront", icon: Store },
 ]
 
@@ -132,7 +134,7 @@ function getNavSectionKey(item: NavItem): NavSectionKey {
         return "footer"
     }
 
-    if (["dashboard", "analytics", "conversations", "chats", "agent", "agents", "leads", "appointments", "advisors"].includes(item.slug)) {
+    if (["dashboard", "analytics", "copilot", "conversations", "chats", "agent", "agents", "leads", "appointments", "advisors"].includes(item.slug)) {
         return "principal"
     }
 
