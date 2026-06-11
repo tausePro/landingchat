@@ -274,73 +274,73 @@ Sin las 5 precondiciones cumplidas, no abrir la rama.
 
 #### T4.6.a — Action executor
 
-- [ ] Crear `src/lib/copilot/actionExecutor.ts` con shape de `design.md §6.1`:
-  - [ ] Whitelist v0: `send_coupon_to_customers`, `pause_product`, `enable_product`, `notify_owner`
-  - [ ] Switch por kind con handler dedicado por acción
-  - [ ] `runSendCouponToCustomers`: crea cupón en `coupons` + WhatsApp con código
-  - [ ] `runPauseProduct`: `UPDATE products SET active=false WHERE id=$1 AND organization_id=$2`
-  - [ ] `runEnableProduct`: opuesta
-  - [ ] `runNotifyOwner`: `sendNotification` simple
-  - [ ] Emite `COPILOT_ACTION_EXECUTED` event con `idempotency_key='copilot.action.${insight_id}.${kind}'`
-  - [ ] Errores no propagados al UI; retornan `{ ok: false, error }`
-- [ ] Tests `src/__tests__/lib/copilot/actionExecutor.test.ts`:
-  - [ ] 4 tests happy path (1 por kind)
-  - [ ] Kind fuera de whitelist → `{ ok: false, error: 'action_kind_not_whitelisted' }`
-  - [ ] Idempotency: 2 ejecuciones del mismo (insight, kind) emiten 1 sólo evento
+- [x] Crear `src/lib/copilot/actionExecutor.ts` con shape de `design.md §6.1`:
+  - [x] Whitelist v0: `send_coupon_to_customers`, `pause_product`, `enable_product`, `notify_owner`
+  - [x] Switch por kind con handler dedicado por acción
+  - [x] `runSendCouponToCustomers`: crea cupón en `coupons` + WhatsApp con código
+  - [x] `runPauseProduct`: `UPDATE products SET active=false WHERE id=$1 AND organization_id=$2`
+  - [x] `runEnableProduct`: opuesta
+  - [x] `runNotifyOwner`: `sendNotification` simple
+  - [x] Emite `COPILOT_ACTION_EXECUTED` event con `idempotency_key='copilot.action.${insight_id}.${kind}'`
+  - [x] Errores no propagados al UI; retornan `{ ok: false, error }`
+- [x] Tests `src/__tests__/lib/copilot/actionExecutor.test.ts`:
+  - [x] 4 tests happy path (1 por kind)
+  - [x] Kind fuera de whitelist → `{ ok: false, error: 'action_kind_not_whitelisted' }`
+  - [x] Idempotency: 2 ejecuciones del mismo (insight, kind) emiten 1 sólo evento
 
 #### T4.6.b — Server actions
 
-- [ ] Crear `src/app/dashboard/copilot/actions.ts`:
-  - [ ] `decideCopilotInsight({ insightId, decision, note?, actionIndices? })`
-  - [ ] Patrón `ActionResult<T>` heredado del repo
-  - [ ] Carga insight con cliente authenticated (RLS filtra por org)
-  - [ ] Si `decision='approve'`: ejecuta acciones por índice + actualiza `status='executed'`
-  - [ ] Si `decision='dismiss'`: actualiza `status='dismissed'` + `decision_note`
-  - [ ] Persiste `decided_at` y `decided_by`
-  - [ ] Emite `COPILOT_INSIGHT_APPROVED` o `COPILOT_INSIGHT_DISMISSED`
-  - [ ] Retorna `{ executed: number, failed: number }`
-- [ ] Tests `src/__tests__/app/dashboard/copilot/actions.test.ts`:
-  - [ ] Approve con todas las actions → `executed === total`
-  - [ ] Approve con índices parciales → ejecuta sólo esos
-  - [ ] Dismiss → status correcto + note guardada
-  - [ ] Insight de otro org → `{ success: false, error: 'not_found' }` (RLS protege)
-  - [ ] Insight ya `executed` → idempotente (no re-ejecuta)
+- [x] Crear `src/app/dashboard/copilot/actions.ts`:
+  - [x] `decideCopilotInsight({ insightId, decision, note?, actionIndices? })`
+  - [x] Patrón `ActionResult<T>` heredado del repo
+  - [x] Carga insight con cliente authenticated (RLS filtra por org)
+  - [x] Si `decision='approve'`: ejecuta acciones por índice + actualiza `status='executed'`
+  - [x] Si `decision='dismiss'`: actualiza `status='dismissed'` + `decision_note`
+  - [x] Persiste `decided_at` y `decided_by`
+  - [x] Emite `COPILOT_INSIGHT_APPROVED` o `COPILOT_INSIGHT_DISMISSED`
+  - [x] Retorna `{ executed: number, failed: number }`
+- [x] Tests `src/__tests__/app/dashboard/copilot/actions.test.ts`:
+  - [x] Approve con todas las actions → `executed === total`
+  - [x] Approve con índices parciales → ejecuta sólo esos
+  - [x] Dismiss → status correcto + note guardada
+  - [x] Insight de otro org → `{ success: false, error: 'not_found' }` (RLS protege)
+  - [x] Insight ya `executed` → idempotente (no re-ejecuta)
 
 #### T4.6.c — UI pages
 
-- [ ] Crear `src/app/dashboard/copilot/page.tsx` (Server Component):
-  - [ ] Tabs `Pendientes | Historial`
-  - [ ] SELECT insights por status; render `<InsightCard>`
-  - [ ] Empty state: "Tu primer reporte semanal llega el próximo lunes a las 9:00 AM"
-- [ ] Crear `src/app/dashboard/copilot/components/insight-card.tsx`:
-  - [ ] Render markdown body via `react-markdown` (lib existente)
-  - [ ] Chips de proposed_actions
-  - [ ] Botones "Aprobar" (abre modal) y "Rechazar"
-  - [ ] Tailwind v4 + shadcn/ui (mandato)
-  - [ ] `next/image` (no `<img>`)
-- [ ] Crear `src/app/dashboard/copilot/components/decision-modal.tsx`:
-  - [ ] Confirma con preview del efecto: "Se enviará cupón 15% a 3 clientes"
-  - [ ] Llama `decideCopilotInsight()` server action
-  - [ ] Toast de éxito o error
-- [ ] Crear `src/app/dashboard/copilot/settings/page.tsx`:
-  - [ ] Toggle `copilot_autonomy_level`
-  - [ ] Toggle `notify_on_copilot_insight` (afecta `whatsapp_instances` Personal)
-  - [ ] Persiste vía server action
+- [x] Crear `src/app/dashboard/copilot/page.tsx` (Server Component):
+  - [x] Tabs `Pendientes | Historial`
+  - [x] SELECT insights por status; render `<InsightCard>`
+  - [x] Empty state: "Tu primer reporte semanal llega el próximo lunes a las 9:00 AM"
+- [x] Crear `src/app/dashboard/copilot/components/insight-card.tsx`:
+  - [x] Render markdown body via `react-markdown` (lib existente)
+  - [x] Chips de proposed_actions
+  - [x] Botones "Aprobar" (abre modal) y "Rechazar"
+  - [x] Tailwind v4 + shadcn/ui (mandato)
+  - [x] `next/image` (no `<img>`)
+- [x] Crear `src/app/dashboard/copilot/components/decision-modal.tsx`:
+  - [x] Confirma con preview del efecto: "Se enviará cupón 15% a 3 clientes"
+  - [x] Llama `decideCopilotInsight()` server action
+  - [x] Toast de éxito o error
+- [x] Crear `src/app/dashboard/copilot/settings/page.tsx`:
+  - [x] Toggle `copilot_autonomy_level`
+  - [x] Toggle `notify_on_copilot_insight` (afecta `whatsapp_instances` Personal)
+  - [x] Persiste vía server action
 
 #### T4.6.d — Tests E2E (security + flow)
 
-- [ ] `src/__tests__/security/copilot-rls.test.ts`:
-  - [ ] Org A no ve insights de org B (SELECT)
-  - [ ] Org A no puede UPDATE insight de org B
-  - [ ] Service role bypassea RLS sólo en INSERT (worker)
-  - [ ] User no-admin no puede cambiar `copilot_autonomy_level` (depende de policy en `organizations`)
-- [ ] `src/__tests__/integration/copilot-whatsapp-personal.test.ts`:
-  - [ ] Worker → composer → insight persistido → sendCopilotInsight → mock WhatsApp recibió mensaje
-  - [ ] Worker para org sin Personal connected → cero side effects
-  - [ ] Worker para org con Personal pero `notify_on_copilot_insight=false` → insight persistido pero sin envío
+- [x] `src/__tests__/security/copilot-rls.test.ts`:
+  - [x] Org A no ve insights de org B (SELECT)
+  - [x] Org A no puede UPDATE insight de org B
+  - [x] Service role bypassea RLS sólo en INSERT (worker)
+  - [x] User no-admin no puede cambiar `copilot_autonomy_level` (depende de policy en `organizations`)
+- [x] `src/__tests__/integration/copilot-whatsapp-personal.test.ts`:
+  - [x] Worker → composer → insight persistido → sendCopilotInsight → mock WhatsApp recibió mensaje
+  - [x] Worker para org sin Personal connected → cero side effects
+  - [x] Worker para org con Personal pero `notify_on_copilot_insight=false` → insight persistido pero sin envío
 
-- [ ] Validaciones tsc + eslint + vitest focalizado + `npm run build`
-- [ ] Commit: `feat(copilot): T4.6 dashboard UI + action executor + RLS suite`
+- [x] Validaciones tsc + eslint + vitest focalizado + `npm run build`
+- [x] Commit: `feat(copilot): T4.6 dashboard UI + action executor + RLS suite`
 
 ### Criterios de aceptación T4.6
 

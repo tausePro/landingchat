@@ -235,6 +235,38 @@ La cita queda pendiente de confirmación.`
     }
 }
 
+/**
+ * Notificación genérica al WhatsApp Personal del owner (respeta
+ * `notifications_enabled`). Usada por el action executor del copilot
+ * (notify_owner, código de cupón creado).
+ */
+export async function sendOwnerNotification(
+    organizationId: string,
+    message: string
+): Promise<boolean> {
+    try {
+        const supabase = await createServiceClient()
+
+        const { data: instance } = await supabase
+            .from("whatsapp_instances")
+            .select("phone_number, notifications_enabled")
+            .eq("organization_id", organizationId)
+            .eq("instance_type", "personal")
+            .eq("status", "connected")
+            .single()
+
+        if (!instance?.phone_number || instance.notifications_enabled === false) {
+            return false
+        }
+
+        await sendNotification(organizationId, instance.phone_number, message)
+        return true
+    } catch (error) {
+        console.error("[WhatsApp Notifications] Error sending owner notification:", error)
+        return false
+    }
+}
+
 /** Trunca el body del insight para WhatsApp (legibilidad móvil). */
 function truncateInsightBody(body: string, maxLength = 800): string {
     if (body.length <= maxLength) return body
