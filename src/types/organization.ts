@@ -222,6 +222,13 @@ export interface OrganizationSettingsOverrides {
     request_delay_days?: number
     [key: string]: unknown
   }
+  /** Horario de atención para booking de citas/servicios. */
+  booking?: {
+    day_start_hour?: number
+    day_end_hour?: number
+    skip_sundays?: boolean
+    [key: string]: unknown
+  }
   whatsapp?: OrganizationStorefrontWhatsAppSettings
   whatsapp_operator?: OrganizationWhatsAppOperatorSettings
   [key: string]: unknown

@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json()
-        const { organizationId, slug, propertyCode, proposedDate, customerName, customerPhone, customerEmail } = body
+        const { organizationId, slug, propertyCode, proposedDate, customerName, customerPhone, customerEmail, title } = body
 
         if ((!organizationId && !slug) || !proposedDate || !customerName || !customerPhone) {
             return NextResponse.json(
@@ -51,11 +51,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 })
         }
 
+        // `title` viene del booking de servicios (Fase 2): cita de servicio,
+        // no visita inmobiliaria. Sin title se conserva el flujo original.
+        const isServiceBooking = typeof title === "string" && title.trim().length > 0
+
         const result = await createManagedAppointment(supabase, {
             organizationId: organization.id,
+            title: isServiceBooking ? title.trim().slice(0, 120) : undefined,
             proposedDate: startDate,
             durationMinutes: 60,
-            appointmentType: "visit",
+            appointmentType: isServiceBooking ? "service" : "visit",
             locationType: "in_person",
             customerName,
             customerPhone,
@@ -97,7 +102,9 @@ export async function POST(request: NextRequest) {
                 time: timeFormatted,
                 advisor: result.assignedAdvisor ? result.assignedAdvisor.name : null,
             },
-            message: `Tu visita ha sido agendada para el ${dateFormatted} a las ${timeFormatted}.${result.assignedAdvisor ? ` Tu asesor será ${result.assignedAdvisor.name}.` : " Un asesor confirmará en breve."}`,
+            message: isServiceBooking
+                ? `Tu cita ha sido agendada para el ${dateFormatted} a las ${timeFormatted}. El equipo la confirmará en breve.`
+                : `Tu visita ha sido agendada para el ${dateFormatted} a las ${timeFormatted}.${result.assignedAdvisor ? ` Tu asesor será ${result.assignedAdvisor.name}.` : " Un asesor confirmará en breve."}`,
         })
     } catch (error) {
         console.error("[bookings/create] Error:", error)
