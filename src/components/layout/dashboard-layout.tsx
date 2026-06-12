@@ -159,6 +159,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [userName, setUserName] = React.useState<string>("Admin")
     const [enabledModules, setEnabledModules] = React.useState<string[]>([])
     const [industrySlug, setIndustrySlug] = React.useState<string>("")
+    const [isSuspended, setIsSuspended] = React.useState(false)
 
     React.useEffect(() => {
         const checkOnboarding = async () => {
@@ -181,7 +182,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 if (profile?.organization_id) {
                     const { data: org } = await supabase
                         .from("organizations")
-                        .select("onboarding_completed, enabled_modules, industry")
+                        .select("onboarding_completed, enabled_modules, industry, status")
                         .eq("id", profile.organization_id)
                         .single()
 
@@ -192,6 +193,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         }
                         setEnabledModules(org.enabled_modules || [])
                         setIndustrySlug(org.industry || "")
+                        setIsSuspended(org.status === "suspended")
                     }
                 }
             } catch (error) {
@@ -392,7 +394,20 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         </Link>
                     </div>
                 </header>
-                <div className="flex-1 overflow-y-auto p-8">{children}</div>
+                <div className="flex-1 overflow-y-auto p-8">
+                    {isSuspended && (
+                        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40 p-4 flex items-start gap-3">
+                            <span className="material-symbols-outlined text-red-600 mt-0.5">lock</span>
+                            <div>
+                                <p className="font-semibold text-red-800 dark:text-red-300">Cuenta suspendida</p>
+                                <p className="text-sm text-red-700 dark:text-red-400 mt-0.5">
+                                    Tu tienda y el chat están fuera de línea para tus clientes. Contacta al equipo de LandingChat para reactivar el servicio.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    {children}
+                </div>
             </main>
         </div>
     )
