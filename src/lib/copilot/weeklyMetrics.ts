@@ -10,9 +10,12 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
+import { fetchAllPages } from "@/lib/supabase/fetch-all"
+import { logger } from "@/lib/logger"
+
+const log = logger("copilot/metrics")
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const ROW_CAP = 1000
 
 export interface WeeklyMetrics {
     weekStart: Date
@@ -86,58 +89,69 @@ export async function loadWeeklyMetrics(organizationId: string, now: Date = new 
 
     const orderSelect = "id, total, payment_status, customer_id, customer_info, items, created_at"
 
+    // Auditoría 2026-06-12: PostgREST capa toda respuesta en 1000 filas —
+    // el .limit(5000) de analytics_events entregaba máximo 1000 EN SILENCIO
+    // y los .limit(1000) subestimaban métricas de tenants grandes. Toda
+    // query pagina con fetchAllPages (las métricas del insight deben ser
+    // exactas: el composer se las dicta al merchant).
     const [currentOrdersRes, prevOrdersRes, currentChatsRes, prevChatsRes, eventsRes, historyOrdersRes] = await Promise.all([
-        supabase
+        fetchAllPages<OrderRow>((from, to) => supabase
             .from("orders")
             .select(orderSelect)
             .eq("organization_id", organizationId)
             .gte("created_at", weekStart.toISOString())
             .lt("created_at", weekEnd.toISOString())
-            .limit(ROW_CAP),
-        supabase
+            .range(from, to)),
+        fetchAllPages<OrderRow>((from, to) => supabase
             .from("orders")
             .select(orderSelect)
             .eq("organization_id", organizationId)
             .gte("created_at", previousWeekStart.toISOString())
             .lt("created_at", weekStart.toISOString())
-            .limit(ROW_CAP),
-        supabase
+            .range(from, to)),
+        fetchAllPages<{ id: string; channel: string | null }>((from, to) => supabase
             .from("chats")
             .select("id, channel")
             .eq("organization_id", organizationId)
             .gte("created_at", weekStart.toISOString())
             .lt("created_at", weekEnd.toISOString())
-            .limit(ROW_CAP),
-        supabase
+            .range(from, to)),
+        fetchAllPages<{ id: string }>((from, to) => supabase
             .from("chats")
             .select("id")
             .eq("organization_id", organizationId)
             .gte("created_at", previousWeekStart.toISOString())
             .lt("created_at", weekStart.toISOString())
-            .limit(ROW_CAP),
-        supabase
+            .range(from, to)),
+        fetchAllPages<AnalyticsEventRow>((from, to) => supabase
             .from("analytics_events")
             .select("session_id, event_name, content_ids, value, occurred_at")
             .eq("organization_id", organizationId)
             .in("event_name", ["view_content", "add_to_cart", "checkout_order_created", "purchase"])
             .gte("occurred_at", weekStart.toISOString())
             .lt("occurred_at", weekEnd.toISOString())
-            .limit(5000),
-        supabase
+            .range(from, to), { maxRows: 20_000 }),
+        fetchAllPages<{ customer_id: string | null; customer_info: { name?: string } | null; created_at: string }>((from, to) => supabase
             .from("orders")
             .select("customer_id, customer_info, created_at")
             .eq("organization_id", organizationId)
             .gte("created_at", lookback90d.toISOString())
             .order("created_at", { ascending: false })
-            .limit(ROW_CAP),
+            .range(from, to)),
     ])
 
-    const currentOrders = (currentOrdersRes.data ?? []) as OrderRow[]
-    const prevOrders = (prevOrdersRes.data ?? []) as OrderRow[]
-    const currentChats = (currentChatsRes.data ?? []) as Array<{ id: string; channel: string | null }>
-    const prevChats = (prevChatsRes.data ?? []) as Array<{ id: string }>
-    const events = (eventsRes.data ?? []) as AnalyticsEventRow[]
-    const historyOrders = (historyOrdersRes.data ?? []) as Array<{ customer_id: string | null; customer_info: { name?: string } | null; created_at: string }>
+    for (const [name, result] of [["orders", currentOrdersRes], ["events", eventsRes], ["history", historyOrdersRes]] as const) {
+        if (result.truncated) {
+            log.warn("weekly metrics truncated at maxRows", { organizationId, query: name })
+        }
+    }
+
+    const currentOrders = currentOrdersRes.rows
+    const prevOrders = prevOrdersRes.rows
+    const currentChats = currentChatsRes.rows
+    const prevChats = prevChatsRes.rows
+    const events = eventsRes.rows
+    const historyOrders = historyOrdersRes.rows
 
     // --- Órdenes ---
     const revenue = paidRevenue(currentOrders)

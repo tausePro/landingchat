@@ -21,7 +21,7 @@ const mockSendInsight = vi.fn()
 // sin exigir WhatsApp (la entrega va por la cadena notifyMerchant)
 function thenableChain(resultFn: () => unknown) {
     const chain: Record<string, unknown> = {}
-    for (const method of ["select", "eq", "in", "gte"]) {
+    for (const method of ["select", "eq", "in", "gte", "range"]) {
         chain[method] = vi.fn(() => chain)
     }
     chain.then = (resolve: (value: unknown) => void) => resolve(resultFn())
