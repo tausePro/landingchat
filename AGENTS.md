@@ -64,6 +64,10 @@ Variables completas y comandos detallados en `docs/AGENTS_GUIDE.md`.
 - ❌ NO montar `<MetaPixel>` ni `<TrackingProvider>` en layouts anidados si el padre ya los monta
 - ✅ PostHog: `capture_pageview: false`, emitimos `$pageview` manualmente vía `usePosthogTracking`
 
+### Supabase / PostgREST
+- ⚠️ PostgREST capa TODA respuesta en **1000 filas** sin importar `.limit(5000)` o `.range(0, 4999)` — el exceso se descarta EN SILENCIO. Toda query de agregación que pueda superar 1000 filas DEBE paginar con `fetchAllPages` (`src/lib/supabase/fetch-all.ts`). Los `count: "exact", head: true` son inmunes (se calculan server-side)
+- ✅ En queries de inspección SIEMPRE verificar `error` — un JOIN embebido que falla retorna `data: null` silencioso (causó un diagnóstico falso de "tabla vacía")
+
 ### Migraciones DB
 - ✅ `migrations/` con naming `YYYYMMDD_descripcion.sql`
 - ✅ Usar `IF NOT EXISTS` y `DROP POLICY IF EXISTS` siempre
