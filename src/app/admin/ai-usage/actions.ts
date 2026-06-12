@@ -72,24 +72,37 @@ export async function getAiUsageOverview(
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
         // Proyección estrecha: solo las columnas que necesita `buildOverview`.
-        // Cap a 50k filas — si excedemos, marcamos truncated y el UI sugiere
-        // bajar el rango.
-        const { data, error } = await supabase
-            .from("ai_usage_events")
-            .select(
-                "organization_id,model,mode,channel,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,cost_usd_cents,latency_ms,error_code,created_at",
-            )
-            .gte("created_at", since)
-            .order("created_at", { ascending: false })
-            .limit(ROW_CAP + 1)
-            .returns<AiUsageEventRow[]>()
+        //
+        // PAGINACIÓN OBLIGATORIA (fix 2026-06-11): PostgREST capa TODA
+        // respuesta en 1000 filas sin importar `.limit()`. Sin paginar, cada
+        // ventana (7/14/30/90 días) devolvía "los 1000 eventos más recientes"
+        // → el dashboard mostraba datos idénticos en todos los intervalos.
+        const PAGE_SIZE = 1000
+        const rawRows: AiUsageEventRow[] = []
+        let pageStart = 0
 
-        if (error) {
-            console.error("ai_usage_events query failed", error)
-            return failure(`Error consultando ai_usage_events: ${error.message}`)
+        while (rawRows.length <= ROW_CAP) {
+            const { data, error } = await supabase
+                .from("ai_usage_events")
+                .select(
+                    "organization_id,model,mode,channel,input_tokens,output_tokens,cache_creation_input_tokens,cache_read_input_tokens,cost_usd_cents,latency_ms,error_code,created_at",
+                )
+                .gte("created_at", since)
+                .order("created_at", { ascending: false })
+                .range(pageStart, pageStart + PAGE_SIZE - 1)
+                .returns<AiUsageEventRow[]>()
+
+            if (error) {
+                console.error("ai_usage_events query failed", error)
+                return failure(`Error consultando ai_usage_events: ${error.message}`)
+            }
+
+            const page = data ?? []
+            rawRows.push(...page)
+            if (page.length < PAGE_SIZE) break
+            pageStart += PAGE_SIZE
         }
 
-        const rawRows: AiUsageEventRow[] = data ?? []
         const truncated = rawRows.length > ROW_CAP
         const rows = truncated ? rawRows.slice(0, ROW_CAP) : rawRows
 
