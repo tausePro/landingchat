@@ -1,5 +1,6 @@
 "use server"
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
@@ -14,15 +15,16 @@ export interface MarketplaceItemData {
     base_price: number
     cost: number
     billing_period: 'monthly' | 'yearly' | 'one_time'
-    config_schema?: any
+    config_schema?: Record<string, unknown>
     is_active: boolean
     // Agent Template specific
     agent_role?: string
     system_prompt?: string
-    default_config?: any
+    default_config?: Record<string, unknown>
 }
 
 export async function getMarketplaceItems() {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     const supabase = await createClient()
 
     const { data, error } = await supabase
@@ -42,6 +44,7 @@ export async function getMarketplaceItems() {
 }
 
 export async function createMarketplaceItem(data: MarketplaceItemData) {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     const supabase = await createClient()
 
     // 1. Create Marketplace Item
@@ -91,6 +94,7 @@ export async function createMarketplaceItem(data: MarketplaceItemData) {
 }
 
 export async function updateMarketplaceItem(id: string, data: MarketplaceItemData) {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     const supabase = await createClient()
 
     // 1. Update Marketplace Item
@@ -156,6 +160,7 @@ export async function updateMarketplaceItem(id: string, data: MarketplaceItemDat
 }
 
 export async function deleteMarketplaceItem(id: string) {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     const supabase = await createClient()
 
     const { error } = await supabase

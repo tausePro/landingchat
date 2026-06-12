@@ -21,7 +21,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { UserData, updateUserRole, toggleSuperadmin } from "../actions"
+import { UserData, updateUserRole, toggleSuperadmin, updateAdminRole } from "../actions"
 import { formatBogotaDate } from "@/lib/utils/date"
 
 // Simple debounce implementation
@@ -91,6 +91,18 @@ export function UserList({ initialData }: UserListProps) {
         }
     }
 
+    const handleAdminRoleChange = async (id: string, adminRole: "finance" | "tech" | null) => {
+        setLoading(true)
+        try {
+            await updateAdminRole(id, adminRole)
+            router.refresh()
+        } catch {
+            alert("Error al actualizar el rol de plataforma")
+        } finally {
+            setLoading(false)
+        }
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -141,11 +153,15 @@ export function UserList({ initialData }: UserListProps) {
                                     </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {user.is_superadmin && (
+                                    {user.is_superadmin ? (
                                         <Badge variant="destructive" className="bg-indigo-600 hover:bg-indigo-700">
                                             Superadmin
                                         </Badge>
-                                    )}
+                                    ) : user.admin_role === "finance" ? (
+                                        <Badge className="bg-emerald-600 hover:bg-emerald-700">Finanzas</Badge>
+                                    ) : user.admin_role === "tech" ? (
+                                        <Badge className="bg-sky-600 hover:bg-sky-700">Técnico</Badge>
+                                    ) : null}
                                 </TableCell>
                                 <TableCell>{formatBogotaDate(user.created_at)}</TableCell>
                                 <TableCell className="text-right">
@@ -168,6 +184,26 @@ export function UserList({ initialData }: UserListProps) {
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => handleRoleChange(user.id, 'member')} disabled={user.role === 'member'}>
                                                 Hacer Miembro
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuLabel>Rol de Plataforma</DropdownMenuLabel>
+                                            <DropdownMenuItem
+                                                onClick={() => handleAdminRoleChange(user.id, "finance")}
+                                                disabled={user.admin_role === "finance" || user.is_superadmin}
+                                            >
+                                                Asignar Finanzas
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => handleAdminRoleChange(user.id, "tech")}
+                                                disabled={user.admin_role === "tech" || user.is_superadmin}
+                                            >
+                                                Asignar Técnico
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() => handleAdminRoleChange(user.id, null)}
+                                                disabled={!user.admin_role || user.is_superadmin}
+                                            >
+                                                Quitar rol de plataforma
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuLabel className="text-red-600">Zona de Peligro</DropdownMenuLabel>

@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { type ActionResult, success, failure } from "@/types"
 import { localeSettingsSchema, type LocaleSettingsInput } from "@/lib/i18n/locale-settings"
+import { requireAdminRole } from "@/lib/admin/roles"
 
 export interface OrganizationData {
     id: string
@@ -23,6 +24,10 @@ export interface OrganizationData {
 }
 
 export async function getOrganizations(page = 1, limit = 10, search = "") {
+    // Admin S1: gate explícito (las server actions son invocables directo)
+    if (!(await requireAdminRole(["tech"]))) {
+        return { organizations: [], total: 0, totalPages: 0 }
+    }
     const supabase = createServiceClient()
 
     // Calculate offset
@@ -83,17 +88,8 @@ export async function updateOrganizationLocale(
     input: LocaleSettingsInput
 ): Promise<ActionResult<void>> {
     try {
-        const authClient = await createClient()
-        const { data: { user } } = await authClient.auth.getUser()
-        if (!user) return failure("No autorizado")
-
-        const { data: profile } = await authClient
-            .from("profiles")
-            .select("is_superadmin")
-            .eq("id", user.id)
-            .single()
-
-        if (!profile?.is_superadmin) return failure("No autorizado")
+        // Admin S1: superadmin o tech
+        if (!(await requireAdminRole(["tech"]))) return failure("No autorizado")
 
         const validation = localeSettingsSchema.safeParse(input)
         if (!validation.success) {
@@ -120,6 +116,9 @@ export async function updateOrganizationLocale(
 }
 
 export async function updateOrganizationStatus(id: string, status: 'active' | 'suspended' | 'archived') {
+    if (!(await requireAdminRole(["tech"]))) {
+        throw new Error("No autorizado")
+    }
     const supabase = createServiceClient()
 
     const { error } = await supabase
@@ -137,6 +136,10 @@ export async function updateOrganizationStatus(id: string, status: 'active' | 's
 }
 
 export async function deleteOrganization(id: string): Promise<{ success: boolean; error?: string }> {
+    // DESTRUCTIVO: solo superadmin (requireAdminRole con lista vacía)
+    if (!(await requireAdminRole([]))) {
+        return { success: false, error: "Solo superadmin puede eliminar organizaciones" }
+    }
     const supabase = createServiceClient()
 
     try {

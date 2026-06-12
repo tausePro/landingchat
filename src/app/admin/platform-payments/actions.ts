@@ -1,5 +1,6 @@
 "use server"
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createServiceClient } from "@/lib/supabase/server"
 import { createClient } from "@/lib/supabase/server"
 import { encrypt, decrypt } from "@/lib/utils/encryption"
@@ -34,18 +35,8 @@ interface ConfigRow {
  * Verifica que el usuario sea superadmin
  */
 async function verifySuperadmin(): Promise<boolean> {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) return false
-
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_superadmin")
-        .eq("id", user.id)
-        .single()
-
-    return profile?.is_superadmin === true
+    // Admin S1: superadmin o finance (pagos de la plataforma)
+    return requireAdminRole(["finance"])
 }
 
 /**

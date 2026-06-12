@@ -1,6 +1,13 @@
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { getCurrentAdminRole, canAccessSection } from "@/lib/admin/roles"
+
+const ROLE_LABELS = {
+    superadmin: "Superadmin",
+    finance: "Finanzas",
+    tech: "Técnico",
+} as const
 
 export default async function AdminLayout({
     children,
@@ -15,16 +22,14 @@ export default async function AdminLayout({
         redirect("/login")
     }
 
-    // Check if user is superadmin
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_superadmin")
-        .eq("id", user.id)
-        .single()
-
-    if (!profile?.is_superadmin) {
+    // Admin S1: acceso por rol de plataforma (superadmin | finance | tech).
+    // El sidebar se filtra por rol; el gate REAL está en cada server action.
+    const role = await getCurrentAdminRole()
+    if (!role) {
         redirect("/dashboard")
     }
+
+    const show = (path: string) => canAccessSection(role, path)
 
     return (
         <div className="flex min-h-screen w-full bg-slate-50 dark:bg-slate-950">
@@ -51,20 +56,25 @@ export default async function AdminLayout({
                         Panel Principal
                     </Link>
 
+                    {show("/admin/organizations") && (
                     <Link href="/admin/organizations" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
                         Organizaciones
                     </Link>
+                    )}
 
+                    {show("/admin/users") && (
                     <Link href="/admin/users" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                         Usuarios
                     </Link>
+                    )}
 
+                    {show("/admin/ai-usage") && (
                     <Link href="/admin/ai-usage" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -76,7 +86,9 @@ export default async function AdminLayout({
                             </span>
                         </span>
                     </Link>
+                    )}
 
+                    {show("/admin/operating-costs") && (
                     <Link href="/admin/operating-costs" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -88,7 +100,9 @@ export default async function AdminLayout({
                             </span>
                         </span>
                     </Link>
+                    )}
 
+                    {show("/admin/marketplace") && (<>
                     <div className="mt-6 mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-indigo-400">
                         Marketplace
                     </div>
@@ -132,25 +146,33 @@ export default async function AdminLayout({
                             </span>
                         </span>
                     </Link>
+                    </>)}
 
+                    {(show("/admin/settings/evolution") || show("/admin/platform-payments")) && (
                     <div className="mt-6 mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-indigo-400">
                         Configuración
                     </div>
+                    )}
 
+                    {show("/admin/settings/landing") && (
                     <Link href="/admin/settings/landing" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                         </svg>
                         Landing Principal
                     </Link>
+                    )}
 
+                    {show("/admin/platform-payments") && (
                     <Link href="/admin/platform-payments" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                         </svg>
                         Pasarela de Pagos
                     </Link>
+                    )}
 
+                    {show("/admin/settings/platform-notifications") && (<>
                     <Link href="/admin/settings/platform-notifications" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
                         <svg className="size-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -178,6 +200,7 @@ export default async function AdminLayout({
                         </svg>
                         Instancias WhatsApp
                     </Link>
+                    </>)}
 
                     <div className="mt-auto pt-10">
                         <Link href="/dashboard" className="flex items-center gap-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm font-medium text-indigo-200 hover:bg-indigo-500/20 transition-colors">
@@ -195,6 +218,9 @@ export default async function AdminLayout({
                 <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/80">
                     <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Panel de Administración</h1>
                     <div className="flex items-center gap-4">
+                        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                            {ROLE_LABELS[role]}
+                        </div>
                         <div className="flex items-center gap-2 rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
                             <span className="relative flex size-2">
                                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75"></span>
