@@ -67,6 +67,30 @@ export default async function StoreLayout({
     const data = await getStoreData(slug)
     
     const organization = data?.organization
+
+    // Suspensión (Admin S2): el layout es el choke point de TODO el storefront
+    // (home, productos, PDP, checkout, reservas). Sin esto, suspender una org
+    // en el admin era decorativo.
+    if (organization && (organization as { status?: string }).status === "suspended") {
+        const suspendedLocale = getTenantLocale(organization).locale
+        const isEnglish = suspendedLocale === "en-US"
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+                <div className="max-w-md text-center">
+                    <div className="text-5xl mb-4">🔒</div>
+                    <h1 className="text-xl font-bold text-slate-900">
+                        {isEnglish ? "Store temporarily unavailable" : "Tienda no disponible temporalmente"}
+                    </h1>
+                    <p className="mt-2 text-sm text-slate-500">
+                        {isEnglish
+                            ? "This store is currently suspended. If you are the owner, please contact LandingChat support."
+                            : "Esta tienda se encuentra suspendida. Si eres el propietario, contacta al soporte de LandingChat."}
+                    </p>
+                </div>
+            </div>
+        )
+    }
+
     const trackingConfig = organization?.tracking_config ?? {}
     const metaPixelId = trackingConfig.meta_pixel_id as string | undefined
     const posthogEnabled = Boolean(trackingConfig.posthog_enabled)

@@ -12,6 +12,7 @@ interface OrganizationRow {
     name: string
     slug: string
     custom_domain: string | null
+    status: string | null
 }
 
 interface ResolvePublicOrganizationInput {
@@ -45,7 +46,12 @@ function normalizePublicHost(host: string | null | undefined): string | null {
     return cleanHost
 }
 
-function mapOrganizationRow(row: OrganizationRow): PublicOrganization {
+function mapOrganizationRow(row: OrganizationRow): PublicOrganization | null {
+    // Suspensión (Admin S2): una org suspendida no es públicamente resoluble —
+    // el chat AI, bookings y demás APIs públicas cortan aquí (choke point único)
+    if (row.status === "suspended") {
+        return null
+    }
     return {
         id: row.id,
         name: row.name,
@@ -65,7 +71,7 @@ export async function resolvePublicOrganization(
     if (host) {
         const { data } = await supabase
             .from("organizations")
-            .select("id, name, slug, custom_domain")
+            .select("id, name, slug, custom_domain, status")
             .eq("custom_domain", host)
             .single()
 
@@ -87,7 +93,7 @@ export async function resolvePublicOrganization(
     if (slug) {
         const { data } = await supabase
             .from("organizations")
-            .select("id, name, slug, custom_domain")
+            .select("id, name, slug, custom_domain, status")
             .eq("slug", slug)
             .single()
 
@@ -108,7 +114,7 @@ export async function resolvePublicOrganization(
 
     const { data } = await supabase
         .from("organizations")
-        .select("id, name, slug, custom_domain")
+        .select("id, name, slug, custom_domain, status")
         .eq("id", organizationId)
         .single()
 
