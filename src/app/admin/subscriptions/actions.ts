@@ -1,5 +1,6 @@
 "use server"
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import {
@@ -21,6 +22,7 @@ import {
 export async function getSubscriptions(
     filters?: SubscriptionFilters
 ): Promise<ActionResult<{ subscriptions: SubscriptionWithOrg[]; total: number; totalPages: number }>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 
@@ -83,6 +85,7 @@ export async function getSubscriptions(
  * Obtiene métricas de suscripciones para el dashboard
  */
 export async function getSubscriptionMetrics(): Promise<ActionResult<SubscriptionMetrics>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 
@@ -180,6 +183,7 @@ export async function updateSubscriptionStatus(
     id: string,
     status: SubscriptionStatus
 ): Promise<ActionResult<Subscription>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const validation = UpdateSubscriptionInputSchema.safeParse({ status })
         if (!validation.success) {
@@ -252,6 +256,7 @@ export async function updateSubscriptionPlan(
     id: string,
     planId: string
 ): Promise<ActionResult<Subscription>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const validation = UpdateSubscriptionInputSchema.safeParse({ plan_id: planId })
         if (!validation.success) {
@@ -306,6 +311,7 @@ export async function assignPlanToOrganization(
     orgId: string,
     planId: string
 ): Promise<ActionResult<Subscription>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         if (!orgId || typeof orgId !== "string") {
             return failure("organization_id requerido")
@@ -401,6 +407,7 @@ export async function assignPlanToOrganization(
 export async function getOrganizationSubscription(
     orgId: string
 ): Promise<ActionResult<SubscriptionWithOrg | null>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 

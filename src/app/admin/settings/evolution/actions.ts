@@ -1,5 +1,6 @@
 "use server"
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { EvolutionClient } from "@/lib/evolution"
@@ -9,20 +10,8 @@ import { type ActionResult, success, failure, EvolutionConfigSchema } from "@/ty
  * Verifica que el usuario sea superadmin
  */
 async function checkSuperAdmin() {
-    const supabase = await createClient()
-    const {
-        data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) return false
-
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_superadmin")
-        .eq("id", user.id)
-        .single()
-
-    return profile?.is_superadmin === true
+    // Admin S1: superadmin siempre pasa; 'tech' tiene acceso a esta sección
+    return requireAdminRole(["tech"])
 }
 
 /**

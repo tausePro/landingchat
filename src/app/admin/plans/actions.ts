@@ -1,5 +1,6 @@
 "use server"
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import {
@@ -19,6 +20,7 @@ import {
  * Obtiene todos los planes (activos e inactivos)
  */
 export async function getPlans(): Promise<ActionResult<Plan[]>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 
@@ -44,6 +46,7 @@ export async function getPlans(): Promise<ActionResult<Plan[]>> {
  * Obtiene un plan por su ID
  */
 export async function getPlanById(id: string): Promise<ActionResult<Plan>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 
@@ -70,6 +73,7 @@ export async function getPlanById(id: string): Promise<ActionResult<Plan>> {
  * Crea un nuevo plan
  */
 export async function createPlan(input: CreatePlanInput): Promise<ActionResult<Plan>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         // Validar input con Zod
         const validation = CreatePlanInputSchema.safeParse(input)
@@ -118,6 +122,7 @@ export async function createPlan(input: CreatePlanInput): Promise<ActionResult<P
  * Actualiza un plan existente
  */
 export async function updatePlan(id: string, input: UpdatePlanInput): Promise<ActionResult<Plan>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         // Validar input con Zod
         const validation = UpdatePlanInputSchema.safeParse(input)
@@ -182,6 +187,7 @@ export async function updatePlan(id: string, input: UpdatePlanInput): Promise<Ac
  * Activa o desactiva un plan
  */
 export async function togglePlanStatus(id: string): Promise<ActionResult<Plan>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 
@@ -224,6 +230,7 @@ export async function togglePlanStatus(id: string): Promise<ActionResult<Plan>> 
  * Elimina un plan (solo si no tiene suscripciones activas)
  */
 export async function deletePlan(id: string): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = await createServiceClient()
 

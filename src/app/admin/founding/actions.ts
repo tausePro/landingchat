@@ -1,5 +1,6 @@
 "use server"
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import {
@@ -30,6 +31,7 @@ import {
  * Obtiene el programa de founding (solo hay uno)
  */
 export async function getFoundingProgram(): Promise<ActionResult<FoundingProgram | null>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -61,6 +63,7 @@ export async function updateFoundingProgram(
     programId: string,
     input: UpdateFoundingProgramInput
 ): Promise<ActionResult<FoundingProgram>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const validation = UpdateFoundingProgramInputSchema.safeParse(input)
         if (!validation.success) {
@@ -100,6 +103,7 @@ export async function toggleFoundingProgram(
     programId: string,
     isActive: boolean
 ): Promise<ActionResult<FoundingProgram>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     return updateFoundingProgram(programId, {
         is_active: isActive,
         starts_at: isActive ? new Date().toISOString() : null,
@@ -116,6 +120,7 @@ export async function toggleFoundingProgram(
 export async function getFoundingTiers(
     programId: string
 ): Promise<ActionResult<FoundingTier[]>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -143,6 +148,7 @@ export async function getFoundingTiers(
 export async function getFoundingTiersWithStats(
     programId: string
 ): Promise<ActionResult<Array<FoundingTier & { slots_remaining: number; slots_claimed: number; current_price: number }>>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -210,6 +216,7 @@ export async function getFoundingTiersWithStats(
 export async function createFoundingTier(
     input: CreateFoundingTierInput
 ): Promise<ActionResult<FoundingTier>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const validation = CreateFoundingTierInputSchema.safeParse(input)
         if (!validation.success) {
@@ -244,6 +251,7 @@ export async function updateFoundingTier(
     tierId: string,
     input: UpdateFoundingTierInput
 ): Promise<ActionResult<FoundingTier>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const validation = UpdateFoundingTierInputSchema.safeParse(input)
         if (!validation.success) {
@@ -299,6 +307,7 @@ export async function updateFoundingTier(
 export async function deleteFoundingTier(
     tierId: string
 ): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -341,6 +350,7 @@ export async function getFoundingSlots(
     programId: string,
     filters?: { status?: string; tier_id?: string }
 ): Promise<ActionResult<FoundingSlotWithRelations[]>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -382,6 +392,7 @@ export async function updateFoundingSlotStatus(
     slotId: string,
     status: string
 ): Promise<ActionResult<FoundingSlot>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -427,6 +438,7 @@ export async function getFoundingActivityFeed(
     programId: string,
     limit: number = 10
 ): Promise<ActionResult<FoundingActivity[]>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -459,6 +471,7 @@ export async function addFoundingActivity(
     tierName: string | null,
     message: string
 ): Promise<ActionResult<FoundingActivity>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -496,6 +509,7 @@ export async function addFoundingActivity(
 export async function getFoundingMetrics(
     programId: string
 ): Promise<ActionResult<FoundingMetrics>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
@@ -610,6 +624,7 @@ export async function getFoundingMetrics(
  * (llamar desde cron job)
  */
 export async function applyWeeklyPriceIncrease(): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["finance"]))) throw new Error("No autorizado")
     try {
         const supabase = createServiceClient()
 
