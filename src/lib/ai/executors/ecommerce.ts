@@ -7,7 +7,8 @@ import {
     findVariantBySelectedOptions,
     selectDefaultVariant,
 } from "@/lib/commerce/productWithVariants"
-import { getVariantPriceRange } from "@/lib/commerce/variantPricing"
+import { getVariantPriceRange, findApplicableTier } from "@/lib/commerce/variantPricing"
+import type { PriceTier } from "@/types/product"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
 import {
     ApplyDiscountSchema,
@@ -485,6 +486,67 @@ interface SearchProductsRpcRow {
     similarity: number | null
 }
 
+// ─── Precios por cantidad (fix 2026-06-12, reporte Goldcaps) ─────────
+// El agente cotizaba 20 unidades al precio detal porque ni los tools ni el
+// carrito conocían los price_tiers (solo el contexto de PDP los tenía).
+
+interface QuantityPricingInfo {
+    tiers: PriceTier[]
+    minimum_quantity: number | null
+    note: string
+}
+
+/** Normaliza price_tiers del JSONB y arma la nota instructiva para el modelo. */
+function getQuantityPricing(product: {
+    has_quantity_pricing?: unknown
+    price_tiers?: unknown
+    minimum_quantity?: unknown
+}): QuantityPricingInfo | null {
+    if (!product.has_quantity_pricing || !Array.isArray(product.price_tiers)) return null
+
+    const tiers = product.price_tiers.flatMap((raw): PriceTier[] => {
+        const record = asRecord(raw)
+        if (!record) return []
+        const minQuantity = parseFiniteNumber(record.min_quantity)
+        const unitPrice = parseFiniteNumber(record.unit_price)
+        if (minQuantity == null || unitPrice == null) return []
+        return [{
+            min_quantity: minQuantity,
+            max_quantity: parseFiniteNumber(record.max_quantity),
+            unit_price: unitPrice,
+            label: typeof record.label === "string" ? record.label : undefined,
+        } as PriceTier]
+    })
+    if (tiers.length === 0) return null
+
+    const minimumQuantity = parseFiniteNumber(product.minimum_quantity)
+    const ranges = tiers
+        .map((tier) => `${tier.min_quantity}${tier.max_quantity ? `-${tier.max_quantity}` : "+"} unidades: $${tier.unit_price.toLocaleString("es-CO")}/u${tier.label ? ` (${tier.label})` : ""}`)
+        .join("; ")
+
+    return {
+        tiers,
+        minimum_quantity: minimumQuantity && minimumQuantity > 1 ? minimumQuantity : null,
+        note: `PRECIO POR CANTIDAD: ${ranges}. SIEMPRE pregunta la cantidad antes de cotizar y usa el precio unitario del rango correspondiente.`,
+    }
+}
+
+/** Precio unitario tier-aware: precio explícito de variante > tier por cantidad > sale/base. */
+function resolveTierAwareUnitPrice(params: {
+    variantPrice: number | null | undefined
+    quantityPricing: QuantityPricingInfo | null
+    quantity: number
+    salePrice: number | null
+    basePrice: number
+}): number {
+    if (params.variantPrice != null) return params.variantPrice
+    if (params.quantityPricing) {
+        const tier = findApplicableTier(params.quantityPricing.tiers, params.quantity)
+        if (tier) return tier.unit_price
+    }
+    return params.salePrice || params.basePrice
+}
+
 const searchProducts: ToolHandler = async (supabase, input, context) => {
     const { query, category, max_price, limit = 15 } = input
     const maxPrice = parseFiniteNumber(max_price)
@@ -528,7 +590,7 @@ const searchProducts: ToolHandler = async (supabase, input, context) => {
 
     let dbQuery = supabase
         .from("products")
-        .select("id, name, description, price, sale_price, image_url, images, stock, categories, variants")
+        .select("id, name, description, price, sale_price, image_url, images, stock, categories, variants, has_quantity_pricing, price_tiers, minimum_quantity")
         .eq("organization_id", context.organizationId)
         .eq("is_active", true)
 
@@ -568,13 +630,25 @@ const searchProducts: ToolHandler = async (supabase, input, context) => {
         })
     }
 
+    // Tiers por producto (fix Goldcaps): el agente debe verlos en el resultado
+    const quantityPricingById = new Map<string, QuantityPricingInfo>()
+    for (const raw of products || []) {
+        const record = asRecord(raw)
+        const rawId = record && typeof record.id === "string" ? record.id : null
+        const pricing = record ? getQuantityPricing(record) : null
+        if (rawId && pricing) quantityPricingById.set(rawId, pricing)
+    }
+
     const variantsByProductId = await getSellableVariantsForProducts(
         supabase,
         context.organizationId,
         productRows.map((product) => product.id),
     )
     const resolvedProducts = productRows
-        .map((product) => resolveAgentSearchProduct(product, variantsByProductId.get(product.id) ?? []))
+        .map((product) => ({
+            ...resolveAgentSearchProduct(product, variantsByProductId.get(product.id) ?? []),
+            quantity_pricing: quantityPricingById.get(product.id) ?? null,
+        }))
         .filter((product) => {
             if (maxPrice == null) {
                 return true
@@ -642,6 +716,7 @@ const showProduct: ToolHandler = async (supabase, input, context) => {
                 default_variant_stock: defaultVariant?.stock_quantity ?? null,
                 variant_options: buildAgentVariantOptions(variants),
                 available_variants: buildAgentAvailableVariants(variants),
+                quantity_pricing: getQuantityPricing(product),
             }
         }
     }
@@ -704,7 +779,7 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
 
     const { data: product, error: productError } = await supabase
         .from("products")
-        .select("id, name, price, sale_price, image_url, stock, variants")
+        .select("id, name, price, sale_price, image_url, stock, variants, has_quantity_pricing, price_tiers, minimum_quantity")
         .eq("id", product_id)
         .eq("organization_id", context.organizationId)
         .single()
@@ -786,10 +861,30 @@ const addToCart: ToolHandler = async (supabase, input, context) => {
 
     const items = normalizeAiCartLineItems(cart.items)
     const lineId = selectedVariant?.id ?? product.id
-    const unitPrice = selectedVariant?.price ?? (product.sale_price || product.price)
+    const existingIndex = items.findIndex((item) => item.id === lineId)
+
+    // Precio tier-aware (fix Goldcaps): el unitario se resuelve con la
+    // cantidad TOTAL del line item (existente + nueva) — agregar 8 y luego
+    // 12 debe cruzar al precio por mayor, no quedarse en el detal
+    const totalQuantity = existingIndex >= 0 ? items[existingIndex].quantity + quantity : quantity
+    const quantityPricing = getQuantityPricing(product)
+
+    if (quantityPricing?.minimum_quantity && totalQuantity < quantityPricing.minimum_quantity) {
+        return {
+            success: false,
+            error: `Este producto tiene una cantidad mínima de pedido de ${quantityPricing.minimum_quantity} unidades. Informa al cliente y ajusta la cantidad.`,
+        }
+    }
+
+    const unitPrice = resolveTierAwareUnitPrice({
+        variantPrice: selectedVariant?.price,
+        quantityPricing,
+        quantity: totalQuantity,
+        salePrice: product.sale_price,
+        basePrice: product.price,
+    })
     const compareAtPrice = selectedVariant?.compare_at_price ?? (product.sale_price ? product.price : null)
     const imageUrl = resolveLegacyVariantImage(product.variants, selectedVariant, variant) || selectedVariant?.image_url || product.image_url
-    const existingIndex = items.findIndex((item) => item.id === lineId)
 
     if (existingIndex >= 0) {
         const currentItem = items[existingIndex]
@@ -941,9 +1036,43 @@ const updateCartQuantity: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "No hay carrito activo" }
     }
 
+    // Tier-aware (fix Goldcaps): al cambiar la cantidad el unitario debe
+    // recalcularse (8 → 20 unidades cruza al precio por mayor). Solo aplica
+    // a líneas cuya variante NO tiene precio explícito propio.
+    let tierUnitPrice: number | null = null
+    let variantsWithOwnPrice = new Set<string>()
+    if (typeof quantity === "number" && quantity > 0) {
+        const { data: product } = await supabase
+            .from("products")
+            .select("price, sale_price, variants, has_quantity_pricing, price_tiers")
+            .eq("id", product_id)
+            .eq("organization_id", context.organizationId)
+            .single()
+
+        const quantityPricing = product ? getQuantityPricing(product) : null
+        if (product && quantityPricing) {
+            tierUnitPrice = resolveTierAwareUnitPrice({
+                variantPrice: null,
+                quantityPricing,
+                quantity,
+                salePrice: product.sale_price,
+                basePrice: product.price,
+            })
+            variantsWithOwnPrice = new Set(
+                (Array.isArray(product.variants) ? product.variants : []).flatMap((raw) => {
+                    const record = asRecord(raw)
+                    const variantId = record && typeof record.id === "string" ? record.id : null
+                    return variantId && parseFiniteNumber(record?.price) != null ? [variantId] : []
+                })
+            )
+        }
+    }
+
     const items = normalizeAiCartLineItems(cart.items).map((item) => {
         if (item.product_id === product_id) {
-            return { ...item, quantity }
+            const keepsVariantPrice = item.variant_id != null && variantsWithOwnPrice.has(item.variant_id)
+            const nextPrice = tierUnitPrice != null && !keepsVariantPrice ? tierUnitPrice : item.price
+            return { ...item, quantity, price: nextPrice, unit_price: nextPrice }
         }
         return item
     }).filter((item) => item.quantity > 0)
