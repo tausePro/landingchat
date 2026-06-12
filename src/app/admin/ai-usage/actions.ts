@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { requireAdminRole } from "@/lib/admin/roles"
 import { type ActionResult, success, failure } from "@/types/common"
 import {
     buildOverview,
@@ -60,13 +61,9 @@ export async function getAiUsageOverview(
         if (!user) {
             return failure("No autenticado")
         }
-        const { data: profile, error: profileErr } = await supabase
-            .from("profiles")
-            .select("is_superadmin")
-            .eq("id", user.id)
-            .single()
-        if (profileErr || !profile?.is_superadmin) {
-            return failure("Acceso restringido a superadministradores")
+        // Admin S1: superadmin o finance (la vista es de números)
+        if (!(await requireAdminRole(["finance"]))) {
+            return failure("Acceso restringido al equipo de plataforma")
         }
 
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()

@@ -10,23 +10,15 @@
  * Cruce con MRR real (subscriptions activas con price > 0).
  */
 
+import { requireAdminRole } from "@/lib/admin/roles"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { type ActionResult, success, failure } from "@/types"
 
 async function checkSuperAdmin() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return false
-
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_superadmin")
-        .eq("id", user.id)
-        .single()
-
-    return profile?.is_superadmin === true
+    // Admin S1: superadmin siempre pasa; 'finance' tiene acceso a esta sección
+    return requireAdminRole(["finance"])
 }
 
 const costItemSchema = z.object({
