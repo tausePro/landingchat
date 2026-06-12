@@ -33,6 +33,8 @@ import {
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
 import { extractPhoneFromJid } from "@/lib/utils/phone"
 import { logger } from "@/lib/logger"
+import { PLATFORM_INSTANCE_NAME } from "@/lib/whatsapp/reconcileInstances"
+import { handleCopilotWhatsAppReply } from "@/lib/copilot/whatsappReplyHandler"
 
 const log = logger("webhooks/whatsapp")
 
@@ -145,6 +147,34 @@ export async function POST(request: NextRequest) {
         if (!instance) {
             log.error("No instance found in payload")
             return NextResponse.json({ error: "Instance required" }, { status: 400 })
+        }
+
+        // Copilot v1: la instancia PLATFORM no pertenece a ningún tenant —
+        // sus mensajes entrantes son respuestas de merchants al copilot
+        // ("1", "todas", "no"). Antes se descartaban como "Instance not found".
+        if (instance === PLATFORM_INSTANCE_NAME) {
+            if (event === "messages.upsert") {
+                const platformMessage = IncomingMessageSchema.safeParse(data)
+                if (
+                    platformMessage.success &&
+                    !platformMessage.data.key.fromMe &&
+                    !platformMessage.data.key.remoteJid.endsWith("@g.us")
+                ) {
+                    const senderPhone = extractPhoneFromJid(platformMessage.data.key.remoteJid)
+                    const text = platformMessage.data.message?.conversation
+                        || platformMessage.data.message?.extendedTextMessage?.text
+                        || ""
+                    if (senderPhone && text) {
+                        const result = await handleCopilotWhatsAppReply({
+                            senderPhone,
+                            text,
+                            messageId: platformMessage.data.key.id,
+                        })
+                        log.info("platform reply processed", { handled: result.handled, replied: result.replied })
+                    }
+                }
+            }
+            return NextResponse.json({ received: true, platform: true })
         }
 
         // Buscar la instancia en la base de datos
