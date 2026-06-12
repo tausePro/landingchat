@@ -26,9 +26,17 @@ function formatCop(amount: number): string {
  * Costos de operar la plataforma: fijos manuales (Vercel, Supabase, VPS...)
  * + costo AI medido del mes, cruzado con el MRR real de subscriptions.
  */
+/** Estado de edición: el monto se mantiene como string mientras se tipea
+ * (evita que "3534." salte a 0 y los spinners del input number). */
+type DraftCostItem = Omit<OperatingCostItem, "monthly_usd"> & { monthly_usd: string }
+
+function toDraft(item: OperatingCostItem): DraftCostItem {
+    return { ...item, monthly_usd: String(item.monthly_usd) }
+}
+
 export default function OperatingCostsPage() {
     const [overview, setOverview] = useState<OperatingCostsOverview | null>(null)
-    const [items, setItems] = useState<OperatingCostItem[]>([])
+    const [items, setItems] = useState<DraftCostItem[]>([])
     const [rate, setRate] = useState(4100)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -37,7 +45,7 @@ export default function OperatingCostsPage() {
         const result = await getOperatingCostsOverview()
         if (result.success) {
             setOverview(result.data)
-            setItems(result.data.config.items)
+            setItems(result.data.config.items.map(toDraft))
             setRate(result.data.config.usd_to_cop_rate)
         } else {
             toast.error(result.error)
@@ -50,7 +58,10 @@ export default function OperatingCostsPage() {
     }, [load])
 
     const totals = useMemo(() => {
-        const fixedUsd = items.reduce((sum, item) => sum + (Number(item.monthly_usd) || 0), 0)
+        const fixedUsd = items.reduce(
+            (sum, item) => sum + (Number(String(item.monthly_usd).replace(",", ".")) || 0),
+            0,
+        )
         const aiUsd = (overview?.aiCostMonthUsdCents ?? 0) / 100
         const totalUsd = fixedUsd + aiUsd
         const mrrCop = overview?.mrr.find((entry) => entry.currency === "COP")?.amount ?? 0
@@ -60,25 +71,29 @@ export default function OperatingCostsPage() {
         return { fixedUsd, aiUsd, totalUsd, mrrCop, mrrUsd, otherMrr, marginUsd }
     }, [items, overview, rate])
 
-    const updateItem = (id: string, patch: Partial<OperatingCostItem>) =>
+    const updateItem = (id: string, patch: Partial<DraftCostItem>) =>
         setItems((prev) => prev.map((item) => item.id === id ? { ...item, ...patch } : item))
 
     const addItem = () =>
-        setItems((prev) => [...prev, { id: `item-${Date.now()}`, name: "", monthly_usd: 0, notes: "" }])
+        setItems((prev) => [...prev, { id: `item-${Date.now()}`, name: "", monthly_usd: "", notes: "" }])
 
     const removeItem = (id: string) =>
         setItems((prev) => prev.filter((item) => item.id !== id))
 
     const handleSave = async () => {
-        const cleaned = items
-            .map((item) => ({ ...item, name: item.name.trim(), monthly_usd: Number(item.monthly_usd) || 0 }))
+        const cleaned: OperatingCostItem[] = items
+            .map((item) => ({
+                ...item,
+                name: item.name.trim(),
+                monthly_usd: Number(String(item.monthly_usd).replace(",", ".")) || 0,
+            }))
             .filter((item) => item.name.length > 0)
         setSaving(true)
         try {
             const result = await saveOperatingCosts({ items: cleaned, usd_to_cop_rate: rate })
             if (result.success) {
                 toast.success("Costos guardados")
-                setItems(cleaned)
+                setItems(cleaned.map(toDraft))
             } else {
                 toast.error(result.error)
             }
@@ -171,17 +186,14 @@ export default function OperatingCostsPage() {
                                 placeholder="Proveedor (ej: Vercel Pro)"
                                 className="flex-1"
                             />
-                            <div className="relative w-32">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
-                                <Input
-                                    type="number"
-                                    min={0}
-                                    step="0.01"
-                                    value={item.monthly_usd}
-                                    onChange={(event) => updateItem(item.id, { monthly_usd: Number(event.target.value) })}
-                                    className="pl-7 font-mono"
-                                />
-                            </div>
+                            <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={item.monthly_usd}
+                                onChange={(event) => updateItem(item.id, { monthly_usd: event.target.value.replace(/[^\d.,]/g, "") })}
+                                placeholder="USD/mes"
+                                className="w-32 shrink-0 font-mono text-right"
+                            />
                             <Input
                                 value={item.notes ?? ""}
                                 onChange={(event) => updateItem(item.id, { notes: event.target.value })}
