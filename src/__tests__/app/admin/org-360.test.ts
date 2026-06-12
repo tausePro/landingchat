@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 let allowedRole = true
 const updates: Array<Record<string, unknown>> = []
+const upserts: Array<Record<string, unknown>> = []
 
 vi.mock("@/lib/admin/roles", () => ({
     requireAdminRole: vi.fn(async () => allowedRole),
@@ -17,7 +18,16 @@ vi.mock("@/lib/supabase/server", () => ({
         from: () => ({
             update: vi.fn((payload: Record<string, unknown>) => {
                 updates.push(payload)
-                return { eq: vi.fn(async () => ({ error: null })) }
+                const chain = { eq: vi.fn(() => chain), then: (resolve: (value: unknown) => void) => resolve({ error: null }) }
+                return chain
+            }),
+            upsert: vi.fn(async (payload: Record<string, unknown>) => {
+                upserts.push(payload)
+                return { error: null }
+            }),
+            delete: vi.fn(() => {
+                const chain = { eq: vi.fn(() => chain), then: (resolve: (value: unknown) => void) => resolve({ error: null }) }
+                return chain
             }),
         }),
     })),
@@ -31,6 +41,7 @@ import { updateOrganizationModules, updateOrgNotificationPhone } from "@/app/adm
 beforeEach(() => {
     allowedRole = true
     updates.length = 0
+    upserts.length = 0
 })
 
 describe("updateOrganizationModules", () => {
@@ -78,5 +89,41 @@ describe("updateOrgNotificationPhone", () => {
 
         expect(result.success).toBe(false)
         expect(updates).toEqual([])
+    })
+})
+
+describe("addons del marketplace (Admin C)", () => {
+    it("asigna addon con upsert (re-asignar reactiva)", async () => {
+        const { assignAddonToOrganization } = await import("@/app/admin/organizations/[id]/actions")
+        const result = await assignAddonToOrganization({
+            orgId: "3f2c9a10-0000-4000-8000-0000000000aa",
+            marketplaceItemId: "3f2c9a10-0000-4000-8000-0000000000bb",
+            priceOverride: 25000,
+        })
+
+        expect(result.success).toBe(true)
+        expect(upserts[0]).toMatchObject({
+            status: "active",
+            price_override: 25000,
+        })
+    })
+
+    it("precio negativo → rechazado", async () => {
+        const { assignAddonToOrganization } = await import("@/app/admin/organizations/[id]/actions")
+        const result = await assignAddonToOrganization({
+            orgId: "3f2c9a10-0000-4000-8000-0000000000aa",
+            marketplaceItemId: "3f2c9a10-0000-4000-8000-0000000000bb",
+            priceOverride: -5,
+        })
+
+        expect(result.success).toBe(false)
+    })
+
+    it("sin rol → no autorizado", async () => {
+        allowedRole = false
+        const { updateOrgAddonStatus } = await import("@/app/admin/organizations/[id]/actions")
+        const result = await updateOrgAddonStatus("a-1", "org-1", "suspend")
+
+        expect(result.success).toBe(false)
     })
 })
