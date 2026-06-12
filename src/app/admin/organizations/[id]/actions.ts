@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { type ActionResult, success, failure } from "@/types"
 import { requireAdminRole } from "@/lib/admin/roles"
+import { fetchAllPages } from "@/lib/supabase/fetch-all"
 
 import { VALID_MODULE_IDS } from "./module-catalog"
 
@@ -70,12 +71,13 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
                 .from("whatsapp_instances")
                 .select("instance_type, status, phone_number_display")
                 .eq("organization_id", id),
-            supabase
+            // fetchAllPages: .range(0,4999) igual se capa en 1000 (PostgREST)
+            fetchAllPages<{ cost_usd_cents: number | null }>((from, to) => supabase
                 .from("ai_usage_events")
                 .select("cost_usd_cents")
                 .eq("organization_id", id)
                 .gte("created_at", monthStart.toISOString())
-                .range(0, 4999),
+                .range(from, to)),
             supabase.from("products").select("*", { count: "exact", head: true }).eq("organization_id", id),
             supabase.from("orders").select("*", { count: "exact", head: true }).eq("organization_id", id),
             supabase.from("chats").select("*", { count: "exact", head: true }).eq("organization_id", id),
@@ -84,7 +86,7 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
         const subRow = subRes.data as { status: string; price: number; currency: string; current_period_end: string | null; plans?: { name?: string } | { name?: string }[] } | null
         const planName = Array.isArray(subRow?.plans) ? subRow?.plans[0]?.name : subRow?.plans?.name
 
-        const aiEvents = aiRes.data ?? []
+        const aiEvents = aiRes.rows
 
         return success({
             ...org,

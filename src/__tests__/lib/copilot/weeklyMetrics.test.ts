@@ -30,8 +30,10 @@ function buildChain(table: string) {
         in: vi.fn(() => chain),
         order: vi.fn(() => chain),
         limit: vi.fn(() => chain),
-        then: (resolve: (value: { data: unknown[] }) => void) =>
-            resolve({ data: dataByTable[table] ?? [] }),
+        // fetchAllPages pagina con .range (fix del cap de PostgREST)
+        range: vi.fn(() => chain),
+        then: (resolve: (value: { data: unknown[]; error: null }) => void) =>
+            resolve({ data: dataByTable[table] ?? [], error: null }),
     }
     return chain
 }

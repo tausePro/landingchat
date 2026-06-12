@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
 import { computeIsoWeek } from "@/lib/utils/iso-week"
+import { fetchAllPages } from "@/lib/supabase/fetch-all"
 import { loadWeeklyMetrics } from "@/lib/copilot/weeklyMetrics"
 import { composeWeeklyInsight } from "@/lib/copilot/insightComposer"
 import { emitPlatformEvent } from "@/lib/events/emit"
@@ -54,20 +55,28 @@ export async function GET(request: Request) {
     // es la fuente de verdad. Nota: sin JOIN embebido — la FK de
     // whatsapp_instances no existe en el schema cache de prod (T0b).
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    // fetchAllPages: sin paginar, PostgREST capa en 1000 filas y con volumen
+    // cross-tenant las orgs más antiguas del scan quedarían fuera del cron
     const [ordersRes, chatsRes] = await Promise.all([
-        supabase.from("orders").select("organization_id").gte("created_at", weekAgo),
-        supabase.from("chats").select("organization_id").gte("created_at", weekAgo),
+        fetchAllPages<{ organization_id: string }>((from, to) =>
+            supabase.from("orders").select("organization_id").gte("created_at", weekAgo).range(from, to),
+            { maxRows: 50_000 }
+        ),
+        fetchAllPages<{ organization_id: string }>((from, to) =>
+            supabase.from("chats").select("organization_id").gte("created_at", weekAgo).range(from, to),
+            { maxRows: 50_000 }
+        ),
     ])
 
     if (ordersRes.error || chatsRes.error) {
-        const error = ordersRes.error?.message ?? chatsRes.error?.message ?? "unknown"
+        const error = ordersRes.error ?? chatsRes.error ?? "unknown"
         log.error("failed to load weekly activity", { error })
         return NextResponse.json({ error: "Failed to load activity" }, { status: 500 })
     }
 
     const activeOrgIds = [...new Set([
-        ...(ordersRes.data ?? []).map((row) => row.organization_id),
-        ...(chatsRes.data ?? []).map((row) => row.organization_id),
+        ...ordersRes.rows.map((row) => row.organization_id),
+        ...chatsRes.rows.map((row) => row.organization_id),
     ])]
 
     if (activeOrgIds.length === 0) {
