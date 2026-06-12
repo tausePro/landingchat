@@ -67,6 +67,8 @@ Variables completas y comandos detallados en `docs/AGENTS_GUIDE.md`.
 ### Supabase / PostgREST
 - ⚠️ PostgREST capa TODA respuesta en **1000 filas** sin importar `.limit(5000)` o `.range(0, 4999)` — el exceso se descarta EN SILENCIO. Toda query de agregación que pueda superar 1000 filas DEBE paginar con `fetchAllPages` (`src/lib/supabase/fetch-all.ts`). Los `count: "exact", head: true` son inmunes (se calculan server-side)
 - ✅ En queries de inspección SIEMPRE verificar `error` — un JOIN embebido que falla retorna `data: null` silencioso (causó un diagnóstico falso de "tabla vacía")
+- ⚠️ Antes de un DELETE en migraciones: mapear TODAS las tablas que referencian la entidad (`grep "REFERENCES <tabla>" migrations/`) y verificar cada una contra los registros a borrar — verificar "las 2 obvias" no basta (caso real: carts bloqueó un DELETE de customers tras verificar solo orders/chats)
+- ✅ El schema histórico tiene FKs fantasma (tablas multi-tenant sin FK a organizations → joins embebidos rotos + huérfanas). Barrido 2026-06-12 reparó: whatsapp_instances, subscriptions, customers, coupons, payment_gateway_configs, shipping_settings. Si un JOIN embebido falla con "Could not find a relationship", revisar si falta la FK
 
 ### Migraciones DB
 - ✅ `migrations/` con naming `YYYYMMDD_descripcion.sql`
