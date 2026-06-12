@@ -27,6 +27,8 @@ export interface EmitPlatformEventInput {
 
 export interface EmitPlatformEventResult {
     ok: boolean
+    /** true si el idempotency_key ya existía (el caller puede deduplicar). */
+    duplicate?: boolean
     error?: string
 }
 
@@ -50,7 +52,7 @@ export async function emitPlatformEvent(input: EmitPlatformEventInput): Promise<
 
         if (error) {
             // Conflicto de idempotencia: el evento ya existe — no es error real
-            if (error.code === "23505") return { ok: true }
+            if (error.code === "23505") return { ok: true, duplicate: true }
 
             log.error("insert failed", { eventType: input.eventType, error: error.message })
             return { ok: false, error: error.message }

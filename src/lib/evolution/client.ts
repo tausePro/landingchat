@@ -299,6 +299,36 @@ export class EvolutionClient {
     }
 
     /**
+     * Configura el webhook de una instancia existente (Evolution v2).
+     * Idempotente: aplicar dos veces deja la misma config.
+     */
+    async setWebhook(
+        instanceName: string,
+        config: { url: string; events: string[]; byEvents?: boolean }
+    ): Promise<void> {
+        const response = await fetch(`${this.config.baseUrl}/webhook/set/${instanceName}`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+                webhook: {
+                    enabled: true,
+                    url: config.url,
+                    byEvents: config.byEvents ?? true,
+                    base64: false,
+                    events: config.events,
+                },
+            }),
+        })
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}))
+            throw new Error(
+                `Evolution API error: ${(error as { message?: string }).message || "Failed to set webhook"}`
+            )
+        }
+    }
+
+    /**
      * Lista TODAS las instancias del server, normalizando los formatos de
      * Evolution v1 ({ instance: { instanceName, status, owner } }) y
      * v2 ({ name, connectionStatus, ownerJid }).

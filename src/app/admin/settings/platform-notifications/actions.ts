@@ -7,7 +7,7 @@
  */
 
 import { requireAdminRole } from "@/lib/admin/roles"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { createEvolutionClient } from "@/lib/evolution"
@@ -158,6 +158,17 @@ export async function savePlatformChannelConfig(input: SavePlatformConfigInput):
     }
 }
 
+/** URL del webhook de la plataforma (mismas reglas www que los tenants). */
+function buildPlatformWebhookUrl(): string | null {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!appUrl) return null
+    let webhookUrl = `${appUrl}/api/webhooks/whatsapp`
+    if (appUrl.includes("landingchat.co") && !appUrl.includes("www.")) {
+        webhookUrl = webhookUrl.replace("landingchat.co", "www.landingchat.co")
+    }
+    return webhookUrl
+}
+
 /** Crea (si falta) la instancia platform y retorna el QR para conectar. */
 export async function connectPlatformInstance(): Promise<ActionResult<{ qrCode: string | null }>> {
     if (!(await checkSuperAdmin())) return failure("No autorizado")
@@ -167,6 +178,7 @@ export async function connectPlatformInstance(): Promise<ActionResult<{ qrCode: 
         const evolution = await createEvolutionClient(supabase)
         if (!evolution) return failure("Evolution API no configurada")
 
+        const webhookUrl = buildPlatformWebhookUrl()
         const instances = await evolution.listInstances()
         const exists = instances.some((instance) => instance.name === PLATFORM_INSTANCE_NAME)
 
@@ -175,6 +187,21 @@ export async function connectPlatformInstance(): Promise<ActionResult<{ qrCode: 
                 instanceName: PLATFORM_INSTANCE_NAME,
                 qrcode: true,
                 integration: "WHATSAPP-BAILEYS",
+                ...(webhookUrl && {
+                    webhook: {
+                        url: webhookUrl,
+                        byEvents: true,
+                        base64: false,
+                        events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE", "QRCODE_UPDATED"],
+                    },
+                }),
+            })
+        } else if (webhookUrl) {
+            // Instancia existente: asegurar el webhook (Copilot v1 — las
+            // respuestas del merchant llegan por aquí). Idempotente.
+            await evolution.setWebhook(PLATFORM_INSTANCE_NAME, {
+                url: webhookUrl,
+                events: ["MESSAGES_UPSERT", "CONNECTION_UPDATE"],
             })
         }
 

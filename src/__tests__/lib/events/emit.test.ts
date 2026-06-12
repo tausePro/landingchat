@@ -60,7 +60,8 @@ describe("emitPlatformEvent", () => {
 
         const result = await emitPlatformEvent({ ...BASE_INPUT, idempotencyKey: "dup-key" })
 
-        expect(result).toEqual({ ok: true })
+        // Copilot v1: duplicate=true permite a los callers deduplicar webhooks
+        expect(result).toEqual({ ok: true, duplicate: true })
     })
 
     it("error genérico retorna ok: false con mensaje, sin lanzar", async () => {
