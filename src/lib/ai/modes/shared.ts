@@ -136,7 +136,7 @@ export const sharedTools: Anthropic.Tool[] = [
                 },
                 property_code: {
                     type: "string",
-                    description: "Código de la propiedad (ej: 'ARR-137', '1436'). Si la cita es para visitar una propiedad específica, incluye su código. La ubicación se auto-completa con la dirección de la propiedad."
+                    description: "Código de la propiedad (ej: 'ARR-137', '1436'). OBLIGATORIO cuando appointment_type es 'visit' en una inmobiliaria: usa el código de la propiedad de la que están hablando; si no es claro, PREGUNTA al cliente cuál propiedad quiere visitar antes de agendar. La ubicación se auto-completa con la dirección de la propiedad."
                 }
             },
             required: ["title", "proposed_date", "customer_name"]
