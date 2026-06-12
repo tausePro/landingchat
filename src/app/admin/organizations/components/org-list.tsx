@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -134,10 +135,10 @@ export function OrgList({ initialData }: OrgListProps) {
                         {initialData.organizations.map((org) => (
                             <TableRow key={org.id}>
                                 <TableCell>
-                                    <div className="flex flex-col">
-                                        <span className="font-medium">{org.name}</span>
+                                    <Link href={`/admin/organizations/${org.id}`} className="flex flex-col group">
+                                        <span className="font-medium group-hover:text-indigo-600 group-hover:underline">{org.name}</span>
                                         <span className="text-xs text-muted-foreground">{org.slug}</span>
-                                    </div>
+                                    </Link>
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant={
@@ -166,6 +167,9 @@ export function OrgList({ initialData }: OrgListProps) {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                            <DropdownMenuItem asChild>
+                                                <Link href={`/admin/organizations/${org.id}`}>Ver ficha 360</Link>
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => navigator.clipboard.writeText(org.id)}>
                                                 Copiar ID
                                             </DropdownMenuItem>
