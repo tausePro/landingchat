@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { UserData, updateUserRole, toggleSuperadmin, updateAdminRole } from "../actions"
+import { CreateUserDialog } from "./create-user-dialog"
 import { formatBogotaDate } from "@/lib/utils/date"
 
 // Simple debounce implementation
@@ -105,7 +106,7 @@ export function UserList({ initialData }: UserListProps) {
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
                 <div className="flex w-full max-w-sm items-center space-x-2">
                     <Input
                         placeholder="Buscar por nombre o email..."
@@ -114,6 +115,7 @@ export function UserList({ initialData }: UserListProps) {
                         className="h-9"
                     />
                 </div>
+                <CreateUserDialog />
             </div>
 
             <div className="rounded-md border bg-white dark:bg-slate-900">
