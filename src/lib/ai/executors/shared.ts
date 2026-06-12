@@ -694,6 +694,27 @@ const scheduleAppointment: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "Fecha inválida. Usa formato ISO 8601 (ej: 2025-02-20T10:00:00)" }
     }
 
+    // Guard inmobiliario (fix 2026-06-12, reporte de casainmobiliaria):
+    // las visitas llegaban al calendario SIN propiedad ("Visita a propiedad"
+    // genérica) y el asesor no sabía a dónde ir. Si la org maneja
+    // propiedades, una 'visit' SIN property_code se rebota al agente con
+    // instrucción de preguntar. Orgs sin propiedades (booking de servicios
+    // ecommerce, ej. Tantor) no se ven afectadas.
+    if (validated.appointment_type === "visit" && !validated.property_code) {
+        const { count: propertyCount } = await supabase
+            .from("properties")
+            .select("*", { count: "exact", head: true })
+            .eq("organization_id", context.organizationId)
+
+        if ((propertyCount ?? 0) > 0) {
+            apptLog.info("visit without property_code rejected (RE org)")
+            return {
+                success: false,
+                error: "Para agendar una VISITA necesito el código de la propiedad (property_code). Si ya estaban hablando de una propiedad, usa su código. Si no, pregunta al cliente cuál propiedad quiere visitar ANTES de agendar. Incluye el código también en el título (ej: 'Visita propiedad ARR-137').",
+            }
+        }
+    }
+
     const result = await createManagedAppointment(supabase, {
         organizationId: context.organizationId,
         title: validated.title,
