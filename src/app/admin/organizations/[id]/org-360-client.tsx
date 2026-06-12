@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Bot, CreditCard, MessageSquare, Phone, Power, Puzzle } from "lucide-react"
@@ -15,7 +15,12 @@ import { MODULE_CATALOG } from "./module-catalog"
 import {
     updateOrganizationModules,
     updateOrgNotificationPhone,
+    getOrganizationAddons,
+    assignAddonToOrganization,
+    updateOrgAddonStatus,
     type Organization360,
+    type OrgAddon,
+    type AddonCatalogItem,
 } from "./actions"
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -30,6 +35,61 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
     const [modules, setModules] = useState<string[]>(org.enabled_modules)
     const [phone, setPhone] = useState(org.notification_phone ?? "")
     const [saving, setSaving] = useState<string | null>(null)
+    const [addons, setAddons] = useState<OrgAddon[]>([])
+    const [addonCatalog, setAddonCatalog] = useState<AddonCatalogItem[]>([])
+    const [newAddonId, setNewAddonId] = useState("")
+    const [newAddonPrice, setNewAddonPrice] = useState("")
+
+    const loadAddons = async () => {
+        const result = await getOrganizationAddons(org.id)
+        if (result.success) {
+            setAddons(result.data.assigned)
+            setAddonCatalog(result.data.catalog)
+        }
+    }
+
+    useEffect(() => {
+        loadAddons()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [org.id])
+
+    const handleAssignAddon = async () => {
+        if (!newAddonId) return
+        setSaving("addon")
+        try {
+            const result = await assignAddonToOrganization({
+                orgId: org.id,
+                marketplaceItemId: newAddonId,
+                priceOverride: newAddonPrice.trim() ? Number(newAddonPrice.replace(",", ".")) : null,
+            })
+            if (result.success) {
+                toast.success("Addon asignado")
+                setNewAddonId("")
+                setNewAddonPrice("")
+                await loadAddons()
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setSaving(null)
+        }
+    }
+
+    const handleAddonAction = async (addonId: string, action: "suspend" | "activate" | "remove") => {
+        if (action === "remove" && !confirm("¿Quitar este addon de la organización?")) return
+        setSaving(`addon-${addonId}`)
+        try {
+            const result = await updateOrgAddonStatus(addonId, org.id, action)
+            if (result.success) {
+                toast.success(action === "remove" ? "Addon eliminado" : action === "suspend" ? "Addon suspendido" : "Addon reactivado")
+                await loadAddons()
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setSaving(null)
+        }
+    }
 
     const status = STATUS_BADGE[org.status ?? "active"] ?? STATUS_BADGE.active
     const isSuspended = org.status === "suspended"
@@ -154,6 +214,77 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
                     <div className="flex justify-end">
                         <Button onClick={handleSaveModules} disabled={saving === "modules"}>
                             {saving === "modules" ? "Guardando..." : "Guardar módulos"}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Addons del marketplace */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2"><Puzzle className="h-4 w-4" /> Addons del marketplace</CardTitle>
+                    <CardDescription>Items asignados a este cliente (precio pactado o de lista)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {addons.length === 0 ? (
+                        <p className="text-sm text-slate-500">Sin addons asignados</p>
+                    ) : (
+                        addons.map((addon) => (
+                            <div key={addon.id} className="flex items-center justify-between rounded-lg border p-3 text-sm">
+                                <div>
+                                    <span className="font-medium">{addon.item_name}</span>
+                                    <Badge variant="outline" className="ml-2 text-[10px]">{addon.item_type}</Badge>
+                                    {addon.status === "suspended" && (
+                                        <Badge className="ml-2 bg-amber-100 text-amber-800">Suspendido</Badge>
+                                    )}
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        ${(addon.price_override ?? addon.base_price).toLocaleString("es-CO")} COP/mes
+                                        {addon.price_override !== null && " (pactado)"}
+                                    </p>
+                                </div>
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="ghost" size="sm"
+                                        disabled={saving === `addon-${addon.id}`}
+                                        onClick={() => handleAddonAction(addon.id, addon.status === "active" ? "suspend" : "activate")}
+                                    >
+                                        {addon.status === "active" ? "Suspender" : "Reactivar"}
+                                    </Button>
+                                    <Button
+                                        variant="ghost" size="sm" className="text-red-600"
+                                        disabled={saving === `addon-${addon.id}`}
+                                        onClick={() => handleAddonAction(addon.id, "remove")}
+                                    >
+                                        Quitar
+                                    </Button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+
+                    <div className="flex flex-wrap gap-2 items-center pt-2 border-t">
+                        <select
+                            value={newAddonId}
+                            onChange={(event) => setNewAddonId(event.target.value)}
+                            className="h-9 rounded-md border border-input bg-transparent px-2 text-sm flex-1 min-w-44"
+                        >
+                            <option value="">Asignar addon...</option>
+                            {addonCatalog
+                                .filter((item) => !addons.some((addon) => addon.marketplace_item_id === item.id && addon.status === "active"))
+                                .map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                        {item.name} — ${item.base_price.toLocaleString("es-CO")}
+                                    </option>
+                                ))}
+                        </select>
+                        <Input
+                            value={newAddonPrice}
+                            onChange={(event) => setNewAddonPrice(event.target.value.replace(/[^\d.,]/g, ""))}
+                            placeholder="Precio pactado (opcional)"
+                            className="w-44 text-sm"
+                        />
+                        <Button size="sm" onClick={handleAssignAddon} disabled={!newAddonId || saving === "addon"}>
+                            {saving === "addon" ? "..." : "Asignar"}
                         </Button>
                     </div>
                 </CardContent>

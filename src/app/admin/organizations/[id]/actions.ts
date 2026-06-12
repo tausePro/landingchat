@@ -170,3 +170,150 @@ export async function updateOrgNotificationPhone(id: string, phone: string): Pro
         return failure("Error al guardar el teléfono")
     }
 }
+
+// ─── Addons del marketplace (Admin C) ──────────────────────────────
+
+export interface OrgAddon {
+    id: string
+    marketplace_item_id: string
+    item_name: string
+    item_type: string
+    status: "active" | "suspended"
+    price_override: number | null
+    base_price: number
+    notes: string | null
+}
+
+export interface AddonCatalogItem {
+    id: string
+    name: string
+    type: string
+    base_price: number
+}
+
+/** Addons asignados a la org + catálogo disponible para asignar. */
+export async function getOrganizationAddons(orgId: string): Promise<ActionResult<{
+    assigned: OrgAddon[]
+    catalog: AddonCatalogItem[]
+}>> {
+    if (!(await requireAdminRole(["tech", "finance"]))) return failure("No autorizado")
+
+    try {
+        const supabase = await createServiceClient()
+
+        const [assignedRes, catalogRes] = await Promise.all([
+            supabase
+                .from("organization_addons")
+                .select("id, marketplace_item_id, status, price_override, notes, marketplace_items(name, type, base_price)")
+                .eq("organization_id", orgId),
+            supabase
+                .from("marketplace_items")
+                .select("id, name, type, base_price")
+                .eq("is_active", true),
+        ])
+
+        const assigned: OrgAddon[] = (assignedRes.data ?? []).map((row) => {
+            const item = (Array.isArray(row.marketplace_items) ? row.marketplace_items[0] : row.marketplace_items) as
+                | { name?: string; type?: string; base_price?: number }
+                | null
+            return {
+                id: row.id,
+                marketplace_item_id: row.marketplace_item_id,
+                item_name: item?.name ?? "(item eliminado)",
+                item_type: item?.type ?? "",
+                status: row.status as "active" | "suspended",
+                price_override: row.price_override !== null ? Number(row.price_override) : null,
+                base_price: Number(item?.base_price ?? 0),
+                notes: row.notes,
+            }
+        })
+
+        return success({
+            assigned,
+            catalog: (catalogRes.data ?? []).map((item) => ({
+                id: item.id,
+                name: item.name,
+                type: item.type,
+                base_price: Number(item.base_price ?? 0),
+            })),
+        })
+    } catch (error) {
+        console.error("[org-360] Addons error:", error)
+        return failure("Error al cargar los addons")
+    }
+}
+
+const assignAddonSchema = z.object({
+    orgId: z.string().uuid(),
+    marketplaceItemId: z.string().uuid(),
+    priceOverride: z.number().min(0).nullable(),
+    notes: z.string().trim().max(200).optional(),
+})
+
+/** Asigna un addon a la org (upsert: re-asignar reactiva y actualiza precio). */
+export async function assignAddonToOrganization(
+    input: z.infer<typeof assignAddonSchema>
+): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["tech", "finance"]))) return failure("No autorizado")
+
+    const validation = assignAddonSchema.safeParse(input)
+    if (!validation.success) return failure(validation.error.issues[0]?.message || "Datos inválidos")
+    const data = validation.data
+
+    try {
+        const supabase = await createServiceClient()
+        const { error } = await supabase.from("organization_addons").upsert(
+            {
+                organization_id: data.orgId,
+                marketplace_item_id: data.marketplaceItemId,
+                status: "active",
+                price_override: data.priceOverride,
+                notes: data.notes || null,
+                updated_at: new Date().toISOString(),
+            },
+            { onConflict: "organization_id,marketplace_item_id" }
+        )
+        if (error) return failure(error.message)
+
+        revalidatePath(`/admin/organizations/${data.orgId}`)
+        return success(undefined)
+    } catch (error) {
+        console.error("[org-360] Assign addon error:", error)
+        return failure("Error al asignar el addon")
+    }
+}
+
+/** Suspende/reactiva o elimina un addon asignado. */
+export async function updateOrgAddonStatus(
+    addonId: string,
+    orgId: string,
+    action: "suspend" | "activate" | "remove"
+): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["tech", "finance"]))) return failure("No autorizado")
+
+    try {
+        const supabase = await createServiceClient()
+
+        if (action === "remove") {
+            const { error } = await supabase
+                .from("organization_addons")
+                .delete()
+                .eq("id", addonId)
+                .eq("organization_id", orgId)
+            if (error) return failure(error.message)
+        } else {
+            const { error } = await supabase
+                .from("organization_addons")
+                .update({ status: action === "suspend" ? "suspended" : "active", updated_at: new Date().toISOString() })
+                .eq("id", addonId)
+                .eq("organization_id", orgId)
+            if (error) return failure(error.message)
+        }
+
+        revalidatePath(`/admin/organizations/${orgId}`)
+        return success(undefined)
+    } catch (error) {
+        console.error("[org-360] Addon status error:", error)
+        return failure("Error al actualizar el addon")
+    }
+}
