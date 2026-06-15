@@ -108,6 +108,12 @@ describe("GET /api/cron/copilot/weekly-insights", () => {
         expect(response.status).toBe(401)
     })
 
+    it("SIN CRON_SECRET seteado → NO 401 (bug 2026-06-15: era el único cron estricto)", async () => {
+        vi.stubEnv("CRON_SECRET", "")
+        const response = await GET(buildRequest())
+        expect(response.status).not.toBe(401)
+    })
+
     it("200 sin orgs elegibles", async () => {
         mockOrdersResult.mockReturnValue({ data: [], error: null })
         mockChatsResult.mockReturnValue({ data: [], error: null })

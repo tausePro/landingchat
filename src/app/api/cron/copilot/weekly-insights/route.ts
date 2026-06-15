@@ -41,7 +41,12 @@ export async function GET(request: Request) {
     const authHeader = request.headers.get("authorization")
     const cronSecret = process.env.CRON_SECRET
 
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    // Mismo patrón que los otros 4 crons: enforce SOLO si CRON_SECRET está
+    // seteado. Antes usaba `!cronSecret || ...` (estricto) y era el ÚNICO cron
+    // así → como CRON_SECRET no está en Vercel, devolvía 401 SIEMPRE y nunca
+    // ejecutaba (bug 2026-06-15, confirmado en logs: GET 401 vercel-cron/1.0).
+    // Recomendado: setear CRON_SECRET en Vercel para asegurar los 5 crons.
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
