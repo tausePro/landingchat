@@ -98,6 +98,27 @@ describe("extractStoreFromUrl", () => {
         }
     })
 
+    it("imágenes: acepta URL real de la página, descarta la inventada", async () => {
+        const html = `<html><body>
+            <img src="https://tienda.co/img/gorra-negra.jpg" alt="Gorra Negra" />
+            <img src="https://tienda.co/img/logo.png" alt="logo" />
+        </body></html>`
+        stubFetch(html)
+        mockCreateMessage.mockResolvedValue(llmReply({
+            products: [
+                { name: "Gorra Negra", price: 30000, image_url: "https://tienda.co/img/gorra-negra.jpg" }, // real → entra
+                { name: "Gorra Roja", price: 30000, image_url: "https://evil.com/robada.jpg" },             // inventada → null
+            ],
+        }))
+
+        const result = await extractStoreFromUrl("https://tienda.co")
+        expect(result.ok).toBe(true)
+        if (result.ok) {
+            expect(result.data.products.find((p) => p.name === "Gorra Negra")?.imageUrl).toBe("https://tienda.co/img/gorra-negra.jpg")
+            expect(result.data.products.find((p) => p.name === "Gorra Roja")?.imageUrl).toBeNull()
+        }
+    })
+
     it("sitio sin productos → error claro", async () => {
         stubFetch("<html><body><h1>Blog</h1></body></html>")
         const result = await extractStoreFromUrl("https://ejemplo.com")
