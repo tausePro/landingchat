@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ProgressBar } from "@/components/onboarding/progress-bar"
+import { StoreImportCard } from "./components/store-import-card"
 
 export default function ProductIntegrationPage() {
     return (
@@ -42,30 +43,8 @@ export default function ProductIntegrationPage() {
                     </div>
                 </div>
 
-                {/* E-commerce Integration Card */}
-                <div className="flex flex-col gap-4 rounded-xl border border-primary dark:border-primary bg-primary/5 dark:bg-primary/10 p-6 shadow-sm ring-2 ring-primary/20 transition-shadow hover:shadow-lg">
-                    <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                        <span className="material-symbols-outlined text-3xl">hub</span>
-                    </div>
-                    <div className="flex flex-grow flex-col gap-2">
-                        <p className="text-slate-900 dark:text-slate-50 text-lg font-bold leading-normal">
-                            Conecta tu tienda e-commerce
-                        </p>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm font-normal leading-normal">
-                            Sincronización automática de stock y productos. Ideal para usuarios de Shopify, WooCommerce, etc.
-                        </p>
-                        <div className="flex items-center gap-2 pt-2">
-                            <div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded" />
-                            <div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded" />
-                            <div className="h-6 w-6 bg-slate-200 dark:bg-slate-700 rounded" />
-                        </div>
-                    </div>
-                    <div className="mt-auto flex flex-col items-start">
-                        <Button className="w-full h-11 px-5 text-sm">
-                            <span className="truncate">Conectar</span>
-                        </Button>
-                    </div>
-                </div>
+                {/* Onboarding mágico: importa desde la web actual del merchant */}
+                <StoreImportCard />
 
                 {/* Manual Entry Card */}
                 <div className="flex flex-col gap-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm transition-shadow hover:shadow-lg">
