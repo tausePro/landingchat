@@ -47,6 +47,7 @@ Variables completas y comandos detallados en `docs/AGENTS_GUIDE.md`.
 - ❌ NO refactor transversal solo por perseguir deuda técnica fuera del scope
 - ✅ Usar Zod para validar inputs externos (forms, APIs, webhooks)
 - ✅ Server Actions devuelven `ActionResult<T>` (success/error pattern)
+- ✅ YAGNI: el mínimo que funcione bien. Antes de una abstracción o dependencia nueva, preferir stdlib / feature nativa / lo ya instalado. NUNCA recortar validación, seguridad, manejo de pérdida de datos ni tests
 
 ### React / Next.js
 - ✅ Server Components por defecto; `'use client'` solo cuando se necesite estado/efectos del cliente
@@ -89,6 +90,12 @@ Variables completas y comandos detallados en `docs/AGENTS_GUIDE.md`.
 - `docs:` documentación
 - `test:` agregar o modificar tests
 - `security:` mejoras de seguridad
+
+## 🚀 Workflow de releases (no negociable)
+
+- ✅ Toda feature/fix en **rama propia** (`feat/…`, `fix/…`, `chore/…`) → `develop` → `main`. NUNCA commitear features directo en `develop`
+- ✅ Antes de mergear a `main`: `tsc` + `vitest` + `build` **Y smoke local del flujo real** — "compila y renderiza" NO es suficiente. Para UI: levantar dev y recorrer el camino a mano (o Puppeteer) antes del release
+- ✅ Release por slice: `chore(release): vX.Y.Z` + tag; verificar `develop == main` (0 0)
 
 ## 🤖 Otros archivos para agentes
 
