@@ -14,6 +14,8 @@ interface QueryRecord {
 
 const queryLog: QueryRecord[] = []
 let dataByTable: Record<string, unknown[]>
+let singleByTable: Record<string, unknown>   // .single() → org row (vertical)
+let countByTable: Record<string, number>     // head:true counts (citas)
 
 function buildChain(table: string) {
     const record: QueryRecord = { table, eqCalls: [] }
@@ -32,8 +34,9 @@ function buildChain(table: string) {
         limit: vi.fn(() => chain),
         // fetchAllPages pagina con .range (fix del cap de PostgREST)
         range: vi.fn(() => chain),
-        then: (resolve: (value: { data: unknown[]; error: null }) => void) =>
-            resolve({ data: dataByTable[table] ?? [], error: null }),
+        single: vi.fn(() => Promise.resolve({ data: singleByTable[table] ?? null, error: null })),
+        then: (resolve: (value: { data: unknown[]; error: null; count: number }) => void) =>
+            resolve({ data: dataByTable[table] ?? [], error: null, count: countByTable[table] ?? 0 }),
     }
     return chain
 }
@@ -51,6 +54,8 @@ beforeEach(() => {
     vi.clearAllMocks()
     queryLog.length = 0
     dataByTable = { orders: [], chats: [], analytics_events: [], products: [] }
+    singleByTable = {}   // org null → vertical commerce (default)
+    countByTable = {}    // citas 0
 })
 
 describe("loadWeeklyMetrics", () => {
@@ -63,20 +68,35 @@ describe("loadWeeklyMetrics", () => {
         expect(metrics.orders).toEqual({ count: 0, revenue: 0, ticketAvg: 0 })
         expect(metrics.ordersPrev).toEqual({ count: 0, revenue: 0 })
         expect(metrics.conversations).toEqual({ count: 0, whatsappPct: 0 })
+        expect(metrics.vertical).toBe("commerce")
+        expect(metrics.appointments).toEqual({ count: 0, completed: 0 })
+        expect(metrics.appointmentsPrev).toEqual({ count: 0 })
         expect(metrics.cartsAbandoned).toEqual([])
         expect(metrics.inactiveCustomers).toEqual([])
         expect(metrics.topProductsViewed).toEqual([])
         expect(metrics.topProductsConverted).toEqual([])
     })
 
-    it("toda query a tablas multi-tenant filtra por organization_id", async () => {
+    it("vertical real_estate: detecta industria y trae citas (no se mide por ventas)", async () => {
+        singleByTable.organizations = { industry: "real_estate", enabled_modules: ["properties", "appointments"] }
+        countByTable.appointments = 6
+
+        const metrics = await loadWeeklyMetrics("org-re", NOW)
+
+        expect(metrics.vertical).toBe("real_estate")
+        expect(metrics.appointments.count).toBe(6)
+    })
+
+    it("toda query a tablas multi-tenant filtra por su tenant", async () => {
         await loadWeeklyMetrics("org-secure", NOW)
 
         expect(queryLog.length).toBeGreaterThanOrEqual(6)
         for (const record of queryLog) {
+            // La tabla organizations se filtra por su propio id; el resto por organization_id
+            const column = record.table === "organizations" ? "id" : "organization_id"
             expect(
-                record.eqCalls.some(([column, value]) => column === "organization_id" && value === "org-secure"),
-                `query a "${record.table}" sin filtro de organization_id`
+                record.eqCalls.some(([col, value]) => col === column && value === "org-secure"),
+                `query a "${record.table}" sin filtro de ${column}`
             ).toBe(true)
         }
     })
