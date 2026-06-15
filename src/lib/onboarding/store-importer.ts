@@ -18,7 +18,8 @@ const log = logger("onboarding/importer")
 
 const FETCH_TIMEOUT_MS = 12_000
 const MAX_HTML_BYTES = 1_500_000          // no descargar páginas gigantes
-const MAX_LLM_CHARS = 28_000              // presupuesto de tokens del prompt
+const MAX_LLM_CHARS = 24_000              // presupuesto de tokens del prompt (texto)
+const MAX_IMAGE_CANDIDATES = 40           // URLs de imagen que ve el LLM
 const MAX_PRODUCTS = 50
 const EXTRACTOR_MODEL = "claude-haiku-4-5-20251001"
 
@@ -143,6 +144,39 @@ function extractMeta(html: string, baseUrl: string) {
     }
 }
 
+interface ImageCandidate {
+    url: string
+    alt: string
+}
+
+const IMAGE_JUNK = /logo|icon|favicon|sprite|banner|placeholder|loading|spinner|avatar|payment|badge|flag|\.svg(\?|$)/i
+
+/**
+ * URLs de imagen presentes en el HTML estático (src/srcset/data-src) con su
+ * alt. Muchos sitios (WordPress/WooCommerce/Shopify) sirven las fotos así —
+ * no hace falta navegador. Se filtran logos/iconos/sprites y se deduplica.
+ */
+function extractImageCandidates(html: string, baseUrl: string): ImageCandidate[] {
+    const seen = new Set<string>()
+    const candidates: ImageCandidate[] = []
+
+    for (const tag of html.matchAll(/<img\b[^>]*>/gi)) {
+        const attrs = tag[0]
+        const get = (name: string) => attrs.match(new RegExp(`${name}=["']([^"']+)["']`, "i"))?.[1]?.trim()
+        const srcset = get("srcset") || get("data-srcset")
+        const raw = get("src") || get("data-src") || get("data-lazy-src") || srcset?.split(",")[0]?.trim().split(/\s+/)[0]
+        if (!raw) continue
+        if (raw.startsWith("data:")) continue
+        const url = absoluteUrl(raw, baseUrl)
+        if (!url || IMAGE_JUNK.test(url) || seen.has(url)) continue
+        if (!/\.(jpe?g|png|webp|avif)(\?|$)/i.test(url)) continue
+        seen.add(url)
+        candidates.push({ url, alt: (get("alt") || "").slice(0, 80) })
+        if (candidates.length >= MAX_IMAGE_CANDIDATES) break
+    }
+    return candidates
+}
+
 /** HTML → texto plano acotado para el LLM (quita script/style/tags). */
 function htmlToText(html: string): string {
     return html
@@ -183,12 +217,13 @@ async function fetchHtml(url: string): Promise<string | null> {
     }
 }
 
-const EXTRACT_PROMPT = (text: string, jsonLdHint: string) => `
+const EXTRACT_PROMPT = (text: string, jsonLdHint: string, imagesBlock: string) => `
 You extract a store's catalog from its website content. Return JSON ONLY.
 
 WEBSITE CONTENT (truncated):
 ${text}
 ${jsonLdHint ? `\nSTRUCTURED PRODUCTS ALREADY FOUND (schema.org):\n${jsonLdHint}` : ""}
+${imagesBlock ? `\nAVAILABLE IMAGES (url — alt text). Match each product to its image by alt text / filename similarity:\n${imagesBlock}` : ""}
 
 Return a JSON object:
 {
@@ -203,6 +238,7 @@ Return a JSON object:
 RULES:
 - Only REAL products being sold. Ignore nav links, categories, blog posts, footer.
 - price: numeric only, no currency symbols or thousand separators (e.g. 30000 not "$30.000").
+- image_url: MUST be one of the URLs from AVAILABLE IMAGES above, matched to the product by alt/filename. If no clear match, use null. NEVER invent an image URL.
 - Max ${MAX_PRODUCTS} products. If none are clearly products, return "products": [].
 - Do NOT invent products, prices or names not present in the content.
 Return JSON only, no markdown fences.
@@ -218,15 +254,27 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
 
     const jsonLdProducts = extractJsonLd(html, url)
     const meta = extractMeta(html, url)
+    const imageCandidates = extractImageCandidates(html, url)
+    // Guard anti-alucinación: solo aceptamos imágenes presentes en la página
+    // (set exacto) o, a lo sumo, del mismo origen del sitio.
+    const candidateUrls = new Set(imageCandidates.map((image) => image.url))
+    let siteOrigin = ""
+    try { siteOrigin = new URL(url).origin } catch { /* noop */ }
+    const isRealImage = (candidate: string | null): candidate is string => {
+        if (!candidate) return false
+        if (candidateUrls.has(candidate)) return true
+        try { return new URL(candidate).origin === siteOrigin } catch { return false }
+    }
 
     let llmStore: z.infer<typeof llmStoreSchema> | null = null
     try {
         const jsonLdHint = jsonLdProducts.slice(0, 10).map((product) => `- ${product.name} (${product.price ?? "?"})`).join("\n")
+        const imagesBlock = imageCandidates.map((image) => `- ${image.url}${image.alt ? ` — ${image.alt}` : ""}`).join("\n")
         const response = await createMessage({
             model: EXTRACTOR_MODEL,
             max_tokens: 3000,
             temperature: 0.2,
-            messages: [{ role: "user", content: EXTRACT_PROMPT(htmlToText(html), jsonLdHint) }],
+            messages: [{ role: "user", content: EXTRACT_PROMPT(htmlToText(html), jsonLdHint, imagesBlock) }],
         })
         const textBlock = response.content.find((block) => block.type === "text")
         if (textBlock && textBlock.type === "text") {
@@ -248,11 +296,12 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
         if (!name) continue
         const key = name.toLowerCase()
         if (byName.has(key)) continue
+        const llmImage = absoluteUrl(raw.image_url, url)
         byName.set(key, {
             name: name.slice(0, 120),
             price: normalizePrice(raw.price),
             description: raw.description?.trim().slice(0, 500) ?? null,
-            imageUrl: absoluteUrl(raw.image_url, url),
+            imageUrl: isRealImage(llmImage) ? llmImage : null,   // descarta URLs inventadas
         })
     }
 
