@@ -12,6 +12,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { fetchAllPages } from "@/lib/supabase/fetch-all"
 import { logger } from "@/lib/logger"
+import { deriveVertical, type CopilotVertical } from "./vertical"
 
 const log = logger("copilot/metrics")
 
@@ -22,11 +23,20 @@ export interface WeeklyMetrics {
     weekEnd: Date
     previousWeekStart: Date
 
+    // Vertical del negocio: gobierna QUÉ KPIs son primarios (commerce = ventas;
+    // real_estate/services = atención + citas). Fix Casa Inmobiliaria 2026-06-15.
+    vertical: CopilotVertical
+
     orders: { count: number; revenue: number; ticketAvg: number }
     ordersPrev: { count: number; revenue: number }
 
     conversations: { count: number; whatsappPct: number }
     conversationsPrev: { count: number }
+
+    // Citas/visitas: KPI primario en inmobiliaria/servicios (agendadas esta
+    // semana, completadas, y agendadas la semana previa para comparar).
+    appointments: { count: number; completed: number }
+    appointmentsPrev: { count: number }
 
     cartsAbandoned: Array<{ id: string; customerName: string | null; total: number; createdAt: string }>
     inactiveCustomers: Array<{ id: string; name: string | null; lastOrderAt: string }>
@@ -86,6 +96,15 @@ export async function loadWeeklyMetrics(organizationId: string, now: Date = new 
     const previousWeekStart = new Date(now.getTime() - 14 * DAY_MS)
     const inactiveCutoff = new Date(now.getTime() - 21 * DAY_MS)
     const lookback90d = new Date(now.getTime() - 90 * DAY_MS)
+
+    // Vertical del negocio (Casa Inmobiliaria fix): determina qué KPIs son
+    // primarios. Sin org → commerce por defecto (compat).
+    const { data: orgRow } = await supabase
+        .from("organizations")
+        .select("industry, enabled_modules")
+        .eq("id", organizationId)
+        .single()
+    const vertical = deriveVertical(orgRow ?? {})
 
     const orderSelect = "id, total, payment_status, customer_id, customer_info, items, created_at"
 
@@ -171,6 +190,26 @@ export async function loadWeeklyMetrics(organizationId: string, now: Date = new 
     }
     const conversationsPrev = { count: prevChats.length }
 
+    // --- Citas/visitas (KPI primario inmobiliaria/servicios) ---
+    // counts head:true (inmunes al cap de 1000). Guard: si la tabla/columna
+    // falla, citas = 0 (no rompe el insight de un commerce sin citas).
+    let appointments = { count: 0, completed: 0 }
+    let appointmentsPrev = { count: 0 }
+    try {
+        const [apptCur, apptDone, apptPrev] = await Promise.all([
+            supabase.from("appointments").select("*", { count: "exact", head: true })
+                .eq("organization_id", organizationId).gte("created_at", weekStart.toISOString()),
+            supabase.from("appointments").select("*", { count: "exact", head: true })
+                .eq("organization_id", organizationId).eq("status", "completed").gte("created_at", weekStart.toISOString()),
+            supabase.from("appointments").select("*", { count: "exact", head: true })
+                .eq("organization_id", organizationId).gte("created_at", previousWeekStart.toISOString()).lt("created_at", weekStart.toISOString()),
+        ])
+        appointments = { count: apptCur.count ?? 0, completed: apptDone.count ?? 0 }
+        appointmentsPrev = { count: apptPrev.count ?? 0 }
+    } catch (error) {
+        log.warn("appointments metrics unavailable", { organizationId, error: error instanceof Error ? error.message : "unknown" })
+    }
+
     // --- Carritos abandonados (heurística por sesión de analytics) ---
     // Sesiones con add_to_cart pero SIN checkout_order_created/purchase en la semana.
     const convertedSessions = new Set(
@@ -255,10 +294,13 @@ export async function loadWeeklyMetrics(organizationId: string, now: Date = new 
         weekStart,
         weekEnd,
         previousWeekStart,
+        vertical,
         orders,
         ordersPrev,
         conversations,
         conversationsPrev,
+        appointments,
+        appointmentsPrev,
         cartsAbandoned,
         inactiveCustomers,
         topProductsViewed,

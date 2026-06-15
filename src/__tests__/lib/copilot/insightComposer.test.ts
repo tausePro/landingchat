@@ -19,10 +19,13 @@ function buildMetrics(overrides: Partial<WeeklyMetrics> = {}): WeeklyMetrics {
         weekStart: new Date("2026-06-03T00:00:00Z"),
         weekEnd: new Date("2026-06-10T00:00:00Z"),
         previousWeekStart: new Date("2026-05-27T00:00:00Z"),
+        vertical: "commerce",
         orders: { count: 18, revenue: 2400000, ticketAvg: 133000 },
         ordersPrev: { count: 12, revenue: 1500000 },
         conversations: { count: 40, whatsappPct: 60 },
         conversationsPrev: { count: 35 },
+        appointments: { count: 0, completed: 0 },
+        appointmentsPrev: { count: 0 },
         cartsAbandoned: [{ id: "s1", customerName: null, total: 90000, createdAt: "2026-06-09T10:00:00Z" }],
         inactiveCustomers: [{ id: "c1", name: "Laura", lastOrderAt: "2026-05-01T00:00:00Z" }],
         topProductsViewed: [{ productId: "p1", name: "Serum", views: 120, conversions: 8 }],
@@ -119,6 +122,50 @@ describe("composeWeeklyInsight", () => {
 
         expect(result.proposed_actions).toEqual([])
         expect(result.body.length).toBeGreaterThan(0)
+    })
+
+    it("real_estate: NO se mide por ventas — prompt centrado en atención + citas", async () => {
+        await composeWeeklyInsight({
+            organizationId: "org-re",
+            locale: "es-CO",
+            metrics: buildMetrics({
+                vertical: "real_estate",
+                orders: { count: 0, revenue: 0, ticketAvg: 0 }, // inmobiliaria: siempre 0
+                ordersPrev: { count: 0, revenue: 0 },
+                conversations: { count: 126, whatsappPct: 98 },
+                appointments: { count: 6, completed: 1 },
+                appointmentsPrev: { count: 5 },
+            }),
+        })
+
+        // No es thin-data (tiene conversaciones + citas) → SÍ llama al LLM
+        expect(mockCreateMessage).toHaveBeenCalled()
+        const prompt = mockCreateMessage.mock.calls[0][0].messages[0].content as string
+        expect(prompt).toContain("REAL ESTATE")
+        expect(prompt).toContain("property visits")
+        expect(prompt.toLowerCase()).toContain("never frame")
+        expect(prompt).toContain('"sin ventas"')
+        // El contexto NO debe exponer ingresos/órdenes como KPI
+        expect(prompt).not.toContain("Revenue:")
+    })
+
+    it("real_estate sin actividad (0 conv, 0 citas) → fallback sin hablar de órdenes", async () => {
+        const result = await composeWeeklyInsight({
+            organizationId: "org-re",
+            locale: "es-CO",
+            metrics: buildMetrics({
+                vertical: "real_estate",
+                orders: { count: 0, revenue: 0, ticketAvg: 0 },
+                ordersPrev: { count: 0, revenue: 0 },
+                conversations: { count: 0, whatsappPct: 0 },
+                appointments: { count: 0, completed: 0 },
+                appointmentsPrev: { count: 0 },
+            }),
+        })
+
+        expect(mockCreateMessage).not.toHaveBeenCalled()
+        expect(result.body).toContain("citas")
+        expect(result.body).not.toContain("órdenes")
     })
 
     it("locale en-US produce prompt en inglés y fences de markdown se toleran", async () => {

@@ -21,6 +21,7 @@ import {
 } from "./types"
 import type { WeeklyMetrics } from "./weeklyMetrics"
 import { buildWeeklyInsightPrompt } from "./prompts/weeklyInsightPrompt"
+import { isAppointmentFirst } from "./vertical"
 
 const log = logger("copilot/composer")
 
@@ -37,11 +38,15 @@ export interface ComposeWeeklyInsightInput {
 
 function buildMetricsSnapshot(metrics: WeeklyMetrics): Record<string, unknown> {
     return {
+        vertical: metrics.vertical,
         orders_count: metrics.orders.count,
         orders_revenue: metrics.orders.revenue,
         orders_prev_count: metrics.ordersPrev.count,
         orders_prev_revenue: metrics.ordersPrev.revenue,
         conversations_count: metrics.conversations.count,
+        appointments_count: metrics.appointments.count,
+        appointments_completed: metrics.appointments.completed,
+        appointments_prev_count: metrics.appointmentsPrev.count,
         carts_abandoned: metrics.cartsAbandoned.length,
         inactive_customers: metrics.inactiveCustomers.length,
     }
@@ -50,16 +55,30 @@ function buildMetricsSnapshot(metrics: WeeklyMetrics): Record<string, unknown> {
 /** Insight mínimo seguro: sin acciones, válido contra el schema. */
 function buildFallbackInsight(metrics: WeeklyMetrics, locale: SupportedLocale, reason: "thin_data" | "llm_failure"): CopilotInsightPayload {
     const es = locale !== "en-US"
+    const apptFirst = isAppointmentFirst(metrics.vertical)
     const title = reason === "thin_data"
         ? (es ? "Semana con pocos datos" : "A quiet week of data")
         : (es ? "Resumen semanal" : "Weekly summary")
-    const body = reason === "thin_data"
-        ? (es
-            ? `Esta semana hubo muy poca actividad (${metrics.orders.count} órdenes). Con más ventas y conversaciones podré darte recomendaciones accionables. Mientras tanto: comparte el link de tu tienda y activa tus canales.`
-            : `There was very little activity this week (${metrics.orders.count} orders). With more sales and conversations I can give you actionable recommendations. Meanwhile: share your store link and activate your channels.`)
-        : (es
-            ? `Tu tienda registró ${metrics.orders.count} órdenes y ${metrics.conversations.count} conversaciones esta semana (la anterior: ${metrics.ordersPrev.count} órdenes). No pude generar el análisis detallado esta vez — el próximo reporte llegará con normalidad.`
-            : `Your store recorded ${metrics.orders.count} orders and ${metrics.conversations.count} conversations this week (previous week: ${metrics.ordersPrev.count} orders). I couldn't generate the detailed analysis this time — the next report will arrive as usual.`)
+
+    // Inmobiliaria/servicios: nunca enmarcar por "órdenes" — usar atención + citas
+    let body: string
+    if (apptFirst) {
+        body = reason === "thin_data"
+            ? (es
+                ? `Esta semana hubo poca actividad (${metrics.conversations.count} conversaciones, ${metrics.appointments.count} citas agendadas). Con más conversaciones y citas podré darte recomendaciones accionables. Mientras tanto: comparte tu link y responde rápido los mensajes nuevos.`
+                : `There was little activity this week (${metrics.conversations.count} conversations, ${metrics.appointments.count} appointments). With more conversations and appointments I can give actionable recommendations.`)
+            : (es
+                ? `Esta semana atendiste ${metrics.conversations.count} conversaciones y agendaste ${metrics.appointments.count} citas (la anterior: ${metrics.appointmentsPrev.count} citas). No pude generar el análisis detallado esta vez — el próximo reporte llegará con normalidad.`
+                : `This week you handled ${metrics.conversations.count} conversations and scheduled ${metrics.appointments.count} appointments (previous week: ${metrics.appointmentsPrev.count}). I couldn't generate the detailed analysis this time.`)
+    } else {
+        body = reason === "thin_data"
+            ? (es
+                ? `Esta semana hubo muy poca actividad (${metrics.orders.count} órdenes). Con más ventas y conversaciones podré darte recomendaciones accionables. Mientras tanto: comparte el link de tu tienda y activa tus canales.`
+                : `There was very little activity this week (${metrics.orders.count} orders). With more sales and conversations I can give you actionable recommendations. Meanwhile: share your store link and activate your channels.`)
+            : (es
+                ? `Tu tienda registró ${metrics.orders.count} órdenes y ${metrics.conversations.count} conversaciones esta semana (la anterior: ${metrics.ordersPrev.count} órdenes). No pude generar el análisis detallado esta vez — el próximo reporte llegará con normalidad.`
+                : `Your store recorded ${metrics.orders.count} orders and ${metrics.conversations.count} conversations this week (previous week: ${metrics.ordersPrev.count} orders). I couldn't generate the detailed analysis this time — the next report will arrive as usual.`)
+    }
 
     return CopilotInsightPayloadSchema.parse({
         title,
@@ -77,9 +96,15 @@ function stripMarkdownFences(text: string): string {
 export async function composeWeeklyInsight(input: ComposeWeeklyInsightInput): Promise<CopilotInsightPayload> {
     const { organizationId, locale, metrics } = input
 
-    // Datos demasiado pobres: no quemamos tokens — insight determinista
-    if (metrics.orders.count === 0 && metrics.ordersPrev.count === 0 && metrics.conversations.count === 0) {
-        log.info("thin data, skipping LLM", { organizationId })
+    // Datos demasiado pobres: no quemamos tokens — insight determinista.
+    // Vertical-aware: inmobiliaria/servicios no tienen órdenes, su "thin" es
+    // sin conversaciones NI citas (orders===0 sería siempre verdad para ellos).
+    const apptFirst = isAppointmentFirst(metrics.vertical)
+    const thin = apptFirst
+        ? (metrics.conversations.count === 0 && metrics.appointments.count === 0 && metrics.appointmentsPrev.count === 0)
+        : (metrics.orders.count === 0 && metrics.ordersPrev.count === 0 && metrics.conversations.count === 0)
+    if (thin) {
+        log.info("thin data, skipping LLM", { organizationId, vertical: metrics.vertical })
         return buildFallbackInsight(metrics, locale, "thin_data")
     }
 
