@@ -25,7 +25,7 @@ export function AnalyticsCharts({ ordersByDay, revenueByDay }: AnalyticsChartsPr
         <Card>
             <CardHeader>
                 <CardTitle>Tendencias</CardTitle>
-                <CardDescription>Órdenes e ingresos en los últimos 30 días</CardDescription>
+                <CardDescription>Órdenes e ingresos</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="orders">
