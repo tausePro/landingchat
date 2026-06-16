@@ -53,6 +53,12 @@ export type AnalyticsEventProperties = {
     placement?: "pdp" | "storefront"
     trigger?: "time_on_page"
     destination?: "web_chat" | "whatsapp_fallback"
+    // Instrumentación de chat / agente
+    fromProduct?: boolean
+    userMessageNumber?: number
+    messageLength?: number
+    responseMs?: number
+    actionsCount?: number
     attribution?: AnalyticsEventAttribution
 }
 
