@@ -14,6 +14,10 @@ import { formatBogotaDayKey } from "@/lib/utils/date"
 import { CampaignPerformanceCard, type CampaignPerformance } from "./components/campaign-performance-card"
 import { CheckoutIntelligenceCard, type CheckoutIntelligence } from "./components/checkout-intelligence-card"
 import { ProactiveNudgeCard, type ProactiveNudgeAnalytics } from "./components/proactive-nudge-card"
+import { ChatIntelligenceCard, type ChatIntelligence } from "./components/chat-intelligence-card"
+import { DateRangePicker } from "./components/date-range-picker"
+import { resolveDateRange, type ResolvedRange } from "./date-range"
+import { fetchAllPages } from "@/lib/supabase/fetch-all"
 
 export const dynamic = 'force-dynamic'
 
@@ -62,6 +66,12 @@ function toNumber(value: unknown): number {
     return 0
 }
 
+// Δ% vs período anterior. null = sin base de comparación (período previo en 0).
+function pctDelta(current: number, previous: number): number | null {
+    if (previous === 0) return null
+    return ((current - previous) / previous) * 100
+}
+
 function getAttribution(properties: Record<string, unknown> | null): AnalyticsAttribution | null {
     if (!properties || !isRecord(properties.attribution)) return null
 
@@ -95,7 +105,7 @@ function getOrderItems(items: unknown): AnalyticsOrderItem[] {
     }, [])
 }
 
-async function getAnalyticsData() {
+async function getAnalyticsData(range: ResolvedRange) {
     const supabase = await createClient()
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -116,16 +126,27 @@ async function getAnalyticsData() {
 
     const orgId = profile.organization_id
 
-    // Get orders data for conversion metrics
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    // Ventana de fechas dinámica (default 30d) + período inmediatamente anterior.
+    const startIso = range.startDate.toISOString()
+    const endIso = range.endDate.toISOString()
+    const prevStartIso = range.prevStartDate.toISOString()
+    const prevEndIso = range.prevEndDate.toISOString()
 
     // Filtrar por status válidos (mismo criterio que dashboard-actions.ts)
     const validStatuses = ["pending", "confirmed", "processing", "shipped", "delivered", "completed"]
 
-    // Fetch org, orders, chats, products and analytics events in parallel
-    // Messages se fetchean después en batches (necesitan chatIds primero)
-    const [orgResult, ordersResult, chatsResult, productsResult, analyticsEventsResult] = await Promise.all([
+    // Fetch en paralelo. analytics_events pagina con fetchAllPages: con rangos
+    // largos puede pasar el cap de 1000 filas de PostgREST y truncar EN SILENCIO
+    // (regla de AGENTS.md). Messages se fetchean después (necesitan chatIds).
+    const [
+        orgResult,
+        ordersResult,
+        chatsResult,
+        productsResult,
+        analyticsEventsPaged,
+        prevOrdersResult,
+        prevChatsResult,
+    ] = await Promise.all([
         supabase
             .from("organizations")
             .select("id, name, slug, tracking_config")
@@ -136,29 +157,55 @@ async function getAnalyticsData() {
             .select("id, total, created_at, status, payment_status, source_channel, chat_id, utm_data, items")
             .eq("organization_id", orgId)
             .in("status", validStatuses)
-            .gte("created_at", thirtyDaysAgo.toISOString())
+            .gte("created_at", startIso)
+            .lte("created_at", endIso)
             .order("created_at", { ascending: true }),
         supabase
             .from("chats")
             .select("id, created_at, channel")
             .eq("organization_id", orgId)
-            .gte("created_at", thirtyDaysAgo.toISOString()),
+            .gte("created_at", startIso)
+            .lte("created_at", endIso),
         supabase
             .from("products")
             .select("id, name, stock, image_url, is_active")
             .eq("organization_id", orgId),
+        fetchAllPages<AnalyticsEventRow>((from, to) =>
+            supabase
+                .from("analytics_events")
+                .select("event_name, session_id, order_id, content_ids, value, properties, occurred_at")
+                .eq("organization_id", orgId)
+                .gte("occurred_at", startIso)
+                .lte("occurred_at", endIso)
+                .range(from, to), { maxRows: 50_000 }),
         supabase
-            .from("analytics_events")
-            .select("event_name, session_id, order_id, content_ids, value, properties, occurred_at")
+            .from("orders")
+            .select("total, payment_status")
             .eq("organization_id", orgId)
-            .gte("occurred_at", thirtyDaysAgo.toISOString()),
+            .in("status", validStatuses)
+            .gte("created_at", prevStartIso)
+            .lt("created_at", prevEndIso),
+        supabase
+            .from("chats")
+            .select("id")
+            .eq("organization_id", orgId)
+            .gte("created_at", prevStartIso)
+            .lt("created_at", prevEndIso),
     ])
 
     const org = orgResult.data
     const orders = ordersResult.data
     const chats = chatsResult.data
     const products = productsResult.data
-    const analyticsEvents = (analyticsEventsResult.data || []) as AnalyticsEventRow[]
+    const analyticsEvents = analyticsEventsPaged.rows
+
+    // Período anterior (mismos KPIs, ventana previa de igual duración)
+    const prevPaidOrdersList = (prevOrdersResult.data || []).filter((o) => o.payment_status === "paid")
+    const prevRevenue = prevPaidOrdersList.reduce((sum, o) => sum + (o.total || 0), 0)
+    const prevPaidOrders = prevPaidOrdersList.length
+    const prevChats = prevChatsResult.data?.length || 0
+    const prevConversionRate = prevChats > 0 ? (prevPaidOrders / prevChats) * 100 : 0
+    const prevAvgOrderValue = prevPaidOrders > 0 ? prevRevenue / prevPaidOrders : 0
 
     if (!org) {
         redirect("/onboarding")
@@ -729,6 +776,37 @@ async function getAnalyticsData() {
     const webOrders = paidOrdersList.filter(o => o.chat_id && webChatIds.has(o.chat_id)).length
     const waOrders = paidOrdersList.filter(o => o.chat_id && waChatIds.has(o.chat_id)).length
 
+    // Inteligencia del chat (eventos first-party del chat web conversacional)
+    const chatOpenedCount = analyticsEvents.filter(e => e.event_name === "chat_opened").length
+    const chatMessageCount = analyticsEvents.filter(e => e.event_name === "chat_message_sent").length
+    const agentRepliedRows = analyticsEvents.filter(e => e.event_name === "agent_replied")
+    const agentCartRows = analyticsEvents.filter(e => e.event_name === "agent_added_to_cart")
+    const responseMsValues = agentRepliedRows
+        .map(e => toNumber(e.properties?.responseMs))
+        .filter(v => v > 0)
+    const chatIntelligence: ChatIntelligence = {
+        chatsOpened: chatOpenedCount,
+        messagesSent: chatMessageCount,
+        avgMessagesPerChat: chatOpenedCount > 0 ? chatMessageCount / chatOpenedCount : 0,
+        agentReplies: agentRepliedRows.length,
+        avgAgentResponseMs: responseMsValues.length > 0
+            ? responseMsValues.reduce((s, v) => s + v, 0) / responseMsValues.length
+            : null,
+        agentCartAdds: agentCartRows.length,
+        agentCartValue: agentCartRows.reduce((s, e) => s + toNumber(e.value), 0),
+    }
+
+    // Comparación vs período anterior (Δ% por KPI)
+    const conversionRateNum = totalChats > 0 ? (totalPaidOrders / totalChats) * 100 : 0
+    const averageOrderValueNum = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0
+    const comparison = {
+        totalRevenue: pctDelta(totalRevenue, prevRevenue),
+        totalPaidOrders: pctDelta(totalPaidOrders, prevPaidOrders),
+        totalChats: pctDelta(totalChats, prevChats),
+        conversionRate: pctDelta(conversionRateNum, prevConversionRate),
+        averageOrderValue: pctDelta(averageOrderValueNum, prevAvgOrderValue),
+    }
+
     return {
         organization: org,
         metrics: {
@@ -741,6 +819,8 @@ async function getAnalyticsData() {
             ordersFromChat,
             chatConversionRate,
         },
+        comparison,
+        chatIntelligence,
         charts: {
             ordersByDay: Object.entries(ordersByDay).map(([date, count]) => ({ date, orders: count })),
             revenueByDay: Object.entries(revenueByDay).map(([date, revenue]) => ({ date, revenue })),
@@ -779,8 +859,13 @@ async function getAnalyticsData() {
     }
 }
 
-export default async function AnalyticsPage() {
-    const data = await getAnalyticsData()
+export default async function AnalyticsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ range?: string; from?: string; to?: string }>
+}) {
+    const range = resolveDateRange(await searchParams)
+    const data = await getAnalyticsData(range)
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-CO', {
@@ -790,16 +875,30 @@ export default async function AnalyticsPage() {
         }).format(amount)
     }
 
+    const formatDelta = (delta: number | null) => {
+        if (delta === null) return null
+        const up = delta >= 0
+        return (
+            <div className={`mt-1 flex items-center gap-0.5 text-xs font-medium ${up ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                <span className="material-symbols-outlined text-sm leading-none">{up ? "trending_up" : "trending_down"}</span>
+                {up ? "+" : ""}{delta.toFixed(1)}% vs período anterior
+            </div>
+        )
+    }
+
     return (
         <DashboardLayout>
             <div className="space-y-8">
-                <div>
-                    <h1 className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">
-                        Analytics
-                    </h1>
-                    <p className="text-text-light-secondary dark:text-text-dark-secondary mt-2">
-                        Métricas de rendimiento de tu tienda en los últimos 30 días
-                    </p>
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-text-light-primary dark:text-text-dark-primary">
+                            Analytics
+                        </h1>
+                        <p className="text-text-light-secondary dark:text-text-dark-secondary mt-2">
+                            Métricas de rendimiento de tu tienda · {range.label}
+                        </p>
+                    </div>
+                    <DateRangePicker />
                 </div>
 
                 {/* Tracking Status */}
@@ -835,7 +934,7 @@ export default async function AnalyticsPage() {
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Ingresos pagados (30d)</CardTitle>
+                            <CardTitle className="text-sm font-medium">Ingresos pagados</CardTitle>
                             <span className="material-symbols-outlined text-green-500">payments</span>
                         </CardHeader>
                         <CardContent>
@@ -843,6 +942,7 @@ export default async function AnalyticsPage() {
                             <p className="text-xs text-muted-foreground">
                                 {data.metrics.totalPaidOrders} pagadas · {data.metrics.totalOrders} creadas
                             </p>
+                            {formatDelta(data.comparison.totalRevenue)}
                         </CardContent>
                     </Card>
 
@@ -856,6 +956,7 @@ export default async function AnalyticsPage() {
                             <p className="text-xs text-muted-foreground">
                                 Chats iniciados
                             </p>
+                            {formatDelta(data.comparison.totalChats)}
                         </CardContent>
                     </Card>
 
@@ -869,6 +970,7 @@ export default async function AnalyticsPage() {
                             <p className="text-xs text-muted-foreground">
                                 Chat → Compra pagada
                             </p>
+                            {formatDelta(data.comparison.conversionRate)}
                         </CardContent>
                     </Card>
 
@@ -882,6 +984,7 @@ export default async function AnalyticsPage() {
                             <p className="text-xs text-muted-foreground">
                                 Por orden pagada
                             </p>
+                            {formatDelta(data.comparison.averageOrderValue)}
                         </CardContent>
                     </Card>
                 </div>
@@ -907,6 +1010,8 @@ export default async function AnalyticsPage() {
                 <CheckoutIntelligenceCard intelligence={data.checkoutIntelligence} />
 
                 <ProactiveNudgeCard analytics={data.proactiveNudgeAnalytics} />
+
+                <ChatIntelligenceCard intelligence={data.chatIntelligence} rangeLabel={range.label} />
 
                 <div className="grid gap-6 lg:grid-cols-2">
                     <SalesSources

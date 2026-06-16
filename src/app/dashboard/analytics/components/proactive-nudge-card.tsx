@@ -58,7 +58,7 @@ export function ProactiveNudgeCard({ analytics }: ProactiveNudgeCardProps) {
                     <span className="material-symbols-outlined text-emerald-500">bolt</span>
                     Burbuja proactiva
                 </CardTitle>
-                <CardDescription>Intención generada por nudges contextuales en PDP durante los últimos 30 días</CardDescription>
+                <CardDescription>Intención generada por nudges contextuales en PDP</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -160,7 +160,7 @@ export function ProactiveNudgeCard({ analytics }: ProactiveNudgeCardProps) {
                     </div>
                 ) : (
                     <div className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                        Aún no hay eventos de burbuja proactiva en los últimos 30 días.
+                        Aún no hay eventos de burbuja proactiva en este período.
                     </div>
                 )}
             </CardContent>

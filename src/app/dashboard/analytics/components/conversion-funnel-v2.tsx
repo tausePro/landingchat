@@ -37,7 +37,7 @@ export function ConversionFunnelV2({ stages, criticalDropOff }: ConversionFunnel
         <Card>
             <CardHeader>
                 <CardTitle>Embudo de Conversión</CardTitle>
-                <CardDescription>Eventos first-party de tienda y checkout en los últimos 30 días</CardDescription>
+                <CardDescription>Eventos first-party de tienda y checkout</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
                 {criticalDropOff && criticalDropOff.lost > 0 && (

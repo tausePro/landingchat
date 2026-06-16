@@ -63,7 +63,7 @@ export function CheckoutIntelligenceCard({ intelligence }: CheckoutIntelligenceC
                     <span className="material-symbols-outlined text-purple-500">shopping_cart_checkout</span>
                     Inteligencia de Checkout
                 </CardTitle>
-                <CardDescription>Abandono, fallos y productos con intención alta en los últimos 30 días</CardDescription>
+                <CardDescription>Abandono, fallos y productos con intención alta</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
                 <div className="grid grid-cols-3 gap-3 text-sm">

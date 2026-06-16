@@ -30,7 +30,7 @@ export function CampaignPerformanceCard({ campaigns }: CampaignPerformanceCardPr
         <Card>
             <CardHeader>
                 <CardTitle>Campañas Meta</CardTitle>
-                <CardDescription>Rendimiento first-party por campaña detectada en los últimos 30 días</CardDescription>
+                <CardDescription>Rendimiento first-party por campaña detectada</CardDescription>
             </CardHeader>
             <CardContent>
                 {campaigns.length === 0 ? (
