@@ -1,0 +1,39 @@
+-- Instrumentación del chat: eventos del funnel conversacional (chat web + agente).
+-- Amplía el CHECK de analytics_events.event_name para permitir los nuevos eventos.
+ALTER TABLE public.analytics_events
+    DROP CONSTRAINT IF EXISTS analytics_events_event_name_check;
+
+ALTER TABLE public.analytics_events
+    ADD CONSTRAINT analytics_events_event_name_check
+    CHECK (event_name IN (
+        'page_view',
+        'view_content',
+        'add_to_cart',
+        'cart_opened',
+        'cart_item_removed',
+        'cart_quantity_changed',
+        'cart_coupon_applied',
+        'cart_coupon_failed',
+        'checkout_started',
+        'checkout_contact_submitted',
+        'checkout_contact_validation_failed',
+        'checkout_shipping_unavailable',
+        'checkout_payment_method_selected',
+        'checkout_order_created',
+        'checkout_order_create_failed',
+        'checkout_payment_redirect_started',
+        'checkout_payment_instructions_shown',
+        'checkout_gateway_load_failed',
+        'payment_pending',
+        'payment_failed',
+        'payment_retry_clicked',
+        'proactive_nudge_shown',
+        'proactive_nudge_clicked',
+        'proactive_nudge_dismissed',
+        'proactive_nudge_chat_started',
+        'chat_opened',
+        'chat_message_sent',
+        'agent_replied',
+        'agent_added_to_cart',
+        'purchase'
+    ));
