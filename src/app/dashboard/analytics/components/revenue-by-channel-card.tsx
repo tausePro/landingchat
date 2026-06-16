@@ -82,7 +82,7 @@ export function RevenueByChannelCard({ revenueBySource, totalRevenue, metaAdsSpe
                     Ingresos por Canal
                 </CardTitle>
                 <CardDescription>
-                    Distribución de ingresos por origen (30 días)
+                    Distribución de ingresos por origen
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">

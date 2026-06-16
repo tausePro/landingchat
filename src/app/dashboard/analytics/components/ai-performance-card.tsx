@@ -58,7 +58,7 @@ export function AiPerformanceCard({
                     <span className="material-symbols-outlined text-indigo-500">smart_toy</span>
                     Performance del Agente AI
                 </CardTitle>
-                <CardDescription>Cómo rinde tu vendedor virtual (30 días)</CardDescription>
+                <CardDescription>Cómo rinde tu vendedor virtual</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* KPIs principales */}

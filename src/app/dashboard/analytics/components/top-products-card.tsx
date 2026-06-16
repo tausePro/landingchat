@@ -37,7 +37,7 @@ export function TopProductsCard({ topProducts, lowStockProducts }: TopProductsCa
                     <span className="material-symbols-outlined text-amber-500">star</span>
                     Productos Estrella
                 </CardTitle>
-                <CardDescription>Top productos por ingresos (30 días)</CardDescription>
+                <CardDescription>Top productos por ingresos</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
                 {topProducts.length === 0 ? (
