@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Proxy de PostHog: NO redirigir (308) las rutas con trailing slash de /ingest
+  // (p.ej. /ingest/e/, /ingest/flags/). posthog-js captura con sendBeacon/fetch
+  // keepalive, que NO siguen el 308 → los eventos se perdían en el proxy.
+  // Requisito documentado de PostHog + Next.js reverse proxy.
+  skipTrailingSlashRedirect: true,
   experimental: {
     serverActions: {
       bodySizeLimit: "50mb",
