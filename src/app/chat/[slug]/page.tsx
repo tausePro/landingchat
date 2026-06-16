@@ -205,6 +205,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     const initializationRef = useRef(false)
     const processedProductIdRef = useRef<string | null>(null)
     const trackedProactiveNudgeChatRef = useRef<string | null>(null)
+    const trackedChatOpenRef = useRef(false)
 
     useTrackingParams(slug)
 
@@ -238,6 +239,21 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
     useEffect(() => {
         scrollToBottom()
     }, [messages])
+
+    // Instrumentación: chat abierto (una sola vez por carga, cuando el chat queda usable)
+    useEffect(() => {
+        if (trackedChatOpenRef.current || !chatId || !customerId) return
+        trackedChatOpenRef.current = true
+        const fromProduct = typeof window !== "undefined"
+            && new URLSearchParams(window.location.search).has("product")
+        tracking.trackEvent("chat_opened", {
+            sourceChannel: "chat",
+            properties: {
+                chatId,
+                fromProduct,
+            },
+        })
+    }, [chatId, customerId, tracking])
 
     const fetchHistory = useCallback(async (id: string): Promise<"loaded" | "missing" | "invalid-session"> => {
         try {
@@ -540,6 +556,18 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
         if (!textOverride) setInput("")
         setIsLoading(true)
 
+        // Instrumentación: mensaje enviado por el cliente
+        const userMessageNumber = messages.filter(m => m.role === 'user').length + 1
+        tracking.trackEvent("chat_message_sent", {
+            sourceChannel: "chat",
+            properties: {
+                chatId,
+                userMessageNumber,
+                messageLength: textToSend.length,
+            },
+        })
+        const agentStartedAt = Date.now()
+
         try {
             const currentProductId = new URLSearchParams(window.location.search).get('product') || undefined
             const response = await fetch('/api/ai-chat', {
@@ -586,6 +614,16 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
             const data = await response.json() as AIChatResponse
 
+            // Instrumentación: el agente respondió
+            tracking.trackEvent("agent_replied", {
+                sourceChannel: "chat",
+                properties: {
+                    chatId,
+                    responseMs: Date.now() - agentStartedAt,
+                    actionsCount: data.actions?.length ?? 0,
+                },
+            })
+
             // Process actions from AI
             const collectedProducts: Product[] = []
             const collectedMedia: MediaAttachment[] = []
@@ -619,6 +657,18 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                             image_url: addedProduct.image_url ?? matchedProduct?.image_url,
                             categories: addedProduct.categories,
                         }, addedProduct.quantity || 1)
+
+                        // Instrumentación: el agente agregó al carrito (momento de venta del agente)
+                        tracking.trackEvent("agent_added_to_cart", {
+                            sourceChannel: "chat",
+                            contentIds: [productId],
+                            value: addedProduct.price,
+                            properties: {
+                                chatId,
+                                contentName: addedProduct.name,
+                                quantity: addedProduct.quantity || 1,
+                            },
+                        })
                     } else if (action.type === 'send_media' && action.data?.media) {
                         collectedMedia.push(action.data.media as MediaAttachment)
                     }

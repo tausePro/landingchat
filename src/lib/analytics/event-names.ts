@@ -24,6 +24,10 @@ export const ANALYTICS_EVENT_NAMES = [
     "proactive_nudge_clicked",
     "proactive_nudge_dismissed",
     "proactive_nudge_chat_started",
+    "chat_opened",
+    "chat_message_sent",
+    "agent_replied",
+    "agent_added_to_cart",
     "purchase",
 ] as const
 
