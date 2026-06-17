@@ -6,6 +6,7 @@ import { redirect } from "next/navigation"
 import { VisitorsCard } from "./components/visitors-card"
 import { StatWidget } from "./components/stat-widget"
 import { RevenueChart } from "./components/revenue-chart"
+import { ConversationUsageCard } from "./components/conversation-usage-card"
 import { Greeting } from "./components/greeting"
 
 export const dynamic = 'force-dynamic'
@@ -284,6 +285,9 @@ export default async function DashboardPage() {
                         </>
                     )}
                 </div>
+
+                {/* Consumo de conversaciones del mes + comprar más */}
+                <ConversationUsageCard />
 
                 {/* Indicadores del mes (ecommerce) — agrupados con los KPIs primarios */}
                 {!isRealEstate && (
