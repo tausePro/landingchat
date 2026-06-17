@@ -103,8 +103,14 @@ export async function POST(request: Request) {
             }
         }
 
-        // La referencia contiene: sub_{subscription_id}_{timestamp}
         const reference = transaction.reference
+
+        // Compras de packs de créditos de conversaciones: reference = credits_<uuid> (Slice C)
+        if (reference.startsWith("credits_")) {
+            return await handleCreditPurchase(supabase, transaction, reference, payload, startTime)
+        }
+
+        // La referencia contiene: sub_{subscription_id}_{timestamp}
         const subscriptionId = extractSubscriptionId(reference)
 
         if (!subscriptionId) {
@@ -218,6 +224,102 @@ export async function POST(request: Request) {
             { status: 500 }
         )
     }
+}
+
+/**
+ * Procesa el pago de un pack de créditos de conversaciones (Slice C).
+ * Idempotente: acredita UNA sola vez vía claim atómico de credited_at. Si la
+ * acreditación falla, revierte el claim y devuelve 500 para que Wompi reintente.
+ */
+async function handleCreditPurchase(
+    supabase: SupabaseServiceClient,
+    transaction: WompiWebhookPayload["data"]["transaction"],
+    reference: string,
+    payload: WompiWebhookPayload,
+    startTime: number
+) {
+    const { data: purchase, error: purchaseError } = await supabase
+        .from("credit_purchases")
+        .select("id, organization_id, credit_amount, credited_at")
+        .eq("reference", reference)
+        .maybeSingle()
+
+    if (purchaseError || !purchase) {
+        log.error("Credit purchase not found", { reference })
+        await logWebhook(supabase, null, "error", payload, { error: "Credit purchase not found", reference })
+        return NextResponse.json({ error: "Credit purchase not found" }, { status: 404 })
+    }
+
+    // Idempotencia rápida: ya acreditado
+    if (purchase.credited_at) {
+        log.info("Credit purchase already credited", { reference, purchaseId: purchase.id })
+        await logWebhook(supabase, purchase.organization_id, "success", payload, { reference, alreadyCredited: true })
+        return NextResponse.json({ received: true })
+    }
+
+    const paymentStatus = mapWompiStatus(transaction.status)
+
+    if (paymentStatus !== "approved") {
+        const storedStatus =
+            paymentStatus === "pending" ? "pending" : paymentStatus === "declined" ? "declined" : "error"
+        await supabase
+            .from("credit_purchases")
+            .update({ status: storedStatus, provider_transaction_id: transaction.id, updated_at: new Date().toISOString() })
+            .eq("id", purchase.id)
+        log.info("Credit purchase not approved", { reference, paymentStatus })
+        await logWebhook(supabase, purchase.organization_id, "success", payload, {
+            reference,
+            paymentStatus,
+            processingTime: Date.now() - startTime,
+        })
+        return NextResponse.json({ received: true })
+    }
+
+    // Claim atómico: marca credited_at solo si sigue null (gana un solo webhook,
+    // evita doble-acreditación bajo reintentos/concurrencia).
+    const { data: claimed } = await supabase
+        .from("credit_purchases")
+        .update({
+            status: "approved",
+            provider_transaction_id: transaction.id,
+            credited_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", purchase.id)
+        .is("credited_at", null)
+        .select("id")
+        .maybeSingle()
+
+    if (!claimed) {
+        log.info("Credit purchase already credited (claim perdido)", { reference })
+        await logWebhook(supabase, purchase.organization_id, "success", payload, { reference, alreadyCredited: true })
+        return NextResponse.json({ received: true })
+    }
+
+    // Acreditar (RPC restringido a service_role)
+    const { error: creditError } = await supabase.rpc("add_conversation_credits", {
+        org_id: purchase.organization_id,
+        amount: purchase.credit_amount,
+    })
+
+    if (creditError) {
+        // Revertir el claim para permitir el reintento de Wompi
+        await supabase
+            .from("credit_purchases")
+            .update({ status: "error", credited_at: null, updated_at: new Date().toISOString() })
+            .eq("id", purchase.id)
+        log.error("Error acreditando, claim revertido", { reference, error: creditError.message })
+        await logWebhook(supabase, purchase.organization_id, "error", payload, { reference, error: creditError.message })
+        return NextResponse.json({ error: "Crediting failed" }, { status: 500 })
+    }
+
+    log.info("Créditos acreditados", { reference, orgId: purchase.organization_id, amount: purchase.credit_amount })
+    await logWebhook(supabase, purchase.organization_id, "success", payload, {
+        reference,
+        credited: purchase.credit_amount,
+        processingTime: Date.now() - startTime,
+    })
+    return NextResponse.json({ received: true })
 }
 
 /**

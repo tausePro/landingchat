@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { MessageCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { BuyCreditsDialog } from "./buy-credits-dialog"
 
 // Debe coincidir con MESSAGING_CHANNELS en lib/utils/whatsapp-limits.ts
 const MESSAGING_CHANNELS = ["whatsapp", "instagram", "messenger"]
@@ -19,6 +19,7 @@ interface ConversationUsage {
 export function ConversationUsageCard() {
     const [usage, setUsage] = useState<ConversationUsage | null>(null)
     const [loading, setLoading] = useState(true)
+    const [buyOpen, setBuyOpen] = useState(false)
 
     useEffect(() => {
         const fetchUsage = async () => {
@@ -111,7 +112,8 @@ export function ConversationUsageCard() {
     const ctaProminent = blocked || near || usingCredits
 
     return (
-        <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80">
+        <>
+            <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80">
             <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:gap-8">
                 <div className="flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
@@ -150,12 +152,17 @@ export function ConversationUsageCard() {
                     </p>
                 </div>
 
-                <Link href="/dashboard/subscription" className="sm:shrink-0">
-                    <Button variant={ctaProminent ? "default" : "outline"} size="sm" className="w-full sm:w-auto">
-                        Comprar más conversaciones
-                    </Button>
-                </Link>
+                <Button
+                    variant={ctaProminent ? "default" : "outline"}
+                    size="sm"
+                    className="w-full sm:w-auto sm:shrink-0"
+                    onClick={() => setBuyOpen(true)}
+                >
+                    Comprar más conversaciones
+                </Button>
             </CardContent>
-        </Card>
+            </Card>
+            <BuyCreditsDialog open={buyOpen} onOpenChange={setBuyOpen} />
+        </>
     )
 }
