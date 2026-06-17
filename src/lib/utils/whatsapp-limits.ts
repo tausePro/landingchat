@@ -42,6 +42,55 @@ export async function getMessagingConversationsThisMonth(
     return count || 0
 }
 
+// Defaults de límite (deben coincidir con webhook-utils.ts checkConversationLimit)
+const DEFAULT_LIMIT_NO_SUBSCRIPTION = 1000
+const DEFAULT_LIMIT_FREE_PLAN = 10
+
+/**
+ * Tras crear una conversación NUEVA: si la org ya superó su límite mensual del
+ * plan, consume 1 crédito comprado (overflow, roll-over). El bloqueo cuando NO
+ * hay créditos ya lo decidió checkConversationLimit antes de crear. No-op si está
+ * dentro del plan, si el plan es ilimitado, o si no quedan créditos.
+ */
+export async function consumeCreditIfOverPlanLimit(
+    supabase: SupabaseClient,
+    organizationId: string
+): Promise<void> {
+    // Fail-open: un error de contabilidad de créditos NO debe romper la entrega
+    // del webhook ni sobre-cobrar. Ante cualquier error, no se consume (el cliente
+    // obtiene la conversación; se registra el error).
+    try {
+        const { data: subscription } = await supabase
+            .from("subscriptions")
+            .select("plans(max_whatsapp_conversations)")
+            .eq("organization_id", organizationId)
+            .eq("status", "active")
+            .maybeSingle()
+
+        const planRow = subscription?.plans as
+            | { max_whatsapp_conversations?: number | null }
+            | { max_whatsapp_conversations?: number | null }[]
+            | null
+            | undefined
+        const planData = Array.isArray(planRow) ? planRow[0] : planRow
+
+        const limit = planData
+            ? (planData.max_whatsapp_conversations || DEFAULT_LIMIT_FREE_PLAN)
+            : DEFAULT_LIMIT_NO_SUBSCRIPTION
+
+        if (limit === -1) return // ilimitado
+
+        // 'used' ya incluye la conversación recién creada; si supera el límite del
+        // plan, esta conversación es overflow y consume 1 crédito.
+        const used = await getMessagingConversationsThisMonth(supabase, organizationId)
+        if (used > limit) {
+            await supabase.rpc("consume_conversation_credit", { org_id: organizationId })
+        }
+    } catch (error) {
+        console.error("[whatsapp-limits] consumeCreditIfOverPlanLimit error (no-op):", error)
+    }
+}
+
 /**
  * Verifica si una organización puede crear más conversaciones WhatsApp
  */
