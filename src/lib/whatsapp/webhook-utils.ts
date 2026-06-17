@@ -7,7 +7,7 @@
 
 import crypto from "crypto"
 import { normalizePhone, getPhoneVariants, buildWhatsAppJid } from "@/lib/utils/phone"
-import { getMessagingConversationsThisMonth } from "@/lib/utils/whatsapp-limits"
+import { getMessagingConversationsThisMonth, consumeCreditIfOverPlanLimit } from "@/lib/utils/whatsapp-limits"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = any
@@ -188,6 +188,9 @@ export async function findOrCreateChat(
   // Incrementar contador de conversaciones del mes
   await incrementConversationCount(supabase, organizationId)
 
+  // Si esta conversación supera el límite del plan, consume 1 crédito (overflow)
+  await consumeCreditIfOverPlanLimit(supabase, organizationId)
+
   return newChat
 }
 
@@ -208,7 +211,7 @@ export async function checkConversationLimit(
   // Obtener organización
   const { data: org, error: orgError } = await supabase
     .from("organizations")
-    .select("id, whatsapp_conversations_used")
+    .select("id, whatsapp_conversations_used, conversation_credits")
     .eq("id", organizationId)
     .single()
 
@@ -241,10 +244,13 @@ export async function checkConversationLimit(
   // acumulativo (whatsapp_conversations_used) ni del cron —cuya falla dejaba
   // tenants bloqueados silenciosamente (incidente recurrente Casa Inmobiliaria).
   const used = await getMessagingConversationsThisMonth(supabase, organizationId)
+  if (used < limit) return true
 
-  console.log(`[WhatsApp Webhook Utils] Conversation limit: used=${used}, limit=${limit}`)
-
-  return used < limit
+  // Sobre el límite del plan: permitir si la org tiene créditos comprados
+  // (overflow, roll-over). El consumo del crédito ocurre al crear la conversación.
+  const credits = (org as { conversation_credits?: number | null }).conversation_credits || 0
+  console.log(`[WhatsApp Webhook Utils] Over plan limit: used=${used}, limit=${limit}, credits=${credits}`)
+  return credits > 0
 }
 
 /**
@@ -458,6 +464,9 @@ export async function findOrCreateSocialChat(
 
   // Incrementar contador de conversaciones
   await incrementConversationCount(supabase, organizationId)
+
+  // Si esta conversación supera el límite del plan, consume 1 crédito (overflow)
+  await consumeCreditIfOverPlanLimit(supabase, organizationId)
 
   return newChat
 }

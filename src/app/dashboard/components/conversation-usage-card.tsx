@@ -13,6 +13,7 @@ const MESSAGING_CHANNELS = ["whatsapp", "instagram", "messenger"]
 interface ConversationUsage {
     used: number
     limit: number // -1 = ilimitado
+    credits: number // saldo de créditos comprados (overflow, roll-over)
 }
 
 export function ConversationUsageCard() {
@@ -63,7 +64,13 @@ export function ConversationUsageCard() {
                 .in("channel", MESSAGING_CHANNELS)
                 .gte("created_at", monthStart.toISOString())
 
-            setUsage({ used: count || 0, limit })
+            const { data: orgRow } = await supabase
+                .from("organizations")
+                .select("conversation_credits")
+                .eq("id", orgId)
+                .maybeSingle()
+
+            setUsage({ used: count || 0, limit, credits: orgRow?.conversation_credits ?? 0 })
             setLoading(false)
         }
 
@@ -88,17 +95,20 @@ export function ConversationUsageCard() {
 
     const unlimited = usage.limit === -1
     const pct = unlimited || usage.limit <= 0 ? 0 : Math.min((usage.used / usage.limit) * 100, 100)
-    const remaining = unlimited ? Infinity : Math.max(usage.limit - usage.used, 0)
-    const over = !unlimited && usage.used >= usage.limit
-    const near = !unlimited && pct >= 80
+    const planRemaining = unlimited ? Infinity : Math.max(usage.limit - usage.used, 0)
+    const overPlan = !unlimited && usage.used >= usage.limit
+    const blocked = overPlan && usage.credits <= 0
+    const usingCredits = overPlan && usage.credits > 0
+    const near = !unlimited && !overPlan && pct >= 80
 
-    const barColor = over ? "bg-red-500" : near ? "bg-amber-500" : "bg-primary"
-    const statusLabel = over ? "Límite alcanzado" : near ? "Cerca del límite" : "Disponible"
-    const statusClass = over
+    const barColor = blocked ? "bg-red-500" : usingCredits || near ? "bg-amber-500" : "bg-primary"
+    const statusLabel = blocked ? "Límite alcanzado" : usingCredits ? "Usando créditos" : near ? "Cerca del límite" : "Disponible"
+    const statusClass = blocked
         ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-        : near
+        : usingCredits || near
             ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
             : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+    const ctaProminent = blocked || near || usingCredits
 
     return (
         <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80">
@@ -114,14 +124,19 @@ export function ConversationUsageCard() {
                         </span>
                     </div>
 
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                         <span className="text-3xl font-bold tracking-tight">{usage.used.toLocaleString("es-CO")}</span>
                         <span className="text-base font-medium text-text-light-secondary dark:text-text-dark-secondary">
                             / {unlimited ? "∞" : usage.limit.toLocaleString("es-CO")}
                         </span>
                         {!unlimited && (
                             <span className="text-sm text-text-light-secondary dark:text-text-dark-secondary">
-                                · {remaining.toLocaleString("es-CO")} restantes
+                                · {planRemaining.toLocaleString("es-CO")} del plan restantes
+                            </span>
+                        )}
+                        {usage.credits > 0 && (
+                            <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                                +{usage.credits.toLocaleString("es-CO")} créditos
                             </span>
                         )}
                     </div>
@@ -136,7 +151,7 @@ export function ConversationUsageCard() {
                 </div>
 
                 <Link href="/dashboard/subscription" className="sm:shrink-0">
-                    <Button variant={over || near ? "default" : "outline"} size="sm" className="w-full sm:w-auto">
+                    <Button variant={ctaProminent ? "default" : "outline"} size="sm" className="w-full sm:w-auto">
                         Comprar más conversaciones
                     </Button>
                 </Link>
