@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { getMessagingConversationsThisMonth } from "@/lib/utils/whatsapp-limits"
 import { revalidatePath } from "next/cache"
 import {
     type ActionResult,
@@ -96,12 +97,8 @@ export async function getChannelsStatus(): Promise<ActionResult<ChannelsStatus>>
         const subscriptionPlan = subscription?.plans as SubscriptionPlanLimitRow | null | undefined
         const planLimit = subscriptionPlan?.max_whatsapp_conversations || 10
 
-        // Conversaciones usadas
-        const { data: orgData } = await supabase
-            .from("organizations")
-            .select("whatsapp_conversations_used")
-            .eq("id", orgId)
-            .single()
+        // Conversaciones de mensajería de este mes (dinámico, resetea solo)
+        const conversationsUsed = await getMessagingConversationsThisMonth(supabase, orgId)
 
         // Social channels: Instagram y Messenger
         const { data: socialChannels } = await supabase
@@ -135,7 +132,7 @@ export async function getChannelsStatus(): Promise<ActionResult<ChannelsStatus>>
             whatsapp: {
                 instance: corporate ? deserializeWhatsAppInstance(corporate as unknown as Record<string, unknown>) : null,
                 plan_limit: planLimit,
-                conversations_used: orgData?.whatsapp_conversations_used || 0,
+                conversations_used: conversationsUsed,
             },
             instagram: instagram || null,
             messenger: messenger || null,
