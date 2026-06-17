@@ -1419,6 +1419,17 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
     }
 }
 
+/**
+ * Resuelve la pasarela online a usar para una org. Fuente de verdad: las
+ * pasarelas configuradas + activas (payment_gateway_configs), NO el slug que
+ * sugiera el agente. Usa la pedida solo si la org la tiene activa; si no, la
+ * primera configurada. Devuelve null si no hay ninguna (→ ofrecer contraentrega).
+ */
+export function resolveOnlineGateway(configuredOnline: string[], requested: string): string | null {
+    if (configuredOnline.length === 0) return null
+    return configuredOnline.includes(requested) ? requested : configuredOnline[0]
+}
+
 const createPaymentLink: ToolHandler = async (supabase, input, context) => {
     const payLog = log.withContext({ chatId: context.chatId, orgId: context.organizationId })
     payLog.info("createPaymentLink starting")
@@ -1482,6 +1493,36 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         .eq("id", context.organizationId)
         .single()
 
+    // Pasarelas online ACTIVAS de esta org = fuente de verdad. El agente puede
+    // sugerir un slug, pero NO ofrecemos pasarelas que la org no tiene configuradas:
+    // caso real (qp) — el agente generó un link de ePayco cuando qp solo tiene Wompi.
+    const { data: activeGateways } = await supabase
+        .from("payment_gateway_configs")
+        .select("provider")
+        .eq("organization_id", context.organizationId)
+        .eq("is_active", true)
+    const configuredOnline = (activeGateways ?? [])
+        .map((g) => (g.provider ?? "").toLowerCase())
+        .filter(Boolean)
+
+    const requestedMethod = (payment_method ?? "").toLowerCase()
+    const isManual = requestedMethod === "manual" || requestedMethod === "contraentrega" || requestedMethod === "cod"
+
+    // Resolver la pasarela online real: usa la pedida SOLO si la org la tiene activa;
+    // si no, la primera configurada. Sin pago en línea → guiar a contraentrega.
+    let onlineProvider: string | null = null
+    if (!isManual) {
+        onlineProvider = resolveOnlineGateway(configuredOnline, requestedMethod)
+        if (!onlineProvider) {
+            payLog.warn("createPaymentLink: org sin pasarela online configurada", { requestedMethod })
+            return {
+                success: false,
+                error: "Esta tienda no tiene pago en línea configurado. Ofrece al cliente pago contra entrega.",
+            }
+        }
+    }
+    const resolvedPaymentMethod = isManual ? "manual" : (onlineProvider as string)
+
     const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(Math.random() * 1000).toString().padStart(3, "0")}`
 
     const { data: order, error: orderError } = await supabase
@@ -1514,7 +1555,7 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
             total,
             status: "pending",
             payment_status: "pending",
-            payment_method: payment_method || "epayco",
+            payment_method: resolvedPaymentMethod,
             customer_info: {
                 name: shippingInfo.customer_name,
                 email: shippingInfo.email || null,
@@ -1570,8 +1611,6 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
     //     que carga el widget JS del proveedor en el storefront.
     //   - hosted_redirect (Bold/Addi): paymentService.initiatePayment genera la sesión externa
     //     server-side y el cliente sale del storefront al sitio del gateway.
-    const isManual = payment_method === "manual" || payment_method === "contraentrega"
-
     let paymentUrl: string
     let paymentInstructions: string
 
@@ -1579,18 +1618,17 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         paymentUrl = appendStorefrontAccessParam(`${storeBaseUrl}/order/${order.id}`, orderAccessToken)
         paymentInstructions = "Tu pedido ha sido registrado. Puedes pagar contra entrega o por transferencia."
     } else {
-        const requestedProvider = (payment_method ?? "epayco").toLowerCase()
-        const providerInfo = getProviderInfo(requestedProvider)
+        const providerInfo = getProviderInfo(onlineProvider as string)
 
         if (!providerInfo || !providerInfo.enabled) {
             payLog.warn("Payment provider not available in registry", {
-                requested: requestedProvider,
+                requested: onlineProvider,
                 exists: !!providerInfo,
                 enabled: providerInfo?.enabled ?? false,
             })
             return {
                 success: false,
-                error: `El método de pago "${requestedProvider}" no está disponible. Pide al cliente que elija otro.`,
+                error: `El método de pago "${onlineProvider}" no está disponible. Pide al cliente que elija otro.`,
             }
         }
 
@@ -1679,7 +1717,7 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
                 shippingCost,
                 itemCount: items.length
             },
-            paymentMethod: payment_method || "epayco",
+            paymentMethod: resolvedPaymentMethod,
             paymentUrl,
             message: customer_message || "¡Gracias por tu compra!",
             instructions: paymentInstructions
