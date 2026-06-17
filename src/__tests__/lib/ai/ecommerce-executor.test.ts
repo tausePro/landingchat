@@ -3,6 +3,7 @@ import {
   ecommerceToolHandlers,
   normalizeAiCartLineItem,
   resolveAgentSearchProduct,
+  resolveOnlineGateway,
 } from "@/lib/ai/executors/ecommerce"
 import type { ProductVariantRow } from "@/types/product"
 
@@ -159,6 +160,27 @@ describe("AI ecommerce executor variant contracts", () => {
       quantity: 2,
       categories: ["categoria"],
     })
+  })
+})
+
+// =============================================================================
+// Regresión bug pagos (2026-06): el agente envió un link de ePayco a qp, que
+// solo tiene Wompi + contraentrega. La pasarela online debe resolverse desde
+// las configuradas de la org, NO desde el slug que sugiera el agente.
+// =============================================================================
+describe("resolveOnlineGateway", () => {
+  it("usa la pasarela pedida solo si la org la tiene activa", () => {
+    expect(resolveOnlineGateway(["wompi", "bold"], "bold")).toBe("bold")
+    expect(resolveOnlineGateway(["wompi"], "wompi")).toBe("wompi")
+  })
+
+  it("ignora el slug pedido si la org no lo tiene y usa la primera configurada (caso qp: pide epayco, tiene wompi)", () => {
+    expect(resolveOnlineGateway(["wompi"], "epayco")).toBe("wompi")
+  })
+
+  it("devuelve null si la org no tiene pasarela online (→ ofrecer contraentrega)", () => {
+    expect(resolveOnlineGateway([], "epayco")).toBeNull()
+    expect(resolveOnlineGateway([], "")).toBeNull()
   })
 })
 

@@ -305,6 +305,27 @@ async function loadRealPaymentMethods(
     }
 }
 
+/**
+ * Resumen corto de los métodos de pago configurados de la org para INYECTAR en
+ * el system prompt: el agente ofrece SOLO lo real y nunca inventa una pasarela
+ * (caso real: ePayco ofrecido a una tienda que solo tiene Wompi + contraentrega).
+ */
+export async function getOrgPaymentMethodsSummary(
+    supabase: ToolSupabaseClient,
+    organizationId: string,
+): Promise<string> {
+    const pm = await loadRealPaymentMethods(supabase, organizationId)
+    const methods = (pm.methods as Array<{ type: string }>) ?? []
+    const available: string[] = []
+    if (methods.some((m) => m.type === "online")) available.push("Pago en línea (tarjeta, PSE, Nequi) por link seguro")
+    if (methods.some((m) => m.type === "bank_transfer")) available.push("Transferencia bancaria")
+    if (methods.some((m) => m.type === "cash_on_delivery")) available.push("Contra entrega")
+    if (available.length === 0) {
+        return "Esta tienda aún no tiene métodos de pago configurados. Dile al cliente que el equipo se los confirmará; NO inventes formas de pago."
+    }
+    return `${available.map((m) => `- ${m}`).join("\n")}\nOfrece ÚNICAMENTE estos. NUNCA nombres una pasarela específica (ePayco, Wompi…): el sistema la resuelve según lo configurado.`
+}
+
 /** Envíos y devoluciones REALES desde shipping_settings (misma fuente que el storefront). */
 async function loadRealShippingSettings(supabase: ToolSupabaseClient, organizationId: string) {
     const { data } = await supabase
