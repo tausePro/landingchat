@@ -14,6 +14,15 @@ import {
   type CustomerStats,
 } from "@/types/customer"
 import { computeIntentScore, type IntentScore } from "./lib/intent-score"
+import { fetchAllPages } from "@/lib/supabase/fetch-all"
+
+// Cliente con sus pedidos embebidos (para computar comportamiento)
+type CustomerWithOrders = Customer & {
+  orders?: Array<{ id: string; total: number | null; status: string | null }>
+}
+
+const isCompletedOrder = (o: { status: string | null }): boolean =>
+  Boolean(o.status) && !["cancelled", "cancelado", "refunded", "reembolsado"].includes((o.status || "").toLowerCase())
 
 // ============================================================================
 // Query Actions
@@ -54,98 +63,168 @@ export async function getCustomers({
       return { success: false, error: "No organization found" }
     }
 
-    let query = supabase
-      .from("customers")
-      .select("*, orders(id, total, status)", { count: "exact" })
-      .eq("organization_id", profile.organization_id)
-
-    // Search
-    if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
-    }
-
-    // Filters
-    if (category && category !== "all") {
-      query = query.eq("category", category)
-    }
-
-    if (channel && channel !== "all") {
-      query = query.eq("acquisition_channel", channel)
-    }
-
-    if (zone && zone !== "all") {
-      query = query.eq("address->>zone", zone)
-    }
-
-    if (tags && tags.length > 0) {
-      query = query.contains("tags", tags)
-    }
-
-    // Segment filters
-    if (segment && segment !== "all") {
-      if (segment === "whatsapp_leads") {
-        query = query.eq("acquisition_channel", "whatsapp")
-      } else if (segment === "recurring") {
-        query = query.in("category", ["recurrente", "vip", "fieles 1", "fieles 2", "fieles 3", "fieles 4"])
-      } else if (segment === "pending_followup") {
-        query = query.in("category", ["riesgo", "inactivo"])
+    // Traemos TODOS los clientes que matchean los filtros de COLUMNA (search,
+    // category, channel, zone, tags) y computamos en memoria. Los segmentos y el
+    // intent score son por COMPORTAMIENTO (nº de pedidos) — las categorías en la
+    // práctica vienen null — así que NO se pueden filtrar en SQL. Paginar en DB
+    // primero rompía el filtro por score: solo veía 25 filas y devolvía 0.
+    const { rows, error } = await fetchAllPages<CustomerWithOrders>((from, to) => {
+      let q = supabase
+        .from("customers")
+        .select("*, orders(id, total, status)")
+        .eq("organization_id", profile.organization_id)
+      if (search) {
+        q = q.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`)
       }
-    }
-
-    // Pagination
-    const from = (page - 1) * limit
-    const to = from + limit - 1
-
-    const { data, error, count } = await query
-      .order("created_at", { ascending: false })
-      .range(from, to)
+      if (category && category !== "all") q = q.eq("category", category)
+      if (channel && channel !== "all") q = q.eq("acquisition_channel", channel)
+      if (zone && zone !== "all") q = q.eq("address->>zone", zone)
+      if (tags && tags.length > 0) q = q.contains("tags", tags)
+      return q.order("created_at", { ascending: false }).range(from, to)
+    }, { maxRows: 20_000 })
 
     if (error) {
-      return { success: false, error: `Failed to fetch customers: ${error.message}` }
+      return { success: false, error: `Failed to fetch customers: ${error}` }
     }
 
-    // Procesar datos para calcular total_spent y total_orders
-    const customersWithTotals = (data || []).map((customer: any) => {
-      const orders = customer.orders || []
-      const completedOrders = orders.filter((o: any) =>
-        o.status && !['cancelled', 'cancelado', 'refunded', 'reembolsado'].includes(o.status.toLowerCase())
-      )
-      return {
-        ...customer,
-        total_orders: completedOrders.length,
-        total_spent: completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0),
-        orders: undefined // Remover el array de orders del resultado
-      }
+    // Computar total_orders / total_spent / intent por cliente
+    const computed = rows.map((customer) => {
+      const completed = (customer.orders || []).filter(isCompletedOrder)
+      const total_orders = completed.length
+      const total_spent = completed.reduce((sum, o) => sum + (o.total || 0), 0)
+      const intent = computeIntentScore({
+        category: customer.category,
+        total_orders,
+        total_spent,
+        last_interaction_at: customer.last_interaction_at,
+      })
+      const { orders: _orders, ...rest } = customer
+      return { ...rest, total_orders, total_spent, intent }
     })
 
-    // Filtrar por intent score (post-fetch ya que es calculado)
-    let filteredCustomers = customersWithTotals
-    if (intentScores && intentScores.length > 0) {
-      filteredCustomers = customersWithTotals.filter((c: any) =>
-        intentScores.includes(computeIntentScore({
-          category: c.category,
-          total_orders: c.total_orders,
-          total_spent: c.total_spent,
-          last_interaction_at: c.last_interaction_at,
-        }))
-      )
+    // Filtro por SEGMENTO (comportamiento, no strings de categoría)
+    let filtered = computed
+    if (segment === "recurring") {
+      filtered = filtered.filter((c) => c.total_orders >= 2)
+    } else if (segment === "whatsapp_leads") {
+      filtered = filtered.filter((c) => c.acquisition_channel === "whatsapp")
+    } else if (segment === "pending_followup") {
+      filtered = filtered.filter((c) => c.intent === "riesgo")
     }
+
+    // Filtro por intent score (sobre el set COMPLETO, no por página)
+    if (intentScores && intentScores.length > 0) {
+      filtered = filtered.filter((c) => intentScores.includes(c.intent))
+    }
+
+    // Paginación en memoria → total / totalPages correctos sobre el set filtrado
+    const total = filtered.length
+    const totalPages = Math.max(1, Math.ceil(total / limit))
+    const startIdx = (page - 1) * limit
+    const pageItems = filtered.slice(startIdx, startIdx + limit)
 
     return {
       success: true,
       data: {
-        customers: filteredCustomers as Customer[],
-        total: intentScores && intentScores.length > 0 ? filteredCustomers.length : (count || 0),
-        totalPages: intentScores && intentScores.length > 0
-          ? Math.ceil(filteredCustomers.length / limit)
-          : Math.ceil((count || 0) / limit)
-      }
+        customers: pageItems as Customer[],
+        total,
+        totalPages,
+      },
     }
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : "Unknown error fetching customers"
     }
+  }
+}
+
+// ============================================================================
+// Customer 360 (detalle)
+// ============================================================================
+
+export interface CustomerOrderSummary {
+  id: string
+  order_number: string | null
+  total: number
+  status: string | null
+  payment_status: string | null
+  created_at: string
+}
+
+export interface CustomerChatSummary {
+  id: string
+  channel: string | null
+  created_at: string
+}
+
+export interface CustomerDetail extends Customer {
+  orders: CustomerOrderSummary[]
+  chats: CustomerChatSummary[]
+  averageOrderValue: number
+  lastOrderAt: string | null
+}
+
+export async function getCustomerById(id: string): Promise<ActionResult<CustomerDetail>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "Unauthorized" }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+    if (!profile?.organization_id) return { success: false, error: "No organization found" }
+    const orgId = profile.organization_id
+
+    const { data: customer, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("id", id)
+      .eq("organization_id", orgId)
+      .single()
+    if (error || !customer) return { success: false, error: "Cliente no encontrado" }
+
+    const [ordersRes, chatsRes] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("id, order_number, total, status, payment_status, created_at")
+        .eq("organization_id", orgId)
+        .eq("customer_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("chats")
+        .select("id, channel, created_at")
+        .eq("organization_id", orgId)
+        .eq("customer_id", id)
+        .order("created_at", { ascending: false }),
+    ])
+
+    const orders = (ordersRes.data || []) as CustomerOrderSummary[]
+    const chats = (chatsRes.data || []) as CustomerChatSummary[]
+    // total_orders/total_spent ignoran canceladas/reembolsadas (igual que la lista)
+    const completed = orders.filter(
+      (o) => o.status && !["cancelled", "cancelado", "refunded", "reembolsado"].includes(o.status.toLowerCase())
+    )
+    const totalSpent = completed.reduce((sum, o) => sum + (o.total || 0), 0)
+    const totalOrders = completed.length
+
+    return {
+      success: true,
+      data: {
+        ...(customer as Customer),
+        total_orders: totalOrders,
+        total_spent: totalSpent,
+        orders,
+        chats,
+        averageOrderValue: totalOrders > 0 ? totalSpent / totalOrders : 0,
+        lastOrderAt: orders[0]?.created_at ?? null,
+      },
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Error al cargar el cliente" }
   }
 }
 
@@ -178,16 +257,17 @@ export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
 
-    // Queries en paralelo
+    // Queries en paralelo. Los segmentos "recurrentes" y "pendiente seguimiento"
+    // y los intent scores se computan por COMPORTAMIENTO (nº de pedidos) sobre
+    // todos los clientes (scoreRows), NO por strings de categoría (vienen null).
+    // scoreRows pagina con fetchAllPages para no caer en el cap de 1000.
     const [
       leadsThisMonth,
       leadsLastMonth,
       activeChats,
       allCustomers,
       whatsappLeads,
-      recurringBuyers,
-      pendingFollowUp,
-      customersForScore,
+      scoreRows,
     ] = await Promise.all([
       // Total leads este mes
       supabase
@@ -224,25 +304,18 @@ export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
         .eq("organization_id", orgId)
         .eq("acquisition_channel", "whatsapp"),
 
-      // Compradores recurrentes
-      supabase
-        .from("customers")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", orgId)
-        .in("category", ["recurrente", "vip", "fieles 1", "fieles 2", "fieles 3", "fieles 4"]),
-
-      // Pendiente seguimiento
-      supabase
-        .from("customers")
-        .select("*", { count: "exact", head: true })
-        .eq("organization_id", orgId)
-        .in("category", ["riesgo", "inactivo"]),
-
-      // Todos los clientes para calcular intent scores
-      supabase
-        .from("customers")
-        .select("category, orders(id, total, status)")
-        .eq("organization_id", orgId),
+      // Todos los clientes + pedidos para computar intent y segmentos.
+      // Incluye last_interaction_at para que el conteo use la misma recencia
+      // que el filtro de getCustomers (si no, sidebar y filtro divergen).
+      fetchAllPages<{ category: string | null; last_interaction_at: string | null; orders: Array<{ total: number | null; status: string | null }> | null }>(
+        (from, to) =>
+          supabase
+            .from("customers")
+            .select("category, last_interaction_at, orders(id, total, status)")
+            .eq("organization_id", orgId)
+            .range(from, to),
+        { maxRows: 20_000 }
+      ),
     ])
 
     // Calcular growth
@@ -252,27 +325,24 @@ export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
       ? Math.round(((thisMonthCount - lastMonthCount) / lastMonthCount) * 100)
       : thisMonthCount > 0 ? 100 : 0
 
-    // Calcular intent score counts
+    // Calcular intent score counts + segmentos por comportamiento (un solo loop)
     const intentScoreCounts: CustomerStats["intentScoreCounts"] = {
       alta: 0,
       media: 0,
       baja: 0,
       riesgo: 0,
     }
+    let recurringBuyersCount = 0
+    let pendingFollowUpCount = 0
 
-    if (customersForScore.data) {
-      for (const customer of customersForScore.data) {
-        const orders = (customer as any).orders || []
-        const completedOrders = orders.filter((o: any) =>
-          o.status && !['cancelled', 'cancelado', 'refunded', 'reembolsado'].includes(o.status.toLowerCase())
-        )
-        const score = computeIntentScore({
-          category: customer.category,
-          total_orders: completedOrders.length,
-          total_spent: completedOrders.reduce((sum: number, o: any) => sum + (o.total || 0), 0),
-        })
-        intentScoreCounts[score]++
-      }
+    for (const customer of scoreRows.rows) {
+      const completedOrders = (customer.orders || []).filter(isCompletedOrder)
+      const total_orders = completedOrders.length
+      const total_spent = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+      const score = computeIntentScore({ category: customer.category, total_orders, total_spent, last_interaction_at: customer.last_interaction_at })
+      intentScoreCounts[score]++
+      if (total_orders >= 2) recurringBuyersCount++
+      if (score === "riesgo") pendingFollowUpCount++
     }
 
     return {
@@ -285,8 +355,8 @@ export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
         segments: {
           all: allCustomers.count || 0,
           whatsappLeads: whatsappLeads.count || 0,
-          recurringBuyers: recurringBuyers.count || 0,
-          pendingFollowUp: pendingFollowUp.count || 0,
+          recurringBuyers: recurringBuyersCount,
+          pendingFollowUp: pendingFollowUpCount,
         },
         intentScoreCounts,
       },
