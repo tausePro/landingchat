@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { getMessagingConversationsThisMonth } from "@/lib/utils/whatsapp-limits"
+import { getMessagingConversationsThisMonth, consumeCreditIfOverPlanLimit } from "@/lib/utils/whatsapp-limits"
 
 // =============================================================================
 // Regresión bug cuota WhatsApp (2026-06): el límite usaba un contador acumulativo
@@ -67,5 +67,62 @@ describe("getMessagingConversationsThisMonth", () => {
             "org-1",
         )
         expect(used).toBe(0)
+    })
+})
+
+// =============================================================================
+// Slice B créditos: al crear una conversación que supera el límite del plan, se
+// consume 1 crédito comprado (overflow, roll-over). Dentro del plan o ilimitado
+// no se consume.
+// =============================================================================
+
+function mockClientForConsume(opts: { planLimit: number | null; usedCount: number }) {
+    const rpcCalls: Array<{ fn: string; args: unknown }> = []
+    const client = {
+        from(table: string) {
+            if (table === "subscriptions") {
+                const b: Record<string, unknown> = {}
+                b.select = () => b
+                b.eq = () => b
+                b.maybeSingle = () =>
+                    Promise.resolve({
+                        data: opts.planLimit === null ? null : { plans: { max_whatsapp_conversations: opts.planLimit } },
+                        error: null,
+                    })
+                return b
+            }
+            // chats → getMessagingConversationsThisMonth
+            const b: Record<string, unknown> = {}
+            b.select = () => b
+            b.eq = () => b
+            b.in = () => b
+            b.gte = () => Promise.resolve({ count: opts.usedCount, error: null })
+            return b
+        },
+        rpc(fn: string, args: unknown) {
+            rpcCalls.push({ fn, args })
+            return Promise.resolve({ data: null, error: null })
+        },
+    }
+    return { client, rpcCalls }
+}
+
+describe("consumeCreditIfOverPlanLimit", () => {
+    it("consume 1 crédito cuando la org supera el límite del plan", async () => {
+        const { client, rpcCalls } = mockClientForConsume({ planLimit: 10, usedCount: 15 })
+        await consumeCreditIfOverPlanLimit(client as unknown as SupabaseArg, "org-1")
+        expect(rpcCalls).toEqual([{ fn: "consume_conversation_credit", args: { org_id: "org-1" } }])
+    })
+
+    it("NO consume si está dentro del límite del plan", async () => {
+        const { client, rpcCalls } = mockClientForConsume({ planLimit: 100, usedCount: 50 })
+        await consumeCreditIfOverPlanLimit(client as unknown as SupabaseArg, "org-1")
+        expect(rpcCalls).toEqual([])
+    })
+
+    it("NO consume si el plan es ilimitado (-1)", async () => {
+        const { client, rpcCalls } = mockClientForConsume({ planLimit: -1, usedCount: 9999 })
+        await consumeCreditIfOverPlanLimit(client as unknown as SupabaseArg, "org-1")
+        expect(rpcCalls).toEqual([])
     })
 })
