@@ -315,7 +315,7 @@ export const tools: Anthropic.Tool[] = [
             properties: {
                 payment_method: {
                     type: "string",
-                    description: "Método de pago: 'epayco' (tarjetas y PSE), 'wompi' (tarjetas), 'manual' (contraentrega/transferencia). Por defecto 'epayco'."
+                    description: "Método elegido por el cliente: 'online' para pago en línea (la pasarela real de la tienda se resuelve automáticamente) o 'manual'/'contraentrega' para pago contra entrega. NO asumas ni nombres una pasarela específica."
                 },
                 customer_message: {
                     type: "string",

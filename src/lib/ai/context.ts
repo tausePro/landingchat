@@ -146,6 +146,8 @@ export function buildSystemPromptOptimized(
     currentProduct?: Product,
     /** T1.7 — Locale del tenant (BCP 47). Default `'es-CO'` por retro-compat. */
     locale: string = "es-CO",
+    /** Métodos de pago REALES de la org, para ofrecer solo lo configurado. */
+    paymentMethodsSummary?: string,
 ): string {
     const customInstructions = agent.configuration?.personality?.instructions
     const hasCustomPrompt = customInstructions && customInstructions.trim().length > 50
@@ -211,7 +213,7 @@ HERRAMIENTAS DISPONIBLES (úsalas cuando sea necesario):
 - get_customer_history: Obtener historial del cliente, incluyendo su ÚLTIMA DIRECCIÓN DE ENVÍO. USAR antes de pedir datos de envío para reutilizar
 - render_checkout_summary: USAR cuando el cliente diga "quiero comprar", "pagar", "finalizar". Muestra resumen visual del carrito
 - confirm_shipping_details: CONFIRMAR datos de envío (nombre, teléfono, dirección, ciudad, cédula)
-- create_payment_link: USAR después de confirm_shipping_details. Pregunta método de pago (ePayco, contraentrega) y genera link de pago
+- create_payment_link: USAR después de confirm_shipping_details. Pregunta el método según lo que la tienda ofrezca (pago en línea o contraentrega) y genera el link. Si no conoces los métodos configurados, usa get_store_info con topic 'payment_methods'
 - escalate_to_human: Transferir a agente humano si es necesario
 
 FLUJO DE CHECKOUT CONVERSACIONAL (¡REUTILIZA TODOS LOS DATOS!):
@@ -225,7 +227,7 @@ FLUJO DE CHECKOUT CONVERSACIONAL (¡REUTILIZA TODOS LOS DATOS!):
 4. Si NO tiene lastShippingInfo → pide los datos conversacionalmente
 5. Cuando tengas todos los datos, usa 'confirm_shipping_details'
 6. Después de confirmar datos, pregunta: "¿Cómo prefieres pagar? Tenemos: 💳 Pago en línea (tarjetas, PSE) o 💵 Contra entrega"
-7. Cuando elija método, usa 'create_payment_link' con payment_method='epayco' o 'manual'
+7. Cuando elija método, usa 'create_payment_link' con payment_method='online' (pago en línea) o 'manual' (contraentrega). NUNCA nombres una pasarela específica (ePayco, Wompi…) — la tienda la resuelve automáticamente según lo que tenga configurado
 8. Envía al cliente el link de pago generado para que complete su compra
 
 ⚠️ IMPORTANTE SOBRE lastShippingInfo:
@@ -317,6 +319,12 @@ IMPORTANTE:
 - Usa 'show_product' para que el cliente vea imagen y botón de compra
 - Usa 'render_checkout_summary' cuando el cliente diga "quiero comprar", "pagar", "finalizar"
 - Usa 'confirm_shipping_details' cuando tengas TODOS los datos del cliente`
+    }
+
+    // Métodos de pago REALES de la org (autoridad). Va al final = alta recencia:
+    // el agente ofrece SOLO lo configurado y no inventa pasarelas.
+    if (paymentMethodsSummary) {
+        prompt += `\n\n💳 MÉTODOS DE PAGO DE ESTA TIENDA (autoridad — ofrece SOLO estos):\n${paymentMethodsSummary}`
     }
 
     // T1.7 — prependar instrucción de idioma al inicio (mayor prioridad que las

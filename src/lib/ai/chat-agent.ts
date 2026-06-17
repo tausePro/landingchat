@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createMessage } from "./anthropic"
 import { getOrgMode, getToolsForMode, getModePromptAddendum } from "./agent-factory"
 import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
+import { getOrgPaymentMethodsSummary } from "./executors/shared"
 import { executeTool } from "./tool-executor"
 import { calculateCostCents } from "./pricing"
 import { createServiceClient } from "@/lib/supabase/server"
@@ -356,6 +357,8 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             .single()
 
         // 7. Build system prompt (optimized: only pass product count, not all products)
+        // Métodos de pago REALES de la org → el agente ofrece SOLO lo configurado.
+        const paymentMethodsSummary = await getOrgPaymentMethodsSummary(supabase, input.organizationId)
         log.debug("Building system prompt", { currentProduct: currentProduct?.name || "NONE", locale: tenantLocale.locale })
         let systemPrompt = buildSystemPromptOptimized(
             agent,
@@ -364,6 +367,7 @@ export async function processMessage(input: ProcessMessageInput): Promise<Proces
             customer || undefined,
             currentProduct || undefined,
             tenantLocale.locale,
+            paymentMethodsSummary,
         )
 
         // 7.5. Inyectar documentos de conocimiento del agente (si existen)
