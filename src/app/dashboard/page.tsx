@@ -5,6 +5,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { VisitorsCard } from "./components/visitors-card"
 import { StatWidget } from "./components/stat-widget"
+import { RevenueChart } from "./components/revenue-chart"
 import { Greeting } from "./components/greeting"
 
 export const dynamic = 'force-dynamic'
@@ -41,6 +42,7 @@ export default async function DashboardPage() {
             insights: {
                 averageOrderValue: 0,
                 pendingOrders: 0,
+                pendingOrderId: null,
                 newCustomers: 0,
                 repeatPurchaseRate: 0,
             },
@@ -73,8 +75,6 @@ export default async function DashboardPage() {
         escalation: { icon: 'support_agent', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' },
     }
 
-    const weeklyRevenueTotal = stats.revenue.weeklyHistory.reduce((sum, day) => sum + day.value, 0)
-    const maxWeeklyRevenueValue = Math.max(...stats.revenue.weeklyHistory.map((day) => day.value), 1)
     const displaySiteUrl = stats.siteStatus.url || (stats.organizationSlug ? `${stats.organizationSlug}.landingchat.co` : "Sin dominio configurado")
 
     const ecommerceQuickActions = [
@@ -295,6 +295,7 @@ export default async function DashboardPage() {
                             icon="shoppingmode"
                             trendLabel={stats.revenue.growth ? `${stats.revenue.growth}%` : undefined}
                             trendDirection={stats.revenue.growth >= 0 ? "up" : "down"}
+                            href="/dashboard/orders"
                         />
                         <StatWidget
                             title="Órdenes pendientes"
@@ -302,6 +303,9 @@ export default async function DashboardPage() {
                             helper="Pendientes por gestión"
                             icon="pending_actions"
                             accentColor="text-amber-500"
+                            href={stats.insights.pendingOrderId
+                                ? `/dashboard/orders/${stats.insights.pendingOrderId}`
+                                : "/dashboard/orders?status=pending"}
                         />
                         <StatWidget
                             title="Clientes nuevos"
@@ -310,6 +314,7 @@ export default async function DashboardPage() {
                             icon="group_add"
                             trendLabel="Nuevas cuentas"
                             trendDirection="neutral"
+                            href="/dashboard/customers"
                         />
                         <StatWidget
                             title="Recompra"
@@ -318,6 +323,7 @@ export default async function DashboardPage() {
                             icon="loyalty"
                             trendDirection={stats.insights.repeatPurchaseRate >= 30 ? "up" : "neutral"}
                             trendLabel={stats.insights.repeatPurchaseRate >= 30 ? "Saludable" : "Oportunidad"}
+                            href="/dashboard/customers"
                         />
                     </div>
                 )}
@@ -409,50 +415,12 @@ export default async function DashboardPage() {
                     </div>
                 ) : (
                     <div className="grid gap-6 lg:grid-cols-5">
-                        {/* Ingresos esta semana — 3 columnas */}
-                        <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80 lg:col-span-3">
-                            <CardHeader className="flex flex-col gap-4 pb-0 md:flex-row md:items-start md:justify-between">
-                                <div>
-                                    <CardTitle className="text-base font-semibold">Ingresos esta semana</CardTitle>
-                                    <p className="text-xs font-medium text-text-light-secondary dark:text-text-dark-secondary">Todos los canales</p>
-                                </div>
-                                <div className="flex items-center gap-3 self-start">
-                                    <span className="text-xl font-bold tracking-tight">
-                                        {formatCurrency(weeklyRevenueTotal)}
-                                    </span>
-                                    {renderTrendBadge(stats.revenue.growth)}
-                                </div>
-                            </CardHeader>
-                            <CardContent className="pt-5">
-                                {stats.revenue.weeklyHistory.length > 0 ? (
-                                    <div className="flex h-44 items-end gap-3">
-                                        {stats.revenue.weeklyHistory.map((day, i) => {
-                                            const height = day.value > 0
-                                                ? Math.max((day.value / maxWeeklyRevenueValue) * 100, 14)
-                                                : 8
-
-                                            return (
-                                                <div key={i} className="flex flex-1 flex-col items-center gap-3">
-                                                    <div className="flex h-36 w-full max-w-[64px] items-end rounded-2xl bg-background-light px-1.5 pb-1.5 dark:bg-background-dark">
-                                                        <div
-                                                            className="w-full rounded-xl bg-primary/85"
-                                                            style={{ height: `${height}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-[10px] font-medium text-text-light-secondary dark:text-text-dark-secondary">
-                                                        {day.day}
-                                                    </span>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="flex h-44 items-center justify-center rounded-2xl bg-background-light text-sm text-text-light-secondary dark:bg-background-dark dark:text-text-dark-secondary">
-                                        Sin ingresos registrados esta semana
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                        {/* Ingresos — gráfico con selector de días (7/14/30) */}
+                        <RevenueChart
+                            series={stats.revenue.history}
+                            growth={stats.revenue.growth}
+                            className="lg:col-span-3"
+                        />
 
                         {/* Actividad Reciente — 2 columnas */}
                         <Card className="overflow-hidden border-border-light/80 shadow-sm dark:border-border-dark/80 lg:col-span-2">

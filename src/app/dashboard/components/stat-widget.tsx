@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface StatWidgetProps {
@@ -10,6 +11,7 @@ interface StatWidgetProps {
     trendLabel?: string
     trendDirection?: "up" | "down" | "neutral"
     accentColor?: string
+    href?: string
 }
 
 const trendColorMap: Record<NonNullable<StatWidgetProps["trendDirection"]>, string> = {
@@ -26,9 +28,10 @@ export function StatWidget({
     trendLabel,
     trendDirection = "neutral",
     accentColor,
+    href,
 }: StatWidgetProps) {
-    return (
-        <Card className="h-full">
+    const card = (
+        <Card className={`h-full ${href ? "transition-colors hover:border-primary/50 hover:shadow-md" : ""}`}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-text-light-secondary dark:text-text-dark-secondary">
                     {title}
@@ -57,4 +60,14 @@ export function StatWidget({
             </CardContent>
         </Card>
     )
+
+    if (href) {
+        return (
+            <Link href={href} className="block h-full">
+                {card}
+            </Link>
+        )
+    }
+
+    return card
 }
