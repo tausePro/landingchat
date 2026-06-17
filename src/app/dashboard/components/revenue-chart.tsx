@@ -14,13 +14,13 @@ interface RevenueChartProps {
 
 const RANGES = [7, 14, 30]
 
+// Compacto determinista. NO usar Intl notation:"compact": Node y el navegador
+// rinden el sufijo distinto ("k" vs "K") → hydration mismatch en SSR.
 function formatCompactCurrency(value: number): string {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-        notation: "compact",
-    }).format(value)
+    const abs = Math.abs(value)
+    if (abs >= 1_000_000) return `$${(value / 1_000_000).toFixed(1).replace(".", ",")}M`
+    if (abs >= 1_000) return `$${(value / 1_000).toFixed(1).replace(".", ",")}k`
+    return `$${Math.round(value)}`
 }
 
 function formatFullCurrency(value: number): string {
