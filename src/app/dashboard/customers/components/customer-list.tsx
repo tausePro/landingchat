@@ -206,9 +206,12 @@ export function CustomerList({ customers, isLoading }: CustomerListProps) {
                                                 )} />
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="font-medium text-text-light-primary dark:text-text-dark-primary">
+                                                <Link
+                                                    href={`/dashboard/customers/${customer.id}`}
+                                                    className="font-medium text-text-light-primary transition-colors hover:text-primary hover:underline dark:text-text-dark-primary"
+                                                >
                                                     {customer.full_name || "Cliente Sin Nombre"}
-                                                </span>
+                                                </Link>
                                                 <span className="text-xs text-text-light-secondary dark:text-text-dark-secondary flex items-center gap-1">
                                                     {customer.phone && (
                                                         <>

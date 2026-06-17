@@ -150,6 +150,95 @@ export async function getCustomers({
 }
 
 // ============================================================================
+// Customer 360 (detalle)
+// ============================================================================
+
+export interface CustomerOrderSummary {
+  id: string
+  order_number: string | null
+  total: number
+  status: string | null
+  payment_status: string | null
+  created_at: string
+}
+
+export interface CustomerChatSummary {
+  id: string
+  channel: string | null
+  created_at: string
+}
+
+export interface CustomerDetail extends Customer {
+  orders: CustomerOrderSummary[]
+  chats: CustomerChatSummary[]
+  averageOrderValue: number
+  lastOrderAt: string | null
+}
+
+export async function getCustomerById(id: string): Promise<ActionResult<CustomerDetail>> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: "Unauthorized" }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single()
+    if (!profile?.organization_id) return { success: false, error: "No organization found" }
+    const orgId = profile.organization_id
+
+    const { data: customer, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("id", id)
+      .eq("organization_id", orgId)
+      .single()
+    if (error || !customer) return { success: false, error: "Cliente no encontrado" }
+
+    const [ordersRes, chatsRes] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("id, order_number, total, status, payment_status, created_at")
+        .eq("organization_id", orgId)
+        .eq("customer_id", id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("chats")
+        .select("id, channel, created_at")
+        .eq("organization_id", orgId)
+        .eq("customer_id", id)
+        .order("created_at", { ascending: false }),
+    ])
+
+    const orders = (ordersRes.data || []) as CustomerOrderSummary[]
+    const chats = (chatsRes.data || []) as CustomerChatSummary[]
+    // total_orders/total_spent ignoran canceladas/reembolsadas (igual que la lista)
+    const completed = orders.filter(
+      (o) => o.status && !["cancelled", "cancelado", "refunded", "reembolsado"].includes(o.status.toLowerCase())
+    )
+    const totalSpent = completed.reduce((sum, o) => sum + (o.total || 0), 0)
+    const totalOrders = completed.length
+
+    return {
+      success: true,
+      data: {
+        ...(customer as Customer),
+        total_orders: totalOrders,
+        total_spent: totalSpent,
+        orders,
+        chats,
+        averageOrderValue: totalOrders > 0 ? totalSpent / totalOrders : 0,
+        lastOrderAt: orders[0]?.created_at ?? null,
+      },
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Error al cargar el cliente" }
+  }
+}
+
+// ============================================================================
 // Stats Action (KPIs + Segments)
 // ============================================================================
 
