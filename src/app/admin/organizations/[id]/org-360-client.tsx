@@ -15,6 +15,7 @@ import { MODULE_CATALOG } from "./module-catalog"
 import {
     updateOrganizationModules,
     updateOrgNotificationPhone,
+    resetWhatsappConversationCounter,
     getOrganizationAddons,
     assignAddonToOrganization,
     updateOrgAddonStatus,
@@ -118,6 +119,21 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
             const result = await updateOrgNotificationPhone(org.id, phone)
             if (result.success) {
                 toast.success("Teléfono de notificaciones guardado")
+                router.refresh()
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setSaving(null)
+        }
+    }
+
+    const handleResetWhatsappCounter = async () => {
+        setSaving("wa-counter")
+        try {
+            const result = await resetWhatsappConversationCounter(org.id)
+            if (result.success) {
+                toast.success("Contador de conversaciones WhatsApp reseteado")
                 router.refresh()
             } else {
                 toast.error(result.error)
@@ -336,6 +352,21 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
                                 </div>
                             ))
                         )}
+                        <div className="pt-2 border-t flex items-center justify-between gap-2">
+                            <div>
+                                <p className="text-xs text-slate-500">Conversaciones WhatsApp (cuota del plan)</p>
+                                <p className="font-mono text-sm flex items-center gap-2">
+                                    {org.whatsappUsage.used}{org.whatsappUsage.limit != null && org.whatsappUsage.limit !== -1 ? ` / ${org.whatsappUsage.limit}` : ""}
+                                    {org.whatsappUsage.limit != null && org.whatsappUsage.limit !== -1 && org.whatsappUsage.used >= org.whatsappUsage.limit && (
+                                        <Badge className="bg-red-100 text-red-800">Bloqueada</Badge>
+                                    )}
+                                </p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={handleResetWhatsappCounter} disabled={saving === "wa-counter"}>
+                                {saving === "wa-counter" ? "..." : "Resetear"}
+                            </Button>
+                        </div>
+
                         <div className="pt-2 border-t space-y-2">
                             <p className="text-xs text-slate-500 flex items-center gap-1">
                                 <Phone className="h-3 w-3" /> WhatsApp de notificaciones (fallback platform)
