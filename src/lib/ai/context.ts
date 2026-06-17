@@ -146,6 +146,8 @@ export function buildSystemPromptOptimized(
     currentProduct?: Product,
     /** T1.7 — Locale del tenant (BCP 47). Default `'es-CO'` por retro-compat. */
     locale: string = "es-CO",
+    /** Métodos de pago REALES de la org, para ofrecer solo lo configurado. */
+    paymentMethodsSummary?: string,
 ): string {
     const customInstructions = agent.configuration?.personality?.instructions
     const hasCustomPrompt = customInstructions && customInstructions.trim().length > 50
@@ -317,6 +319,12 @@ IMPORTANTE:
 - Usa 'show_product' para que el cliente vea imagen y botón de compra
 - Usa 'render_checkout_summary' cuando el cliente diga "quiero comprar", "pagar", "finalizar"
 - Usa 'confirm_shipping_details' cuando tengas TODOS los datos del cliente`
+    }
+
+    // Métodos de pago REALES de la org (autoridad). Va al final = alta recencia:
+    // el agente ofrece SOLO lo configurado y no inventa pasarelas.
+    if (paymentMethodsSummary) {
+        prompt += `\n\n💳 MÉTODOS DE PAGO DE ESTA TIENDA (autoridad — ofrece SOLO estos):\n${paymentMethodsSummary}`
     }
 
     // T1.7 — prependar instrucción de idioma al inicio (mayor prioridad que las
