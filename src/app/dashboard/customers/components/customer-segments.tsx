@@ -41,6 +41,7 @@ const SCORE_ITEMS: { key: IntentScoreFilter; label: string; color: string }[] = 
     { key: "alta", label: "Intención Alta", color: "text-green-600" },
     { key: "media", label: "Intención Media", color: "text-blue-600" },
     { key: "baja", label: "Intención Baja", color: "text-yellow-600" },
+    { key: "riesgo", label: "En Riesgo", color: "text-red-600" },
 ]
 
 export function CustomerSegments({

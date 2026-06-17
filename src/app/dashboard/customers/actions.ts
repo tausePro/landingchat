@@ -304,12 +304,14 @@ export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
         .eq("organization_id", orgId)
         .eq("acquisition_channel", "whatsapp"),
 
-      // Todos los clientes + pedidos para computar intent y segmentos
-      fetchAllPages<{ category: string | null; orders: Array<{ total: number | null; status: string | null }> | null }>(
+      // Todos los clientes + pedidos para computar intent y segmentos.
+      // Incluye last_interaction_at para que el conteo use la misma recencia
+      // que el filtro de getCustomers (si no, sidebar y filtro divergen).
+      fetchAllPages<{ category: string | null; last_interaction_at: string | null; orders: Array<{ total: number | null; status: string | null }> | null }>(
         (from, to) =>
           supabase
             .from("customers")
-            .select("category, orders(id, total, status)")
+            .select("category, last_interaction_at, orders(id, total, status)")
             .eq("organization_id", orgId)
             .range(from, to),
         { maxRows: 20_000 }
@@ -337,7 +339,7 @@ export async function getCustomerStats(): Promise<ActionResult<CustomerStats>> {
       const completedOrders = (customer.orders || []).filter(isCompletedOrder)
       const total_orders = completedOrders.length
       const total_spent = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0)
-      const score = computeIntentScore({ category: customer.category, total_orders, total_spent })
+      const score = computeIntentScore({ category: customer.category, total_orders, total_spent, last_interaction_at: customer.last_interaction_at })
       intentScoreCounts[score]++
       if (total_orders >= 2) recurringBuyersCount++
       if (score === "riesgo") pendingFollowUpCount++

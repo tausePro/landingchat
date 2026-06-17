@@ -85,7 +85,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                                 </span>
                             </div>
                         </div>
-                        {(c.phone || c.full_name) && (
+                        {c.chats.length > 0 && (
                             <Link
                                 href={latestChatHref}
                                 className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90"
