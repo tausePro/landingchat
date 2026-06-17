@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { formatBogotaDayKey, getBogotaDayRange, getBogotaRecentDayRanges } from "@/lib/utils/date"
+import { getBogotaDayRange, getBogotaRecentDayRanges } from "@/lib/utils/date"
 
 export interface RealEstateStats {
     activeProperties: number
@@ -67,6 +67,7 @@ export interface DashboardStats {
     insights: {
         averageOrderValue: number
         pendingOrders: number
+        pendingOrderId: string | null
         newCustomers: number
         repeatPurchaseRate: number
     }
@@ -122,23 +123,21 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const totalRevenue = validOrders.reduce((sum, order) => sum + (order.total || 0), 0)
     const totalOrders = validOrders.length
     const pendingStatuses = new Set(["pending", "processing"])
-    const pendingOrders = validOrders.filter(order => pendingStatuses.has(order.status || "")).length
+    const pendingOrdersList = validOrders.filter(order => pendingStatuses.has(order.status || ""))
+    const pendingOrders = pendingOrdersList.length
+    // Si hay exactamente 1 pendiente, la card linkea directo a esa orden
+    const pendingOrderId = pendingOrders === 1 ? pendingOrdersList[0].id : null
 
-    // Revenue History (Last 30 days)
-    // Agrupamos por día en hora Colombia (America/Bogota). Sin timezone explícita
-    // las ventas hechas entre 19:00 y 23:59 hora local aparecían corridas al día
-    // siguiente UTC, distorsionando la curva de ventas del dashboard. Ver Fase
-    // 0.4 post-mortem en docs-private/PUNCHLIST_HARDENING_PLATAFORMA_2026-04.md.
-    const revenueByDay = new Map<string, number>()
-    validOrders.forEach(order => {
-        if (order.created_at >= thirtyDaysAgo) {
-            const date = formatBogotaDayKey(order.created_at)
-            revenueByDay.set(date, (revenueByDay.get(date) || 0) + (order.total || 0))
-        }
+    // Serie diaria de ingresos (últimos 30 días, rellena con 0) para el gráfico.
+    // Usa rangos en hora Colombia (America/Bogota): sin timezone explícita las
+    // ventas de 19:00–23:59 local se corrían al día UTC siguiente. Etiqueta d/m.
+    const history = getBogotaRecentDayRanges(30).map(({ start, end }) => {
+        const d = new Date(start)
+        const dayRevenue = validOrders
+            .filter(o => o.created_at >= start && o.created_at < end)
+            .reduce((sum, order) => sum + (order.total || 0), 0)
+        return { date: `${d.getUTCDate()}/${d.getUTCMonth() + 1}`, value: dayRevenue }
     })
-
-    // Fill in missing days? For now let's just send what we have
-    const history = Array.from(revenueByDay.entries()).map(([date, value]) => ({ date, value }))
 
     // 2. CHATS & CONVERSION (FIXED: Better filtering and calculation)
     const { data: chats } = await supabase
@@ -416,6 +415,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             insights: {
                 averageOrderValue,
                 pendingOrders,
+                pendingOrderId,
                 newCustomers: newCustomersCount || 0,
                 repeatPurchaseRate: parseFloat(repeatPurchaseRate.toFixed(1)),
             },
@@ -443,6 +443,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             insights: {
                 averageOrderValue: 0,
                 pendingOrders: 0,
+                pendingOrderId: null,
                 newCustomers: 0,
                 repeatPurchaseRate: 0,
             },
