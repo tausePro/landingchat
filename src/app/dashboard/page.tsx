@@ -285,6 +285,43 @@ export default async function DashboardPage() {
                     )}
                 </div>
 
+                {/* Indicadores del mes (ecommerce) — agrupados con los KPIs primarios */}
+                {!isRealEstate && (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatWidget
+                            title="Ticket Promedio"
+                            value={formatCurrency(stats.insights.averageOrderValue)}
+                            helper="Promedio de orden en los últimos 30 días"
+                            icon="shoppingmode"
+                            trendLabel={stats.revenue.growth ? `${stats.revenue.growth}%` : undefined}
+                            trendDirection={stats.revenue.growth >= 0 ? "up" : "down"}
+                        />
+                        <StatWidget
+                            title="Órdenes pendientes"
+                            value={stats.insights.pendingOrders.toString()}
+                            helper="Pendientes por gestión"
+                            icon="pending_actions"
+                            accentColor="text-amber-500"
+                        />
+                        <StatWidget
+                            title="Clientes nuevos"
+                            value={stats.insights.newCustomers.toString()}
+                            helper="En los últimos 30 días"
+                            icon="group_add"
+                            trendLabel="Nuevas cuentas"
+                            trendDirection="neutral"
+                        />
+                        <StatWidget
+                            title="Recompra"
+                            value={`${stats.insights.repeatPurchaseRate}%`}
+                            helper="Clientes que compraron 2+ veces"
+                            icon="loyalty"
+                            trendDirection={stats.insights.repeatPurchaseRate >= 30 ? "up" : "neutral"}
+                            trendLabel={stats.insights.repeatPurchaseRate >= 30 ? "Saludable" : "Oportunidad"}
+                        />
+                    </div>
+                )}
+
                 {/* Insight Widgets */}
                 {isRealEstate && re && (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -527,42 +564,6 @@ export default async function DashboardPage() {
                                 </div>
                             </CardContent>
                         </Card>
-                    </div>
-                )}
-
-                {!isRealEstate && (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <StatWidget
-                            title="Ticket Promedio"
-                            value={formatCurrency(stats.insights.averageOrderValue)}
-                            helper="Promedio de orden en los últimos 30 días"
-                            icon="shoppingmode"
-                            trendLabel={stats.revenue.growth ? `${stats.revenue.growth}%` : undefined}
-                            trendDirection={stats.revenue.growth >= 0 ? "up" : "down"}
-                        />
-                        <StatWidget
-                            title="Órdenes pendientes"
-                            value={stats.insights.pendingOrders.toString()}
-                            helper="Pendientes por gestión"
-                            icon="pending_actions"
-                            accentColor="text-amber-500"
-                        />
-                        <StatWidget
-                            title="Clientes nuevos"
-                            value={stats.insights.newCustomers.toString()}
-                            helper="En los últimos 30 días"
-                            icon="group_add"
-                            trendLabel="Nuevas cuentas"
-                            trendDirection="neutral"
-                        />
-                        <StatWidget
-                            title="Recompra"
-                            value={`${stats.insights.repeatPurchaseRate}%`}
-                            helper="Clientes que compraron 2+ veces"
-                            icon="loyalty"
-                            trendDirection={stats.insights.repeatPurchaseRate >= 30 ? "up" : "neutral"}
-                            trendLabel={stats.insights.repeatPurchaseRate >= 30 ? "Saludable" : "Oportunidad"}
-                        />
                     </div>
                 )}
 
