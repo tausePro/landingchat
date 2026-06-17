@@ -65,12 +65,94 @@ async function getPlatformWompiConfig(supabase: SupabaseServiceClient): Promise<
 }
 
 /**
- * Extrae el subscription_id de la referencia de transacción
- * Formato: SUB-{subscriptionId}-{timestamp}-{random}
+ * Extrae el subscription_id de la referencia de transacción.
+ * Formato actual (subscription/actions.ts): sub_{subscriptionId}_{timestamp}
  */
 function extractSubscriptionIdFromReference(reference: string): string | null {
-    const match = reference.match(/^SUB-([a-f0-9-]+)-/)
-    return match ? match[1] : null
+    if (!reference.startsWith("sub_")) return null
+    const parts = reference.split("_")
+    if (parts.length < 3) return null
+    // El UUID está entre 'sub_' y el timestamp final
+    return parts.slice(1, -1).join("_")
+}
+
+/**
+ * Procesa el pago de un pack de créditos de conversaciones (reference credits_*).
+ * Idempotente: acredita UNA sola vez vía claim atómico de credited_at. Si la
+ * acreditación falla, revierte el claim y devuelve 500 para que Wompi reintente.
+ */
+async function handleCreditPurchase(
+    supabase: SupabaseServiceClient,
+    transaction: WompiWebhookPayload["data"]["transaction"]
+) {
+    const reference = transaction.reference
+
+    const { data: purchase, error } = await supabase
+        .from("credit_purchases")
+        .select("id, organization_id, credit_amount, credited_at")
+        .eq("reference", reference)
+        .maybeSingle()
+
+    if (error || !purchase) {
+        console.error("[Wompi Billing] Credit purchase not found:", reference)
+        return NextResponse.json({ error: "Credit purchase not found" }, { status: 404 })
+    }
+
+    // Idempotencia rápida: ya acreditado
+    if (purchase.credited_at) {
+        console.log("[Wompi Billing] Credit purchase already credited:", reference)
+        return NextResponse.json({ received: true })
+    }
+
+    if (transaction.status !== "APPROVED") {
+        const mapped = WOMPI_STATUS_MAP[transaction.status]
+        const storedStatus = mapped === "voided" ? "error" : mapped
+        await supabase
+            .from("credit_purchases")
+            .update({ status: storedStatus, provider_transaction_id: transaction.id, updated_at: new Date().toISOString() })
+            .eq("id", purchase.id)
+        console.log("[Wompi Billing] Credit purchase not approved:", reference, transaction.status)
+        return NextResponse.json({ received: true })
+    }
+
+    // Claim atómico: marca credited_at solo si sigue null (evita doble-acreditación
+    // bajo reintentos/concurrencia).
+    const { data: claimed } = await supabase
+        .from("credit_purchases")
+        .update({
+            status: "approved",
+            provider_transaction_id: transaction.id,
+            credited_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", purchase.id)
+        .is("credited_at", null)
+        .select("id")
+        .maybeSingle()
+
+    if (!claimed) {
+        console.log("[Wompi Billing] Credit purchase already credited (claim perdido):", reference)
+        return NextResponse.json({ received: true })
+    }
+
+    // Acreditar (RPC restringido a service_role)
+    const { error: creditError } = await supabase.rpc("add_conversation_credits", {
+        org_id: purchase.organization_id,
+        amount: purchase.credit_amount,
+    })
+
+    if (creditError) {
+        // Revertir el claim para permitir el reintento de Wompi
+        await supabase
+            .from("credit_purchases")
+            .update({ status: "error", credited_at: null, updated_at: new Date().toISOString() })
+            .eq("id", purchase.id)
+        console.error("[Wompi Billing] Error acreditando, claim revertido:", reference, creditError.message)
+        return NextResponse.json({ error: "Crediting failed" }, { status: 500 })
+    }
+
+    console.log("[Wompi Billing] Créditos acreditados:", reference, purchase.credit_amount)
+    return NextResponse.json({ received: true })
 }
 
 export async function POST(request: NextRequest) {
@@ -117,6 +199,11 @@ export async function POST(request: NextRequest) {
         }
 
         const transaction = payload.data.transaction
+
+        // Compras de packs de créditos de conversaciones (reference credits_*)
+        if (transaction.reference.startsWith("credits_")) {
+            return await handleCreditPurchase(supabase, transaction)
+        }
 
         // Registrar la transacción en payment_transactions
         const { error: txError } = await supabase
