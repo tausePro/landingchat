@@ -155,6 +155,17 @@ export default async function DashboardPage() {
                     </div>
                 )}
 
+                {/* Acceso al análisis profundo (el dashboard es el resumen accionable) */}
+                <div className="flex justify-end">
+                    <Link
+                        href="/dashboard/analytics"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                    >
+                        Ver análisis completo
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </Link>
+                </div>
+
                 {/* KPI Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {isRealEstate && re ? (
@@ -225,7 +236,7 @@ export default async function DashboardPage() {
                                             {formatCurrency(stats.revenue.today)}
                                         </p>
                                         <p className="text-xs font-medium text-text-light-secondary dark:text-text-dark-secondary">
-                                            Revenue Today
+                                            Ingresos hoy
                                         </p>
                                     </div>
                                 </CardContent>
@@ -265,7 +276,7 @@ export default async function DashboardPage() {
                                             {stats.chats.conversionRate}%
                                         </p>
                                         <p className="text-xs font-medium text-text-light-secondary dark:text-text-dark-secondary">
-                                            Conv. Rate
+                                            Conversión · chats que compraron
                                         </p>
                                     </div>
                                 </CardContent>
@@ -499,7 +510,7 @@ export default async function DashboardPage() {
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="rounded-2xl bg-background-light px-4 py-3 dark:bg-background-dark">
                                         <p className="text-xs font-medium text-text-light-secondary dark:text-text-dark-secondary">
-                                            Revenue total
+                                            Ingresos totales
                                         </p>
                                         <p className="mt-1 text-lg font-bold tracking-tight text-text-light-primary dark:text-text-dark-primary">
                                             {formatCurrency(stats.siteStatus.revenue)}
@@ -545,7 +556,7 @@ export default async function DashboardPage() {
                             trendDirection="neutral"
                         />
                         <StatWidget
-                            title="Repeat Purchase"
+                            title="Recompra"
                             value={`${stats.insights.repeatPurchaseRate}%`}
                             helper="Clientes que compraron 2+ veces"
                             icon="loyalty"
