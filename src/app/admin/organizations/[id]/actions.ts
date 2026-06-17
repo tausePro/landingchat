@@ -38,6 +38,8 @@ export interface Organization360 {
     whatsapp: Array<{ instance_type: string | null; status: string | null; phone_display: string | null }>
     aiUsageMonth: { costUsdCents: number; events: number }
     counts: { products: number; orders: number; chats: number }
+    /** Contador acumulativo de conversaciones WhatsApp vs límite del plan. */
+    whatsappUsage: { used: number; limit: number | null }
 }
 
 export async function getOrganization360(id: string): Promise<ActionResult<Organization360>> {
@@ -48,7 +50,7 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
 
         const { data: org, error } = await supabase
             .from("organizations")
-            .select("id, name, slug, status, industry, locale, currency_code, custom_domain, notification_phone, copilot_autonomy_level, enabled_modules, created_at")
+            .select("id, name, slug, status, industry, locale, currency_code, custom_domain, notification_phone, copilot_autonomy_level, enabled_modules, created_at, whatsapp_conversations_used")
             .eq("id", id)
             .single()
 
@@ -61,7 +63,7 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
         const [subRes, waRes, aiRes, productsRes, ordersRes, chatsRes] = await Promise.all([
             supabase
                 .from("subscriptions")
-                .select("status, price, currency, current_period_end, plans(name)")
+                .select("status, price, currency, current_period_end, plans(name, max_whatsapp_conversations)")
                 .eq("organization_id", id)
                 .in("status", ["active", "trialing", "past_due"])
                 .order("created_at", { ascending: false })
@@ -83,8 +85,10 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
             supabase.from("chats").select("*", { count: "exact", head: true }).eq("organization_id", id),
         ])
 
-        const subRow = subRes.data as { status: string; price: number; currency: string; current_period_end: string | null; plans?: { name?: string } | { name?: string }[] } | null
-        const planName = Array.isArray(subRow?.plans) ? subRow?.plans[0]?.name : subRow?.plans?.name
+        const subRow = subRes.data as { status: string; price: number; currency: string; current_period_end: string | null; plans?: { name?: string; max_whatsapp_conversations?: number | null } | { name?: string; max_whatsapp_conversations?: number | null }[] } | null
+        const planRow = Array.isArray(subRow?.plans) ? subRow?.plans[0] : subRow?.plans
+        const planName = planRow?.name
+        const whatsappLimit = planRow?.max_whatsapp_conversations ?? null
 
         const aiEvents = aiRes.rows
 
@@ -113,6 +117,10 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
                 products: productsRes.count ?? 0,
                 orders: ordersRes.count ?? 0,
                 chats: chatsRes.count ?? 0,
+            },
+            whatsappUsage: {
+                used: (org as { whatsapp_conversations_used?: number }).whatsapp_conversations_used ?? 0,
+                limit: whatsappLimit,
             },
         })
     } catch (error) {
@@ -168,6 +176,31 @@ export async function updateOrgNotificationPhone(id: string, phone: string): Pro
     } catch (error) {
         console.error("[org-360] Error updating phone:", error)
         return failure("Error al guardar el teléfono")
+    }
+}
+
+/**
+ * Resetea el contador acumulativo de conversaciones WhatsApp de la org (desbloqueo
+ * manual desde superadmin). El reset mensual lo hace el cron whatsapp/reset-counters;
+ * esto es el control manual para cuando un tenant queda bloqueado por cuota histórica.
+ */
+export async function resetWhatsappConversationCounter(id: string): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["tech"]))) return failure("No autorizado")
+
+    try {
+        const supabase = await createServiceClient()
+        const { error } = await supabase
+            .from("organizations")
+            .update({ whatsapp_conversations_used: 0 })
+            .eq("id", id)
+
+        if (error) return failure(error.message)
+
+        revalidatePath(`/admin/organizations/${id}`)
+        return success(undefined)
+    } catch (error) {
+        console.error("[org-360] Error reset whatsapp counter:", error)
+        return failure("Error al resetear el contador de conversaciones")
     }
 }
 
