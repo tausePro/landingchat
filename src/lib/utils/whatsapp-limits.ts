@@ -3,12 +3,43 @@
  */
 
 import { createServiceClient } from "@/lib/supabase/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 interface ConversationLimitResult {
     allowed: boolean
     used: number
     limit: number
     percentage: number
+}
+
+// Canales de mensajería que consumen la cuota de conversaciones. Cada chat nuevo
+// en estos canales incrementaba el contador histórico; el chat web se gatea aparte
+// (lib/utils/subscription.ts).
+const MESSAGING_CHANNELS = ["whatsapp", "instagram", "messenger"]
+
+/**
+ * Conversaciones de mensajería (WhatsApp + social) creadas en el MES CALENDARIO
+ * actual. Es la fuente de verdad del límite: cuenta filas de chat reales, por lo
+ * que el límite resetea solo cada mes SIN depender del contador acumulativo
+ * (organizations.whatsapp_conversations_used) ni del cron mensual —cuya falla
+ * dejaba tenants bloqueados silenciosamente (incidente recurrente Casa Inmobiliaria).
+ */
+export async function getMessagingConversationsThisMonth(
+    supabase: SupabaseClient,
+    organizationId: string
+): Promise<number> {
+    const startOfMonth = new Date()
+    startOfMonth.setUTCDate(1)
+    startOfMonth.setUTCHours(0, 0, 0, 0)
+
+    const { count } = await supabase
+        .from("chats")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", organizationId)
+        .in("channel", MESSAGING_CHANNELS)
+        .gte("created_at", startOfMonth.toISOString())
+
+    return count || 0
 }
 
 /**
@@ -45,7 +76,8 @@ export async function checkConversationLimit(
 
     const subscription = org.subscriptions?.[0] as any
     const limit = subscription?.plans?.max_whatsapp_conversations || 0
-    const used = org.whatsapp_conversations_used || 0
+    // Conteo dinámico por mes (resetea solo, sin depender del cron)
+    const used = await getMessagingConversationsThisMonth(supabase, organizationId)
     const percentage = limit > 0 ? (used / limit) * 100 : 0
 
     return {
@@ -142,7 +174,7 @@ export async function getWhatsAppUsage(organizationId: string): Promise<{
         .eq("instance_type", "corporate")
         .single()
 
-    const conversationsUsed = org?.whatsapp_conversations_used || 0
+    const conversationsUsed = await getMessagingConversationsThisMonth(supabase, organizationId)
     const subscription = org?.subscriptions?.[0] as any
     const conversationsLimit = subscription?.plans?.max_whatsapp_conversations || 0
     const messagesThisMonth = instance?.messages_sent_this_month || 0
