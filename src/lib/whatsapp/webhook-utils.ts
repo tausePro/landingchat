@@ -7,6 +7,7 @@
 
 import crypto from "crypto"
 import { normalizePhone, getPhoneVariants, buildWhatsAppJid } from "@/lib/utils/phone"
+import { getMessagingConversationsThisMonth } from "@/lib/utils/whatsapp-limits"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseClient = any
@@ -236,7 +237,10 @@ export async function checkConversationLimit(
   // -1 = ilimitado
   if (limit === -1) return true
 
-  const used = org.whatsapp_conversations_used || 0
+  // Conteo dinámico por mes calendario: resetea solo, sin depender del contador
+  // acumulativo (whatsapp_conversations_used) ni del cron —cuya falla dejaba
+  // tenants bloqueados silenciosamente (incidente recurrente Casa Inmobiliaria).
+  const used = await getMessagingConversationsThisMonth(supabase, organizationId)
 
   console.log(`[WhatsApp Webhook Utils] Conversation limit: used=${used}, limit=${limit}`)
 

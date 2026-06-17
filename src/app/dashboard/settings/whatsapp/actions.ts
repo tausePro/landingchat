@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { getMessagingConversationsThisMonth } from "@/lib/utils/whatsapp-limits"
 import { revalidatePath } from "next/cache"
 import {
     type ActionResult,
@@ -86,18 +87,14 @@ export async function getWhatsAppStatus(): Promise<
         const personal =
             instances?.find((i) => i.instance_type === "personal") || null
 
-        // Obtener contador de conversaciones usadas
-        const { data: orgData } = await supabase
-            .from("organizations")
-            .select("whatsapp_conversations_used")
-            .eq("id", orgId)
-            .single()
+        // Conversaciones de mensajería de este mes (dinámico, resetea solo)
+        const conversationsUsed = await getMessagingConversationsThisMonth(supabase, orgId)
 
         return success({
             corporate: corporate ? deserializeWhatsAppInstance(corporate as unknown as Record<string, unknown>) : null,
             personal: personal ? deserializeWhatsAppInstance(personal as unknown as Record<string, unknown>) : null,
             plan_limit: planLimit,
-            conversations_used: orgData?.whatsapp_conversations_used || 0,
+            conversations_used: conversationsUsed,
         })
     } catch (error) {
         return failure(

@@ -86,14 +86,19 @@ export function PlanUsageCard() {
             const agents = agentsCount || 0
             const conversations = conversationsCount || 0
 
-            // Obtener uso de WhatsApp
-            const { data: orgData } = await supabase
-                .from("organizations")
-                .select("whatsapp_conversations_used")
-                .eq("id", orgId)
-                .single()
-
-            const whatsappUsed = orgData?.whatsapp_conversations_used || 0
+            // Conversaciones de mensajería de ESTE mes (conteo dinámico — resetea
+            // solo cada mes; los canales deben coincidir con MESSAGING_CHANNELS en
+            // lib/utils/whatsapp-limits.ts).
+            const monthStart = new Date()
+            monthStart.setUTCDate(1)
+            monthStart.setUTCHours(0, 0, 0, 0)
+            const { count: whatsappCount } = await supabase
+                .from("chats")
+                .select("*", { count: "exact", head: true })
+                .eq("organization_id", orgId)
+                .in("channel", ["whatsapp", "instagram", "messenger"])
+                .gte("created_at", monthStart.toISOString())
+            const whatsappUsed = whatsappCount || 0
 
             const calcPercentage = (current: number, limit: number) => {
                 if (limit === -1) return 0 // Ilimitado
