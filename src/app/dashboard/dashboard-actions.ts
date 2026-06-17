@@ -111,7 +111,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     // Ideally we should aggregate in SQL but for MVP we fetch and process
     const { data: orders } = await supabase
         .from("orders")
-        .select("id, order_number, total, created_at, status, customer_id")
+        .select("id, order_number, total, created_at, status, customer_id, chat_id")
         .eq("organization_id", orgId)
         .in("status", ["pending", "confirmed", "processing", "shipped", "delivered", "completed"])
         .order("created_at", { ascending: true })
@@ -150,11 +150,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const whatsappChats = chats?.filter(c => c.channel === 'whatsapp').length || 0
     const webChats = chats?.filter(c => c.channel === 'web').length || 0
 
-    // Conversion Rate: (Total Orders / Total Chats) * 100
-    // Only count chats that actually belong to this organization
-    const conversionRate = totalChats > 0 ? (totalOrders / totalChats) * 100 : 0
+    // Conversión real: % de conversaciones que terminaron en una orden.
+    // (totalOrders / totalChats podía superar 100% porque hay órdenes que NO
+    //  vienen de un chat — WhatsApp directo, link de pago, etc. Atribuimos por
+    //  chat_id y acotamos a 100% para no mentirle al merchant.)
+    const convertingChatIds = new Set(
+        validOrders.map(o => o.chat_id).filter((id): id is string => Boolean(id))
+    )
+    const conversionRate = totalChats > 0
+        ? Math.min(100, (convertingChatIds.size / totalChats) * 100)
+        : 0
 
-    console.log(`[Dashboard] Org ${orgId}: ${totalChats} chats, ${totalOrders} orders, ${conversionRate.toFixed(1)}% conversion`)
+    console.log(`[Dashboard] Org ${orgId}: ${totalChats} chats, ${totalOrders} orders, ${convertingChatIds.size} converting chats, ${conversionRate.toFixed(1)}% conversion`)
 
     // 3. CUSTOMERS INSIGHTS
     const { count: newCustomersCount } = await supabase
