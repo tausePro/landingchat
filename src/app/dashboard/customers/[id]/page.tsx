@@ -51,6 +51,10 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         last_interaction_at: c.last_interaction_at,
     })
     const chatSearch = encodeURIComponent(c.full_name || c.phone || "")
+    // El botón del header lleva al chat más reciente; si no hay, a la consola para buscar/iniciar
+    const latestChatHref = c.chats.length > 0
+        ? `/dashboard/chats/${c.chats[0].id}`
+        : `/dashboard/chats/console?search=${chatSearch}`
 
     return (
         <DashboardLayout>
@@ -83,7 +87,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                         </div>
                         {(c.phone || c.full_name) && (
                             <Link
-                                href={`/dashboard/chats/console?search=${chatSearch}`}
+                                href={latestChatHref}
                                 className="inline-flex items-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/90"
                             >
                                 <span className="material-symbols-outlined text-base">chat</span>
@@ -165,7 +169,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                             {c.chats.length > 0 ? c.chats.map((chat) => (
                                 <Link
                                     key={chat.id}
-                                    href={`/dashboard/chats/console?search=${chatSearch}`}
+                                    href={`/dashboard/chats/${chat.id}`}
                                     className="flex items-center justify-between rounded-lg border border-transparent px-3 py-2 transition-colors hover:border-border-light hover:bg-background-light/60 dark:hover:border-border-dark dark:hover:bg-background-dark/60"
                                 >
                                     <div className="flex items-center gap-3">
