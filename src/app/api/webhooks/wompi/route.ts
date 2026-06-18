@@ -101,20 +101,6 @@ export async function POST(request: NextRequest) {
 
         console.log("[Wompi Billing] Webhook received:", payload.event)
 
-        // DIAGNÓSTICO TEMPORAL (remover tras smoke de créditos): registra TODO
-        // evento entrante ANTES de filtrar/validar, para depurar la entrega del
-        // webhook (¿llega Wompi? ¿con qué payload/firma?).
-        try {
-            await supabase.from("webhook_logs").insert({
-                webhook_type: "wompi_billing",
-                event_type: payload?.event ?? "unknown",
-                instance_name: payload?.data?.transaction?.reference ?? null,
-                payload,
-                headers: Object.fromEntries(request.headers),
-                processing_result: "received",
-            })
-        } catch { /* el logging no debe romper el webhook */ }
-
         // Solo procesar eventos de transacción
         if (payload.event !== "transaction.updated") {
             return NextResponse.json({ received: true })
@@ -144,15 +130,6 @@ export async function POST(request: NextRequest) {
 
             if (!isValid) {
                 console.error("[Wompi Billing] Invalid webhook signature")
-                // DIAGNÓSTICO TEMPORAL: marca firma inválida (secreto de eventos no coincide)
-                try {
-                    await supabase.from("webhook_logs").insert({
-                        webhook_type: "wompi_billing",
-                        event_type: payload.event,
-                        instance_name: payload?.data?.transaction?.reference ?? null,
-                        processing_result: "signature_invalid",
-                    })
-                } catch { /* no-op */ }
                 return NextResponse.json(
                     { error: "Invalid signature" },
                     { status: 401 }
