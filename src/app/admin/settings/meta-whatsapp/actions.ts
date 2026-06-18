@@ -177,3 +177,40 @@ export async function testMetaConnection(
         )
     }
 }
+
+const SendTestMessageSchema = z.object({
+    phoneNumberId: z.string().min(1, "Phone Number ID requerido"),
+    accessToken: z.string().min(1, "Access Token requerido"),
+    to: z.string().min(1, "Número destinatario requerido"),
+    message: z.string().min(1, "Mensaje requerido"),
+})
+
+/**
+ * Envía un mensaje de prueba vía Meta Cloud API usando credenciales provistas
+ * (ej. el número de prueba de Meta). Sirve para grabar la evidencia del App Review
+ * (whatsapp_business_messaging) y para validar credenciales sin instancia conectada.
+ */
+export async function sendTestMetaMessage(input: {
+    phoneNumberId: string
+    accessToken: string
+    to: string
+    message: string
+}): Promise<ActionResult<{ messageId?: string }>> {
+    try {
+        const isSuperAdmin = await checkSuperAdmin()
+        if (!isSuperAdmin) {
+            return failure("No autorizado")
+        }
+
+        const { phoneNumberId, accessToken, to, message } = SendTestMessageSchema.parse(input)
+
+        const client = new MetaCloudClient()
+        const response = await client.sendTextMessage(phoneNumberId, accessToken, to, message)
+
+        return success({ messageId: response.messages?.[0]?.id })
+    } catch (error) {
+        return failure(
+            error instanceof Error ? error.message : "Error al enviar mensaje de prueba"
+        )
+    }
+}
