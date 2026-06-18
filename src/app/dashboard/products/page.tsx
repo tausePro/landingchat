@@ -1,4 +1,6 @@
 import { getProducts } from "./actions"
+import { createClient } from "@/lib/supabase/server"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import Link from "next/link"
 import { WooImportModal } from "./components/woo-import-modal"
@@ -12,6 +14,16 @@ export default async function ProductsPage() {
     const result = await getProducts()
     const products = result.success ? result.data : []
 
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = user
+        ? await supabase.from("profiles").select("organization_id").eq("id", user.id).single()
+        : { data: null }
+    const { data: org } = profile?.organization_id
+        ? await supabase.from("organizations").select("currency_code, locale").eq("id", profile.organization_id).single()
+        : { data: null }
+    const tenantLocale = getTenantLocale(org)
+
     return (
         <DashboardLayout>
             <div className="p-8">
@@ -22,7 +34,7 @@ export default async function ProductsPage() {
                     </div>
                     <div className="flex flex-wrap gap-3">
                         <ProductCsvTools />
-                        <ProductReorderToggle products={products} />
+                        <ProductReorderToggle products={products} tenantLocale={tenantLocale} />
                         <WooImportModal />
                         <Link href="/dashboard/products/new" className="flex h-10 cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 text-white text-sm font-bold shadow-sm hover:bg-primary/90">
                             <span className="material-symbols-outlined text-lg">add_circle</span>
@@ -31,7 +43,7 @@ export default async function ProductsPage() {
                     </div>
                 </div>
 
-                <ProductTable products={products} />
+                <ProductTable products={products} tenantLocale={tenantLocale} />
             </div>
         </DashboardLayout>
     )

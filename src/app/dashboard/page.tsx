@@ -8,6 +8,8 @@ import { StatWidget } from "./components/stat-widget"
 import { RevenueChart } from "./components/revenue-chart"
 import { ConversationUsageCard } from "./components/conversation-usage-card"
 import { Greeting } from "./components/greeting"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { getCurrentTenantLocale } from "@/lib/i18n/tenant-locale-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -53,14 +55,9 @@ export default async function DashboardPage() {
         }
     }
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount)
-    }
+    const tenantLocale = await getCurrentTenantLocale()
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     const isRealEstate = stats.industry === "real_estate" && !!stats.realEstate
     const re = stats.realEstate

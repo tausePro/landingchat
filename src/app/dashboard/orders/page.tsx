@@ -3,6 +3,8 @@ import { getOrders } from "./actions"
 import Link from "next/link"
 import { formatBogotaDate } from "@/lib/utils/date"
 import { OrderFilters } from "./order-filters"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { getCurrentTenantLocale } from "@/lib/i18n/tenant-locale-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -92,14 +94,9 @@ export default async function OrdersPage({
         }
     }
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount)
-    }
+    const tenantLocale = await getCurrentTenantLocale()
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     return (
         <DashboardLayout>

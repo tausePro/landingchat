@@ -2,12 +2,14 @@
 
 import { useState } from "react"
 import { ProductReorder } from "./product-reorder"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface ProductReorderToggleProps {
     products: any[]
+    tenantLocale?: TenantLocaleContext
 }
 
-export function ProductReorderToggle({ products }: ProductReorderToggleProps) {
+export function ProductReorderToggle({ products, tenantLocale = DEFAULT_TENANT_LOCALE }: ProductReorderToggleProps) {
     const [showReorder, setShowReorder] = useState(false)
 
     return (
@@ -45,7 +47,7 @@ export function ProductReorderToggle({ products }: ProductReorderToggleProps) {
                             </button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
-                            <ProductReorder products={products} />
+                            <ProductReorder products={products} tenantLocale={tenantLocale} />
                         </div>
                     </div>
                 </div>
