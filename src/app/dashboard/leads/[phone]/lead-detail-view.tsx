@@ -13,6 +13,8 @@ import {
     formatBogotaMonthShort,
     formatBogotaTime,
 } from "@/lib/utils/date"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 const STATUS_OPTIONS: Array<{ value: string; label: string; color: string }> = [
     { value: "new", label: "Nuevo", color: "#f59e0b" },
@@ -39,15 +41,15 @@ const CHANNEL_LABELS: Record<string, string> = {
     messenger: "Messenger",
 }
 
-const formatPrice = (price: number) =>
-    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
-
 interface Props {
     lead: LeadDetail
     advisors: AdvisorOption[]
+    tenantLocale?: TenantLocaleContext
 }
 
-export function LeadDetailView({ lead, advisors }: Props) {
+export function LeadDetailView({ lead, advisors, tenantLocale = DEFAULT_TENANT_LOCALE }: Props) {
+    const formatPrice = (price: number) =>
+        formatTenantCurrency(price, { currency: tenantLocale.currency, locale: tenantLocale.locale })
     const [status, setStatus] = useState(lead.status)
     const [notes, setNotes] = useState(lead.notes || "")
     const [savingStatus, setSavingStatus] = useState(false)
