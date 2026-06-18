@@ -17,12 +17,14 @@ import { ChatPanel } from "./components/chat-panel"
 import { CustomerSidebar } from "./components/customer-sidebar"
 import { ArrowLeft, Layers } from "lucide-react"
 import Link from "next/link"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface ChatConsoleProps {
     initialData: ConsoleChatsResult
+    tenantLocale?: TenantLocaleContext
 }
 
-export function ChatConsole({ initialData }: ChatConsoleProps) {
+export function ChatConsole({ initialData, tenantLocale = DEFAULT_TENANT_LOCALE }: ChatConsoleProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
 
@@ -205,6 +207,7 @@ export function ChatConsole({ initialData }: ChatConsoleProps) {
                     <CustomerSidebar
                         chatDetail={chatDetail}
                         onToggleHumanOnly={handleToggleHumanOnly}
+                        tenantLocale={tenantLocale}
                     />
                 </div>
             )}

@@ -15,20 +15,13 @@ import {
     ShieldOff,
     Loader2,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface CustomerSidebarProps {
     chatDetail: ChatDetailData
     onToggleHumanOnly?: (isHumanOnly: boolean) => Promise<void>
-}
-
-function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount)
+    tenantLocale?: TenantLocaleContext
 }
 
 function formatDate(dateStr: string): string {
@@ -43,7 +36,9 @@ function getStatusColor(status: string): string {
     return "text-slate-600 bg-slate-50 dark:text-slate-400 dark:bg-slate-800"
 }
 
-export function CustomerSidebar({ chatDetail, onToggleHumanOnly }: CustomerSidebarProps) {
+export function CustomerSidebar({ chatDetail, onToggleHumanOnly, tenantLocale = DEFAULT_TENANT_LOCALE }: CustomerSidebarProps) {
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
     const customer = chatDetail.customer
     const displayName = customer?.full_name || chatDetail.customer_name || "Sin nombre"
     const [togglingHuman, setTogglingHuman] = useState(false)
