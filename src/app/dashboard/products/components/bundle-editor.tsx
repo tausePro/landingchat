@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface BundleItem {
     product_id: string
@@ -31,6 +33,7 @@ interface BundleEditorProps {
     onDiscountValueChange: (value: number) => void
     onDiscountEndsAtChange: (value: string) => void
     organizationId: string
+    tenantLocale?: TenantLocaleContext
 }
 
 export function BundleEditor({
@@ -42,7 +45,8 @@ export function BundleEditor({
     onDiscountTypeChange,
     onDiscountValueChange,
     onDiscountEndsAtChange,
-    organizationId
+    organizationId,
+    tenantLocale = DEFAULT_TENANT_LOCALE,
 }: BundleEditorProps) {
     const [products, setProducts] = useState<ProductOption[]>([])
     const [loading, setLoading] = useState(true)
@@ -112,13 +116,8 @@ export function BundleEditor({
 
     const total = Math.max(0, subtotal - discount)
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount)
-    }
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     if (loading) {
         return <div className="text-center py-4 text-text-light-secondary dark:text-text-dark-secondary">Cargando productos...</div>

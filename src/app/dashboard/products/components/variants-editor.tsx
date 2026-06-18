@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface Variant {
     type: string
@@ -24,6 +26,7 @@ interface VariantsEditorProps {
     onChange: (variants: Variant[]) => void
     productImages: string[]
     basePrice: number
+    tenantLocale?: TenantLocaleContext
 }
 
 interface SellableVariantCombination {
@@ -63,7 +66,7 @@ function buildSellableVariantCombinations(variants: Variant[]): SellableVariantC
         }))
 }
 
-export function VariantsEditor({ variants, onChange, productImages = [], basePrice }: VariantsEditorProps) {
+export function VariantsEditor({ variants, onChange, productImages = [], basePrice, tenantLocale = DEFAULT_TENANT_LOCALE }: VariantsEditorProps) {
     // Local state for input values (allows free typing)
     const [localValues, setLocalValues] = useState<string[]>(
         variants.map(v => v.values.join(', '))
@@ -162,9 +165,8 @@ export function VariantsEditor({ variants, onChange, productImages = [], basePri
         onChange(newVariants)
     }
 
-    const formatCurrency = (price: number) => {
-        return `$${price.toLocaleString()}`
-    }
+    const formatCurrency = (price: number) =>
+        formatTenantCurrency(price, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     const handleStockToggle = (index: number, enabled: boolean) => {
         const newVariants = [...variants]
