@@ -8,16 +8,10 @@ import {
     getIntentScoreColor,
     getIntentScoreIcon,
 } from "../lib/intent-score"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { getCurrentTenantLocale } from "@/lib/i18n/tenant-locale-server"
 
 export const dynamic = "force-dynamic"
-
-function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-    }).format(amount)
-}
 
 function formatDate(iso: string | null | undefined): string {
     if (!iso) return "—"
@@ -44,6 +38,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     }
 
     const c = result.data
+    const tenantLocale = await getCurrentTenantLocale()
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
     const intent = computeIntentScore({
         category: c.category,
         total_orders: c.total_orders,
