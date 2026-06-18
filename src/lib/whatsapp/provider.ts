@@ -11,6 +11,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { MetaCloudClient } from "./meta-client"
 import { EvolutionClient } from "@/lib/evolution"
+import { decrypt, isEncrypted } from "@/lib/utils/encryption"
 
 // ============================================
 // Tipos internos
@@ -33,6 +34,15 @@ interface WhatsAppInstanceRow {
 interface EvolutionConfig {
   url: string
   apiKey: string
+}
+
+/**
+ * Desencripta el token de acceso de Meta si viene encriptado. Compat con
+ * instancias antiguas que lo guardaban en claro (lo devuelve tal cual).
+ */
+function resolveMetaToken(token: string | null): string | null {
+  if (!token) return token
+  return isEncrypted(token) ? decrypt(token) : token
 }
 
 // ============================================
@@ -78,6 +88,7 @@ export async function sendWhatsAppMessage(
   }
 
   const row = instance as WhatsAppInstanceRow
+  row.meta_access_token = resolveMetaToken(row.meta_access_token)
 
   if (row.provider === "meta") {
     return sendViaMeta(row, to, text)
@@ -355,7 +366,9 @@ async function getConnectedInstance(organizationId: string): Promise<WhatsAppIns
     instance = fallback.data
   }
 
-  return instance as WhatsAppInstanceRow
+  const row = instance as WhatsAppInstanceRow
+  row.meta_access_token = resolveMetaToken(row.meta_access_token)
+  return row
 }
 
 // ============================================
