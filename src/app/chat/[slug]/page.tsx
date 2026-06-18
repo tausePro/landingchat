@@ -372,12 +372,22 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 }
 
                 if (productId) {
-                    // Evitar procesar el mismo producto dos veces en la misma sesión
-                    if (processedProductIdRef.current === productId) {
-                        console.log("Producto ya procesado en esta sesión, omitiendo mensaje inicial.")
+                    // Evitar re-saludar el mismo producto. El ref cubre re-renders dentro
+                    // de la misma vida del componente; sessionStorage cubre RECARGAS — p.ej.
+                    // volver de la pasarela de pago con "atrás", donde el ref se pierde y
+                    // antes el agente re-escribía el saludo del producto.
+                    const greetedKey = `lc_greeted_${currentChatId}_${productId}`
+                    const alreadyGreeted =
+                        processedProductIdRef.current === productId ||
+                        (typeof window !== "undefined" && window.sessionStorage.getItem(greetedKey) === "1")
+                    if (alreadyGreeted) {
+                        console.log("Producto ya saludado en esta sesión, omitiendo mensaje inicial.")
                         return
                     }
                     processedProductIdRef.current = productId
+                    if (typeof window !== "undefined") {
+                        window.sessionStorage.setItem(greetedKey, "1")
+                    }
 
                     // Buscar el producto para obtener su nombre y hacer el mensaje más explícito
                     // Esto ayuda al agente a diferenciar del contexto histórico
