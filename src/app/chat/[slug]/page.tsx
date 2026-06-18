@@ -1148,8 +1148,8 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
 
                 {/* Magic Input Area */}
                 <div className="w-full shrink-0 p-5 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 relative z-30">
-                    {/* Quick Replies - Floating above input */}
-                    <div className="absolute -top-12 left-6 flex gap-2 overflow-x-auto max-w-[95%] pb-2 scrollbar-hide mask-fade-right z-10">
+                    {/* Quick Replies - en flujo normal sobre el input (no overlap con ChatPayBar) */}
+                    <div className="max-w-4xl mx-auto mb-3 flex gap-2 overflow-x-auto scrollbar-hide mask-fade-right">
                         {[
                             { text: "Recomiéndame un producto para...", icon: "auto_awesome" },
                             { text: "Quiero ver ofertas disponibles", icon: "local_offer" },
