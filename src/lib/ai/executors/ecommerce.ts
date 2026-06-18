@@ -10,6 +10,7 @@ import {
 import { getVariantPriceRange, findApplicableTier } from "@/lib/commerce/variantPricing"
 import type { PriceTier } from "@/types/product"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
+import { getShippingAvailability } from "@/lib/utils/shipping"
 import {
     ApplyDiscountSchema,
     CreatePaymentLinkSchema,
@@ -1383,10 +1384,12 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
         .eq("organization_id", context.organizationId)
         .single()
 
-    const freeShippingEnabled = shippingSettings?.free_shipping_enabled || false
     const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 0
-    const defaultShipping = shippingSettings?.default_shipping_rate ?? 0
-    const qualifiesForFreeShipping = freeShippingEnabled && (!freeShippingThreshold || subtotal >= freeShippingThreshold)
+    // Estimado PRE-ciudad vía el helper canónico (sin ciudad). Si hay zonas de envío
+    // gratis, el helper cobra la tarifa default hasta confirmar la ciudad en
+    // create_payment_link → evita prometer gratis y luego cobrar. Sin zonas, gratis por monto.
+    const estimatedShipping = getShippingAvailability(shippingSettings, subtotal, undefined).cost
+    const qualifiesForFreeShipping = estimatedShipping === 0
 
     return {
         success: true,
@@ -1408,10 +1411,10 @@ const renderCheckoutSummary: ToolHandler = async (supabase, input, context) => {
                 })),
                 itemCount,
                 subtotal,
-                estimatedShipping: qualifiesForFreeShipping ? 0 : defaultShipping,
+                estimatedShipping,
                 freeShippingThreshold,
                 qualifiesForFreeShipping,
-                total: subtotal + (qualifiesForFreeShipping ? 0 : defaultShipping)
+                total: subtotal + estimatedShipping
             },
             nextStep: "shipping_form",
             instructions: "Para continuar, necesito tus datos de envío. ¿Me los puedes proporcionar?"
@@ -1481,10 +1484,11 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
         .eq("organization_id", context.organizationId)
         .single()
 
-    const freeShippingEnabled = shippingSettings?.free_shipping_enabled || false
-    const freeShippingThreshold = shippingSettings?.free_shipping_min_amount || 0
-    const qualifiesFreeShipping = freeShippingEnabled && (!freeShippingThreshold || subtotal >= freeShippingThreshold)
-    const shippingCost = qualifiesFreeShipping ? 0 : (shippingSettings?.default_shipping_rate ?? 0)
+    // Envío zone-aware vía el helper canónico (getShippingAvailability): gratis SOLO si
+    // la ciudad está en zona gratis (cuando hay zonas) Y cumple el mínimo; si no, tarifa
+    // default. Antes este flujo tenía una copia zone-blind que cobraba $0 fuera de zona
+    // (caso real qp → Medellín). La ciudad viene de los datos de envío confirmados.
+    const shippingCost = getShippingAvailability(shippingSettings, subtotal, shippingInfo.city).cost
     const total = subtotal + shippingCost
 
     const { data: organization } = await supabase
