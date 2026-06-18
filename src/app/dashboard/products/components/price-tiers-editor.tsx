@@ -5,19 +5,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PriceTier } from "@/types/product"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface PriceTiersEditorProps {
     tiers: PriceTier[]
     onChange: (tiers: PriceTier[]) => void
     minimumQuantity?: number
     onMinimumQuantityChange?: (qty: number | undefined) => void
+    tenantLocale?: TenantLocaleContext
 }
 
 export function PriceTiersEditor({
     tiers,
     onChange,
     minimumQuantity,
-    onMinimumQuantityChange
+    onMinimumQuantityChange,
+    tenantLocale = DEFAULT_TENANT_LOCALE,
 }: PriceTiersEditorProps) {
 
     const addTier = () => {
@@ -43,13 +47,8 @@ export function PriceTiersEditor({
         onChange(tiers.filter((_, i) => i !== index))
     }
 
-    const formatPrice = (value: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            maximumFractionDigits: 0
-        }).format(value)
-    }
+    const formatPrice = (value: number) =>
+        formatTenantCurrency(value, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     return (
         <div className="space-y-4">

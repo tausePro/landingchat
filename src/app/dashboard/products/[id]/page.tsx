@@ -3,6 +3,7 @@ import { ProductForm } from "../components/product-form"
 import { ProductReviewsManager } from "../components/ProductReviewsManager"
 import { getProductById } from "../actions"
 import { createClient } from "@/lib/supabase/server"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import {
     getProductEngagementSummaryForDashboard,
     getProductReviewsForDashboard,
@@ -37,7 +38,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
         getProductEngagementSummaryForDashboard(id),
         supabase
             .from("organizations")
-            .select("slug")
+            .select("slug, currency_code, locale")
             .eq("id", product.organization_id)
             .single(),
     ])
@@ -52,6 +53,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
             ? engagementResult.error
             : undefined
     const storeSlug = organizationResult.data?.slug || ""
+    const tenantLocale = getTenantLocale(organizationResult.data)
 
     return (
         <DashboardLayout>
@@ -60,6 +62,7 @@ export default async function EditProductPage({ params }: EditProductPageProps) 
                 storeSlug={storeSlug}
                 initialData={product}
                 isEditing
+                tenantLocale={tenantLocale}
             />
             <ProductReviewsManager
                 organizationId={product.organization_id}
