@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MessageSquare, ExternalLink, Copy, Check } from "lucide-react"
+import { MessageSquare, ExternalLink, Copy, Check, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import {
     getMetaWhatsAppConfig,
     saveMetaWhatsAppConfig,
+    sendTestMetaMessage,
 } from "./actions"
 
 export default function MetaWhatsAppSettingsPage() {
@@ -23,6 +24,13 @@ export default function MetaWhatsAppSettingsPage() {
     const [configId, setConfigId] = useState("")
     const [solutionId, setSolutionId] = useState("")
     const [webhookUrl, setWebhookUrl] = useState("")
+
+    // Enviar mensaje de prueba (evidencia App Review + validación de credenciales)
+    const [testPhoneNumberId, setTestPhoneNumberId] = useState("")
+    const [testAccessToken, setTestAccessToken] = useState("")
+    const [testRecipient, setTestRecipient] = useState("")
+    const [testMessage, setTestMessage] = useState("Hola desde LandingChat, mensaje de prueba.")
+    const [sendingTest, setSendingTest] = useState(false)
 
     useEffect(() => {
         fetchConfig()
@@ -78,6 +86,31 @@ export default function MetaWhatsAppSettingsPage() {
         setCopied(true)
         toast.success("URL copiada")
         setTimeout(() => setCopied(false), 2000)
+    }
+
+    const handleSendTest = async () => {
+        setSendingTest(true)
+        try {
+            const result = await sendTestMetaMessage({
+                phoneNumberId: testPhoneNumberId.trim(),
+                accessToken: testAccessToken.trim(),
+                to: testRecipient.trim(),
+                message: testMessage,
+            })
+            if (result.success) {
+                toast.success("Mensaje enviado", {
+                    description: result.data?.messageId
+                        ? `Message ID: ${result.data.messageId}`
+                        : "Revisa el WhatsApp del destinatario.",
+                })
+            } else {
+                toast.error("Error al enviar", { description: result.error })
+            }
+        } catch {
+            toast.error("Error", { description: "No se pudo enviar el mensaje de prueba" })
+        } finally {
+            setSendingTest(false)
+        }
     }
 
     if (loading) {
@@ -213,6 +246,77 @@ export default function MetaWhatsAppSettingsPage() {
                     </Button>
                 </div>
             </form>
+
+            {/* Enviar mensaje de prueba — evidencia App Review + validar credenciales */}
+            <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-slate-900">
+                <h2 className="mb-1 text-lg font-semibold">Enviar mensaje de prueba</h2>
+                <p className="mb-4 text-sm text-slate-500">
+                    Envía un mensaje vía Cloud API con el Phone Number ID y token (ej. los del
+                    número de prueba de Meta en WhatsApp → Prueba de API). Sirve para grabar la
+                    evidencia del App Review y validar credenciales sin instancia conectada.
+                </p>
+
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="testPhoneNumberId">Phone Number ID</Label>
+                        <Input
+                            id="testPhoneNumberId"
+                            value={testPhoneNumberId}
+                            onChange={(e) => setTestPhoneNumberId(e.target.value)}
+                            placeholder="Phone Number ID del número de prueba"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="testAccessToken">Access Token</Label>
+                        <Input
+                            id="testAccessToken"
+                            type="password"
+                            value={testAccessToken}
+                            onChange={(e) => setTestAccessToken(e.target.value)}
+                            placeholder="Token temporal de prueba de Meta"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="testRecipient">Número destinatario</Label>
+                        <Input
+                            id="testRecipient"
+                            value={testRecipient}
+                            onChange={(e) => setTestRecipient(e.target.value)}
+                            placeholder="573001234567 (código de país, sin +)"
+                        />
+                        <p className="text-xs text-slate-500">
+                            Debe estar registrado como destinatario en la configuración del número de prueba en Meta.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="testMessage">Mensaje</Label>
+                        <Input
+                            id="testMessage"
+                            value={testMessage}
+                            onChange={(e) => setTestMessage(e.target.value)}
+                        />
+                    </div>
+
+                    <Button
+                        type="button"
+                        onClick={handleSendTest}
+                        disabled={
+                            sendingTest ||
+                            !testPhoneNumberId.trim() ||
+                            !testAccessToken.trim() ||
+                            !testRecipient.trim() ||
+                            !testMessage.trim()
+                        }
+                        className="w-full"
+                    >
+                        <Send className="mr-2 h-4 w-4" />
+                        {sendingTest ? "Enviando..." : "Enviar mensaje de prueba"}
+                    </Button>
+                </div>
+            </div>
 
             {/* Pasos de configuración */}
             <div className="rounded-xl border bg-slate-50 p-6 dark:bg-slate-800/50">
