@@ -498,6 +498,25 @@ export async function proxy(request: NextRequest) {
         return NextResponse.rewrite(url)
     }
 
+    // ============================================
+    // REDIRECTS SEO DE MIGRACIÓN WOOCOMMERCE → LANDINGCHAT
+    // Merchants migrados de WooCommerce (ej. goldcaps) tienen URLs indexadas en
+    // Google con el permalink de WooCommerce que aquí no existen → 404 y pérdida de
+    // tráfico SEO. 301-redirigimos los patrones conocidos al catálogo de productos.
+    // Solo corre para tiendas resueltas (slug != null); el dominio principal cae al
+    // landing antes de llegar aquí.
+    // ============================================
+    const isWooLegacyUrl =
+        // Feeds RSS de WordPress: /.../feed o /feed (categorías, atributos, etc.)
+        /\/feed\/?$/.test(pathname) ||
+        // Categorías de producto WooCommerce (permalink ES/EN)
+        pathname.startsWith('/categoria-producto/') ||
+        pathname.startsWith('/product-category/')
+    if (isWooLegacyUrl) {
+        console.log(`[MIDDLEWARE] WooCommerce SEO redirect 301: ${hostname}${pathname} → /productos`)
+        return NextResponse.redirect(new URL('/productos', request.url), 301)
+    }
+
     // Cualquier otra ruta bajo el subdominio
     // Ejemplo: tienda.landingchat.co/productos → /store/tienda/productos
     // Ejemplo: tez.com.co/profile?phone=123 → /store/tez/profile?phone=123

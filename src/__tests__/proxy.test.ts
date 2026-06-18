@@ -366,4 +366,46 @@ describe('Middleware Routing Tests', () => {
       }
     })
   })
+
+  describe('WooCommerce SEO redirects (migración goldcaps)', () => {
+    // URLs viejas de WooCommerce indexadas en Google que aquí no existen → 301 al
+    // catálogo /productos (en vez de 404). Solo en tiendas resueltas (subdominio).
+    it('301 /categoria-producto/<cat> → /productos', async () => {
+      const url = new URL('https://goldcaps.landingchat.co/categoria-producto/gold-caps')
+      const request = new NextRequest(url, { headers: { host: 'goldcaps.landingchat.co' } })
+      const response = await middleware(request)
+      expect(response.status).toBe(301)
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/productos')
+    })
+
+    it('301 /product-category/<cat> (permalink EN) → /productos', async () => {
+      const url = new URL('https://goldcaps.landingchat.co/product-category/caps')
+      const request = new NextRequest(url, { headers: { host: 'goldcaps.landingchat.co' } })
+      const response = await middleware(request)
+      expect(response.status).toBe(301)
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/productos')
+    })
+
+    it('301 feed RSS de WordPress (/color/<x>/feed) → /productos', async () => {
+      const url = new URL('https://goldcaps.landingchat.co/color/rosado-blanco/feed')
+      const request = new NextRequest(url, { headers: { host: 'goldcaps.landingchat.co' } })
+      const response = await middleware(request)
+      expect(response.status).toBe(301)
+      expect(new URL(response.headers.get('location')!).pathname).toBe('/productos')
+    })
+
+    it('NO redirige /productos (evita loop)', async () => {
+      const url = new URL('https://goldcaps.landingchat.co/productos')
+      const request = new NextRequest(url, { headers: { host: 'goldcaps.landingchat.co' } })
+      const response = await middleware(request)
+      expect(response.status).not.toBe(301)
+    })
+
+    it('NO redirige páginas de producto /producto/<slug>', async () => {
+      const url = new URL('https://goldcaps.landingchat.co/producto/gorra-malla-4-a6lye')
+      const request = new NextRequest(url, { headers: { host: 'goldcaps.landingchat.co' } })
+      const response = await middleware(request)
+      expect(response.status).not.toBe(301)
+    })
+  })
 })
