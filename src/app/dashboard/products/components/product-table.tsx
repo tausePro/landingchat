@@ -7,27 +7,24 @@ import { DeleteProductButton } from "./delete-product-button"
 import { InlineEditCell } from "./inline-edit-cell"
 import { quickUpdateProduct } from "../actions"
 import { ProductData } from "@/types/product"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface ProductTableProps {
     products: ProductData[]
+    tenantLocale?: TenantLocaleContext
 }
-
-const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount)
 
 const getProductImage = (product: ProductData): string | null =>
     product.images?.[0] || product.image_url || null
 
 type StatusFilter = "all" | "active" | "inactive" | "out_of_stock"
 
-export function ProductTable({ products }: ProductTableProps) {
+export function ProductTable({ products, tenantLocale = DEFAULT_TENANT_LOCALE }: ProductTableProps) {
     const [search, setSearch] = useState("")
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     const handleInlineSave = useCallback(
         async (productId: string, field: string, value: number): Promise<boolean> => {

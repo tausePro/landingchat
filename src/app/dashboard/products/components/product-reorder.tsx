@@ -4,6 +4,8 @@ import { useState } from "react"
 import { ArrowUp, ArrowDown, GripVertical, Save } from "lucide-react"
 import { updateProductOrder } from "../actions"
 import { toast } from "sonner"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface Product {
     id: string
@@ -16,9 +18,10 @@ interface Product {
 interface ProductReorderProps {
     products: Product[]
     primaryColor?: string
+    tenantLocale?: TenantLocaleContext
 }
 
-export function ProductReorder({ products: initialProducts, primaryColor = "#3B82F6" }: ProductReorderProps) {
+export function ProductReorder({ products: initialProducts, primaryColor = "#3B82F6", tenantLocale = DEFAULT_TENANT_LOCALE }: ProductReorderProps) {
     const [products, setProducts] = useState<Product[]>(
         [...initialProducts].sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
     )
@@ -53,7 +56,7 @@ export function ProductReorder({ products: initialProducts, primaryColor = "#3B8
     }
 
     const formatPrice = (price: number) =>
-        new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(price)
+        formatTenantCurrency(price, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     return (
         <div className="space-y-4">
