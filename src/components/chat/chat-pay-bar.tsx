@@ -19,7 +19,7 @@ export function ChatPayBar({
     primaryColor,
     onCheckout,
     onExpand,
-    checkoutLabel = "Generar link de pago",
+    checkoutLabel = "Ir a pagar",
 }: ChatPayBarProps) {
     if (itemCount <= 0) {
         return null

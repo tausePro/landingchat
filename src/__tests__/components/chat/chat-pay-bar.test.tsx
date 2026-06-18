@@ -24,7 +24,7 @@ describe("ChatPayBar", () => {
     it("muestra el total formateado y el CTA por defecto cuando hay ítems", () => {
         const html = renderToStaticMarkup(<ChatPayBar itemCount={2} {...baseProps} />)
         expect(html).toContain("$50.000")
-        expect(html).toContain("Generar link de pago")
+        expect(html).toContain("Ir a pagar")
         expect(html).toContain("ítems")
     })
 
@@ -34,6 +34,6 @@ describe("ChatPayBar", () => {
         )
         expect(html).toContain("Pagar ahora")
         expect(html).toContain("ítem")
-        expect(html).not.toContain("Generar link de pago")
+        expect(html).not.toContain("Ir a pagar")
     })
 })
