@@ -1,7 +1,8 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface OrderItem {
     name: string
@@ -36,13 +37,9 @@ export function OrderConfirmationInline({
     onSendWhatsApp,
     className
 }: OrderConfirmationInlineProps) {
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(price)
-    }
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    const formatPrice = (price: number) => formatCurrency(price, { currency, locale })
 
     const handleViewOrder = () => {
         if (onViewOrder) {

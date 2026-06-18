@@ -9,6 +9,8 @@ import { formatVariantInfo } from "@/lib/utils/variantInfo"
 import { OrderActions } from "./order-actions"
 import { CustomerJourney } from "./customer-journey"
 import { getProviderInfo } from "@/lib/payments/registry"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { getCurrentTenantLocale } from "@/lib/i18n/tenant-locale-server"
 
 export const dynamic = 'force-dynamic'
 
@@ -36,14 +38,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         notFound()
     }
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount)
-    }
+    const tenantLocale = await getCurrentTenantLocale()
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     // Gap A.2: el provider reconciliable se resuelve en el server (registry-driven)
     // y se pasa al client component, que no puede importar el registry (node-only).

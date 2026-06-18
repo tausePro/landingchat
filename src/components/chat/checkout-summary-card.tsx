@@ -2,7 +2,8 @@
 
 import { useCartStore } from "@/store/cart-store"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import { cn, formatCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface CheckoutSummaryCardProps {
     onProceed: () => void
@@ -23,13 +24,9 @@ export function CheckoutSummaryCard({
     const subtotal = total()
     const finalTotal = subtotal + shippingCost
 
-    const formatPrice = (price: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0
-        }).format(price)
-    }
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    const formatPrice = (price: number) => formatCurrency(price, { currency, locale })
 
     if (items.length === 0) {
         return (
