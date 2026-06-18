@@ -78,7 +78,9 @@ RESPONDE ÚNICAMENTE con JSON válido (sin markdown, sin backticks):
 }`
 
         const response = await createMessage({
-            model: "claude-sonnet-4-20250514",
+            // claude-sonnet-4-20250514 fue retirado por Anthropic (404 not_found).
+            // Usamos el Sonnet vigente (mismo que conoce el cost table en ai/pricing.ts).
+            model: "claude-sonnet-4-5-20250929",
             max_tokens: 500,
             messages: [
                 {
