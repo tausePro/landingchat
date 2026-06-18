@@ -19,12 +19,14 @@ import { BundleItem } from "@/types/product"
 import { enhanceProductDescription } from "../ai-actions"
 import { useIsSubdomain } from "@/hooks/use-is-subdomain"
 import { getProductUrl } from "@/lib/utils/store-urls"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface ProductFormProps {
     organizationId: string
     storeSlug?: string
     initialData?: ProductData
     isEditing?: boolean
+    tenantLocale?: TenantLocaleContext
 }
 
 type ProductFormSection = "info" | "pricing" | "variants" | "content" | "advanced" | "seo"
@@ -65,7 +67,7 @@ function getYouTubeEmbedUrl(value: string): string | null {
     }
 }
 
-export function ProductForm({ organizationId, storeSlug = "", initialData, isEditing = false }: ProductFormProps) {
+export function ProductForm({ organizationId, storeSlug = "", initialData, isEditing = false, tenantLocale = DEFAULT_TENANT_LOCALE }: ProductFormProps) {
     const router = useRouter()
     const isSubdomain = useIsSubdomain()
     const [loading, setLoading] = useState(false)
@@ -422,7 +424,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                 />
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-price">Precio (COP)</label>
+                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-price">Precio ({tenantLocale.currency})</label>
                                 <div className="relative mt-2">
                                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
                                     <input
@@ -438,7 +440,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-sale-price">Precio de Oferta (COP)</label>
+                                <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary" htmlFor="product-sale-price">Precio de Oferta ({tenantLocale.currency})</label>
                                 <div className="relative mt-2">
                                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
                                     <input
@@ -501,6 +503,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                         discountEndsAt={bundleDiscountEndsAt}
                                         onDiscountEndsAtChange={setBundleDiscountEndsAt}
                                         organizationId={organizationId}
+                                        tenantLocale={tenantLocale}
                                     />
                                 </div>
                             )}
@@ -537,6 +540,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                         onChange={setPriceTiers}
                                         minimumQuantity={minimumQuantity}
                                         onMinimumQuantityChange={setMinimumQuantity}
+                                        tenantLocale={tenantLocale}
                                     />
                                 </div>
                             )}
@@ -570,7 +574,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                                 <div className="mt-4 p-4 bg-background-light dark:bg-background-dark rounded-lg border border-border-light dark:border-border-dark space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Precio de Suscripción (COP)</label>
+                                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">Precio de Suscripción ({tenantLocale.currency})</label>
                                             <div className="relative mt-2">
                                                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-text-light-secondary dark:text-text-dark-secondary">$</span>
                                                 <input
@@ -681,7 +685,7 @@ export function ProductForm({ organizationId, storeSlug = "", initialData, isEdi
                     <div id="product-section-variants" className="scroll-mt-8 rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6">
                         <h2 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Atributos y Variantes</h2>
                         <div className="mt-6">
-                            <VariantsEditor variants={variants} onChange={setVariants} productImages={images} basePrice={parseFloat(price) || 0} />
+                            <VariantsEditor variants={variants} onChange={setVariants} productImages={images} basePrice={parseFloat(price) || 0} tenantLocale={tenantLocale} />
                         </div>
                     </div>
 
