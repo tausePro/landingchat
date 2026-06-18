@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { MetaCloudClient, getMetaWhatsAppConfig } from "@/lib/whatsapp"
+import { encrypt } from "@/lib/utils/encryption"
 import { z } from "zod"
 
 const CallbackSchema = z.object({
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
             phone_number_display: phoneNumberDisplay || null,
             meta_phone_number_id: phone_number_id,
             meta_waba_id: waba_id,
-            meta_access_token: tokenResponse.access_token,
+            meta_access_token: encrypt(tokenResponse.access_token),
             connected_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         }
