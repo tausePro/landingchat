@@ -560,4 +560,47 @@ describe("AI ecommerce executor get_shipping_options (regresión bug envío grat
     const free = result.data?.options.find((o: { id: string }) => o.id === "free")
     expect(free?.price).toBe(0)
   })
+
+  it("NO ofrece envío gratis a una ciudad FUERA de zona aunque supere el mínimo (zone-aware)", async () => {
+    const { client } = createShippingMockClient({
+      shippingSettings: {
+        default_shipping_rate: 10000,
+        free_shipping_enabled: true,
+        free_shipping_min_amount: 15000,
+        free_shipping_zones: ["Bogota", "Soacha", "Chia"],
+        estimated_delivery_days: 3,
+      },
+      cartItems: [cartLine(38500)],
+    })
+
+    const handler = ecommerceToolHandlers["get_shipping_options"]!
+    const result = await handler(client as never, { city: "Medellín" }, context)
+
+    expect(result.success).toBe(true)
+    const ids = result.data?.options.map((o: { id: string }) => o.id)
+    expect(ids).not.toContain("free")
+    expect(ids).toContain("standard")
+    const standard = result.data?.options.find((o: { id: string }) => o.id === "standard")
+    expect(standard?.price).toBe(10000)
+  })
+
+  it("ofrece envío gratis a una ciudad EN zona que supera el mínimo (zone-aware)", async () => {
+    const { client } = createShippingMockClient({
+      shippingSettings: {
+        default_shipping_rate: 10000,
+        free_shipping_enabled: true,
+        free_shipping_min_amount: 15000,
+        free_shipping_zones: ["Bogota", "Soacha", "Chia"],
+        estimated_delivery_days: 3,
+      },
+      cartItems: [cartLine(38500)],
+    })
+
+    const handler = ecommerceToolHandlers["get_shipping_options"]!
+    const result = await handler(client as never, { city: "Bogotá" }, context)
+
+    expect(result.success).toBe(true)
+    const free = result.data?.options.find((o: { id: string }) => o.id === "free")
+    expect(free?.price).toBe(0)
+  })
 })
