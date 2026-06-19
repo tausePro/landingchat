@@ -421,6 +421,7 @@ export default async function DashboardPage() {
                             series={stats.revenue.history}
                             growth={stats.revenue.growth}
                             className="lg:col-span-3"
+                            tenantLocale={tenantLocale}
                         />
 
                         {/* Actividad Reciente — 2 columnas */}

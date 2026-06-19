@@ -1,12 +1,14 @@
 import { Suspense } from "react"
 import { CampaignDetailView } from "./campaign-detail-view"
+import { getCurrentTenantLocale } from "@/lib/i18n/tenant-locale-server"
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
+    const tenantLocale = await getCurrentTenantLocale()
     return (
         <div className="p-6 max-w-7xl mx-auto">
             <Suspense fallback={<CampaignDetailSkeleton />}>
-                <CampaignDetailView campaignId={id} />
+                <CampaignDetailView campaignId={id} tenantLocale={tenantLocale} />
             </Suspense>
         </div>
     )

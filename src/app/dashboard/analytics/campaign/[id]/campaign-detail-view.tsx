@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import ReactMarkdown from "react-markdown"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 import {
     LineChart,
     Line,
@@ -143,7 +145,7 @@ const objectiveLabels: Record<string, string> = {
     VIDEO_VIEWS: "Vistas de video",
 }
 
-export function CampaignDetailView({ campaignId }: { campaignId: string }) {
+export function CampaignDetailView({ campaignId, tenantLocale = DEFAULT_TENANT_LOCALE }: { campaignId: string; tenantLocale?: TenantLocaleContext }) {
     const router = useRouter()
     const [data, setData] = useState<CampaignDetailData | null>(null)
     const [loading, setLoading] = useState(true)
@@ -266,8 +268,10 @@ export function CampaignDetailView({ campaignId }: { campaignId: string }) {
         loadSavedAnalysis()
     }, [loadSavedAnalysis])
 
+    // Ingresos en moneda del tenant; el gasto/CPC/CPM de Meta se muestra en la misma
+    // moneda como aproximacion (la moneda real de la cuenta de ads no se propaga aun).
     const formatCurrency = (amount: number) =>
-        new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(amount)
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     const formatNumber = (n: number) => new Intl.NumberFormat("es-CO").format(n)
 

@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 export interface CampaignPerformance {
     campaignName: string
@@ -17,15 +19,10 @@ interface CampaignPerformanceCardProps {
     campaigns: CampaignPerformance[]
 }
 
-function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-    }).format(amount)
-}
-
 export function CampaignPerformanceCard({ campaigns }: CampaignPerformanceCardProps) {
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    const formatCurrency = (amount: number) => formatTenantCurrency(amount, { currency, locale })
     return (
         <Card>
             <CardHeader>
