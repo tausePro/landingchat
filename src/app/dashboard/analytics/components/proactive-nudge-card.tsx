@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 export interface ProactiveNudgeProductInsight {
     productId: string
@@ -38,15 +40,10 @@ function formatNumber(value: number): string {
     return value.toLocaleString("es-CO")
 }
 
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-    }).format(value)
-}
-
 export function ProactiveNudgeCard({ analytics }: ProactiveNudgeCardProps) {
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    const formatCurrency = (value: number) => formatTenantCurrency(value, { currency, locale })
     const totalClicks = analytics.webChatClicks + analytics.whatsappClicks
     const webChatShare = totalClicks > 0 ? (analytics.webChatClicks / totalClicks) * 100 : 0
     const whatsappShare = totalClicks > 0 ? (analytics.whatsappClicks / totalClicks) * 100 : 0

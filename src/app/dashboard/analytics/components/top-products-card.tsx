@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface ProductStat {
     productId: string
@@ -21,12 +23,9 @@ interface TopProductsCardProps {
 }
 
 export function TopProductsCard({ topProducts, lowStockProducts }: TopProductsCardProps) {
-    const formatCurrency = (amount: number) =>
-        new Intl.NumberFormat("es-CO", {
-            style: "currency",
-            currency: "COP",
-            minimumFractionDigits: 0,
-        }).format(amount)
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    const formatCurrency = (amount: number) => formatTenantCurrency(amount, { currency, locale })
 
     const maxRevenue = topProducts.length > 0 ? topProducts[0].totalRevenue : 1
 

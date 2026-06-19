@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface CampaignInsight {
     campaign_id: string
@@ -42,6 +44,8 @@ const datePresetLabels: Record<Exclude<DatePreset, "custom">, string> = {
 
 export function MetaAdsCard() {
     const router = useRouter()
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
     const [data, setData] = useState<MetaAdsData | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
@@ -101,12 +105,9 @@ export function MetaAdsCard() {
         }
     }
 
-    const formatCurrency = (amount: number) =>
-        new Intl.NumberFormat("es-CO", {
-            style: "currency",
-            currency: "COP",
-            minimumFractionDigits: 0,
-        }).format(amount)
+    // Gasto de Meta Ads en la moneda del tenant (aproximacion: la moneda real de la
+    // cuenta de ads aun no se propaga a este nivel).
+    const formatCurrency = (amount: number) => formatTenantCurrency(amount, { currency, locale })
 
     const formatNumber = (n: number) =>
         new Intl.NumberFormat("es-CO").format(n)

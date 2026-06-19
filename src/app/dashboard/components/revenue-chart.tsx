@@ -4,12 +4,15 @@ import { useState } from "react"
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { type TenantLocaleContext, DEFAULT_TENANT_LOCALE } from "@/lib/i18n/tenant-locale"
 
 interface RevenueChartProps {
     // Serie diaria de los últimos 30 días (rellena con 0), etiqueta d/m
     series: { date: string; value: number }[]
     growth: number
     className?: string
+    tenantLocale?: TenantLocaleContext
 }
 
 const RANGES = [7, 14, 30]
@@ -23,16 +26,10 @@ function formatCompactCurrency(value: number): string {
     return `$${Math.round(value)}`
 }
 
-function formatFullCurrency(value: number): string {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-    }).format(value)
-}
-
-export function RevenueChart({ series, growth, className }: RevenueChartProps) {
+export function RevenueChart({ series, growth, className, tenantLocale = DEFAULT_TENANT_LOCALE }: RevenueChartProps) {
     const [days, setDays] = useState(7)
+    const formatFullCurrency = (value: number) =>
+        formatTenantCurrency(value, { currency: tenantLocale.currency, locale: tenantLocale.locale })
     const data = series.slice(-days)
     const total = data.reduce((sum, d) => sum + d.value, 0)
     const up = growth >= 0
