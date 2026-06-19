@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface AnalyticsChartsProps {
     ordersByDay: Array<{ date: string; orders: number }>
@@ -9,17 +10,18 @@ interface AnalyticsChartsProps {
 }
 
 export function AnalyticsCharts({ ordersByDay, revenueByDay }: AnalyticsChartsProps) {
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
     const maxOrders = Math.max(...ordersByDay.map(d => d.orders), 1)
     const maxRevenue = Math.max(...revenueByDay.map(d => d.revenue), 1)
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
+    const formatCurrency = (amount: number) =>
+        new Intl.NumberFormat(locale, {
             style: 'currency',
-            currency: 'COP',
+            currency,
             minimumFractionDigits: 0,
             notation: 'compact',
         }).format(amount)
-    }
 
     return (
         <Card>

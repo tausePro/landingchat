@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 export interface ChatIntelligence {
     chatsOpened: number
@@ -21,14 +23,6 @@ function formatNumber(value: number): string {
     return value.toLocaleString("es-CO")
 }
 
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat("es-CO", {
-        style: "currency",
-        currency: "COP",
-        minimumFractionDigits: 0,
-    }).format(value)
-}
-
 function formatResponse(ms: number | null): string {
     if (ms === null || !Number.isFinite(ms)) return "—"
     const seconds = ms / 1000
@@ -36,6 +30,9 @@ function formatResponse(ms: number | null): string {
 }
 
 export function ChatIntelligenceCard({ intelligence, rangeLabel }: ChatIntelligenceCardProps) {
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    const formatCurrency = (value: number) => formatTenantCurrency(value, { currency, locale })
     const hasData = intelligence.chatsOpened > 0 || intelligence.messagesSent > 0
 
     return (

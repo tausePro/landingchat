@@ -2,6 +2,9 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { getCurrentTenantLocale } from "@/lib/i18n/tenant-locale-server"
+import { TenantLocaleProvider } from "@/lib/i18n/use-tenant-strings"
 import { AnalyticsCharts } from "./components/analytics-charts"
 import { TrafficSources } from "./components/traffic-sources"
 import { ConversionFunnelV2, type FunnelProduct, type FunnelStage } from "./components/conversion-funnel-v2"
@@ -867,13 +870,9 @@ export default async function AnalyticsPage({
     const range = resolveDateRange(await searchParams)
     const data = await getAnalyticsData(range)
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-        }).format(amount)
-    }
+    const tenantLocale = await getCurrentTenantLocale()
+    const formatCurrency = (amount: number) =>
+        formatTenantCurrency(amount, { currency: tenantLocale.currency, locale: tenantLocale.locale })
 
     const formatDelta = (delta: number | null) => {
         if (delta === null) return null
@@ -888,6 +887,7 @@ export default async function AnalyticsPage({
 
     return (
         <DashboardLayout>
+            <TenantLocaleProvider locale={tenantLocale.locale} currencyCode={tenantLocale.currency}>
             <div className="space-y-8">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -1036,6 +1036,7 @@ export default async function AnalyticsPage({
                 {/* AI Performance */}
                 <AiPerformanceCard {...data.aiPerformance} />
             </div>
+            </TenantLocaleProvider>
         </DashboardLayout>
     )
 }

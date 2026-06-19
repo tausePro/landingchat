@@ -1,6 +1,8 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
+import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
 
 interface RevenueByChannelProps {
     revenueBySource: Record<string, { revenue: number; orders: number }>
@@ -48,12 +50,12 @@ const sourceConfig: Record<string, { label: string; icon: string; color: string;
 }
 
 export function RevenueByChannelCard({ revenueBySource, totalRevenue, metaAdsSpend }: RevenueByChannelProps) {
-    const formatCurrency = (amount: number) =>
-        new Intl.NumberFormat("es-CO", {
-            style: "currency",
-            currency: "COP",
-            minimumFractionDigits: 0,
-        }).format(amount)
+    const currency = useTenantCurrency()
+    const locale = useTenantLocale()
+    // Ingresos y gasto de Meta Ads se muestran en la moneda del tenant. El gasto de ads
+    // vendría en la moneda de la cuenta publicitaria; la usamos como aproximación (la
+    // moneda real de la cuenta de ads aún no se propaga hasta este nivel).
+    const formatCurrency = (amount: number) => formatTenantCurrency(amount, { currency, locale })
 
     const channels = Object.entries(revenueBySource)
         .map(([key, data]) => ({
