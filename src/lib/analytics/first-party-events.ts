@@ -50,8 +50,8 @@ export type AnalyticsEventProperties = {
     proactiveNudgeId?: string
     proactiveNudgeProductId?: string
     proactiveNudgeProductName?: string
-    placement?: "pdp" | "storefront"
-    trigger?: "time_on_page"
+    placement?: "pdp" | "storefront" | "home"
+    trigger?: "time_on_page" | "scroll" | "exit_intent"
     destination?: "web_chat" | "whatsapp_fallback"
     // Instrumentación de chat / agente
     fromProduct?: boolean

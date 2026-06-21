@@ -1,4 +1,4 @@
-export type StorefrontTemplateId = "minimal" | "complete" | "single-product" | "services" | "real-estate"
+export type StorefrontTemplateId = "minimal" | "complete" | "single-product" | "services" | "real-estate" | "premium"
 
 interface StorefrontTemplateSettingsLike {
     template?: string | null
@@ -40,6 +40,13 @@ export const STOREFRONT_TEMPLATES: StorefrontTemplateDefinition[] = [
         description: "Storefront completo con todas las secciones",
         preview: "/templates/complete-preview.png",
         features: ["Hero", "Cómo funciona", "Características", "Productos", "Testimonios", "Footer"],
+    },
+    {
+        id: "premium",
+        name: "Premium",
+        description: "Diseño premium enfocado en conversión: hero limpio, asesor IA (concierge) y catálogo curado",
+        preview: "/templates/premium-preview.png",
+        features: ["Hero premium", "Asesor IA (concierge)", "Catálogo con filtros", "Branding por tenant"],
     },
     {
         id: "single-product",

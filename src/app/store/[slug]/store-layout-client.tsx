@@ -17,6 +17,7 @@ import { ConversationalLayout } from "@/components/store/layouts/conversational-
 import { EmbeddableChat } from "@/components/chat/embeddable-chat"
 import { ProductStoryTray } from "@/components/store/product-story-tray"
 import { ProactiveChatBubble } from "@/components/store/proactive-chat-bubble"
+import { HomeProactiveNudge } from "@/components/store/home-proactive-nudge"
 import { WhatsAppFloatingButton } from "@/components/store/whatsapp-floating-button"
 import { ChatAIFloatingButton } from "@/components/store/chat-ai-floating-button"
 import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
@@ -157,7 +158,19 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     const heroSettings = storefrontSettings.hero || {}
     const typographySettings = storefrontSettings.typography || {}
     const headerSettings = storefrontSettings.header || {}
-    const selectedTemplate = getSafeStorefrontTemplate(storefrontSettings.template, organization)
+    // Dev-only: previsualizar cualquier plantilla con ?preview_template=<id> sin tocar la config guardada del tenant.
+    const previewTemplateParam = process.env.NODE_ENV !== "production" ? searchParams?.get("preview_template") : null
+    const selectedTemplate = getSafeStorefrontTemplate(previewTemplateParam || storefrontSettings.template, organization)
+    // Mensajes del announcement bar: premium rota (suma "asesoría") + promos custom de settings.storefront.announcements.
+    const customAnnouncements = Array.isArray(storefrontSettings.announcements)
+        ? (storefrontSettings.announcements as unknown[]).filter((m): m is string => typeof m === "string" && m.trim().length > 0)
+        : []
+    const announcementMessages = [
+        ...(selectedTemplate === "premium" ? [t("store.home.premium_announcement_advisor")] : []),
+        ...customAnnouncements,
+    ]
+    // Saludo configurable del nudge proactivo de home (settings.storefront.proactiveNudge.greeting).
+    const nudgeGreeting = (storefrontSettings.proactiveNudge as { greeting?: string } | undefined)?.greeting
     const showStoreName = headerSettings.showStoreName ?? true
     const headerShippingConfig: HeaderShippingConfig | undefined = shippingConfig
         ? {
@@ -328,6 +341,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     menuItems={menuItems}
                     hideOnMobile={hideHeaderOnMobile}
                     shippingConfig={headerShippingConfig}
+                    announcementMessages={announcementMessages.length > 0 ? announcementMessages : undefined}
                     isRealEstate={isRealEstate}
                     hideMenu={productDetailCRO?.landingMode?.hideMenu}
                     hideSearch={productDetailCRO?.landingMode?.hideSearch}
@@ -424,6 +438,19 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     agentName={organization.settings?.agent?.name}
                     agentAvatar={organization.settings?.agent?.avatar}
                     couponOffer={proactiveCouponOffer}
+                />
+            )}
+
+            {/* Nudge proactivo del HOME (solo premium, solo home): el agente saluda solo y abre chat/WhatsApp. */}
+            {!USE_CONVERSATIONAL_LAYOUT && !isRealEstate && !children && selectedTemplate === "premium" && !showGateModal && (
+                <HomeProactiveNudge
+                    slug={slug}
+                    primaryColor={primaryColor}
+                    onStartChat={handleStartChat}
+                    agentName={typeof organization.settings?.agent?.name === "string" ? organization.settings.agent.name : null}
+                    agentAvatar={typeof organization.settings?.agent?.avatar === "string" ? organization.settings.agent.avatar : null}
+                    greeting={nudgeGreeting}
+                    whatsappPhone={organization.settings?.whatsapp?.phone}
                 />
             )}
         </div>

@@ -46,6 +46,7 @@ interface EnhancedStoreHeaderProps {
         free_shipping_min_amount?: number
         default_shipping_rate?: number
     }
+    announcementMessages?: string[]
 }
 
 export function EnhancedStoreHeader({
@@ -63,7 +64,8 @@ export function EnhancedStoreHeader({
     hideProfile = false,
     hideAnnouncementBar = false,
     isRealEstate = false,
-    shippingConfig
+    shippingConfig,
+    announcementMessages
 }: EnhancedStoreHeaderProps) {
     const router = useRouter()
     const pathname = usePathname()
@@ -123,6 +125,7 @@ export function EnhancedStoreHeader({
                 <AnnouncementBar
                     shippingConfig={shippingConfig}
                     primaryColor={primaryColor}
+                    messages={announcementMessages}
                 />
             )}
 
