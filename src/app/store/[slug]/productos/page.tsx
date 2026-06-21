@@ -2,10 +2,13 @@ import { getStoreData, getStorefrontProductsCatalog } from "../actions"
 import { StoreLayoutClient } from "../store-layout-client"
 import { notFound } from "next/navigation"
 import { headers } from "next/headers"
-import { isSubdomain, getStoreLink } from "@/lib/utils/store-urls"
+import { isSubdomain, getStoreLink, getChatUrl } from "@/lib/utils/store-urls"
 import { ProductCard } from "@/components/store/product-card"
 import { CategoryTracker } from "@/components/analytics/category-tracker"
 import { ProductFiltersPanel } from "./product-filters-panel"
+import { PremiumCatalog } from "./premium-catalog"
+import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
+import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import type { Metadata } from "next"
 import { createServiceClient } from "@/lib/supabase/server"
 import { buildStoreCanonicalUrl, resolveDiscoveryOrganization } from "@/lib/seo/site-discovery"
@@ -35,6 +38,8 @@ interface ProductsPageProps {
         max_price?: string
         // legacy (compat con URLs antiguas)
         categoria?: string
+        // dev-only: previsualizar plantilla (?preview_template=premium)
+        preview_template?: string
     }>
 }
 
@@ -108,6 +113,14 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
     const hostname = headersList.get("host") || ""
     const isSub = isSubdomain(hostname)
 
+    // Plantilla activa (+ override dev-only ?preview_template) para la variante premium del catálogo.
+    const previewTemplate = process.env.NODE_ENV !== "production" ? sp.preview_template : undefined
+    const selectedTemplate = getSafeStorefrontTemplate(previewTemplate || organization.settings?.storefront?.template, organization)
+    const isPremium = selectedTemplate === "premium"
+    const { locale } = getTenantLocale(organization)
+    const agentName = typeof organization.settings?.agent?.name === "string" ? organization.settings.agent.name : null
+    const chatUrl = getChatUrl(isSub, slug, false)
+
     // Titulo dinamico segun los filtros activos.
     const hasActiveFilters =
         activeSearch.length > 0 ||
@@ -154,6 +167,26 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                 categoryName={headingTitle}
             />
 
+            {isPremium ? (
+                <PremiumCatalog
+                    slug={slug}
+                    isSub={isSub}
+                    locale={locale}
+                    primaryColor={primaryColor}
+                    currencyCode={currencyCode}
+                    agentName={agentName}
+                    chatUrl={chatUrl}
+                    products={filteredProducts}
+                    badges={badges}
+                    facets={facets}
+                    activeCategories={activeCategories}
+                    activeSearch={activeSearch}
+                    activeMinPrice={activeMinPrice}
+                    activeMaxPrice={activeMaxPrice}
+                    headingTitle={headingTitle}
+                    headingSubtitle={headingSubtitle}
+                />
+            ) : (
             <div className="container mx-auto px-4 py-12 min-h-[60vh]">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                     <div>
@@ -207,6 +240,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                     </div>
                 </div>
             </div>
+            )}
         </StoreLayoutClient>
     )
 }

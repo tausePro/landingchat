@@ -165,6 +165,12 @@ export const storefrontStrings = {
     "store.home.premium_nudge_greeting_default": "¿Te ayudo a encontrar lo ideal para ti?",
     "store.home.premium_nudge_cta_chat": "Sí, ayúdame",
     "store.home.premium_nudge_context": "Quiero ayuda para elegir.",
+    "store.catalog.premium_eyebrow": "Catálogo",
+    "store.catalog.premium_products_label": "productos",
+    "store.catalog.premium_ask_agent": "Pídele ayuda a",
+    "store.catalog.premium_ask_agent_generic": "Habla con un asesor",
+    "store.catalog.premium_all": "Todos",
+    "store.catalog.premium_results": "resultados",
     // Footer — link extra "Contacto"
     "store.footer.nav_contact": "Contacto",
     // ========================================================================
@@ -848,6 +854,12 @@ export const storefrontStrings = {
     "store.home.premium_nudge_greeting_default": "Can I help you find the right one?",
     "store.home.premium_nudge_cta_chat": "Yes, help me",
     "store.home.premium_nudge_context": "I want help choosing.",
+    "store.catalog.premium_eyebrow": "Catalog",
+    "store.catalog.premium_products_label": "products",
+    "store.catalog.premium_ask_agent": "Get help from",
+    "store.catalog.premium_ask_agent_generic": "Talk to an advisor",
+    "store.catalog.premium_all": "All",
+    "store.catalog.premium_results": "results",
     // Footer — extra "Contact" link
     "store.footer.nav_contact": "Contact",
     // ========================================================================
