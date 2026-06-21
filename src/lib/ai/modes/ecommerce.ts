@@ -33,6 +33,29 @@ export const ecommerceTools: Anthropic.Tool[] = [
         }
     },
     {
+        name: "recommend_products",
+        description: "Arma una recomendación visual de VARIOS productos según la NECESIDAD o intención del cliente (ej: 'algo para piel sensible', 'lo más vendido', 'complementos para lo que lleva', 'un regalo económico'). Devuelve una tarjeta con los productos y un botón para agregarlos todos al carrito. Úsala cuando el cliente expresa una necesidad o te pide que le ayudes a elegir, en vez de listar productos sueltos con search_products.",
+        input_schema: {
+            type: "object" as const,
+            properties: {
+                intent: {
+                    type: "string",
+                    description: "La necesidad o intención del cliente en lenguaje natural (ej: 'rutina para piel grasa', 'regalo económico para mi mamá', 'lo más vendido')"
+                },
+                limit: {
+                    type: "number",
+                    description: "Cuántos productos recomendar (default 3, máximo 5)"
+                },
+                exclude_product_ids: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "IDs de productos a excluir (ej: lo que el cliente ya tiene en el carrito)"
+                }
+            },
+            required: ["intent"]
+        }
+    },
+    {
         name: "show_product",
         description: "Muestra los detalles completos de un producto específico. Usar cuando el cliente quiere ver más info de un producto.",
         input_schema: {

@@ -1729,8 +1729,60 @@ const createPaymentLink: ToolHandler = async (supabase, input, context) => {
     }
 }
 
+/**
+ * Asesor guiado (artifact `recommendation`): arma una selección de N productos
+ * según la intención del cliente. Reúsa `searchProducts` (RPC + normalización +
+ * variantes) y re-envuelve con `ui_component: "recommendation"` para que el chat
+ * lo renderice como una tarjeta con "agregar todo al carrito". Zero-config: el
+ * agente razona sobre el catálogo, sin que el merchant configure nada.
+ */
+const recommendProducts: ToolHandler = async (supabase, input, context) => {
+    const intent = typeof input.intent === "string" ? input.intent.trim() : ""
+    const requestedLimit = parseFiniteNumber(input.limit)
+    const limit = Math.min(Math.max(requestedLimit ?? 3, 1), 5)
+    const excludeIds: string[] = Array.isArray(input.exclude_product_ids)
+        ? input.exclude_product_ids.filter((id: unknown): id is string => typeof id === "string")
+        : []
+
+    if (intent.length === 0) {
+        return { success: false, error: "Falta la intención del cliente para recomendar." }
+    }
+
+    // Reúsa el motor de búsqueda; pedimos de más para poder excluir lo que ya
+    // tiene y aún así llenar el límite con productos relevantes.
+    const searchResult = await searchProducts(
+        supabase,
+        { query: intent, limit: limit + excludeIds.length + 4 },
+        context,
+    )
+    if (!searchResult.success) {
+        return searchResult
+    }
+
+    const allProducts: Array<Record<string, unknown>> = Array.isArray(searchResult.data?.products)
+        ? (searchResult.data.products as Array<Record<string, unknown>>)
+        : []
+    const products = allProducts
+        .filter((product) => {
+            const id = typeof product.id === "string" ? product.id : null
+            return id === null || !excludeIds.includes(id)
+        })
+        .slice(0, limit)
+
+    return {
+        success: true,
+        data: {
+            ui_component: "recommendation",
+            products,
+            intent,
+            reasoning: `Selección para: ${intent}`,
+        },
+    }
+}
+
 export const ecommerceToolHandlers: Record<string, ToolHandler> = {
     search_products: searchProducts,
+    recommend_products: recommendProducts,
     show_product: showProduct,
     get_product_availability: getProductAvailability,
     add_to_cart: addToCart,

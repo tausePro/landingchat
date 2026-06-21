@@ -644,6 +644,10 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                         collectedProducts.push(action.data.product)
                     } else if (action.type === 'search_products' && action.data?.products && action.data.products.length > 0) {
                         collectedProducts.push(...mapSearchResultsToProducts(action.data.products))
+                    } else if (action.type === 'recommend_products' && action.data?.products && action.data.products.length > 0) {
+                        // Asesor guiado (artifact recommendation): el agente armó una selección
+                        // según la intención. Mismo shape que search → reusa el carrusel de productos.
+                        collectedProducts.push(...mapSearchResultsToProducts(action.data.products))
                     } else if (action.type === 'add_to_cart' && action.data?.added) {
                         // Producto agregado al carrito
                         const addedProduct = action.data.added

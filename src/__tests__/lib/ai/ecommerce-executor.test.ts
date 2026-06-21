@@ -604,3 +604,65 @@ describe("AI ecommerce executor get_shipping_options (regresión bug envío grat
     expect(free?.price).toBe(0)
   })
 })
+
+// =============================================================================
+// Artifact `recommendation` (asesor guiado): recommend_products arma una
+// selección de N productos según la intención, reusando search_products, y la
+// envuelve con ui_component "recommendation". Aditivo — no toca el flujo existente.
+// =============================================================================
+describe("AI ecommerce executor recommend_products (artifact recommendation)", () => {
+  const context = { chatId: "chat-1", organizationId: "org-1" }
+
+  const makeClient = () =>
+    createSearchMockClient({
+      rpcResult: {
+        data: [
+          { product_id: "p1", rank: 0.9, similarity: 0 },
+          { product_id: "p2", rank: 0.8, similarity: 0 },
+          { product_id: "p3", rank: 0.7, similarity: 0 },
+        ],
+        error: null,
+      },
+      productsResult: {
+        data: [
+          { id: "p1", name: "Producto uno", description: null, price: 10000, sale_price: null, image_url: null, images: [], stock: 5, categories: [], variants: [] },
+          { id: "p2", name: "Producto dos", description: null, price: 20000, sale_price: null, image_url: null, images: [], stock: 5, categories: [], variants: [] },
+          { id: "p3", name: "Producto tres", description: null, price: 30000, sale_price: null, image_url: null, images: [], stock: 5, categories: [], variants: [] },
+        ],
+        error: null,
+      },
+      variantsResult: { data: [], error: null },
+    })
+
+  it("arma una recomendación (ui_component) con productos del catálogo y respeta el límite", async () => {
+    const { client } = makeClient()
+    const handler = ecommerceToolHandlers["recommend_products"]!
+    const result = await handler(client as never, { intent: "algo para regalar", limit: 2 }, context)
+
+    expect(result.success).toBe(true)
+    expect(result.data?.ui_component).toBe("recommendation")
+    expect(result.data?.intent).toBe("algo para regalar")
+    expect(result.data?.products.map((p: { id: string }) => p.id)).toEqual(["p1", "p2"])
+  })
+
+  it("excluye los exclude_product_ids", async () => {
+    const { client } = makeClient()
+    const handler = ecommerceToolHandlers["recommend_products"]!
+    const result = await handler(
+      client as never,
+      { intent: "algo", limit: 5, exclude_product_ids: ["p1"] },
+      context,
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.data?.products.map((p: { id: string }) => p.id)).toEqual(["p2", "p3"])
+  })
+
+  it("falla si no hay intención (no inventa recomendación)", async () => {
+    const { client } = makeClient()
+    const handler = ecommerceToolHandlers["recommend_products"]!
+    const result = await handler(client as never, { intent: "   " }, context)
+
+    expect(result.success).toBe(false)
+  })
+})
