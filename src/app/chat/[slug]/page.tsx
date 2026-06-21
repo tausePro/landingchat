@@ -13,6 +13,7 @@ import { useTracking } from "@/components/analytics/tracking-provider"
 import { getStoreProducts } from "./actions"
 import { StoreHeader } from "@/components/store/store-header"
 import { ChatProductCard } from "@/components/chat/chat-product-card"
+import { RecommendationCard } from "@/components/chat/recommendation-card"
 import { CartSidebar } from "@/components/chat/cart-sidebar"
 import { CartDrawer } from "../components/cart-drawer"
 import { formatCurrency } from "@/lib/utils"
@@ -50,6 +51,7 @@ interface Message {
     content: string
     product?: Product
     products?: Product[] // Multiple products for carousel
+    recommendation?: { products: Product[]; intent: string; reasoning?: string }
     mediaAttachments?: MediaAttachment[]
     timestamp: Date
 }
@@ -637,6 +639,7 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
             // Process actions from AI
             const collectedProducts: Product[] = []
             const collectedMedia: MediaAttachment[] = []
+            let recommendation: { products: Product[]; intent: string; reasoning?: string } | null = null
 
             if (data.actions && data.actions.length > 0) {
                 for (const action of data.actions) {
@@ -645,9 +648,13 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                     } else if (action.type === 'search_products' && action.data?.products && action.data.products.length > 0) {
                         collectedProducts.push(...mapSearchResultsToProducts(action.data.products))
                     } else if (action.type === 'recommend_products' && action.data?.products && action.data.products.length > 0) {
-                        // Asesor guiado (artifact recommendation): el agente armó una selección
-                        // según la intención. Mismo shape que search → reusa el carrusel de productos.
-                        collectedProducts.push(...mapSearchResultsToProducts(action.data.products))
+                        // Asesor guiado (artifact recommendation): el agente armó una selección.
+                        // Se captura aparte para renderizar la tarjeta rica (no el carrusel plano).
+                        recommendation = {
+                            products: mapSearchResultsToProducts(action.data.products),
+                            intent: typeof action.data.intent === 'string' ? action.data.intent : '',
+                            reasoning: typeof action.data.reasoning === 'string' ? action.data.reasoning : undefined,
+                        }
                     } else if (action.type === 'add_to_cart' && action.data?.added) {
                         // Producto agregado al carrito
                         const addedProduct = action.data.added
@@ -689,31 +696,46 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                 }
             }
 
-            // If we collected products, create a single message with them
-            const uniqueProducts = dedupeProductsById(collectedProducts)
-            if (uniqueProducts.length > 0) {
-                const productMsg: Message = {
+            // Asesor guiado: si el agente armó una recomendación, se renderiza como
+            // tarjeta rica (incluye lo recomendado + lo buscado en el mismo turno).
+            if (recommendation) {
+                const recoProducts = dedupeProductsById([...recommendation.products, ...collectedProducts])
+                const recoMsg: Message = {
                     id: (Date.now() + Math.random()).toString(),
                     role: 'assistant',
                     content: data.message,
-                    products: uniqueProducts.length > 1 ? uniqueProducts : undefined,
-                    product: uniqueProducts.length === 1 ? uniqueProducts[0] : undefined,
+                    recommendation: { products: recoProducts, intent: recommendation.intent, reasoning: recommendation.reasoning },
                     mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
                     timestamp: new Date()
                 }
-                setMessages(prev => [...prev, productMsg])
-            }
+                setMessages(prev => [...prev, recoMsg])
+            } else {
+                // If we collected products, create a single message with them
+                const uniqueProducts = dedupeProductsById(collectedProducts)
+                if (uniqueProducts.length > 0) {
+                    const productMsg: Message = {
+                        id: (Date.now() + Math.random()).toString(),
+                        role: 'assistant',
+                        content: data.message,
+                        products: uniqueProducts.length > 1 ? uniqueProducts : undefined,
+                        product: uniqueProducts.length === 1 ? uniqueProducts[0] : undefined,
+                        mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
+                        timestamp: new Date()
+                    }
+                    setMessages(prev => [...prev, productMsg])
+                }
 
-            // Solo agregar mensaje de texto si NO hubo productos (para evitar duplicados)
-            if (uniqueProducts.length === 0) {
-                const aiMsg: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: 'assistant',
-                    content: data.message,
-                    mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
-                    timestamp: new Date()
+                // Solo agregar mensaje de texto si NO hubo productos (para evitar duplicados)
+                if (uniqueProducts.length === 0) {
+                    const aiMsg: Message = {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: data.message,
+                        mediaAttachments: collectedMedia.length > 0 ? collectedMedia : undefined,
+                        timestamp: new Date()
+                    }
+                    setMessages(prev => [...prev, aiMsg])
                 }
-                setMessages(prev => [...prev, aiMsg])
             }
 
         } catch (error: unknown) {
@@ -1012,6 +1034,15 @@ export default function ChatPage({ params }: { params: Promise<{ slug: string }>
                                         {msg.product && (
                                             <ChatProductCard
                                                 product={msg.product}
+                                                formatPrice={formatPrice}
+                                                primaryColor={primaryColor}
+                                            />
+                                        )}
+
+                                        {msg.recommendation && msg.recommendation.products.length > 0 && (
+                                            <RecommendationCard
+                                                products={msg.recommendation.products}
+                                                reasoning={msg.recommendation.reasoning}
                                                 formatPrice={formatPrice}
                                                 primaryColor={primaryColor}
                                             />
