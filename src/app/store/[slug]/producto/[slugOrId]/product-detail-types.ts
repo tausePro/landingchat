@@ -5,3 +5,13 @@ export interface ProductSectionLink {
     id: string
     label: string
 }
+
+export type FormatPriceFn = (amount: number) => string
+
+export interface ProductShippingCardLabels {
+    activeLabel: string
+    productHasFree: string
+    qualifies: (zonesText: string) => string
+    remaining: (remainingPrice: string, zonesText: string) => string
+    available: (zonesText: string) => string
+}
