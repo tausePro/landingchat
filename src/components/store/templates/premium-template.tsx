@@ -56,7 +56,7 @@ interface PremiumTemplateProps {
     pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: PremiumHeroSettings
-    onStartChat: (productId?: string) => void
+    onStartChat: (productId?: string, query?: string) => void
     isSubdomain?: boolean
 }
 
@@ -241,6 +241,40 @@ export function PremiumTemplate({
                     </span>
                 </div>
             </div>
+
+            {/* ── Asesor guiado: picker de intención (chips → abre chat con la necesidad → recomienda) ── */}
+            {categories.length > 0 ? (
+                <section className="border-b border-slate-100 bg-stone-50">
+                    <div className="mx-auto max-w-7xl px-4 py-10 md:py-14">
+                        <div className="mx-auto max-w-2xl text-center">
+                            <h2 className="text-xl font-bold tracking-tight text-slate-900 md:text-2xl">{t("store.home.premium_picker_title")}</h2>
+                            <p className="mt-2 text-sm leading-relaxed text-slate-600">{t("store.home.premium_picker_subtitle")}</p>
+                        </div>
+                        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                            {categories.slice(0, 6).map((category) => (
+                                <button
+                                    key={category}
+                                    type="button"
+                                    onClick={() => onStartChat(undefined, `${t("store.home.premium_picker_intent_prefix")} ${category}`)}
+                                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
+                                    style={{ transitionTimingFunction: EASE }}
+                                >
+                                    {category}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => onStartChat(undefined, t("store.home.premium_picker_help"))}
+                                className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition-transform hover:-translate-y-0.5 active:scale-[0.98]"
+                                style={{ backgroundColor: primaryColor, color: contrast, transitionTimingFunction: EASE }}
+                            >
+                                <MessageCircle className="h-4 w-4" strokeWidth={1.75} />
+                                {t("store.home.premium_picker_help")}
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            ) : null}
 
             {/* ── "Seleccionado para ti": bento con el concierge tejido como tile (ataca el 88% que no abre chat) ── */}
             {featured.length > 0 ? (

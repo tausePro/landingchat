@@ -171,6 +171,10 @@ export const storefrontStrings = {
     "store.catalog.premium_ask_agent_generic": "Habla con un asesor",
     "store.catalog.premium_all": "Todos",
     "store.catalog.premium_results": "resultados",
+    "store.home.premium_picker_title": "¿Te ayudo a elegir?",
+    "store.home.premium_picker_subtitle": "Dime qué buscas y te armo una recomendación al instante.",
+    "store.home.premium_picker_help": "No sé, ayúdame a elegir",
+    "store.home.premium_picker_intent_prefix": "Quiero recomendaciones de",
     // Footer — link extra "Contacto"
     "store.footer.nav_contact": "Contacto",
     // ========================================================================
@@ -860,6 +864,10 @@ export const storefrontStrings = {
     "store.catalog.premium_ask_agent_generic": "Talk to an advisor",
     "store.catalog.premium_all": "All",
     "store.catalog.premium_results": "results",
+    "store.home.premium_picker_title": "Can I help you choose?",
+    "store.home.premium_picker_subtitle": "Tell me what you need and I'll build a recommendation instantly.",
+    "store.home.premium_picker_help": "I'm not sure, help me choose",
+    "store.home.premium_picker_intent_prefix": "I want recommendations for",
     // Footer — extra "Contact" link
     "store.footer.nav_contact": "Contact",
     // ========================================================================
