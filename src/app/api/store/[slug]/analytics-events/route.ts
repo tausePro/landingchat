@@ -53,8 +53,8 @@ const analyticsPropertiesSchema = z.object({
     proactiveNudgeId: z.string().min(1).max(200).optional(),
     proactiveNudgeProductId: z.string().min(1).max(200).optional(),
     proactiveNudgeProductName: z.string().min(1).max(200).optional(),
-    placement: z.enum(["pdp", "storefront"]).optional(),
-    trigger: z.enum(["time_on_page"]).optional(),
+    placement: z.enum(["pdp", "storefront", "home"]).optional(),
+    trigger: z.enum(["time_on_page", "scroll", "exit_intent"]).optional(),
     destination: z.enum(["web_chat", "whatsapp_fallback"]).optional(),
     attribution: analyticsAttributionSchema.optional(),
 }).strict().default({})

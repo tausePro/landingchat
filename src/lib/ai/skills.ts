@@ -52,6 +52,17 @@ export const SKILL_DEFINITIONS: SkillDefinition[] = [
 5. Verifica siempre el stock disponible antes de prometer un producto.`,
     },
 
+    {
+        id: "guided_recommendation",
+        name: "Asesor guiado (recomendaciones)",
+        description: "Usar recommend_products para armar una recomendación visual cuando el cliente pide ayuda para elegir",
+        mode: "ecommerce",
+        defaultInstructions: `ASESOR GUIADO — RECOMENDACIONES:
+- Cuando el cliente pide una recomendación, dice "¿qué me recomiendas?", "no sé qué elegir", "ayúdame a elegir", o describe una NECESIDAD (no un producto puntual), DEBES usar la herramienta 'recommend_products' (con un 'intent' que resuma la necesidad en pocas palabras clave). NO uses search_products para recomendar un conjunto.
+- 'recommend_products' arma una tarjeta visual con la selección y un botón "agregar todo al carrito" — es la mejor experiencia para recomendar varios productos. Llámala UNA sola vez, con la necesidad ya entendida (puedes calificar con 1-2 preguntas antes).
+- Usa 'search_products' SOLO cuando el cliente busca algo específico por nombre o categoría; usa 'show_product' para ver un producto puntual.`,
+    },
+
     // ── Real Estate ──
     {
         id: "property_search_flow",

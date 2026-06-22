@@ -182,3 +182,65 @@ export function enrichOrganizationWithStorefrontContact<T extends { id: string; 
         },
     }
 }
+
+export interface StorefrontReviewSummaryItem {
+    id: string
+    authorName: string
+    authorImageUrl: string | null
+    rating: number
+    title: string | null
+    content: string | null
+    verifiedPurchase: boolean
+}
+
+export interface StorefrontReviewsSummary {
+    average: number
+    count: number
+    items: StorefrontReviewSummaryItem[]
+}
+
+/**
+ * Resumen de reseñas PUBLICADAS del tenant para prueba social en el storefront.
+ * Solo `is_published = true`, scoped por organization_id. Retorna null si no hay
+ * reseñas publicadas → la UI oculta la sección (nunca datos simulados).
+ */
+export async function resolveOrganizationReviewsSummary(
+    supabase: StorefrontSupabaseClient,
+    organizationId: string,
+): Promise<StorefrontReviewsSummary | null> {
+    const { data, error, count } = await supabase
+        .from("product_reviews")
+        .select("id, author_name, author_image_url, rating, title, content, verified_purchase", { count: "exact" })
+        .eq("organization_id", organizationId)
+        .eq("is_published", true)
+        .order("created_at", { ascending: false })
+        .limit(60)
+
+    if (error || !data || data.length === 0) {
+        return null
+    }
+
+    const ratings = data
+        .map((row) => (typeof row.rating === "number" ? row.rating : null))
+        .filter((value): value is number => value !== null)
+    const average = ratings.length > 0 ? ratings.reduce((acc, value) => acc + value, 0) / ratings.length : 0
+
+    const items: StorefrontReviewSummaryItem[] = data
+        .filter((row) => getOptionalString(row.content) || getOptionalString(row.title))
+        .slice(0, 6)
+        .map((row) => ({
+            id: String(row.id),
+            authorName: getOptionalString(row.author_name) || "Cliente",
+            authorImageUrl: getOptionalString(row.author_image_url),
+            rating: typeof row.rating === "number" ? row.rating : 5,
+            title: getOptionalString(row.title),
+            content: getOptionalString(row.content),
+            verifiedPurchase: Boolean(row.verified_purchase),
+        }))
+
+    return {
+        average: Math.round(average * 10) / 10,
+        count: count ?? data.length,
+        items,
+    }
+}

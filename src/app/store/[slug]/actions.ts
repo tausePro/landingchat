@@ -27,6 +27,7 @@ import {
 import {
     enrichOrganizationWithStorefrontContact,
     resolveOrganizationAgentIdentity,
+    resolveOrganizationReviewsSummary,
     resolveOrganizationWhatsAppPhone,
     type StorefrontSupabaseClient,
 } from "@/lib/storefront/organization-enrichment"
@@ -356,9 +357,10 @@ export async function getStoreData(slug: string, limit?: number) {
     const whatsappPhone = await resolveOrganizationWhatsAppPhone(supabase, org.id, org.settings)
     const agentIdentity = await resolveOrganizationAgentIdentity(supabase, org.id, org.settings)
     const enrichedOrg = enrichOrganizationWithStorefrontContact(org, whatsappPhone, agentIdentity)
+    const reviewsSummary = await resolveOrganizationReviewsSummary(supabase, org.id)
 
     return {
-        organization: enrichedOrg,
+        organization: { ...enrichedOrg, reviewsSummary },
         products: products || [],
         pages: pages || [],
         properties,

@@ -151,6 +151,26 @@ export const storefrontStrings = {
     // Final CTA section
     "store.home.cta_title": "¿Listo para empezar?",
     "store.home.cta_subtitle": "Únete a miles de clientes satisfechos que ya compran de manera inteligente.",
+    // Home — PremiumTemplate (banda concierge)
+    "store.home.premium_concierge_title": "¿Te ayudamos a elegir?",
+    "store.home.premium_concierge_subtitle": "Cuéntale a nuestro asesor qué necesitas y te arma la recomendación en segundos.",
+    "store.home.premium_concierge_cta": "Armar mi recomendación",
+    "store.home.premium_concierge_browse": "O explora por categoría",
+    "store.home.premium_bento_title": "Seleccionado para ti",
+    "store.home.premium_bento_subtitle": "Lo más querido, y un atajo si no sabes por dónde empezar.",
+    "store.home.premium_agent_greeting": "¿Te ayudo a elegir el ideal?",
+    "store.home.premium_announcement_advisor": "Asesoría por chat, siempre disponible",
+    "store.home.premium_reviews_label": "reseñas",
+    "store.home.premium_verified_purchase": "Compra verificada",
+    "store.home.premium_nudge_greeting_default": "¿Te ayudo a encontrar lo ideal para ti?",
+    "store.home.premium_nudge_cta_chat": "Sí, ayúdame",
+    "store.home.premium_nudge_context": "Quiero ayuda para elegir.",
+    "store.catalog.premium_eyebrow": "Catálogo",
+    "store.catalog.premium_products_label": "productos",
+    "store.catalog.premium_ask_agent": "Pídele ayuda a",
+    "store.catalog.premium_ask_agent_generic": "Habla con un asesor",
+    "store.catalog.premium_all": "Todos",
+    "store.catalog.premium_results": "resultados",
     // Footer — link extra "Contacto"
     "store.footer.nav_contact": "Contacto",
     // ========================================================================
@@ -820,6 +840,26 @@ export const storefrontStrings = {
     // Final CTA section
     "store.home.cta_title": "Ready to get started?",
     "store.home.cta_subtitle": "Join thousands of happy customers already shopping smarter.",
+    // Home — PremiumTemplate (concierge band)
+    "store.home.premium_concierge_title": "Need help choosing?",
+    "store.home.premium_concierge_subtitle": "Tell our advisor what you need and get a recommendation in seconds.",
+    "store.home.premium_concierge_cta": "Build my recommendation",
+    "store.home.premium_concierge_browse": "Or browse by category",
+    "store.home.premium_bento_title": "Picked for you",
+    "store.home.premium_bento_subtitle": "Most-loved picks, plus a shortcut if you're not sure where to start.",
+    "store.home.premium_agent_greeting": "Want help choosing the right one?",
+    "store.home.premium_announcement_advisor": "Chat support, always available",
+    "store.home.premium_reviews_label": "reviews",
+    "store.home.premium_verified_purchase": "Verified purchase",
+    "store.home.premium_nudge_greeting_default": "Can I help you find the right one?",
+    "store.home.premium_nudge_cta_chat": "Yes, help me",
+    "store.home.premium_nudge_context": "I want help choosing.",
+    "store.catalog.premium_eyebrow": "Catalog",
+    "store.catalog.premium_products_label": "products",
+    "store.catalog.premium_ask_agent": "Get help from",
+    "store.catalog.premium_ask_agent_generic": "Talk to an advisor",
+    "store.catalog.premium_all": "All",
+    "store.catalog.premium_results": "results",
     // Footer — extra "Contact" link
     "store.footer.nav_contact": "Contact",
     // ========================================================================

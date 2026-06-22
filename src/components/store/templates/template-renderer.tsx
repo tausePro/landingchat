@@ -3,6 +3,7 @@ import { CompleteTemplate } from "./complete-template"
 import { SingleProductTemplate } from "./single-product-template"
 import { ServicesTemplate } from "./services-template"
 import { RealEstateTemplate } from "./real-estate-template"
+import { PremiumTemplate } from "./premium-template"
 import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 
 interface TemplateRendererProps {
@@ -54,6 +55,8 @@ export function TemplateRenderer({
             return <ServicesTemplate {...templateProps} />
         case "real-estate":
             return <RealEstateTemplate organization={organization} properties={properties} onStartChat={onStartChat} />
+        case "premium":
+            return <PremiumTemplate {...templateProps} />
         default:
             return <MinimalTemplate {...templateProps} />
     }
