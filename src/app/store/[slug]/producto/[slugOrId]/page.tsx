@@ -3,6 +3,8 @@ import { Metadata } from "next"
 import { StoreLayoutClient } from "../../store-layout-client"
 import { getProductDetails, getShippingConfig } from "../../actions"
 import { ProductDetailClient } from "./product-detail-client"
+import { PremiumProductConcierge } from "./premium-product-concierge"
+import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
 import { ProductJsonLd } from "@/components/seo/product-json-ld"
 import { headers } from "next/headers"
 import { isSubdomain } from "@/lib/utils/store-urls"
@@ -172,6 +174,14 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
     // Moneda/país del tenant para el JSON-LD (antes COP/CO hardcodeado)
     const jsonLdLocale = getTenantLocale(organization)
 
+    // Plantilla activa (+ override dev ?preview_template) para la banda premium del asesor.
+    const previewTemplate = process.env.NODE_ENV !== "production"
+        ? (resolvedSearchParams as { preview_template?: string } | undefined)?.preview_template
+        : undefined
+    const isPremium = getSafeStorefrontTemplate(previewTemplate || organization.settings?.storefront?.template, organization) === "premium"
+    const premiumPrimaryColor = organization.settings?.branding?.primaryColor || "#2b7cee"
+    const premiumAgentName = typeof organization.settings?.agent?.name === "string" ? organization.settings.agent.name : null
+
     return (
         <>
             <ProductJsonLd
@@ -223,6 +233,16 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
                     shippingConfig={shippingConfig}
                     productDetailCRO={productDetailCRO}
                 />
+                {isPremium ? (
+                    <PremiumProductConcierge
+                        slug={organization.slug}
+                        isSubdomain={initialIsSubdomain}
+                        locale={jsonLdLocale.locale}
+                        primaryColor={premiumPrimaryColor}
+                        agentName={premiumAgentName}
+                        productId={product.id}
+                    />
+                ) : null}
             </StoreLayoutClient>
         </>
     )
