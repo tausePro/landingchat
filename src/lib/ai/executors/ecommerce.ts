@@ -1762,6 +1762,30 @@ const recommendProducts: ToolHandler = async (supabase, input, context) => {
     const allProducts: Array<Record<string, unknown>> = Array.isArray(searchResult.data?.products)
         ? (searchResult.data.products as Array<Record<string, unknown>>)
         : []
+
+    // Fallback robusto: el 'intent' suele ser una frase NL larga y el FTS de
+    // searchProducts matchea poco/nada. Si no llena el límite, completamos con
+    // browse (top productos por stock) para que el asesor guiado SIEMPRE devuelva
+    // una selección no vacía cuando el catálogo tiene productos.
+    if (allProducts.length < limit) {
+        const browseResult = await searchProducts(supabase, { limit: limit + excludeIds.length + 6 }, context)
+        const browseProducts: Array<Record<string, unknown>> = browseResult.success && Array.isArray(browseResult.data?.products)
+            ? (browseResult.data.products as Array<Record<string, unknown>>)
+            : []
+        const seen = new Set(
+            allProducts
+                .map((product) => (typeof product.id === "string" ? product.id : null))
+                .filter((id): id is string => id !== null),
+        )
+        for (const product of browseProducts) {
+            const id = typeof product.id === "string" ? product.id : null
+            if (id && !seen.has(id)) {
+                allProducts.push(product)
+                seen.add(id)
+            }
+        }
+    }
+
     const products = allProducts
         .filter((product) => {
             const id = typeof product.id === "string" ? product.id : null
