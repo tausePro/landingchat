@@ -76,6 +76,9 @@ export function StorefrontForm({ organization }: StorefrontFormProps) {
                         <ProductFeaturesEditor organization={organizationWithSettings} />
                     </>
                 )}
+                {selectedTemplate === "premium" && (
+                    <VideoSectionEditor organization={organizationWithSettings} />
+                )}
 
                 <TypographySelector organization={organizationWithSettings} />
 
