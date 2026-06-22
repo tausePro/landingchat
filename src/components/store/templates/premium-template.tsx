@@ -340,6 +340,73 @@ export function PremiumTemplate({
                 </section>
             ) : null}
 
+            {/* ── Video del merchant (premium): reusa settings.storefront.videoSection (misma config que la plantilla complete) ── */}
+            {(() => {
+                const vs = (organization.settings as { storefront?: { videoSection?: { enabled?: boolean; videoUrl?: string; style?: string; title?: string; subtitle?: string; overlayText?: string } } } | undefined)?.storefront?.videoSection
+                if (!vs?.enabled || !vs.videoUrl) return null
+                const videoUrl = vs.videoUrl
+                const isYouTube = videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")
+                const ytId = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/)?.[1]
+                const embedBase = ytId ? `https://www.youtube.com/embed/${ytId}` : videoUrl
+                const isHero = vs.style === "hero"
+                const isClip = vs.style === "clip"
+
+                if (isHero) {
+                    return (
+                        <section className="relative overflow-hidden" style={{ height: 520 }}>
+                            {isYouTube ? (
+                                <iframe
+                                    src={`${embedBase}?autoplay=1&mute=1&loop=1&playlist=${ytId ?? ""}&controls=0`}
+                                    className="absolute inset-0 h-full w-full"
+                                    style={{ border: 0, pointerEvents: "none" }}
+                                    allow="accelerometer; autoplay; encrypted-media; gyroscope"
+                                />
+                            ) : (
+                                <video src={videoUrl} autoPlay loop muted playsInline className="absolute inset-0 h-full w-full object-cover" />
+                            )}
+                            {vs.overlayText ? (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 px-6">
+                                    <h2 className="text-center text-4xl font-bold tracking-tight text-white md:text-6xl">{vs.overlayText}</h2>
+                                </div>
+                            ) : null}
+                        </section>
+                    )
+                }
+
+                return (
+                    <section className="bg-white py-16 md:py-20">
+                        <div className="mx-auto max-w-5xl px-4">
+                            {vs.title ? (
+                                <div className="mx-auto mb-8 max-w-2xl text-center">
+                                    <h2 className="text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">{vs.title}</h2>
+                                    {vs.subtitle ? <p className="mt-2 leading-relaxed text-slate-600">{vs.subtitle}</p> : null}
+                                </div>
+                            ) : null}
+                            <div className="relative aspect-video overflow-hidden rounded-3xl shadow-lg ring-1 ring-slate-200">
+                                {isYouTube ? (
+                                    <iframe
+                                        src={isClip ? `${embedBase}?autoplay=1&mute=1&loop=1&playlist=${ytId ?? ""}&controls=0` : embedBase}
+                                        className="absolute inset-0 h-full w-full"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                    />
+                                ) : (
+                                    <video
+                                        src={videoUrl}
+                                        autoPlay={isClip}
+                                        loop={isClip}
+                                        muted={isClip}
+                                        controls={!isClip}
+                                        playsInline
+                                        className="h-full w-full object-cover"
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    </section>
+                )
+            })()}
+
             {/* ── Prueba social: reseñas reales publicadas (se oculta si no hay; nunca datos simulados) ── */}
             {reviewsSummary && reviewsSummary.count > 0 ? (
                 <section className="bg-white py-16 md:py-20">
