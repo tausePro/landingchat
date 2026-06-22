@@ -46,7 +46,7 @@ export function RecommendationCard({
     }
 
     return (
-        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 md:max-w-2xl">
             <div
                 className="flex items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-700"
                 style={{ backgroundColor: `${primaryColor}0F` }}
@@ -60,7 +60,7 @@ export function RecommendationCard({
                 </div>
             </div>
 
-            <div className="flex flex-col gap-3 p-3">
+            <div className="grid grid-cols-1 gap-3 p-3 md:grid-cols-2">
                 {products.map((product) => (
                     <ChatProductCard
                         key={product.id}
