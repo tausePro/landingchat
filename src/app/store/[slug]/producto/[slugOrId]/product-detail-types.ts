@@ -15,3 +15,10 @@ export interface ProductShippingCardLabels {
     remaining: (remainingPrice: string, zonesText: string) => string
     available: (zonesText: string) => string
 }
+
+export interface ProductVideoBlockLabels {
+    eyebrow: string
+    title: string
+    iframeTitle: string
+    description: string
+}
