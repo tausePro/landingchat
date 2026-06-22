@@ -15,7 +15,7 @@ interface TemplateRendererProps {
     pages?: Array<{ id: string; slug: string; title: string }>
     primaryColor: string
     heroSettings: any
-    onStartChat: (productId?: string) => void
+    onStartChat: (productId?: string, query?: string) => void
     isSubdomain: boolean
 }
 

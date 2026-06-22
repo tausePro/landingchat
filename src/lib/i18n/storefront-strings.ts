@@ -171,6 +171,15 @@ export const storefrontStrings = {
     "store.catalog.premium_ask_agent_generic": "Habla con un asesor",
     "store.catalog.premium_all": "Todos",
     "store.catalog.premium_results": "resultados",
+    "store.home.premium_picker_title": "¿Te ayudo a elegir?",
+    "store.home.premium_picker_subtitle": "Dime qué buscas y te armo una recomendación al instante.",
+    "store.home.premium_picker_help": "No sé, ayúdame a elegir",
+    "store.home.premium_picker_intent_prefix": "Quiero recomendaciones de",
+    "store.product.premium_concierge_title": "¿Te ayudo a decidir?",
+    "store.product.premium_concierge_subtitle": "Pregúntale al asesor por este producto o con qué combinarlo.",
+    "store.product.premium_concierge_cta": "Pregúntale a",
+    "store.product.premium_concierge_cta_generic": "Hablar con el asesor",
+    "store.product.premium_concierge_intent": "Cuéntame más sobre este producto o recomiéndame con qué combina.",
     // Footer — link extra "Contacto"
     "store.footer.nav_contact": "Contacto",
     // ========================================================================
@@ -860,6 +869,15 @@ export const storefrontStrings = {
     "store.catalog.premium_ask_agent_generic": "Talk to an advisor",
     "store.catalog.premium_all": "All",
     "store.catalog.premium_results": "results",
+    "store.home.premium_picker_title": "Can I help you choose?",
+    "store.home.premium_picker_subtitle": "Tell me what you need and I'll build a recommendation instantly.",
+    "store.home.premium_picker_help": "I'm not sure, help me choose",
+    "store.home.premium_picker_intent_prefix": "I want recommendations for",
+    "store.product.premium_concierge_title": "Need help deciding?",
+    "store.product.premium_concierge_subtitle": "Ask the advisor about this product or what pairs with it.",
+    "store.product.premium_concierge_cta": "Ask",
+    "store.product.premium_concierge_cta_generic": "Talk to the advisor",
+    "store.product.premium_concierge_intent": "Tell me more about this product or recommend what pairs with it.",
     // Footer — extra "Contact" link
     "store.footer.nav_contact": "Contact",
     // ========================================================================
