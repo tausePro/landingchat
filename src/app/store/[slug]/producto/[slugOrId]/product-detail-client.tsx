@@ -1021,18 +1021,18 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         )}
 
                         {/* Price Block */}
-                        <div className="mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                        <div className={isPremium ? "mb-6" : "mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50"}>
                             <div className="flex items-baseline gap-3">
-                                <span className="text-[36px] font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">
+                                <span className={`font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums] ${isPremium ? "text-[44px] leading-none" : "text-[36px]"}`}>
                                     {shouldShowPriceRange && priceRangeLabel ? priceRangeLabel : formatPrice(currentPrice)}
                                 </span>
                                 {compareAtPrice && (
-                                    <span className="text-[18px] text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums]">
+                                    <span className={`text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums] ${isPremium ? "text-[19px]" : "text-[18px]"}`}>
                                         {formatPrice(compareAtPrice)}
                                     </span>
                                 )}
                                 {savingsAmount > 0 && (
-                                    <span className="rounded bg-rose-100 px-2 py-0.5 text-[12px] font-bold text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                                    <span className={`font-bold text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 ${isPremium ? "rounded-full bg-rose-100 px-3 py-1 text-[13px]" : "rounded bg-rose-100 px-2 py-0.5 text-[12px]"}`}>
                                         −{formatPrice(savingsAmount)}
                                     </span>
                                 )}
