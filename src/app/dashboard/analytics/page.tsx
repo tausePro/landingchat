@@ -789,6 +789,7 @@ async function getAnalyticsData(range: ResolvedRange) {
         .filter(v => v > 0)
     const chatIntelligence: ChatIntelligence = {
         chatsOpened: chatOpenedCount,
+        storeVisits: uniqueEventCount(["page_view"]),
         messagesSent: chatMessageCount,
         avgMessagesPerChat: chatOpenedCount > 0 ? chatMessageCount / chatOpenedCount : 0,
         agentReplies: agentRepliedRows.length,

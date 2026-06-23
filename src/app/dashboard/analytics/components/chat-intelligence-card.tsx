@@ -6,6 +6,7 @@ import { useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-string
 
 export interface ChatIntelligence {
     chatsOpened: number
+    storeVisits: number
     messagesSent: number
     avgMessagesPerChat: number
     agentReplies: number
@@ -34,6 +35,9 @@ export function ChatIntelligenceCard({ intelligence, rangeLabel }: ChatIntellige
     const locale = useTenantLocale()
     const formatCurrency = (value: number) => formatTenantCurrency(value, { currency, locale })
     const hasData = intelligence.chatsOpened > 0 || intelligence.messagesSent > 0
+    const chatOpenRate = intelligence.storeVisits > 0
+        ? (intelligence.chatsOpened / intelligence.storeVisits) * 100
+        : 0
 
     return (
         <Card>
@@ -49,6 +53,12 @@ export function ChatIntelligenceCard({ intelligence, rangeLabel }: ChatIntellige
             <CardContent className="space-y-5">
                 {hasData ? (
                     <>
+                        <div className="rounded-lg bg-indigo-50 p-3 dark:bg-indigo-900/20">
+                            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-300">{chatOpenRate.toFixed(1)}%</div>
+                            <div className="text-xs text-muted-foreground">
+                                Tasa de apertura de chat · {formatNumber(intelligence.chatsOpened)} de {formatNumber(intelligence.storeVisits)} visitas
+                            </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                             <div className="rounded-lg bg-muted/50 p-3">
                                 <div className="text-2xl font-bold">{formatNumber(intelligence.chatsOpened)}</div>
