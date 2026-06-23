@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { createMessage } from "./anthropic"
-import { getOrgMode, getToolsForMode, getModePromptAddendum } from "./agent-factory"
+import { getOrgMode, getToolsForMode, getModePromptAddendum, getModeDateTimeContext } from "./agent-factory"
 import { buildSystemPromptOptimized, buildCustomerContext, buildConversationHistory, buildCartContext } from "./context"
 import { getOrgPaymentMethodsSummary } from "./executors/shared"
 import { executeTool } from "./tool-executor"
@@ -399,6 +399,11 @@ IMPORTANTE: Si la respuesta está en estos documentos, cita la información. Si 
         }
 
         // 7.6. Inyectar archivos media disponibles (para tool send_media)
+        // NOTA prompt caching: la lista COMPLETA de media (estable por org) va en
+        // el bloque cacheado (systemPrompt). El destacado "para ESTE mensaje"
+        // depende de input.message → es dinámico y va al bloque NO cacheado
+        // (priorityMediaContext, más abajo) para no invalidar el prefijo estable.
+        let priorityMediaContext = ""
         try {
             const { data: orgMedia } = await supabase
                 .from("organization_media")
@@ -414,7 +419,7 @@ IMPORTANTE: Si la respuesta está en estos documentos, cita la información. Si 
 
                 if (relevantMedia.length > 0) {
                     const relevantMediaList = relevantMedia.map(formatMediaPromptLine).join("\n")
-                    systemPrompt += `\n\nARCHIVOS PRIORITARIOS PARA ESTE MENSAJE:
+                    priorityMediaContext = `ARCHIVOS PRIORITARIOS PARA ESTE MENSAJE:
 El último mensaje del cliente parece pedir un documento o archivo. Estos son los archivos más relevantes para responderle ahora mismo:
 ${relevantMediaList}
 
@@ -442,7 +447,12 @@ INSTRUCCIÓN: Envía estos archivos cuando sea pertinente según su descripción
         })
         const agentSkillsConfig = agent.configuration?.skills || null
         log.info("Org mode resolved", { mode: orgMode, industry: organization?.industry, products: productCount, properties: propertyCount })
-        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig, tenantLocale.locale, organization?.enabled_modules ?? null)
+        // NOTA prompt caching: el addendum (skills + contexto de modo) es estable
+        // y va al bloque cacheado, PERO la fecha/hora cambia por request → se
+        // excluye aquí (includeDateTime=false) y se inyecta en el bloque dinámico
+        // (dateTimeContext, más abajo) para no invalidar el prefijo en cada turno.
+        const dateTimeContext = getModeDateTimeContext(orgMode, tenantLocale.locale, organization?.enabled_modules ?? null)
+        systemPrompt += getModePromptAddendum(orgMode, propertyCount || 0, agentSkillsConfig, tenantLocale.locale, organization?.enabled_modules ?? null, false)
 
         // Add channel-specific instructions
         const channel = input.channel || "web"
@@ -532,14 +542,22 @@ INSTRUCCIÓN: Usa este contexto para dar continuidad. Si el cliente estaba viend
         }
 
         // Separamos la parte estable (systemPrompt, ~95% del tamaño) de la
-        // parte dinámica per-conversation (customer/cart/cross-channel) para
-        // que el prompt caching de Anthropic funcione: el breakpoint cachea
-        // todo lo que va ANTES y DENTRO del bloque marcado con cache_control.
-        const dynamicContextParts: string[] = [
+        // parte dinámica per-request para que el prompt caching de Anthropic
+        // funcione: el breakpoint cachea todo lo que va ANTES y DENTRO del
+        // bloque con cache_control; lo que va DESPUÉS (este bloque) NO se cachea.
+        //
+        // Va aquí TODO lo que cambia por request y rompería el prefijo estable:
+        //   - dateTimeContext: fecha/hora con minutos (real_estate/booking)
+        //   - priorityMediaContext: archivos destacados según input.message
+        //   - customer/cart/cross-channel: estado de la conversación
+        const dynamicContextParts: string[] = []
+        if (dateTimeContext) dynamicContextParts.push(dateTimeContext)
+        if (priorityMediaContext) dynamicContextParts.push(priorityMediaContext)
+        dynamicContextParts.push(
             customer
                 ? buildCustomerContext(customer, customerOrders || [])
                 : buildCustomerContext(undefined, undefined),
-        ]
+        )
         if (cart) dynamicContextParts.push(buildCartContext(cart))
         if (crossChannelContext) dynamicContextParts.push(crossChannelContext)
         const dynamicSystemPrompt = dynamicContextParts.join("\n\n")

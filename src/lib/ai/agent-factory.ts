@@ -100,28 +100,26 @@ export function getToolsForMode(mode: OrgMode): Anthropic.Tool[] {
 }
 
 /**
- * Compone el addendum del system prompt combinando:
- *   1. Contexto del modo (propertyCount, fecha para inmobiliarias)
- *   2. Skills: instrucciones procedurales (defaults + overrides del agente)
+ * Devuelve SOLO la línea de fecha/hora actual cuando el modo la requiere
+ * (real_estate/hybrid, o ecommerce con módulo `appointments`), o "" si no aplica.
  *
- * @param agentSkillsConfig - overrides de skills del agente (de agent.configuration.skills)
- * @param locale T1.7 — locale del tenant (BCP 47). Default `'es-CO'` por
- *               retro-compat. Determina el formato de la fecha del addendum
- *               inmobiliario y el timezone (CO usa Bogota; US usa New York).
+ * Se expone aparte de `getModePromptAddendum` para el prompt caching de Anthropic:
+ * la fecha incluye minutos → cambia en cada request. Si quedara dentro del prefijo
+ * cacheado (system estable) invalidaría el cache en cada turno. El caller debe
+ * inyectar este string en la parte DINÁMICA del system (fuera del cache_control).
+ *
+ * T1.7 — Tenants US ven la fecha en inglés con TZ America/New_York; tenants CO
+ * siguen es-CO/Bogota.
  */
-export function getModePromptAddendum(
+export function getModeDateTimeContext(
     mode: OrgMode,
-    propertyCount: number,
-    agentSkillsConfig?: SkillsConfig | null,
     locale: string = "es-CO",
     enabledModules?: string[] | null,
 ): string {
-    let addendum = ""
-
     const hasBookingModule = enabledModules?.includes("appointments") === true
+    const needsDateTime = mode === "real_estate" || mode === "hybrid" || hasBookingModule
+    if (!needsDateTime) return ""
 
-    // T1.7 — formato + timezone basado en locale. Tenants US ven la fecha
-    // en inglés con TZ America/New_York; tenants CO siguen es-CO/Bogota.
     const timeZone = locale === "en-US" ? "America/New_York" : "America/Bogota"
     const now = new Date().toLocaleString(locale, {
         timeZone,
@@ -133,19 +131,53 @@ export function getModePromptAddendum(
         minute: "2-digit",
     })
 
+    return locale === "en-US"
+        ? `CURRENT DATE AND TIME: ${now}`
+        : `FECHA Y HORA ACTUAL: ${now}`
+}
+
+/**
+ * Compone el addendum del system prompt combinando:
+ *   1. Contexto del modo (propertyCount, fecha para inmobiliarias)
+ *   2. Skills: instrucciones procedurales (defaults + overrides del agente)
+ *
+ * @param agentSkillsConfig - overrides de skills del agente (de agent.configuration.skills)
+ * @param locale T1.7 — locale del tenant (BCP 47). Default `'es-CO'` por
+ *               retro-compat. Determina el formato de la fecha del addendum
+ *               inmobiliario y el timezone (CO usa Bogota; US usa New York).
+ * @param includeDateTime - Si `true` (default, retro-compat) incrusta la fecha/hora
+ *               en el addendum. El chat la pone en `false` y la inyecta aparte vía
+ *               `getModeDateTimeContext` para no romper el prompt caching.
+ */
+export function getModePromptAddendum(
+    mode: OrgMode,
+    propertyCount: number,
+    agentSkillsConfig?: SkillsConfig | null,
+    locale: string = "es-CO",
+    enabledModules?: string[] | null,
+    includeDateTime: boolean = true,
+): string {
+    let addendum = ""
+
+    const hasBookingModule = enabledModules?.includes("appointments") === true
+
+    // La fecha/hora se incrusta salvo que el caller la maneje aparte (prompt
+    // caching). Con includeDateTime=true el output es idéntico al legacy.
+    const dateTimeLine = includeDateTime
+        ? getModeDateTimeContext(mode, locale, enabledModules)
+        : ""
+
     // Contexto inmobiliario (metadata que no es un skill)
     if (mode === "real_estate" || mode === "hybrid") {
         if (locale === "en-US") {
-            addendum += `\nREAL ESTATE MODE: This organization has ${propertyCount} active properties.\nCURRENT DATE AND TIME: ${now}\n`
+            addendum += `\nREAL ESTATE MODE: This organization has ${propertyCount} active properties.\n${dateTimeLine ? `${dateTimeLine}\n` : ""}`
         } else {
-            addendum += `\nMODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.\nFECHA Y HORA ACTUAL: ${now}\n`
+            addendum += `\nMODO INMOBILIARIO: Esta organización tiene ${propertyCount} propiedades activas.\n${dateTimeLine ? `${dateTimeLine}\n` : ""}`
         }
-    } else if (hasBookingModule) {
+    } else if (hasBookingModule && dateTimeLine) {
         // Booking de servicios en ecommerce: el skill service_booking necesita
         // la fecha actual para resolver "mañana"/"el viernes" sin alucinar.
-        addendum += locale === "en-US"
-            ? `\nCURRENT DATE AND TIME: ${now}\n`
-            : `\nFECHA Y HORA ACTUAL: ${now}\n`
+        addendum += `\n${dateTimeLine}\n`
     }
 
     // Skills: instrucciones procedurales configurables (siguen en español;
