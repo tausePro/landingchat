@@ -46,6 +46,8 @@ interface ProductDetailClientProps {
     productDetailCRO?: ProductDetailCROConfig | null
     /** Booking Fase 2b: muestra el panel de reserva del servicio en el PDP. */
     isBookable?: boolean
+    /** Plantilla premium activa: eleva la estética del PDP (variante estilizada, misma lógica). */
+    isPremium?: boolean
 }
 
 interface ProductPriceTier {
@@ -250,7 +252,7 @@ function formatConfiguredCtaText(text: string | undefined, totalPrice: number, f
     return text.replaceAll("{price}", formatPrice(totalPrice)).trim()
 }
 
-export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null, isBookable = false }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null, isBookable = false, isPremium = false }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -853,8 +855,8 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const isSelectedImageOOS = outOfStockImages.has(selectedImage)
 
     return (
-        <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-6">
-            <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className={`relative flex min-h-screen w-full flex-col font-display pb-24 md:pb-0 md:pt-6 ${isPremium ? "bg-stone-50 dark:bg-slate-950" : "bg-background-light dark:bg-background-dark"}`}>
+            <div className={`mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 ${isPremium ? "py-8 lg:py-14" : "py-6 lg:py-8"}`}>
 
                 {/* Breadcrumbs */}
                 <nav className="flex items-center gap-2 text-[13px] text-slate-500 dark:text-slate-400 mb-8">
@@ -873,11 +875,11 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[200px]">{product.name}</span>
                 </nav>
 
-                <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start lg:gap-12">
+                <div className={`grid grid-cols-1 lg:grid-cols-2 lg:items-start ${isPremium ? "gap-12 lg:gap-16" : "gap-10 lg:gap-12"}`}>
 
                     {/* Left Column: Gallery */}
                     <div className="self-start lg:sticky lg:top-[76px]">
-                        <div className="relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                        <div className={`relative aspect-square overflow-hidden bg-white dark:bg-slate-950 ${isPremium ? "rounded-[28px] border border-slate-200/70 shadow-[0_18px_50px_-20px_rgba(15,23,42,0.25)] ring-1 ring-slate-900/5 dark:border-slate-800" : "rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800"}`}>
                                 <Image
                                     src={selectedImage}
                                     alt={`${product.name}${product.brand ? ` - ${product.brand}` : ''} | ${organization.name}`}
@@ -972,7 +974,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             )}
                         </div>
 
-                        <h1 className="mb-3 text-[28px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 dark:text-white sm:text-[32px]">
+                        <h1 className={`mb-3 font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 dark:text-white ${isPremium ? "text-[30px] sm:text-[38px]" : "text-[28px] sm:text-[32px]"}`}>
                             {product.name}
                         </h1>
 
