@@ -29,10 +29,12 @@ export function StoreImportCard() {
     const [step, setStep] = useState<Step>("input")
     const [url, setUrl] = useState("")
     const [brand, setBrand] = useState<string | null>(null)
+    const [primaryColor, setPrimaryColor] = useState<string | null>(null)
+    const [currency, setCurrency] = useState<string | null>(null)
     const [rows, setRows] = useState<Row[]>([])
     const [summary, setSummary] = useState<StoreImportSummary | null>(null)
 
-    const reset = () => { setStep("input"); setUrl(""); setRows([]); setBrand(null); setSummary(null) }
+    const reset = () => { setStep("input"); setUrl(""); setRows([]); setBrand(null); setPrimaryColor(null); setCurrency(null); setSummary(null) }
 
     const handleAnalyze = async () => {
         setStep("loading")
@@ -43,6 +45,8 @@ export function StoreImportCard() {
             return
         }
         setBrand(result.data.brandName)
+        setPrimaryColor(result.data.primaryColor)
+        setCurrency(result.data.currency)
         setRows(result.data.products.map((p) => ({
             include: true,
             name: p.name,
@@ -65,7 +69,7 @@ export function StoreImportCard() {
         if (items.length === 0) { toast.error("Selecciona al menos un producto"); return }
 
         setStep("importing")
-        const result = await confirmStoreImport(items)
+        const result = await confirmStoreImport(items, { primaryColor, currency })
         if (!result.success) { toast.error(result.error); setStep("preview"); return }
         setSummary(result.data)
         setStep("done")
