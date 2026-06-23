@@ -1,10 +1,13 @@
+import { buildDesignSystem, designSystemToOrgSettings } from "@/lib/design/design-system"
+
 /**
- * Construye el update de marca para la organización a partir de lo que el
- * scraping del onboarding mágico extrajo (color + moneda). Puro y testeable
- * (vive fuera de "use server" para poder importarse en tests).
+ * Updates de organización al importar el catálogo en onboarding.
  *
- * Solo aplica un color hex válido (con merge en settings.branding para no pisar
- * otras llaves) y una moneda soportada; si no hay nada válido devuelve null.
+ * Genera el contrato de marca (designSystem) desde lo que el scraping extrajo
+ * (color) + el rubro, y lo mapea a la config concreta que las plantillas YA
+ * consumen: color (primary_color + settings.branding.primaryColor), plantilla
+ * (premium por default) y tipografía. Suma la moneda detectada. Merge seguro
+ * (no pisa otras llaves de settings).
  */
 
 const SUPPORTED_CURRENCIES = ["COP", "USD"]
@@ -15,26 +18,23 @@ export interface ImportedBrand {
 }
 
 export interface OrgBrandCurrent {
-    primary_color?: string | null
     settings?: Record<string, unknown> | null
+    industry?: string | null
 }
 
-export function buildBrandUpdates(brand: ImportedBrand, current: OrgBrandCurrent): Record<string, unknown> | null {
-    const updates: Record<string, unknown> = {}
+export function buildOnboardingOrgUpdates(brand: ImportedBrand, current: OrgBrandCurrent): Record<string, unknown> {
+    const ds = buildDesignSystem({ primaryColor: brand.primaryColor, industry: current.industry })
+    const mapped = designSystemToOrgSettings(ds, current.settings)
 
-    const hex = typeof brand.primaryColor === "string" && /^#[0-9a-fA-F]{6}$/.test(brand.primaryColor)
-        ? brand.primaryColor
-        : null
-    if (hex) {
-        updates.primary_color = hex
-        const settings = (current.settings ?? {}) as Record<string, unknown>
-        const branding = (settings.branding ?? {}) as Record<string, unknown>
-        updates.settings = { ...settings, branding: { ...branding, primaryColor: hex } }
+    const updates: Record<string, unknown> = {
+        primary_color: mapped.primary_color,
+        settings: mapped.settings,
     }
-
+    if (mapped.secondary_color) {
+        updates.secondary_color = mapped.secondary_color
+    }
     if (typeof brand.currency === "string" && SUPPORTED_CURRENCIES.includes(brand.currency)) {
         updates.currency_code = brand.currency
     }
-
-    return Object.keys(updates).length > 0 ? updates : null
+    return updates
 }

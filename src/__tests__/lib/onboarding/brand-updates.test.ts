@@ -1,29 +1,43 @@
 import { describe, it, expect } from "vitest"
-import { buildBrandUpdates } from "@/lib/onboarding/brand-updates"
+import { buildOnboardingOrgUpdates } from "@/lib/onboarding/brand-updates"
 
-describe("buildBrandUpdates", () => {
-    it("aplica color hex válido y lo mergea en settings.branding sin pisar otras llaves", () => {
-        expect(buildBrandUpdates({ primaryColor: "#ff6b35" }, { settings: { branding: { logoUrl: "x" } } }))
-            .toEqual({ primary_color: "#ff6b35", settings: { branding: { logoUrl: "x", primaryColor: "#ff6b35" } } })
+type Settings = {
+    branding: { primaryColor?: string; logoUrl?: string }
+    storefront: { template: string; typography: { fontFamily: string; textColor: string } }
+    [key: string]: unknown
+}
+
+describe("buildOnboardingOrgUpdates", () => {
+    it("genera color + template premium + typography desde la marca extraída", () => {
+        const u = buildOnboardingOrgUpdates({ primaryColor: "#ff6b35" }, { settings: null, industry: null })
+        expect(u.primary_color).toBe("#ff6b35")
+        const s = u.settings as Settings
+        expect(s.branding.primaryColor).toBe("#ff6b35")
+        expect(s.storefront.template).toBe("premium")
+        expect(s.storefront.typography.fontFamily).toBe("Inter")
     })
 
-    it("ignora color inválido (no hex)", () => {
-        expect(buildBrandUpdates({ primaryColor: "rojo" }, {})).toBeNull()
-        expect(buildBrandUpdates({ primaryColor: "#fff" }, {})).toBeNull()
+    it("color inválido → fallback, mantiene template premium", () => {
+        const u = buildOnboardingOrgUpdates({ primaryColor: "rojo" }, {})
+        expect(u.primary_color).toBe("#0F172A")
+        expect((u.settings as Settings).storefront.template).toBe("premium")
     })
 
-    it("aplica moneda soportada, ignora no soportada", () => {
-        expect(buildBrandUpdates({ currency: "COP" }, {})).toEqual({ currency_code: "COP" })
-        expect(buildBrandUpdates({ currency: "EUR" }, {})).toBeNull()
+    it("moneda soportada se persiste; no soportada se ignora", () => {
+        expect(buildOnboardingOrgUpdates({ currency: "COP" }, {}).currency_code).toBe("COP")
+        expect(buildOnboardingOrgUpdates({ currency: "EUR" }, {}).currency_code).toBeUndefined()
     })
 
-    it("color + moneda juntos", () => {
-        expect(buildBrandUpdates({ primaryColor: "#000000", currency: "USD" }, {}))
-            .toEqual({ primary_color: "#000000", settings: { branding: { primaryColor: "#000000" } }, currency_code: "USD" })
+    it("real_estate fuerza su plantilla en vez de premium", () => {
+        const u = buildOnboardingOrgUpdates({}, { industry: "real_estate" })
+        expect((u.settings as Settings).storefront.template).toBe("real-estate")
     })
 
-    it("sin datos válidos → null (no escribe nada)", () => {
-        expect(buildBrandUpdates({}, {})).toBeNull()
-        expect(buildBrandUpdates({ primaryColor: null, currency: null }, {})).toBeNull()
+    it("merge: no pisa otras llaves de settings/branding", () => {
+        const u = buildOnboardingOrgUpdates({ primaryColor: "#000000" }, { settings: { branding: { logoUrl: "x" }, foo: 1 } })
+        const s = u.settings as Settings
+        expect(s.foo).toBe(1)
+        expect(s.branding.logoUrl).toBe("x")
+        expect(s.branding.primaryColor).toBe("#000000")
     })
 })
