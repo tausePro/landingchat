@@ -22,3 +22,10 @@ export interface ProductVideoBlockLabels {
     iframeTitle: string
     description: string
 }
+
+export interface ProductDescriptionLabels {
+    eyebrow: string
+    title: string
+    seeMore: string
+    seeLess: string
+}
