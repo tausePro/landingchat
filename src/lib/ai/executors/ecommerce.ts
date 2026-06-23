@@ -1748,11 +1748,14 @@ const recommendProducts: ToolHandler = async (supabase, input, context) => {
         return { success: false, error: "Falta la intención del cliente para recomendar." }
     }
 
-    // Reúsa el motor de búsqueda; pedimos de más para poder excluir lo que ya
-    // tiene y aún así llenar el límite con productos relevantes.
+    // El 'intent' es una frase NL larga; el FTS (websearch_to_tsquery) ANDea los
+    // términos y casi nunca matchea. Extraemos keywords y las unimos con OR para
+    // matchear CUALQUIER término relevante (el RPC rankea por relevancia).
+    const keywords = extractIntentKeywords(intent)
+    const searchQuery = keywords.length > 0 ? keywords.join(" or ") : intent
     const searchResult = await searchProducts(
         supabase,
-        { query: intent, limit: limit + excludeIds.length + 4 },
+        { query: searchQuery, limit: limit + excludeIds.length + 4 },
         context,
     )
     if (!searchResult.success) {
@@ -1802,6 +1805,30 @@ const recommendProducts: ToolHandler = async (supabase, input, context) => {
             reasoning: `Selección para: ${intent}`,
         },
     }
+}
+
+const INTENT_STOPWORDS = new Set([
+    "de", "la", "el", "en", "y", "a", "los", "las", "un", "una", "para", "con", "que", "mi",
+    "su", "tu", "por", "sin", "no", "se", "lo", "le", "del", "al", "es", "mas", "muy", "me",
+    "te", "o", "u", "e", "si", "ya", "como", "cuando", "donde", "cual", "algo", "quiero",
+    "busco", "necesito", "tiene", "tengo", "sea", "mejor", "porfa", "favor", "hola", "dame",
+])
+
+/**
+ * Extrae palabras clave de una intención en lenguaje natural (minúsculas, sin
+ * acentos ni puntuación, sin stopwords ni palabras < 3 letras). El asesor guiado
+ * recibe frases largas que el FTS (que ANDea términos) no matchea; con keywords
+ * unidas por OR sí matchea cualquier término relevante.
+ */
+export function extractIntentKeywords(intent: string): string[] {
+    const normalized = intent
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    return Array.from(
+        new Set(normalized.split(/\s+/).filter((word) => word.length >= 3 && !INTENT_STOPWORDS.has(word))),
+    ).slice(0, 6)
 }
 
 export const ecommerceToolHandlers: Record<string, ToolHandler> = {
