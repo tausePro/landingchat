@@ -232,6 +232,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
                     reviewSummary={reviewSummary}
                     shippingConfig={shippingConfig}
                     productDetailCRO={productDetailCRO}
+                    isPremium={isPremium}
                 />
                 {isPremium ? (
                     <PremiumProductConcierge
