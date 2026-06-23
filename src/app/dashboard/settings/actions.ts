@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import type { OrganizationSettingsOverrides, OrganizationTrackingConfig, Organization } from "@/types"
 import { type ActionResult, success, failure } from "@/types"
 import { getSafeStorefrontTemplate } from "@/lib/storefront-templates"
+import { deepMerge } from "@/lib/utils/deep-merge"
 import { localeSettingsSchema, type LocaleSettingsInput } from "@/lib/i18n/locale-settings"
 
 export interface SettingsData {
@@ -233,19 +234,27 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
         currentOrganization.industry ??
         (typeof currentSettingsRecord.industry === "string" ? currentSettingsRecord.industry : null)
 
-    let settingsToPersist = data.settings
+    // Deep-merge sobre los settings ACTUALES de la DB para no pisar llaves que el
+    // snapshot del cliente no incluya (evita data-loss: p.ej. borrar videoSection
+    // al guardar otro editor con un snapshot viejo). Antes se reemplazaba la columna
+    // settings completa con el payload del cliente.
+    const mergedSettings: OrganizationSettingsOverrides = data.settings
+        ? deepMerge(currentSettings, data.settings)
+        : currentSettings
+
+    let settingsToPersist: OrganizationSettingsOverrides = mergedSettings
 
     if (requestedTemplate) {
         const safeTemplate = getSafeStorefrontTemplate(requestedTemplate, {
             industry: nextIndustry,
-            settings: incomingSettings,
+            settings: mergedSettings,
         })
 
         if (safeTemplate !== requestedTemplate) {
             settingsToPersist = {
-                ...incomingSettings,
+                ...mergedSettings,
                 storefront: {
-                    ...storefrontSettings,
+                    ...((mergedSettings.storefront as Record<string, unknown> | undefined) ?? {}),
                     template: safeTemplate,
                 },
             } as OrganizationSettingsOverrides
