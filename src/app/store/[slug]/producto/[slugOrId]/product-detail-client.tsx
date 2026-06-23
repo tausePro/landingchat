@@ -1420,7 +1420,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             <div id="product-reviews" className="mt-8 scroll-mt-28 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/40 p-5">
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <div>
-                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t("store.product_detail.reviews_section_title")}</h3>
+                                        <h3 className={`text-slate-900 dark:text-white ${isPremium ? "text-xl font-bold tracking-[-0.02em]" : "text-base font-semibold"}`}>{t("store.product_detail.reviews_section_title")}</h3>
                                         <p className="text-sm text-slate-500 dark:text-slate-400">
                                             {t("store.product_detail.reviews_section_subtitle")}
                                         </p>
@@ -1604,8 +1604,8 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
 
                 {/* Customers Also Bought */}
                 {relatedProducts.length > 0 && (
-                    <div className="mt-16 border-t border-slate-200 dark:border-slate-800 pt-12">
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">{t("store.product_detail.related_section_title")}</h2>
+                    <div className={`border-t border-slate-200 dark:border-slate-800 ${isPremium ? "mt-20 pt-16" : "mt-16 pt-12"}`}>
+                        <h2 className={`text-slate-900 dark:text-white ${isPremium ? "mb-8 text-[28px] font-extrabold tracking-[-0.025em]" : "mb-6 text-2xl font-bold"}`}>{t("store.product_detail.related_section_title")}</h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                             {relatedProducts.map((relatedProduct) => {
                                 const productImage = relatedProduct.images?.[0] || relatedProduct.image_url || '/placeholder-product.png'
