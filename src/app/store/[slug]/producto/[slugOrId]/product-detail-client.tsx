@@ -875,7 +875,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[200px]">{product.name}</span>
                 </nav>
 
-                <div className={`grid grid-cols-1 lg:grid-cols-2 lg:items-start ${isPremium ? "gap-12 lg:gap-16" : "gap-10 lg:gap-12"}`}>
+                <div className={`grid grid-cols-1 lg:items-start ${isPremium ? "lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16" : "lg:grid-cols-2 gap-10 lg:gap-12"}`}>
 
                     {/* Left Column: Gallery */}
                     <div className="self-start lg:sticky lg:top-[76px]">
@@ -1009,7 +1009,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         )}
 
                         {aiRecommendation && (
-                            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-[#b2e8e8] bg-gradient-to-br from-[#f0fafa] to-[#e0f7f7] p-3.5 dark:border-teal-900/30 dark:from-teal-950/20 dark:to-teal-900/10">
+                            <div className={`mb-4 flex items-start gap-2.5 ${isPremium ? "rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-900/40" : "rounded-xl border border-[#b2e8e8] bg-gradient-to-br from-[#f0fafa] to-[#e0f7f7] p-3.5 dark:border-teal-900/30 dark:from-teal-950/20 dark:to-teal-900/10"}`}>
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: accentColor }}>
                                     <span className="material-symbols-outlined text-[18px] text-white [font-variation-settings:'FILL'_1,'wght'_500]">auto_awesome</span>
                                 </div>
@@ -1048,7 +1048,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
 
                         {/* Value Stack */}
                         {heroValueRows.length > 0 && (
-                            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                            <div className={`${isPremium ? "mb-5 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-slate-800 dark:bg-slate-950/40" : "mb-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/40"}`}>
                                 <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
                                     {heroValueStackTitle}
                                 </div>
