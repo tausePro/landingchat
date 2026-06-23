@@ -20,6 +20,14 @@ import type { ProductReview, ProductReviewSummary, ProductWithVariantsReadModel 
 import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
 import { formatCurrency as formatTenantCurrency } from "@/lib/utils"
 import { useT, useTenantCurrency, useTenantLocale } from "@/lib/i18n/use-tenant-strings"
+import { ProductTrustRail } from "./product-trust-rail"
+import { ProductShippingCard } from "./product-shipping-card"
+import { ProductVideoBlock } from "./product-video-block"
+import { ReviewAvatar } from "./product-review-avatar"
+import { ProductCROTrustBlock } from "./product-cro-trust-block"
+import { OfferCountdown, getCountdownTime } from "./product-offer-countdown"
+import { ProductDescription } from "./product-description"
+import type { ProductSectionLink, FormatPriceFn, ProductShippingCardLabels, ProductVideoBlockLabels, ProductDescriptionLabels } from "./product-detail-types"
 import { ProductBookingPanel } from "@/components/store/product-booking-panel"
 
 interface ProductDetailClientProps {
@@ -38,6 +46,8 @@ interface ProductDetailClientProps {
     productDetailCRO?: ProductDetailCROConfig | null
     /** Booking Fase 2b: muestra el panel de reserva del servicio en el PDP. */
     isBookable?: boolean
+    /** Plantilla premium activa: eleva la estética del PDP (variante estilizada, misma lógica). */
+    isPremium?: boolean
 }
 
 interface ProductPriceTier {
@@ -157,11 +167,6 @@ interface ProductDetailProduct {
     bundle_discount_ends_at?: string | null
 }
 
-interface ProductSectionLink {
-    id: string
-    label: string
-}
-
 interface HeroValueRow {
     id: string
     icon: string
@@ -193,7 +198,6 @@ function getDefaultSelectedVariants(variants: ProductVariantOption[]): Record<st
 // del componente principal con `formatTenantCurrency(n, { locale, currency })`
 // y se inyecta a sub-helpers stateless (formatConfiguredCtaText,
 // ProductShippingCard) vía parámetro/prop.
-type FormatPriceFn = (amount: number) => string
 
 function calculateBundleDiscountAmount(subtotal: number, type?: string | null, value?: number | null): number {
     if (subtotal <= 0 || !type || !value || value <= 0) return 0
@@ -229,108 +233,6 @@ function hexToRgba(color: string, alpha: number): string {
     return `rgba(${red}, ${green}, ${blue}, ${clampedAlpha})`
 }
 
-function getReviewInitials(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean)
-    const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("")
-
-    return initials || "•"
-}
-
-function isValidReviewImageUrl(value: string | null | undefined): value is string {
-    if (!value) return false
-
-    try {
-        const url = new URL(value)
-        return url.protocol === "https:"
-    } catch {
-        return false
-    }
-}
-
-function ReviewAvatar({ review, accentColor, size = 44 }: { review: ProductReview; accentColor: string; size?: number }) {
-    const validImageUrl = isValidReviewImageUrl(review.author_image_url) ? review.author_image_url : null
-
-    return (
-        <div
-            className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold text-white"
-            style={{ width: size, height: size, backgroundColor: accentColor }}
-        >
-            {validImageUrl ? (
-                <Image
-                    src={validImageUrl}
-                    alt={`Foto de ${review.author_name}`}
-                    fill
-                    className="object-cover"
-                    sizes={`${size}px`}
-                />
-            ) : (
-                getReviewInitials(review.author_name)
-            )}
-        </div>
-    )
-}
-
-function getYouTubeEmbedUrl(value: string): string | null {
-    try {
-        const url = new URL(value)
-        if (url.hostname.includes("youtu.be")) {
-            const id = url.pathname.replace("/", "")
-            return id ? `https://www.youtube.com/embed/${id}` : null
-        }
-
-        if (url.hostname.includes("youtube.com")) {
-            const id = url.searchParams.get("v")
-            return id ? `https://www.youtube.com/embed/${id}` : value.replace("/watch", "/embed")
-        }
-
-        return null
-    } catch {
-        return null
-    }
-}
-
-interface ProductVideoBlockLabels {
-    eyebrow: string
-    title: string
-    iframeTitle: string
-    description: string
-}
-
-function ProductVideoBlock({ videoUrl, primaryColor, labels }: { videoUrl: string; primaryColor: string; labels: ProductVideoBlockLabels }) {
-    const youtubeEmbedUrl = getYouTubeEmbedUrl(videoUrl)
-
-    return (
-        <section id="product-video" className="mt-8 scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/50">
-            <div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{labels.eyebrow}</p>
-                <h3 className="mt-1 text-lg font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">{labels.title}</h3>
-            </div>
-            <div className="bg-black">
-                {youtubeEmbedUrl ? (
-                    <iframe
-                        src={youtubeEmbedUrl}
-                        title={labels.iframeTitle}
-                        className="aspect-video w-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                    />
-                ) : (
-                    <video
-                        src={videoUrl}
-                        className="aspect-video w-full object-cover"
-                        controls
-                        playsInline
-                    />
-                )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm text-slate-600 dark:text-slate-300 sm:px-5">
-                <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>play_circle</span>
-                <span>{labels.description}</span>
-            </div>
-        </section>
-    )
-}
-
 function buildWhatsAppLink(phone: string | null | undefined, message: string): string | null {
     if (!phone) {
         return null
@@ -344,534 +246,13 @@ function buildWhatsAppLink(phone: string | null | undefined, message: string): s
     return `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`
 }
 
-interface CountdownTime {
-    days: number
-    hours: number
-    minutes: number
-    seconds: number
-}
-
-function getCountdownTime(endsAt: string): CountdownTime | null {
-    const target = new Date(endsAt).getTime()
-    if (!Number.isFinite(target)) return null
-
-    const totalSeconds = Math.floor((target - Date.now()) / 1000)
-    if (totalSeconds <= 0) return null
-
-    const days = Math.floor(totalSeconds / 86400)
-    const hours = Math.floor((totalSeconds % 86400) / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-
-    return { days, hours, minutes, seconds }
-}
-
-function formatCountdownPart(value: number): string {
-    return value.toString().padStart(2, "0")
-}
-
-function OfferCountdown({ endsAt, accentColor, label }: { endsAt: string; accentColor: string; label: string }) {
-    const [remaining, setRemaining] = useState<CountdownTime | null>(null)
-
-    useEffect(() => {
-        const updateRemaining = () => setRemaining(getCountdownTime(endsAt))
-
-        updateRemaining()
-        const intervalId = window.setInterval(updateRemaining, 1000)
-
-        return () => window.clearInterval(intervalId)
-    }, [endsAt])
-
-    if (!remaining) return null
-
-    return (
-        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
-            <span className="material-symbols-outlined text-[17px]" style={{ color: accentColor }}>timer</span>
-            <span>{label}</span>
-            <span className="ml-auto tabular-nums">
-                {remaining.days > 0 ? `${remaining.days}d ` : ""}
-                {formatCountdownPart(remaining.hours)}:{formatCountdownPart(remaining.minutes)}:{formatCountdownPart(remaining.seconds)}
-            </span>
-        </div>
-    )
-}
-
 function formatConfiguredCtaText(text: string | undefined, totalPrice: number, formatPrice: FormatPriceFn): string | null {
     if (!text?.trim()) return null
 
     return text.replaceAll("{price}", formatPrice(totalPrice)).trim()
 }
 
-function ProductCROTrustBlock({ trust, primaryColor }: { trust: NonNullable<ProductDetailCROConfig["trust"]>; primaryColor: string }) {
-    const items = [
-        trust.guaranteeText ? { id: "guarantee", icon: "verified_user", text: trust.guaranteeText } : null,
-        trust.paymentMethodsText ? { id: "payments", icon: "payments", text: trust.paymentMethodsText } : null,
-        trust.securePaymentText ? { id: "secure-payment", icon: "lock", text: trust.securePaymentText } : null,
-    ].filter((item): item is { id: string; icon: string; text: string } => Boolean(item))
-
-    if (items.length === 0) return null
-
-    return (
-        <div className="mt-3 grid gap-2">
-            {items.map((item) => (
-                <div key={item.id} className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-[12.5px] font-semibold leading-5 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300">
-                    <span className="material-symbols-outlined mt-0.5 text-[18px]" style={{ color: primaryColor }}>{item.icon}</span>
-                    <span>{item.text}</span>
-                </div>
-            ))}
-        </div>
-    )
-}
-
-interface ProductDescriptionProps {
-    description: string
-    primaryColor: string
-}
-
-type ProductDescriptionBlock =
-    | { id: string; type: "heading"; text: string }
-    | { id: string; type: "paragraph"; text: string }
-    | { id: string; type: "bulletList"; items: string[] }
-    | { id: string; type: "feature"; marker: string; title: string; body?: string }
-
-function stripHtmlTags(value: string): string {
-    return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
-}
-
-function looksLikeHtml(value: string): boolean {
-    return /<\/?[a-z][\s\S]*>/i.test(value)
-}
-
-function splitMarker(value: string): { marker: string | null; text: string } {
-    const chars = Array.from(value.trim())
-    const marker = chars[0] ?? ""
-    if (!marker || /^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ¿¡]/.test(marker)) {
-        return { marker: null, text: value.trim() }
-    }
-
-    const text = chars.slice(1).join("").trim()
-    return text ? { marker, text } : { marker: null, text: value.trim() }
-}
-
-function isBulletLine(value: string): boolean {
-    return /^[-*•]\s+/.test(value.trim())
-}
-
-function normalizeBulletLine(value: string): string {
-    return value.trim().replace(/^[-*•]\s+/, "").trim()
-}
-
-function isHeadingLine(value: string): boolean {
-    const { text } = splitMarker(value)
-    const letters = Array.from(text).filter((char) => /[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ]/.test(char))
-    if (letters.length < 4) {
-        return false
-    }
-
-    const uppercaseLetters = letters.filter((char) => char === char.toUpperCase())
-    const uppercaseRatio = uppercaseLetters.length / letters.length
-    return uppercaseRatio >= 0.72 && text.length <= 96
-}
-
-function parsePlainDescription(description: string): ProductDescriptionBlock[] {
-    const blocks: ProductDescriptionBlock[] = []
-    const lines = description
-        .replace(/\r\n/g, "\n")
-        .split("\n")
-        .map((line) => line.trim())
-
-    let paragraph: string[] = []
-    let bulletItems: string[] = []
-
-    const flushParagraph = () => {
-        if (paragraph.length === 0) {
-            return
-        }
-
-        blocks.push({
-            id: `paragraph-${blocks.length}`,
-            type: "paragraph",
-            text: paragraph.join(" "),
-        })
-        paragraph = []
-    }
-
-    const flushBullets = () => {
-        if (bulletItems.length === 0) {
-            return
-        }
-
-        blocks.push({
-            id: `bullets-${blocks.length}`,
-            type: "bulletList",
-            items: bulletItems,
-        })
-        bulletItems = []
-    }
-
-    lines.forEach((line) => {
-        if (!line) {
-            flushParagraph()
-            flushBullets()
-            return
-        }
-
-        if (isBulletLine(line)) {
-            flushParagraph()
-            bulletItems.push(normalizeBulletLine(line))
-            return
-        }
-
-        if (isHeadingLine(line)) {
-            flushParagraph()
-            flushBullets()
-            blocks.push({
-                id: `heading-${blocks.length}`,
-                type: "heading",
-                text: splitMarker(line).text,
-            })
-            return
-        }
-
-        const marker = splitMarker(line)
-        if (marker.marker) {
-            flushParagraph()
-            flushBullets()
-            blocks.push({
-                id: `feature-${blocks.length}`,
-                type: "feature",
-                marker: marker.marker,
-                title: marker.text,
-            })
-            return
-        }
-
-        const previousBlock = blocks[blocks.length - 1]
-        if (previousBlock?.type === "feature" && !previousBlock.body) {
-            previousBlock.body = line
-            return
-        }
-
-        flushBullets()
-        paragraph.push(line)
-    })
-
-    flushParagraph()
-    flushBullets()
-
-    return blocks
-}
-
-interface ProductDescriptionLabels {
-    eyebrow: string
-    title: string
-    seeMore: string
-    seeLess: string
-}
-
-interface ProductDescriptionPropsExtended extends ProductDescriptionProps {
-    labels: ProductDescriptionLabels
-}
-
-function ProductDescription({ description, primaryColor, labels }: ProductDescriptionPropsExtended) {
-    const isHtml = looksLikeHtml(description)
-    const plainTextLength = isHtml ? stripHtmlTags(description).length : description.length
-    const hasLongDescription = plainTextLength > 520
-    const [isExpanded, setIsExpanded] = useState(false)
-    const blocks = useMemo(() => isHtml ? [] : parsePlainDescription(description), [description, isHtml])
-    const visibleBlocks = isExpanded ? blocks : blocks.slice(0, 7)
-    const hasHiddenBlocks = !isHtml && blocks.length > visibleBlocks.length
-
-    return (
-        <section className="mt-8 rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 sm:p-6">
-            <div className="mb-5 flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm" style={{ backgroundColor: primaryColor }}>
-                    <span className="material-symbols-outlined text-[20px]">auto_stories</span>
-                </span>
-                <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">{labels.eyebrow}</p>
-                    <h2 className="text-xl font-extrabold tracking-[-0.02em] text-slate-950 dark:text-white">{labels.title}</h2>
-                </div>
-            </div>
-
-            {isHtml ? (
-                <div
-                    className={`prose prose-slate max-w-none text-slate-600 dark:prose-invert dark:text-slate-300 prose-p:leading-7 prose-headings:tracking-[-0.02em] prose-strong:text-slate-900 dark:prose-strong:text-white ${hasLongDescription && !isExpanded ? "line-clamp-[14]" : ""}`}
-                    dangerouslySetInnerHTML={{ __html: description }}
-                />
-            ) : (
-                <div className="space-y-5">
-                    {visibleBlocks.map((block) => {
-                        if (block.type === "heading") {
-                            return (
-                                <h3 key={block.id} className="pt-2 text-lg font-extrabold uppercase tracking-[-0.015em] text-slate-950 dark:text-white">
-                                    {block.text}
-                                </h3>
-                            )
-                        }
-
-                        if (block.type === "bulletList") {
-                            return (
-                                <ul key={block.id} className="grid gap-2 sm:grid-cols-2">
-                                    {block.items.map((item, index) => (
-                                        <li key={`${block.id}-${index}-${item}`} className="flex gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm font-medium leading-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
-                                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: primaryColor }} />
-                                            <span>{item}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )
-                        }
-
-                        if (block.type === "feature") {
-                            return (
-                                <article key={block.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                                    <div className="flex items-start gap-3">
-                                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-lg shadow-sm dark:bg-slate-950">
-                                            {block.marker}
-                                        </span>
-                                        <div>
-                                            <h4 className="font-bold leading-6 text-slate-950 dark:text-white">{block.title}</h4>
-                                            {block.body && (
-                                                <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{block.body}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </article>
-                            )
-                        }
-
-                        return (
-                            <p key={block.id} className="text-[15px] leading-7 text-slate-600 dark:text-slate-300">
-                                {block.text}
-                            </p>
-                        )
-                    })}
-                </div>
-            )}
-
-            {(hasLongDescription || hasHiddenBlocks) && (
-                <button
-                    type="button"
-                    onClick={() => setIsExpanded((current) => !current)}
-                    className="mt-5 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
-                    aria-expanded={isExpanded}
-                >
-                    {isExpanded ? labels.seeLess : labels.seeMore}
-                    <span className={`material-symbols-outlined text-[18px] transition-transform ${isExpanded ? "rotate-180" : ""}`}>
-                        expand_more
-                    </span>
-                </button>
-            )}
-        </section>
-    )
-}
-
-interface ProductShippingCardLabels {
-    activeLabel: string
-    productHasFree: string
-    qualifies: (zonesText: string) => string
-    remaining: (remainingPrice: string, zonesText: string) => string
-    available: (zonesText: string) => string
-}
-
-interface ProductShippingCardProps {
-    shippingConfig?: StorefrontShippingConfig | null
-    subtotal: number
-    primaryColor: string
-    hasProductLevelFreeShipping: boolean
-    formatPrice: FormatPriceFn
-    labels: ProductShippingCardLabels
-}
-
-function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping, formatPrice, labels }: ProductShippingCardProps) {
-    const progress = getFreeShippingProgress(shippingConfig, subtotal)
-    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
-    const shippingQualified = hasProductLevelFreeShipping || (progress.enabled && (!progress.hasMinimum || progress.qualified))
-
-    if (!hasProductLevelFreeShipping && !progress.enabled) {
-        return null
-    }
-
-    const description = hasProductLevelFreeShipping
-        ? labels.productHasFree
-        : progress.hasMinimum
-            ? progress.qualified
-                ? labels.qualifies(progress.zonesText)
-                : labels.remaining(formatPrice(progress.remaining), progress.zonesText)
-            : labels.available(progress.zonesText)
-
-    return (
-        <div className="rounded-[10px] border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/40">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-slate-600 dark:text-slate-300">
-                <span className="material-symbols-outlined text-[16px]" style={{ color: primaryColor }}>local_shipping</span>
-                {shippingQualified ? (
-                    <>
-                        <strong className="text-slate-900 dark:text-white">{labels.activeLabel}</strong>
-                        <span>{description}</span>
-                    </>
-                ) : (
-                    <span>{description}</span>
-                )}
-                {estimatedDeliveryDays ? (
-                    <span className="text-slate-500 dark:text-slate-400">· {estimatedDeliveryDays} día{estimatedDeliveryDays === 1 ? "" : "s"}</span>
-                ) : null}
-            </p>
-            <div className="mt-2 h-[5px] overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-                <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{ width: `${shippingQualified ? 100 : progress.progress}%`, backgroundColor: primaryColor }}
-                />
-            </div>
-        </div>
-    )
-}
-
-interface ProductTrustRailProps {
-    whatsappLink: string | null
-    sectionLinks: ProductSectionLink[]
-    shippingConfig?: StorefrontShippingConfig | null
-    hasFreeShipping: boolean
-    inventoryLabel?: string
-    primaryColor?: string
-    onStartChat: () => void
-}
-
-interface TrustBadgeItem {
-    id: string
-    icon: string
-    title: string
-    description: string
-    href?: string
-    onClick?: () => void
-}
-
-function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, hasFreeShipping, inventoryLabel, primaryColor = "#3B82F6", onStartChat }: ProductTrustRailProps) {
-    // useT() funciona porque el archivo es 'use client' y ProductTrustRail
-    // se renderiza dentro del provider tree de TenantStringsProvider.
-    const t = useT()
-    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
-    const trustBadges: TrustBadgeItem[] = []
-    const resolvedInventoryLabel = inventoryLabel ?? t("store.product_detail.inventory_confirmed")
-
-    if (estimatedDeliveryDays) {
-        trustBadges.push({
-            id: "shipping",
-            icon: "local_shipping",
-            title: t("store.product_detail.trust_rail_fast_shipping"),
-            description: t("store.product_detail.trust_rail_days_label", {
-                count: estimatedDeliveryDays,
-                plural: estimatedDeliveryDays === 1 ? "" : "s",
-            }),
-        })
-    } else if (hasFreeShipping) {
-        trustBadges.push({
-            id: "shipping",
-            icon: "local_shipping",
-            title: t("store.product_detail.trust_rail_free_shipping"),
-            description: t("store.product_detail.trust_rail_active_purchase"),
-        })
-    }
-
-    if (whatsappLink) {
-        trustBadges.push({
-            id: "chat",
-            icon: "chat_bubble",
-            title: t("store.product_detail.trust_badge_assisted_purchase"),
-            description: t("store.product_detail.trust_badge_whatsapp_available"),
-            href: whatsappLink,
-        })
-    } else {
-        trustBadges.push({
-            id: "chat",
-            icon: "chat_bubble",
-            title: t("store.product_detail.trust_badge_assisted_purchase"),
-            description: t("store.product_detail.trust_badge_we_help_chat"),
-            onClick: onStartChat,
-        })
-    }
-
-    trustBadges.push({
-        id: "inventory",
-        icon: "inventory_2",
-        title: t("store.product_detail.trust_rail_real_inventory"),
-        description: resolvedInventoryLabel,
-    })
-
-    if (sectionLinks.length > 0) {
-        trustBadges.push({
-            id: "sections",
-            icon: "menu_book",
-            title: t("store.product_detail.trust_rail_explore"),
-            description: t("store.product_detail.trust_rail_sections_count", {
-                count: sectionLinks.length,
-            }),
-        })
-    }
-
-    if (trustBadges.length === 0 && sectionLinks.length === 0) {
-        return null
-    }
-
-    return (
-        <div className="mt-5 space-y-3">
-            <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/40">
-                <div className="grid grid-cols-2 md:grid-cols-4">
-                    {trustBadges.map((item) => {
-                        const content = (
-                            <>
-                                <span className="material-symbols-outlined text-[18px]" style={{ color: primaryColor }}>{item.icon}</span>
-                                <span>
-                                    {item.title}<br />{item.description}
-                                </span>
-                            </>
-                        )
-
-                        const className = "flex flex-col items-center gap-1 border-r border-slate-200 px-3 py-3 text-center text-[11px] font-medium text-slate-600 last:border-r-0 dark:border-slate-800 dark:text-slate-300"
-
-                        if ("href" in item && item.href) {
-                            return (
-                                <a key={item.id} href={item.href} target="_blank" rel="noopener noreferrer" className={className}>
-                                    {content}
-                                </a>
-                            )
-                        }
-
-                        if ("onClick" in item && item.onClick) {
-                            return (
-                                <button key={item.id} type="button" onClick={item.onClick} className={className}>
-                                    {content}
-                                </button>
-                            )
-                        }
-
-                        return (
-                            <div key={item.id} className={className}>
-                                {content}
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
-
-            {sectionLinks.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                    {sectionLinks.map((sectionLink) => (
-                        <a
-                            key={sectionLink.id}
-                            href={`#${sectionLink.id}`}
-                            className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-500"
-                        >
-                            {sectionLink.label}
-                        </a>
-                    ))}
-                </div>
-            )}
-        </div>
-    )
-}
-
-export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null, isBookable = false }: ProductDetailClientProps) {
+export function ProductDetailClient({ product, productWithVariants, viewModel, organization, badges, promotions, relatedProducts = [], slug, initialIsSubdomain = false, reviews = [], reviewSummary = null, shippingConfig = null, productDetailCRO = null, isBookable = false, isPremium = false }: ProductDetailClientProps) {
     const router = useRouter()
     const clientIsSubdomain = useIsSubdomain()
     const isSubdomain = initialIsSubdomain || clientIsSubdomain
@@ -1474,8 +855,8 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
     const isSelectedImageOOS = outOfStockImages.has(selectedImage)
 
     return (
-        <div className="relative flex min-h-screen w-full flex-col bg-background-light dark:bg-background-dark font-display pb-24 md:pb-0 md:pt-6">
-            <div className="mx-auto max-w-[1180px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className={`relative flex min-h-screen w-full flex-col font-display pb-24 md:pb-0 md:pt-6 ${isPremium ? "bg-stone-50 dark:bg-slate-950" : "bg-background-light dark:bg-background-dark"}`}>
+            <div className={`mx-auto max-w-[1180px] px-4 sm:px-6 lg:px-8 ${isPremium ? "py-8 lg:py-14" : "py-6 lg:py-8"}`}>
 
                 {/* Breadcrumbs */}
                 <nav className="flex items-center gap-2 text-[13px] text-slate-500 dark:text-slate-400 mb-8">
@@ -1494,11 +875,11 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                     <span className="text-slate-700 dark:text-slate-300 font-medium truncate max-w-[200px]">{product.name}</span>
                 </nav>
 
-                <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:items-start lg:gap-12">
+                <div className={`grid grid-cols-1 lg:grid-cols-2 lg:items-start ${isPremium ? "gap-12 lg:gap-16" : "gap-10 lg:gap-12"}`}>
 
                     {/* Left Column: Gallery */}
                     <div className="self-start lg:sticky lg:top-[76px]">
-                        <div className="relative aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                        <div className={`relative aspect-square overflow-hidden bg-white dark:bg-slate-950 ${isPremium ? "rounded-[28px] border border-slate-200/70 shadow-[0_18px_50px_-20px_rgba(15,23,42,0.25)] ring-1 ring-slate-900/5 dark:border-slate-800" : "rounded-2xl border border-slate-200 shadow-sm dark:border-slate-800"}`}>
                                 <Image
                                     src={selectedImage}
                                     alt={`${product.name}${product.brand ? ` - ${product.brand}` : ''} | ${organization.name}`}
@@ -1593,7 +974,7 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                             )}
                         </div>
 
-                        <h1 className="mb-3 text-[28px] font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 dark:text-white sm:text-[32px]">
+                        <h1 className={`mb-3 font-extrabold leading-[1.15] tracking-[-0.025em] text-slate-900 dark:text-white ${isPremium ? "text-[30px] sm:text-[38px]" : "text-[28px] sm:text-[32px]"}`}>
                             {product.name}
                         </h1>
 
@@ -1640,18 +1021,18 @@ export function ProductDetailClient({ product, productWithVariants, viewModel, o
                         )}
 
                         {/* Price Block */}
-                        <div className="mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                        <div className={isPremium ? "mb-6" : "mb-4 rounded-xl border border-[#b2e8e8] bg-[#f0fafa] p-4 dark:border-slate-700 dark:bg-slate-800/50"}>
                             <div className="flex items-baseline gap-3">
-                                <span className="text-[36px] font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums]">
+                                <span className={`font-extrabold tracking-[-0.03em] text-slate-900 dark:text-white [font-variant-numeric:tabular-nums] ${isPremium ? "text-[44px] leading-none" : "text-[36px]"}`}>
                                     {shouldShowPriceRange && priceRangeLabel ? priceRangeLabel : formatPrice(currentPrice)}
                                 </span>
                                 {compareAtPrice && (
-                                    <span className="text-[18px] text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums]">
+                                    <span className={`text-slate-500 line-through dark:text-slate-400 [font-variant-numeric:tabular-nums] ${isPremium ? "text-[19px]" : "text-[18px]"}`}>
                                         {formatPrice(compareAtPrice)}
                                     </span>
                                 )}
                                 {savingsAmount > 0 && (
-                                    <span className="rounded bg-rose-100 px-2 py-0.5 text-[12px] font-bold text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                                    <span className={`font-bold text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 ${isPremium ? "rounded-full bg-rose-100 px-3 py-1 text-[13px]" : "rounded bg-rose-100 px-2 py-0.5 text-[12px]"}`}>
                                         −{formatPrice(savingsAmount)}
                                     </span>
                                 )}
