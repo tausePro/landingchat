@@ -58,15 +58,15 @@ export function StoreHeader({
                         <Image
                             src={organization.logo_url}
                             alt={organization.name}
-                            width={150}
-                            height={40}
-                            className="h-10 w-auto object-contain max-w-[120px] md:max-w-[150px]"
+                            width={200}
+                            height={48}
+                            className="h-11 w-auto object-contain max-w-[160px] md:max-w-[200px]"
                             loading="eager"
                             quality={90}
                             priority
                         />
                     ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg" style={{ backgroundColor: primaryColor }}>
+                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg" style={{ backgroundColor: primaryColor }}>
                             {organization.name.substring(0, 1)}
                         </div>
                     )}
