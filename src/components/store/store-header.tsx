@@ -66,11 +66,11 @@ export function StoreHeader({
                             priority
                         />
                     ) : (
-                        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-white font-bold text-lg" style={{ backgroundColor: primaryColor }}>
-                            {organization.name.substring(0, 1)}
-                        </div>
+                        <span className="truncate text-2xl font-extrabold tracking-tight text-slate-900 max-w-[60vw] sm:max-w-[320px]">
+                            {organization.name}
+                        </span>
                     )}
-                    {showStoreName && (
+                    {organization.logo_url && showStoreName && (
                         <span className="text-lg md:text-xl font-bold tracking-tight">{organization.name}</span>
                     )}
                 </div>
