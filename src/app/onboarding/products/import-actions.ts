@@ -51,18 +51,26 @@ export async function confirmStoreImport(
     items: Array<z.infer<typeof importItemSchema>>,
     brand?: ImportedBrand,
 ): Promise<ActionResult<StoreImportSummary>> {
-    const user = await requireUser()
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) return failure("No autenticado")
 
     if (!Array.isArray(items) || items.length === 0) {
         return failure("No hay productos para importar")
     }
 
+    const { data: profile } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .single()
+    const orgId = profile?.organization_id ?? null
+
     // Onboarding mágico: desde la marca extraída generamos el contrato de diseño
     // (designSystem) y lo aplicamos a la organización → el storefront sale con la
     // marca del cliente + plantilla premium + tipografía desde el primer momento.
-    if (brand) {
-        await persistImportedBrand(user.id, brand)
+    if (brand && orgId) {
+        await persistImportedBrand(supabase, orgId, brand)
     }
 
     const summary: StoreImportSummary = { created: 0, failed: 0, errors: [] }
@@ -76,6 +84,13 @@ export async function confirmStoreImport(
         }
         const item = parsed.data
 
+        // Re-hospedamos la imagen scrapeada en NUESTRO storage: las URLs externas
+        // del merchant no están en images.remotePatterns (next.config), así que
+        // next/image las bloquearía (salían rotas). Si falla, queda sin imagen.
+        const hostedImage = orgId && item.imageUrl
+            ? await rehostProductImage(supabase, item.imageUrl, orgId)
+            : null
+
         // createProduct revalida con Zod (aplica defaults de categories/
         // variants/etc.), por eso basta el objeto mínimo. El cast salva la
         // fricción de tipos (el param es z.infer=salida, con defaults requeridos).
@@ -83,8 +98,8 @@ export async function confirmStoreImport(
             name: item.name,
             description: item.description ?? undefined,
             price: item.price,
-            images: item.imageUrl ? [item.imageUrl] : [],
-            image_url: item.imageUrl ?? undefined,
+            images: hostedImage ? [hostedImage] : [],
+            image_url: hostedImage ?? undefined,
             stock: 0,
             is_active: true,
         } as unknown as Parameters<typeof createProduct>[0])
@@ -103,20 +118,14 @@ export async function confirmStoreImport(
     return success(summary)
 }
 
-/** Persiste la marca/color extraídos en la organización del usuario (RLS: su propia org). */
-async function persistImportedBrand(userId: string, brand: ImportedBrand): Promise<void> {
-    const supabase = await createClient()
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", userId)
-        .single()
-    if (!profile?.organization_id) return
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>
 
+/** Persiste la marca/color/logo extraídos en la organización (RLS: su propia org). */
+async function persistImportedBrand(supabase: ServerSupabase, orgId: string, brand: ImportedBrand): Promise<void> {
     const { data: org } = await supabase
         .from("organizations")
         .select("settings, industry")
-        .eq("id", profile.organization_id)
+        .eq("id", orgId)
         .single()
 
     const updates = buildOnboardingOrgUpdates(brand, {
@@ -124,5 +133,38 @@ async function persistImportedBrand(userId: string, brand: ImportedBrand): Promi
         industry: typeof org?.industry === "string" ? org.industry : null,
     })
 
-    await supabase.from("organizations").update(updates).eq("id", profile.organization_id)
+    // El logo del sitio es externo → re-hospedarlo para que next/image lo sirva.
+    if (brand.logoUrl) {
+        const hostedLogo = await rehostProductImage(supabase, brand.logoUrl, orgId)
+        if (hostedLogo) updates.logo_url = hostedLogo
+    }
+
+    await supabase.from("organizations").update(updates).eq("id", orgId)
+}
+
+/**
+ * Descarga una imagen externa y la re-hospeda en el bucket product-images
+ * (supabase.co, permitido por next/image). Devuelve la URL pública o null si
+ * falla (timeout, no-imagen, muy grande, error de subida) — nunca lanza.
+ */
+async function rehostProductImage(supabase: ServerSupabase, url: string, orgId: string): Promise<string | null> {
+    try {
+        const res = await fetch(url, {
+            signal: AbortSignal.timeout(8000),
+            headers: { "user-agent": "Mozilla/5.0 (compatible; LandingChatImporter/1.0)" },
+        })
+        if (!res.ok) return null
+        const contentType = res.headers.get("content-type") ?? ""
+        if (!contentType.startsWith("image/")) return null
+        const buffer = await res.arrayBuffer()
+        if (buffer.byteLength === 0 || buffer.byteLength > 5_000_000) return null
+        const ext = (contentType.split("/")[1] ?? "jpg").split("+")[0].replace(/[^a-z0-9]/gi, "").slice(0, 5) || "jpg"
+        const path = `${orgId}/imported/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`
+        const { error } = await supabase.storage.from("product-images").upload(path, buffer, { contentType, upsert: false })
+        if (error) return null
+        const { data } = supabase.storage.from("product-images").getPublicUrl(path)
+        return data.publicUrl || null
+    } catch {
+        return null
+    }
 }
