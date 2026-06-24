@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
+    // Logos de marca pueden ser SVG (re-hospedados en supabase). Se sirven
+    // sandboxeados (sin scripts) — seguro para SVG de origen externo.
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     remotePatterns: [
       {
         protocol: 'https',

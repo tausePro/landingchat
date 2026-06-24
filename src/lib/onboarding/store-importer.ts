@@ -179,7 +179,7 @@ function extractLogo(html: string, baseUrl: string): string | null {
         if (!/logo/i.test(attrs)) continue
         const src = attrs.match(/\b(?:src|data-src|data-lazy-src)=["']([^"']+)["']/i)?.[1]
         const abs = absoluteUrl(src, baseUrl)
-        if (abs && /\.(png|jpe?g|webp|avif)(\?|$)/i.test(abs)) return abs
+        if (abs && /\.(png|jpe?g|webp|avif|svg)(\?|$)/i.test(abs)) return abs
     }
     return null
 }
