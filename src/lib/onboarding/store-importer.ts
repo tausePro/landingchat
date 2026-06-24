@@ -261,6 +261,60 @@ async function fetchHtml(url: string): Promise<string | null> {
     }
 }
 
+/** Quita tags HTML y entidades básicas (para descripciones de Shopify body_html). */
+function stripHtml(value: string): string {
+    return value
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&[a-z]+;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+}
+
+const shopifyProductsSchema = z.object({
+    products: z.array(z.object({
+        title: z.string().nullish(),
+        body_html: z.string().nullish(),
+        variants: z.array(z.object({ price: z.union([z.string(), z.number()]).nullish() })).nullish(),
+        images: z.array(z.object({ src: z.string().nullish() })).nullish(),
+    })).nullish(),
+})
+
+/**
+ * Shopify expone /products.json con data completa (título, body_html=descripción,
+ * variants[].price, images[].src). Es la fuente más confiable para tiendas Shopify
+ * — incluye DESCRIPCIONES, que el scrape de una sola página (home/colección) no trae.
+ * Devuelve null si no es Shopify o falla (→ se usa el scrape HTML normal).
+ */
+async function fetchShopifyProducts(origin: string): Promise<ExtractedProduct[] | null> {
+    if (!origin) return null
+    try {
+        const res = await fetch(`${origin}/products.json?limit=250`, {
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+            headers: { "user-agent": "Mozilla/5.0 (compatible; LandingChatImporter/1.0)" },
+        })
+        if (!res.ok || !(res.headers.get("content-type") ?? "").includes("json")) return null
+        const parsed = shopifyProductsSchema.safeParse(await res.json())
+        if (!parsed.success || !parsed.data.products) return null
+        const products: ExtractedProduct[] = []
+        for (const raw of parsed.data.products) {
+            const name = raw.title?.trim()
+            if (!name) continue
+            products.push({
+                name: name.slice(0, 120),
+                price: normalizePrice(raw.variants?.[0]?.price ?? null),
+                description: raw.body_html ? stripHtml(raw.body_html).slice(0, 500) || null : null,
+                imageUrl: raw.images?.[0]?.src ?? null,
+            })
+            if (products.length >= MAX_PRODUCTS) break
+        }
+        return products.length > 0 ? products : null
+    } catch {
+        return null
+    }
+}
+
 const EXTRACT_PROMPT = (text: string, jsonLdHint: string, imagesBlock: string, colorsBlock: string) => `
 You extract a store's catalog and brand from its website content. Return JSON ONLY.
 
@@ -306,6 +360,8 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
     const candidateUrls = new Set(imageCandidates.map((image) => image.url))
     let siteOrigin = ""
     try { siteOrigin = new URL(url).origin } catch { /* noop */ }
+    // Shopify: /products.json es autoritativo e incluye descripciones.
+    const shopifyProducts = await fetchShopifyProducts(siteOrigin)
     const isRealImage = (candidate: string | null): candidate is string => {
         if (!candidate) return false
         if (candidateUrls.has(candidate)) return true
@@ -333,26 +389,31 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
         log.warn("LLM extraction failed, falling back to JSON-LD only", { url, error: error instanceof Error ? error.message : "unknown" })
     }
 
-    // Merge: JSON-LD (fiable) tiene prioridad; el LLM completa lo que falte.
-    const byName = new Map<string, ExtractedProduct>()
-    for (const product of jsonLdProducts) {
-        byName.set(product.name.toLowerCase(), product)
+    // Shopify (autoritativo, con descripciones) tiene prioridad; si no, merge
+    // JSON-LD (fiable) + LLM.
+    let products: ExtractedProduct[]
+    if (shopifyProducts && shopifyProducts.length > 0) {
+        products = shopifyProducts.slice(0, MAX_PRODUCTS)
+    } else {
+        const byName = new Map<string, ExtractedProduct>()
+        for (const product of jsonLdProducts) {
+            byName.set(product.name.toLowerCase(), product)
+        }
+        for (const raw of llmStore?.products ?? []) {
+            const name = (raw.name ?? "").trim()
+            if (!name) continue
+            const key = name.toLowerCase()
+            if (byName.has(key)) continue
+            const llmImage = absoluteUrl(raw.image_url, url)
+            byName.set(key, {
+                name: name.slice(0, 120),
+                price: normalizePrice(raw.price),
+                description: raw.description?.trim().slice(0, 500) ?? null,
+                imageUrl: isRealImage(llmImage) ? llmImage : null,   // descarta URLs inventadas
+            })
+        }
+        products = Array.from(byName.values()).slice(0, MAX_PRODUCTS)
     }
-    for (const raw of llmStore?.products ?? []) {
-        const name = (raw.name ?? "").trim()
-        if (!name) continue
-        const key = name.toLowerCase()
-        if (byName.has(key)) continue
-        const llmImage = absoluteUrl(raw.image_url, url)
-        byName.set(key, {
-            name: name.slice(0, 120),
-            price: normalizePrice(raw.price),
-            description: raw.description?.trim().slice(0, 500) ?? null,
-            imageUrl: isRealImage(llmImage) ? llmImage : null,   // descarta URLs inventadas
-        })
-    }
-
-    const products = Array.from(byName.values()).slice(0, MAX_PRODUCTS)
     if (products.length === 0) {
         return { ok: false, error: "No encontré productos en esa página. Prueba con el link directo a tu catálogo o tienda." }
     }
