@@ -31,6 +31,7 @@ interface StorefrontFormProps {
         name: string
         slug: string
         industry?: string | null
+        logo_url?: string | null
         settings?: StorefrontFormSettings | null
     }
 }
