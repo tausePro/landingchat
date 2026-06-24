@@ -1,4 +1,5 @@
-export type StorefrontTemplateId = "minimal" | "complete" | "single-product" | "services" | "real-estate" | "premium"
+export const STOREFRONT_TEMPLATE_IDS = ["minimal", "complete", "single-product", "services", "real-estate", "premium"] as const
+export type StorefrontTemplateId = (typeof STOREFRONT_TEMPLATE_IDS)[number]
 
 interface StorefrontTemplateSettingsLike {
     template?: string | null

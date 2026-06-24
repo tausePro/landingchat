@@ -13,7 +13,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createProduct } from "@/app/dashboard/products/actions"
 import { extractStoreFromUrl, type ExtractedStore } from "@/lib/onboarding/store-importer"
-import { buildBrandUpdates, type ImportedBrand } from "@/lib/onboarding/brand-updates"
+import { buildOnboardingOrgUpdates, type ImportedBrand } from "@/lib/onboarding/brand-updates"
 import { type ActionResult, success, failure } from "@/types"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
@@ -58,9 +58,9 @@ export async function confirmStoreImport(
         return failure("No hay productos para importar")
     }
 
-    // Quick win onboarding mágico: la marca/color que el scraping ya extraía se
-    // descartaba. Ahora la persistimos en la organización → el storefront sale
-    // con la marca del cliente desde el primer momento.
+    // Onboarding mágico: desde la marca extraída generamos el contrato de diseño
+    // (designSystem) y lo aplicamos a la organización → el storefront sale con la
+    // marca del cliente + plantilla premium + tipografía desde el primer momento.
     if (brand) {
         await persistImportedBrand(user.id, brand)
     }
@@ -115,15 +115,14 @@ async function persistImportedBrand(userId: string, brand: ImportedBrand): Promi
 
     const { data: org } = await supabase
         .from("organizations")
-        .select("primary_color, settings")
+        .select("settings, industry")
         .eq("id", profile.organization_id)
         .single()
 
-    const updates = buildBrandUpdates(
-        brand,
-        (org ?? {}) as { primary_color?: string | null; settings?: Record<string, unknown> | null },
-    )
-    if (!updates) return
+    const updates = buildOnboardingOrgUpdates(brand, {
+        settings: (org?.settings ?? null) as Record<string, unknown> | null,
+        industry: typeof org?.industry === "string" ? org.industry : null,
+    })
 
     await supabase.from("organizations").update(updates).eq("id", profile.organization_id)
 }
