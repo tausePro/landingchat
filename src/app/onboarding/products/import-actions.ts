@@ -100,7 +100,9 @@ export async function confirmStoreImport(
             price: item.price,
             images: hostedImage ? [hostedImage] : [],
             image_url: hostedImage ?? undefined,
-            stock: 0,
+            // Vendibles por default (inStock = stock > 0). El merchant ajusta el
+            // inventario real en el dashboard; importar con 0 los dejaba agotados.
+            stock: 100,
             is_active: true,
         } as unknown as Parameters<typeof createProduct>[0])
 
