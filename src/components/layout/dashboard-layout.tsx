@@ -33,6 +33,7 @@ import {
     UserCog,
     Store,
     Sparkles,
+    Handshake,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -42,6 +43,7 @@ interface DashboardLayoutProps {
 
 // Mapeo de slugs a iconos
 const ICON_MAP: Record<string, LucideIcon> = {
+    affiliates: Handshake,
     dashboard: LayoutDashboard,
     analytics: BarChart3,
     conversations: MessageSquare,
@@ -118,6 +120,7 @@ const MODULE_TO_NAV: Record<string, NavItem> = {
 // Items que siempre aparecen al final
 const FOOTER_NAV_ITEMS: NavItem[] = [
     { slug: "integrations", label: "Integraciones", href: "/dashboard/integrations", icon: Puzzle },
+    { slug: "affiliates", label: "Afiliados", href: "/dashboard/afiliados", icon: Handshake },
     { slug: "subscription", label: "Suscripción", href: "/dashboard/subscription", icon: CreditCard },
 ]
 

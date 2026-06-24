@@ -2,6 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server"
 import { getPlatformWompiCredentials } from "@/app/admin/platform-payments/actions"
+import { generateAffiliateCommissionForSubscriptionPayment } from "@/lib/affiliates/commissions"
 
 /**
  * Verifica el estado de una transacción de Wompi y activa la suscripción si fue aprobada.
@@ -147,6 +148,13 @@ async function activateSubscriptionFromReference(
         }, {
             onConflict: "provider_transaction_id"
         })
+
+    // Comisión de afiliado (si el merchant fue referido por un link ?ref=). Idempotente.
+    await generateAffiliateCommissionForSubscriptionPayment(supabase, {
+        subscriptionId: subscription.id,
+        providerTransactionId: wompiTransactionId,
+        amount: amountInCents / 100,
+    })
 
     console.log(`[activateSubscription] Subscription ${subscriptionId} activated until ${newPeriodEnd.toISOString()}`)
 }
