@@ -10,6 +10,7 @@ import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 import { calculateTaxForItems, buildProductTaxMap, type OrgTaxSettings } from "@/lib/utils/tax"
 import { getPhoneVariants, normalizePhone } from "@/lib/utils/phone"
 import { decrementOrderStock } from "@/lib/commerce/decrementOrderStock"
+import { attributeStoreReferral } from "@/lib/affiliates/order-attribution"
 import {
     appendStorefrontAccessParam,
     createStorefrontOrderAccessToken,
@@ -712,6 +713,10 @@ export async function createOrder(params: CreateOrderParams) {
                 customerId: resolvedCustomerId,
             })
         }
+
+        // Atribución de afiliado tenant: si el comprador llegó por ?ref= de un
+        // afiliado de esta tienda, registra el referral (afiliado→cliente).
+        await attributeStoreReferral(org.id, order.customer_id || resolvedCustomerId)
 
         const orderAccessToken = createStorefrontOrderAccessToken({
             slug: params.slug,
