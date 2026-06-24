@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,6 +16,7 @@ interface HeaderEditorProps {
         id: string
         name: string
         slug: string
+        logo_url?: string | null
         settings: HeaderEditorOrganizationSettings
     }
 }
@@ -34,6 +36,7 @@ interface HeaderEditorOrganizationSettings {
         header?: {
             showStoreName?: boolean
             menuItems?: MenuItem[]
+            logoSize?: number
             [key: string]: unknown
         }
         [key: string]: unknown
@@ -72,6 +75,9 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
     )
     const [menuItems, setMenuItems] = useState<MenuItem[]>(
         organization.settings?.storefront?.header?.menuItems || DEFAULT_MENU_ITEMS
+    )
+    const [logoSize, setLogoSize] = useState<number>(
+        organization.settings?.storefront?.header?.logoSize ?? 44
     )
     const [quickLinks, setQuickLinks] = useState<QuickLink[]>(STATIC_QUICK_LINKS)
     const [loadingCategories, setLoadingCategories] = useState(true)
@@ -266,6 +272,7 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
 
             await updateOrganization({
                 ...organization,
+                logo_url: organization.logo_url ?? undefined,
                 settings: {
                     ...organization.settings,
                     storefront: {
@@ -273,6 +280,7 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                         header: {
                             ...organization.settings?.storefront?.header,
                             showStoreName,
+                            logoSize,
                             menuItems: validMenuItems
                         }
                     }
@@ -324,6 +332,44 @@ export function HeaderEditor({ organization }: HeaderEditorProps) {
                         checked={showStoreName}
                         onCheckedChange={setShowStoreName}
                     />
+                </div>
+
+                {/* Tamaño del logo */}
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">Tamaño del logo</Label>
+                            <p className="text-sm text-muted-foreground">Ajusta el alto del logo en el encabezado de tu tienda.</p>
+                        </div>
+                        <span className="text-sm font-medium tabular-nums text-muted-foreground">{logoSize}px</span>
+                    </div>
+                    <input
+                        type="range"
+                        min={24}
+                        max={80}
+                        step={2}
+                        value={logoSize}
+                        onChange={(event) => setLogoSize(Number(event.target.value))}
+                        className="w-full cursor-pointer accent-primary"
+                        aria-label="Tamaño del logo"
+                    />
+                    <div className="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 p-4">
+                        {organization.logo_url ? (
+                            <Image
+                                src={organization.logo_url}
+                                alt={organization.name}
+                                width={280}
+                                height={80}
+                                className="w-auto object-contain max-w-[280px]"
+                                style={{ height: `${logoSize}px` }}
+                            />
+                        ) : (
+                            <div className="flex items-center justify-center rounded-lg bg-primary font-bold text-white" style={{ height: `${logoSize}px`, width: `${logoSize}px`, fontSize: `${Math.round(logoSize * 0.4)}px` }}>
+                                {organization.name.substring(0, 1)}
+                            </div>
+                        )}
+                        <span className="text-xs text-muted-foreground">Vista previa</span>
+                    </div>
                 </div>
 
                 {/* Separador */}
