@@ -120,7 +120,7 @@ export function StoreImportCard() {
                             )}
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setOpen(false)}>Seguir aquí</Button>
-                                <Button onClick={() => router.push("/onboarding/plan")}>Continuar onboarding</Button>
+                                <Button onClick={() => router.push("/onboarding/preview")}>Ver mi tienda</Button>
                             </DialogFooter>
                         </>
                     ) : step === "preview" ? (
