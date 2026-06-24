@@ -118,8 +118,8 @@ export default function BusinessConfigPage() {
                 return
             }
 
-            // Navigate to WhatsApp connection step
-            router.push("/onboarding/whatsapp")
+            // Flujo único: tras los datos del negocio, configurar la tienda (subdomain)
+            router.push("/onboarding/store")
         } catch (err) {
             console.error("Error:", err)
             alert("Error inesperado. Intenta de nuevo.")
@@ -131,7 +131,7 @@ export default function BusinessConfigPage() {
 
     return (
         <>
-            <ProgressBar currentStep={1} totalSteps={3} stepLabel="Información del Negocio" />
+            <ProgressBar currentStep={1} totalSteps={7} stepLabel="Información del Negocio" />
 
             <div className="flex flex-col gap-3">
                 <div className="w-fit rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary">

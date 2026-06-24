@@ -115,7 +115,7 @@ export default function StoreConfigPage() {
 
     return (
         <>
-            <ProgressBar currentStep={1} totalSteps={5} stepLabel="Configuración de Tienda" />
+            <ProgressBar currentStep={2} totalSteps={7} stepLabel="Configuración de Tienda" />
 
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight sm:text-4xl">
