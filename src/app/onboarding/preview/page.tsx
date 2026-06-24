@@ -36,7 +36,7 @@ export default async function OnboardingPreviewPage() {
         .single()
 
     // Sin slug todavía no hay storefront que mostrar → seguir el flujo.
-    if (!org?.slug) redirect("/onboarding/plan")
+    if (!org?.slug) redirect("/onboarding/whatsapp")
 
     const settings = (org.settings ?? {}) as StorefrontSettingsShape
     const template = getSafeStorefrontTemplate(settings.storefront?.template, { industry: org.industry })
@@ -46,7 +46,7 @@ export default async function OnboardingPreviewPage() {
 
     return (
         <>
-            <ProgressBar currentStep={3} totalSteps={5} stepLabel="Tu tienda ya tiene diseño" />
+            <ProgressBar currentStep={5} totalSteps={7} stepLabel="Tu tienda ya tiene diseño" />
 
             <div className="flex flex-col gap-1 py-4">
                 <p className="text-slate-900 dark:text-slate-50 text-3xl font-extrabold leading-tight tracking-tight">
@@ -101,7 +101,7 @@ export default async function OnboardingPreviewPage() {
                             Ajustar diseño
                         </Button>
                     </Link>
-                    <Link href="/onboarding/plan">
+                    <Link href="/onboarding/whatsapp">
                         <Button className="h-11 px-5">Se ve genial, continuar</Button>
                     </Link>
                 </div>

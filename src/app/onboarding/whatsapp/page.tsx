@@ -139,7 +139,7 @@ export default function WhatsAppOnboardingPage() {
 
     return (
         <>
-            <ProgressBar currentStep={2} totalSteps={3} stepLabel="Conectar WhatsApp" />
+            <ProgressBar currentStep={6} totalSteps={7} stepLabel="Conectar WhatsApp" />
 
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight sm:text-4xl">
