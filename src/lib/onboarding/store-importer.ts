@@ -168,6 +168,22 @@ function extractColorCandidates(html: string): string[] {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([hex]) => hex)
 }
 
+/**
+ * Logo REAL del header (no el favicon): primer <img> cuyo tag mencione "logo"
+ * (class/alt/src/id) y sea raster (png/jpg/webp/avif). Es el wordmark de marca
+ * de buena resolución — mucho mejor que el favicon/apple-touch-icon chico.
+ */
+function extractLogo(html: string, baseUrl: string): string | null {
+    for (const tag of html.matchAll(/<img\b[^>]*>/gi)) {
+        const attrs = tag[0]
+        if (!/logo/i.test(attrs)) continue
+        const src = attrs.match(/\b(?:src|data-src|data-lazy-src)=["']([^"']+)["']/i)?.[1]
+        const abs = absoluteUrl(src, baseUrl)
+        if (abs && /\.(png|jpe?g|webp|avif)(\?|$)/i.test(abs)) return abs
+    }
+    return null
+}
+
 function extractMeta(html: string, baseUrl: string) {
     const meta = (prop: string) => {
         const match = html.match(new RegExp(`<meta[^>]*(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`, "i"))
@@ -184,7 +200,8 @@ function extractMeta(html: string, baseUrl: string) {
         brandName: meta("og:site_name") || titleMatch?.[1]?.trim() || null,
         themeColor: meta("theme-color"),
         ogImage: absoluteUrl(meta("og:image"), baseUrl),
-        logoUrl: absoluteUrl(linkHref("apple-touch-icon") || linkHref("icon") || meta("og:image"), baseUrl),
+        // Logo real del header primero; si no, favicon/apple-touch-icon/og.
+        logoUrl: extractLogo(html, baseUrl) ?? absoluteUrl(linkHref("apple-touch-icon") || linkHref("icon") || meta("og:image"), baseUrl),
     }
 }
 
