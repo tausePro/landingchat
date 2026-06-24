@@ -32,10 +32,11 @@ export function StoreImportCard() {
     const [primaryColor, setPrimaryColor] = useState<string | null>(null)
     const [currency, setCurrency] = useState<string | null>(null)
     const [logoUrl, setLogoUrl] = useState<string | null>(null)
+    const [initialStock, setInitialStock] = useState("100")
     const [rows, setRows] = useState<Row[]>([])
     const [summary, setSummary] = useState<StoreImportSummary | null>(null)
 
-    const reset = () => { setStep("input"); setUrl(""); setRows([]); setBrand(null); setPrimaryColor(null); setCurrency(null); setLogoUrl(null); setSummary(null) }
+    const reset = () => { setStep("input"); setUrl(""); setRows([]); setBrand(null); setPrimaryColor(null); setCurrency(null); setLogoUrl(null); setInitialStock("100"); setSummary(null) }
 
     const handleAnalyze = async () => {
         setStep("loading")
@@ -71,7 +72,7 @@ export function StoreImportCard() {
         if (items.length === 0) { toast.error("Selecciona al menos un producto"); return }
 
         setStep("importing")
-        const result = await confirmStoreImport(items, { primaryColor, currency, logoUrl })
+        const result = await confirmStoreImport(items, { primaryColor, currency, logoUrl }, { initialStock: Number(initialStock) || 100 })
         if (!result.success) { toast.error(result.error); setStep("preview"); return }
         setSummary(result.data)
         setStep("done")
@@ -156,6 +157,18 @@ export function StoreImportCard() {
                                         />
                                     </div>
                                 ))}
+                            </div>
+                            <div className="flex items-center gap-2 border-t pt-3 text-sm dark:border-slate-800">
+                                <label htmlFor="initial-stock" className="text-slate-600 dark:text-slate-400">Stock inicial por producto:</label>
+                                <Input
+                                    id="initial-stock"
+                                    type="number"
+                                    min={0}
+                                    value={initialStock}
+                                    onChange={(event) => setInitialStock(event.target.value)}
+                                    className="h-9 w-24"
+                                />
+                                <span className="text-xs text-slate-400">Ajústalo después en el dashboard.</span>
                             </div>
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setStep("input")}>Atrás</Button>
