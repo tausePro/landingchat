@@ -1,6 +1,7 @@
 "use server"
 
 import { createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
+import { cookies } from "next/headers"
 
 import { calculateCurrentPrice } from "@/types"
 
@@ -113,6 +114,9 @@ export async function setupNewUser(
         // 4. Crear suscripción trial
         await createTrialSubscription(supabase, organizationId)
 
+        // 5. Atribución de afiliado (si el merchant llegó por un link ?ref=)
+        await attributeReferral(supabase, organizationId)
+
         return {
             success: true,
             userId,
@@ -125,6 +129,44 @@ export async function setupNewUser(
             success: false,
             error: error instanceof Error ? error.message : "Error al configurar usuario"
         }
+    }
+}
+
+/**
+ * Atribuye el signup a un afiliado de plataforma si el merchant llegó por un
+ * link ?ref= (cookie lc_ref). NO bloquea el registro: cualquier fallo se loguea
+ * y se ignora. Usa el service client (el nuevo usuario no es el afiliado).
+ */
+async function attributeReferral(supabase: SupabaseServiceClient, organizationId: string): Promise<void> {
+    try {
+        const cookieStore = await cookies()
+        const code = cookieStore.get("lc_ref")?.value
+        if (!code) return
+
+        const { data: affiliate } = await supabase
+            .from("affiliates")
+            .select("id")
+            .eq("code", code)
+            .eq("scope", "platform")
+            .eq("status", "active")
+            .maybeSingle()
+        if (!affiliate) return
+
+        // unique(affiliate_id, subject_type, subject_id): si ya estaba atribuida,
+        // el insert choca (23505) y se ignora.
+        const { error } = await supabase
+            .from("affiliate_referrals")
+            .insert({
+                affiliate_id: affiliate.id,
+                subject_type: "organization",
+                subject_id: organizationId,
+                status: "pending",
+            })
+        if (error && error.code !== "23505") {
+            console.error("[attributeReferral] insert error:", error.message)
+        }
+    } catch (error) {
+        console.error("[attributeReferral] no-fatal:", error)
     }
 }
 
