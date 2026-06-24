@@ -95,16 +95,9 @@ export default async function OnboardingPreviewPage() {
                         Abrir en pestaña nueva
                     </Button>
                 </Link>
-                <div className="flex flex-wrap gap-3">
-                    <Link href="/dashboard/settings/storefront">
-                        <Button variant="secondary" className="h-11 px-5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700">
-                            Ajustar diseño
-                        </Button>
-                    </Link>
-                    <Link href="/onboarding/whatsapp">
-                        <Button className="h-11 px-5">Se ve genial, continuar</Button>
-                    </Link>
-                </div>
+                <Link href="/onboarding/whatsapp">
+                    <Button className="h-11 px-5">Se ve genial, continuar</Button>
+                </Link>
             </div>
         </>
     )

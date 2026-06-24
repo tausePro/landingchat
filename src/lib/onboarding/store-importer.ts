@@ -34,6 +34,7 @@ export interface ExtractedStore {
     brandName: string | null
     currency: string | null
     primaryColor: string | null
+    logoUrl: string | null
     products: ExtractedProduct[]
     sourceUrl: string
     productsFound: number
@@ -131,16 +132,59 @@ function extractJsonLd(html: string, baseUrl: string): ExtractedProduct[] {
     return products
 }
 
+/** #rrggbb válido (expande #rgb), o null. */
+function normalizeHex(value: string | null | undefined): string | null {
+    if (!value) return null
+    const v = value.trim().toLowerCase()
+    const six = v.match(/^#([0-9a-f]{6})$/)
+    if (six) return `#${six[1]}`
+    const three = v.match(/^#([0-9a-f]{3})$/)
+    if (three) return `#${three[1].split("").map((c) => c + c).join("")}`
+    return null
+}
+
+/** Neutro (gris/blanco/negro) → no sirve como color de marca. */
+function isNeutralColor(hex: string): boolean {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    return max - min < 24 || max < 32 || min > 232
+}
+
+/**
+ * Colores de marca candidatos del HTML crudo (style="" + <style>), ordenados por
+ * frecuencia y sin neutros. El LLM no ve estilos (htmlToText los quita), así que
+ * estos candidatos son la fuente real del color de marca.
+ */
+function extractColorCandidates(html: string): string[] {
+    const counts = new Map<string, number>()
+    for (const m of html.matchAll(/#[0-9a-fA-F]{6}\b/g)) {
+        const hex = m[0].toLowerCase()
+        if (isNeutralColor(hex)) continue
+        counts.set(hex, (counts.get(hex) ?? 0) + 1)
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([hex]) => hex)
+}
+
 function extractMeta(html: string, baseUrl: string) {
     const meta = (prop: string) => {
         const match = html.match(new RegExp(`<meta[^>]*(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`, "i"))
         return match?.[1]?.trim() ?? null
+    }
+    const linkHref = (rel: string) => {
+        const m =
+            html.match(new RegExp(`<link[^>]*rel=["'][^"']*${rel}[^"']*["'][^>]*href=["']([^"']+)["']`, "i")) ??
+            html.match(new RegExp(`<link[^>]*href=["']([^"']+)["'][^>]*rel=["'][^"']*${rel}[^"']*["']`, "i"))
+        return m?.[1]?.trim() ?? null
     }
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
     return {
         brandName: meta("og:site_name") || titleMatch?.[1]?.trim() || null,
         themeColor: meta("theme-color"),
         ogImage: absoluteUrl(meta("og:image"), baseUrl),
+        logoUrl: absoluteUrl(linkHref("apple-touch-icon") || linkHref("icon") || meta("og:image"), baseUrl),
     }
 }
 
@@ -217,19 +261,20 @@ async function fetchHtml(url: string): Promise<string | null> {
     }
 }
 
-const EXTRACT_PROMPT = (text: string, jsonLdHint: string, imagesBlock: string) => `
-You extract a store's catalog from its website content. Return JSON ONLY.
+const EXTRACT_PROMPT = (text: string, jsonLdHint: string, imagesBlock: string, colorsBlock: string) => `
+You extract a store's catalog and brand from its website content. Return JSON ONLY.
 
 WEBSITE CONTENT (truncated):
 ${text}
 ${jsonLdHint ? `\nSTRUCTURED PRODUCTS ALREADY FOUND (schema.org):\n${jsonLdHint}` : ""}
 ${imagesBlock ? `\nAVAILABLE IMAGES (url — alt text). Match each product to its image by alt text / filename similarity:\n${imagesBlock}` : ""}
+${colorsBlock ? `\nBRAND COLOR CANDIDATES (hex, by frequency in the page styles):\n${colorsBlock}` : ""}
 
 Return a JSON object:
 {
   "brand_name": "<store/brand name or null>",
   "currency": "<ISO code if evident, e.g. COP, USD, MXN, or null>",
-  "primary_color": "<dominant brand hex color if evident, or null>",
+  "primary_color": "<the brand's MAIN color as #rrggbb, chosen from BRAND COLOR CANDIDATES (used for buttons/headers/brand), or null>",
   "products": [
     { "name": "<product name>", "price": <number or null>, "description": "<short or null>", "image_url": "<url or null>" }
   ]
@@ -255,6 +300,7 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
     const jsonLdProducts = extractJsonLd(html, url)
     const meta = extractMeta(html, url)
     const imageCandidates = extractImageCandidates(html, url)
+    const colorCandidates = extractColorCandidates(html)
     // Guard anti-alucinación: solo aceptamos imágenes presentes en la página
     // (set exacto) o, a lo sumo, del mismo origen del sitio.
     const candidateUrls = new Set(imageCandidates.map((image) => image.url))
@@ -270,11 +316,12 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
     try {
         const jsonLdHint = jsonLdProducts.slice(0, 10).map((product) => `- ${product.name} (${product.price ?? "?"})`).join("\n")
         const imagesBlock = imageCandidates.map((image) => `- ${image.url}${image.alt ? ` — ${image.alt}` : ""}`).join("\n")
+        const colorsBlock = colorCandidates.map((color) => `- ${color}`).join("\n")
         const response = await createMessage({
             model: EXTRACTOR_MODEL,
             max_tokens: 3000,
             temperature: 0.2,
-            messages: [{ role: "user", content: EXTRACT_PROMPT(htmlToText(html), jsonLdHint, imagesBlock) }],
+            messages: [{ role: "user", content: EXTRACT_PROMPT(htmlToText(html), jsonLdHint, imagesBlock, colorsBlock) }],
         })
         const textBlock = response.content.find((block) => block.type === "text")
         if (textBlock && textBlock.type === "text") {
@@ -315,7 +362,8 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
         data: {
             brandName: llmStore?.brand_name?.trim() || meta.brandName,
             currency: llmStore?.currency?.trim().toUpperCase() || null,
-            primaryColor: llmStore?.primary_color?.trim() || meta.themeColor,
+            primaryColor: normalizeHex(llmStore?.primary_color) || normalizeHex(meta.themeColor) || colorCandidates[0] || null,
+            logoUrl: meta.logoUrl,
             products,
             sourceUrl: url,
             productsFound: products.length,

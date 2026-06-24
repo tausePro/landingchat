@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ProgressBar } from "@/components/onboarding/progress-bar"
-import { LogoUploader } from "@/components/onboarding/logo-uploader"
 import { createClient } from "@/lib/supabase/client"
 import { ShoppingBag, Building2, Settings, ArrowRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -213,19 +212,6 @@ export default function BusinessConfigPage() {
                         })}
                     </div>
                 </div>
-
-                {/* Logo Upload (optional) */}
-                {organizationId && (
-                    <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                            Logo <span className="text-slate-400 font-normal">(opcional)</span>
-                        </label>
-                        <LogoUploader
-                            organizationId={organizationId}
-                            onUploadComplete={(url) => setFormData({ ...formData, logoUrl: url })}
-                        />
-                    </div>
-                )}
 
                 {/* Submit Button */}
                 <div className="flex flex-col items-center gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-5 dark:border-slate-800 dark:bg-slate-950/70">
