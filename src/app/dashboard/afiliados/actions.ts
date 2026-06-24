@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { type ActionResult, success, failure } from "@/types"
+import { aggregateAffiliateStats, type AffiliateStats } from "@/lib/affiliates/stats"
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
 
@@ -73,4 +74,28 @@ export async function becomeAffiliate(): Promise<ActionResult<MyAffiliate>> {
         if (error && error.code !== "23505") return failure("No se pudo activar tu afiliado")
     }
     return failure("No se pudo generar un código único. Intenta de nuevo.")
+}
+
+/** Stats del afiliado del usuario actual (referidos + comisiones por estado). */
+export async function getMyAffiliateStats(): Promise<ActionResult<AffiliateStats | null>> {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return failure("No autenticado")
+
+    const { data: affiliate } = await supabase
+        .from("affiliates")
+        .select("id")
+        .eq("owner_user_id", user.id)
+        .eq("scope", "platform")
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+    if (!affiliate) return success(null)
+
+    const [referralsRes, commissionsRes] = await Promise.all([
+        supabase.from("affiliate_referrals").select("status").eq("affiliate_id", affiliate.id),
+        supabase.from("affiliate_commissions").select("status, amount").eq("affiliate_id", affiliate.id),
+    ])
+
+    return success(aggregateAffiliateStats(referralsRes.data ?? [], commissionsRes.data ?? []))
 }
