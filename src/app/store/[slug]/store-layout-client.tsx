@@ -49,6 +49,7 @@ interface OrganizationSettings {
         header?: {
             showStoreName?: boolean
             menuItems?: StoreMenuItem[]
+            logoSize?: number
             [key: string]: unknown
         }
         template?: string
@@ -172,6 +173,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
     // Saludo configurable del nudge proactivo de home (settings.storefront.proactiveNudge.greeting).
     const nudgeGreeting = (storefrontSettings.proactiveNudge as { greeting?: string } | undefined)?.greeting
     const showStoreName = headerSettings.showStoreName ?? true
+    const logoSize = headerSettings.logoSize
     const headerShippingConfig: HeaderShippingConfig | undefined = shippingConfig
         ? {
             free_shipping_enabled: shippingConfig.free_shipping_enabled,
@@ -338,6 +340,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
                     onStartChat={handleStartChat}
                     primaryColor={primaryColor}
                     showStoreName={showStoreName}
+                    logoSize={logoSize}
                     menuItems={menuItems}
                     hideOnMobile={hideHeaderOnMobile}
                     shippingConfig={headerShippingConfig}

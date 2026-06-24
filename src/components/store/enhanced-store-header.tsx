@@ -32,6 +32,8 @@ interface EnhancedStoreHeaderProps {
     onStartChat: (query?: string) => void
     hideOnMobile?: boolean
     primaryColor: string
+    /** Alto del logo en px (configurable por el merchant). Default 44. */
+    logoSize?: number
     showStoreName?: boolean
     menuItems?: MenuItem[]
     className?: string
@@ -55,6 +57,7 @@ export function EnhancedStoreHeader({
     onStartChat,
     hideOnMobile = false,
     primaryColor,
+    logoSize = 44,
     showStoreName = true,
     menuItems = [],
     className = "",
@@ -138,15 +141,16 @@ export function EnhancedStoreHeader({
                             <Image
                                 src={organization.logo_url}
                                 alt={organization.name}
-                                width={200}
-                                height={48}
-                                className="h-11 w-auto object-contain max-w-[160px] md:max-w-[200px]"
+                                width={240}
+                                height={64}
+                                className="w-auto object-contain max-w-[280px]"
+                                style={{ height: `${logoSize}px` }}
                                 loading="eager"
                                 quality={90}
                                 priority
                             />
                         ) : (
-                            <div className="flex h-11 w-11 items-center justify-center rounded-lg text-white font-bold text-base" style={{ backgroundColor: primaryColor }}>
+                            <div className="flex items-center justify-center rounded-lg text-white font-bold" style={{ backgroundColor: primaryColor, height: `${logoSize}px`, width: `${logoSize}px`, fontSize: `${Math.round(logoSize * 0.4)}px` }}>
                                 {organization.name.substring(0, 1)}
                             </div>
                         )}
