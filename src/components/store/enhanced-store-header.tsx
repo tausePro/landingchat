@@ -150,11 +150,14 @@ export function EnhancedStoreHeader({
                                 priority
                             />
                         ) : (
-                            <div className="flex items-center justify-center rounded-lg text-white font-bold" style={{ backgroundColor: primaryColor, height: `${logoSize}px`, width: `${logoSize}px`, fontSize: `${Math.round(logoSize * 0.4)}px` }}>
-                                {organization.name.substring(0, 1)}
-                            </div>
+                            <span
+                                className="truncate font-extrabold tracking-tight text-slate-900 max-w-[60vw] sm:max-w-[320px]"
+                                style={{ fontSize: `${Math.round(logoSize * 0.6)}px`, lineHeight: 1.1 }}
+                            >
+                                {organization.name}
+                            </span>
                         )}
-                        {showStoreName && (
+                        {organization.logo_url && showStoreName && (
                             <span className="hidden sm:block text-lg font-bold tracking-tight">{organization.name}</span>
                         )}
                     </div>
