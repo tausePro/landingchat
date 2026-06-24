@@ -15,6 +15,7 @@ const SUPPORTED_CURRENCIES = ["COP", "USD"]
 export interface ImportedBrand {
     primaryColor?: string | null
     currency?: string | null
+    logoUrl?: string | null
 }
 
 export interface OrgBrandCurrent {
