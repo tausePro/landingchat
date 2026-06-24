@@ -63,6 +63,7 @@ export const ADMIN_SECTION_ACCESS: Record<string, AdminRole[]> = {
     "/admin/subscriptions": ["superadmin", "finance"],
     "/admin/founding": ["superadmin", "finance"],
     "/admin/platform-payments": ["superadmin", "finance"],
+    "/admin/afiliados": ["superadmin", "finance"],
     "/admin/webhook-logs": ["superadmin", "tech"],
     "/admin/whatsapp": ["superadmin", "tech"],
     "/admin/settings/landing": ["superadmin"],
