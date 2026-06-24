@@ -52,6 +52,15 @@ function RegistroForm() {
         }
     }, [isFounding, planSlug])
 
+    // Captura el código de afiliado (?ref=) en una cookie para atribuir el signup
+    // (sobrevive el round-trip de OAuth). setupNewUser la lee al crear la org.
+    useEffect(() => {
+        const ref = searchParams.get("ref")
+        if (ref && /^[A-Za-z0-9]{4,12}$/.test(ref)) {
+            document.cookie = `lc_ref=${ref.toUpperCase()}; path=/; max-age=2592000; SameSite=Lax`
+        }
+    }, [searchParams])
+
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)

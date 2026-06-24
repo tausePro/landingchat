@@ -146,6 +146,15 @@ export default async function AdminLayout({
                             </span>
                         </span>
                     </Link>
+
+                    {show("/admin/afiliados") && (
+                    <Link href="/admin/afiliados" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
+                        <svg className="size-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4z" />
+                        </svg>
+                        Afiliados
+                    </Link>
+                    )}
                     </>)}
 
                     {(show("/admin/settings/evolution") || show("/admin/platform-payments")) && (

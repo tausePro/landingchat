@@ -15,6 +15,7 @@ import { WompiClient } from "@/lib/wompi/client"
 import { type WompiWebhookPayload, WOMPI_STATUS_MAP } from "@/lib/wompi/types"
 import { decrypt } from "@/lib/utils/encryption"
 import { applyConversationCreditPayment } from "@/lib/payments/conversation-credit-payment"
+import { generateAffiliateCommissionForSubscriptionPayment } from "@/lib/affiliates/commissions"
 
 interface PlatformConfigRow {
     value: {
@@ -209,6 +210,15 @@ export async function POST(request: NextRequest) {
                     console.error("Error updating subscription:", subError)
                 } else {
                     console.log(`Subscription ${subscriptionId} updated to ${newStatus}`)
+                }
+
+                // Comisión de afiliado en pago aprobado (idempotente; no bloquea el webhook).
+                if (transaction.status === "APPROVED") {
+                    await generateAffiliateCommissionForSubscriptionPayment(supabase, {
+                        subscriptionId,
+                        providerTransactionId: transaction.id,
+                        amount: transaction.amount_in_cents / 100,
+                    })
                 }
             }
         }
