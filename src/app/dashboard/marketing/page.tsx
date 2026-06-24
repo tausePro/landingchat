@@ -99,6 +99,23 @@ export default function MarketingPage() {
                             </div>
                         </div>
                     </Link>
+
+                    {/* Affiliates Card */}
+                    <Link href="/dashboard/marketing/afiliados">
+                        <div className="rounded-xl border border-border-light dark:border-border-dark bg-card-light dark:bg-card-dark p-6 hover:shadow-lg transition-shadow cursor-pointer">
+                            <div className="flex items-center gap-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-500/10">
+                                    <span className="material-symbols-outlined text-sky-500 text-2xl">handshake</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-text-light-primary dark:text-text-dark-primary">Afiliados</h3>
+                                    <p className="text-sm text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                        Crea afiliados y paga comisiones por ventas
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </DashboardLayout>

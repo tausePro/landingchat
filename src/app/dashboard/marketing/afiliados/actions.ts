@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { type ActionResult, success, failure } from "@/types"
 import { revalidatePath } from "next/cache"
 
@@ -108,4 +108,88 @@ export async function createStoreAffiliate(name: string, rate: number): Promise<
         if (error && error.code !== "23505") return failure("No se pudo crear el afiliado")
     }
     return failure("No se pudo generar un código único. Intenta de nuevo.")
+}
+
+export interface StoreCommission {
+    id: string
+    affiliateName: string
+    baseAmount: number
+    rate: number
+    amount: number
+    status: string
+}
+
+function affiliateField(affiliates: unknown): { name?: string; scope?: string; organization_id?: string } {
+    const row = Array.isArray(affiliates) ? affiliates[0] : affiliates
+    return (row as { name?: string; scope?: string; organization_id?: string } | null | undefined) ?? {}
+}
+
+/** Comisiones de los afiliados TENANT de la tienda del merchant. */
+export async function getMyStoreCommissions(): Promise<ActionResult<StoreCommission[]>> {
+    const supabase = await createClient()
+    const org = await getMerchantOrg(supabase)
+    if (!org) return failure("No autenticado")
+
+    // RLS merchant_select ya filtra a las comisiones de afiliados tenant de la org.
+    // El owner_select tambien expone las comisiones platform del merchant (si las
+    // tiene), por eso filtramos a scope='tenant' + esta org.
+    const { data, error } = await supabase
+        .from("affiliate_commissions")
+        .select("id, base_amount, rate, amount, status, affiliates(name, scope, organization_id)")
+        .order("created_at", { ascending: false })
+        .limit(200)
+    if (error) return failure("No se pudieron cargar las comisiones")
+
+    const rows: StoreCommission[] = (data ?? [])
+        .filter((c) => {
+            const aff = affiliateField(c.affiliates)
+            return aff.scope === "tenant" && aff.organization_id === org.id
+        })
+        .map((c) => ({
+            id: c.id as string,
+            affiliateName: affiliateField(c.affiliates).name ?? "—",
+            baseAmount: Number(c.base_amount),
+            rate: Number(c.rate),
+            amount: Number(c.amount),
+            status: c.status as string,
+        }))
+    return success(rows)
+}
+
+/** El merchant ve la comisión (RLS) ⇒ es suya. Devuelve true si autorizado. */
+async function canManageCommission(supabase: Awaited<ReturnType<typeof createClient>>, commissionId: string): Promise<boolean> {
+    const { data } = await supabase
+        .from("affiliate_commissions")
+        .select("id")
+        .eq("id", commissionId)
+        .maybeSingle()
+    return Boolean(data)
+}
+
+export async function approveStoreCommission(commissionId: string): Promise<ActionResult<void>> {
+    const supabase = await createClient()
+    if (!(await canManageCommission(supabase, commissionId))) return failure("No autorizado")
+    const service = createServiceClient()
+    const { error } = await service
+        .from("affiliate_commissions")
+        .update({ status: "approved" })
+        .eq("id", commissionId)
+        .eq("status", "pending")
+    if (error) return failure("No se pudo aprobar")
+    revalidatePath("/dashboard/marketing/afiliados")
+    return success(undefined)
+}
+
+export async function markStoreCommissionPaid(commissionId: string): Promise<ActionResult<void>> {
+    const supabase = await createClient()
+    if (!(await canManageCommission(supabase, commissionId))) return failure("No autorizado")
+    const service = createServiceClient()
+    const { error } = await service
+        .from("affiliate_commissions")
+        .update({ status: "paid", paid_at: new Date().toISOString() })
+        .eq("id", commissionId)
+        .eq("status", "approved")
+    if (error) return failure("No se pudo marcar como pagada")
+    revalidatePath("/dashboard/marketing/afiliados")
+    return success(undefined)
 }
