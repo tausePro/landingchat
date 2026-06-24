@@ -50,6 +50,7 @@ export interface StoreImportSummary {
 export async function confirmStoreImport(
     items: Array<z.infer<typeof importItemSchema>>,
     brand?: ImportedBrand,
+    options?: { initialStock?: number },
 ): Promise<ActionResult<StoreImportSummary>> {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -100,9 +101,9 @@ export async function confirmStoreImport(
             price: item.price,
             images: hostedImage ? [hostedImage] : [],
             image_url: hostedImage ?? undefined,
-            // Vendibles por default (inStock = stock > 0). El merchant ajusta el
-            // inventario real en el dashboard; importar con 0 los dejaba agotados.
-            stock: 100,
+            // Vendibles por default (inStock = stock > 0). El merchant elige el
+            // stock inicial en el import (o ajusta luego en el dashboard).
+            stock: options?.initialStock && options.initialStock > 0 ? Math.floor(options.initialStock) : 100,
             is_active: true,
         } as unknown as Parameters<typeof createProduct>[0])
 

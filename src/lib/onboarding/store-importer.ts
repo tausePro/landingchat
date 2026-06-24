@@ -315,6 +315,58 @@ async function fetchShopifyProducts(origin: string): Promise<ExtractedProduct[] 
     }
 }
 
+const wooProductsSchema = z.array(z.object({
+    name: z.string().nullish(),
+    description: z.string().nullish(),
+    short_description: z.string().nullish(),
+    prices: z.object({
+        price: z.string().nullish(),
+        currency_minor_unit: z.number().nullish(),
+    }).nullish(),
+    images: z.array(z.object({ src: z.string().nullish() })).nullish(),
+}))
+
+/**
+ * WooCommerce expone la Store API PÚBLICA (/wp-json/wc/store/v1/products) con
+ * data completa: name, description (HTML), prices (en unidad menor) e images.
+ * Equivalente Woo de Shopify /products.json — trae DESCRIPCIONES. null si no es
+ * WooCommerce o falla (→ se usa el scrape HTML normal).
+ */
+async function fetchWooCommerceProducts(origin: string): Promise<ExtractedProduct[] | null> {
+    if (!origin) return null
+    try {
+        const res = await fetch(`${origin}/wp-json/wc/store/v1/products?per_page=100`, {
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+            headers: { "user-agent": "Mozilla/5.0 (compatible; LandingChatImporter/1.0)" },
+        })
+        if (!res.ok || !(res.headers.get("content-type") ?? "").includes("json")) return null
+        const parsed = wooProductsSchema.safeParse(await res.json())
+        if (!parsed.success) return null
+        const products: ExtractedProduct[] = []
+        for (const raw of parsed.data) {
+            const name = raw.name?.trim()
+            if (!name) continue
+            let price: number | null = null
+            if (raw.prices?.price) {
+                const minor = raw.prices.currency_minor_unit ?? 2
+                const value = Number(raw.prices.price) / 10 ** minor
+                price = Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : null
+            }
+            const desc = raw.description || raw.short_description || ""
+            products.push({
+                name: name.slice(0, 120),
+                price,
+                description: desc ? stripHtml(desc).slice(0, 500) || null : null,
+                imageUrl: raw.images?.[0]?.src ?? null,
+            })
+            if (products.length >= MAX_PRODUCTS) break
+        }
+        return products.length > 0 ? products : null
+    } catch {
+        return null
+    }
+}
+
 const EXTRACT_PROMPT = (text: string, jsonLdHint: string, imagesBlock: string, colorsBlock: string) => `
 You extract a store's catalog and brand from its website content. Return JSON ONLY.
 
@@ -360,8 +412,9 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
     const candidateUrls = new Set(imageCandidates.map((image) => image.url))
     let siteOrigin = ""
     try { siteOrigin = new URL(url).origin } catch { /* noop */ }
-    // Shopify: /products.json es autoritativo e incluye descripciones.
-    const shopifyProducts = await fetchShopifyProducts(siteOrigin)
+    // Shopify (/products.json) y WooCommerce (Store API) exponen data completa
+    // con descripciones. Si el sitio es uno de esos, es la fuente autoritativa.
+    const structuredProducts = (await fetchShopifyProducts(siteOrigin)) ?? (await fetchWooCommerceProducts(siteOrigin))
     const isRealImage = (candidate: string | null): candidate is string => {
         if (!candidate) return false
         if (candidateUrls.has(candidate)) return true
@@ -389,11 +442,11 @@ export async function extractStoreFromUrl(rawUrl: string): Promise<ExtractResult
         log.warn("LLM extraction failed, falling back to JSON-LD only", { url, error: error instanceof Error ? error.message : "unknown" })
     }
 
-    // Shopify (autoritativo, con descripciones) tiene prioridad; si no, merge
-    // JSON-LD (fiable) + LLM.
+    // Shopify/WooCommerce (autoritativo, con descripciones) tiene prioridad; si
+    // no, merge JSON-LD (fiable) + LLM.
     let products: ExtractedProduct[]
-    if (shopifyProducts && shopifyProducts.length > 0) {
-        products = shopifyProducts.slice(0, MAX_PRODUCTS)
+    if (structuredProducts && structuredProducts.length > 0) {
+        products = structuredProducts.slice(0, MAX_PRODUCTS)
     } else {
         const byName = new Map<string, ExtractedProduct>()
         for (const product of jsonLdProducts) {
