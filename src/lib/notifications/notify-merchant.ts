@@ -19,6 +19,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { sendWhatsAppMessage } from "@/lib/whatsapp"
 import { logger } from "@/lib/logger"
 import { sendPlatformNotification } from "./platform-whatsapp"
+import { logNotification } from "./log"
 
 const log = logger("notify-merchant")
 
@@ -38,6 +39,30 @@ export interface NotifyMerchantResult {
 }
 
 export async function notifyMerchant(params: {
+    organizationId: string
+    message: string
+    kind: MerchantNotificationKind
+}): Promise<NotifyMerchantResult> {
+    const result = await deliverToMerchant(params)
+    // Visibilidad (Notif Slice 2): persistimos cada intento (canal, estado, error).
+    // Best-effort — nunca rompe el envío.
+    await logNotification({
+        organizationId: params.organizationId,
+        kind: params.kind,
+        channel: "whatsapp",
+        recipientType: "owner",
+        status: result.delivered
+            ? "sent"
+            : result.error?.includes("disabled_by_merchant")
+                ? "skipped"
+                : "failed",
+        channelUsed: result.channel,
+        error: result.error ?? null,
+    })
+    return result
+}
+
+async function deliverToMerchant(params: {
     organizationId: string
     message: string
     kind: MerchantNotificationKind
