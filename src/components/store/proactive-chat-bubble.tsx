@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { MessageCircle, X } from "lucide-react"
+import { MessageCircle, X, PackageCheck, Truck, Tag } from "lucide-react"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { setProactiveNudgeAttribution } from "@/hooks/use-tracking-params"
 
@@ -117,10 +117,6 @@ export function ProactiveChatBubble({
     const nudgeCopy = hasCouponOffer
         ? `Tenemos una oferta disponible para este producto: ${couponOffer?.description || "descuento especial"}. Usa el cupón ${couponOffer?.code}.`
         : SAFE_NUDGE_COPY
-    const context = hasCouponOffer
-        ? `Quiero ayuda con ${contentName} y quiero usar el cupón ${couponOffer?.code}.`
-        : `Quiero ayuda con disponibilidad, envío o detalles de ${contentName}.`
-
     useEffect(() => {
         if (!productId || isWithinCooldown(storageKey, cooldownMs)) {
             return
@@ -161,7 +157,7 @@ export function ProactiveChatBubble({
         return null
     }
 
-    const handlePrimaryClick = () => {
+    const handleChipClick = (question: string) => {
         storeCooldown(storageKey)
         setProactiveNudgeAttribution(slug, {
             proactiveNudgeId: storageKey,
@@ -181,7 +177,7 @@ export function ProactiveChatBubble({
                 destination: "web_chat",
             },
         })
-        onStartChat(productId, context, {
+        onStartChat(productId, question, {
             entry_point: "proactive_nudge",
             proactive_nudge_id: storageKey,
             proactive_nudge_product_id: productId,
@@ -190,6 +186,14 @@ export function ProactiveChatBubble({
             ...(couponCode ? { coupon_code: couponCode } : {}),
         })
     }
+
+    // Quick-replies: las preguntas reales (disponibilidad/envío/precio). 1 toque abre
+    // el chat con esa intención; el agente ya conoce el producto vía params.
+    const pdpChips = [
+        { Icon: PackageCheck, text: "¿Hay disponibilidad?" },
+        { Icon: Truck, text: "Costo de envío" },
+        { Icon: Tag, text: couponCode ? `Usar cupón ${couponCode}` : "¿Tiene descuento?" },
+    ]
 
     const handleDismiss = () => {
         storeCooldown(storageKey)
@@ -231,7 +235,7 @@ export function ProactiveChatBubble({
 
     return (
         <div className="fixed bottom-24 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm sm:right-6">
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 dark:border-slate-800 dark:bg-slate-950">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(2,6,23,0.12)] dark:border-slate-800 dark:bg-slate-950">
                 <div className="flex gap-3 p-4">
                     {displayAgentAvatar ? (
                         <div
@@ -274,26 +278,30 @@ export function ProactiveChatBubble({
                             </div>
                         )}
                         <div className="mt-3 flex flex-wrap gap-2">
-                            <button
-                                type="button"
-                                onClick={handlePrimaryClick}
-                                className="rounded-full px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-offset-2"
-                                style={{ backgroundColor: primaryColor }}
-                            >
-                                Preguntar al agente
-                            </button>
-                            {normalizedWhatsAppPhone && (
-                                <a
-                                    href={`https://wa.me/${normalizedWhatsAppPhone}?text=${encodeURIComponent("Hola, quiero información sobre este producto")}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={handleWhatsAppClick}
-                                    className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            {pdpChips.map(({ Icon, text }) => (
+                                <button
+                                    key={text}
+                                    type="button"
+                                    onClick={() => handleChipClick(text)}
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-transform active:scale-[0.97] hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    style={{ transitionTimingFunction: "cubic-bezier(0.16,1,0.3,1)" }}
                                 >
-                                    WhatsApp
-                                </a>
-                            )}
+                                    <Icon className="h-3.5 w-3.5" strokeWidth={1.75} style={{ color: primaryColor }} aria-hidden="true" />
+                                    {text}
+                                </button>
+                            ))}
                         </div>
+                        {normalizedWhatsAppPhone && (
+                            <a
+                                href={`https://wa.me/${normalizedWhatsAppPhone}?text=${encodeURIComponent("Hola, quiero información sobre este producto")}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={handleWhatsAppClick}
+                                className="mt-2 inline-block text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-slate-700 hover:underline dark:text-slate-400"
+                            >
+                                o escríbenos por WhatsApp
+                            </a>
+                        )}
                     </div>
                 </div>
             </div>

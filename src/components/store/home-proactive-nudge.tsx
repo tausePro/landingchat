@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
-import { MessageCircle, X } from "lucide-react"
+import { MessageCircle, X, Sparkles, Truck, Tag } from "lucide-react"
 import { useTracking } from "@/components/analytics/tracking-provider"
 import { getStoredString } from "@/lib/utils/storage"
 import { getContrastTextColor } from "@/lib/utils"
@@ -135,15 +135,23 @@ export function HomeProactiveNudge({
 
     const greetingText = `${visitorName ? `¡Hola ${visitorName}! ` : "¡Hola! "}${baseGreeting}`
 
-    const handleChat = () => {
+    const handleChip = (question: string) => {
         storeCooldown(key)
         tracking.trackEvent("proactive_nudge_clicked", {
             sourceChannel: "web",
             properties: { placement: "home", destination: "web_chat" },
         })
         setIsVisible(false)
-        onStartChat(undefined, t("store.home.premium_nudge_context"))
+        onStartChat(undefined, question)
     }
+
+    // Quick-replies con las preguntas reales del visitante (vistas en los chats):
+    // 1 toque abre el chat con esa intención → menos fricción que "abrir y escribir".
+    const homeChips = [
+        { Icon: Sparkles, text: t("store.nudge.chip_recommend") },
+        { Icon: Truck, text: t("store.nudge.chip_shipping") },
+        { Icon: Tag, text: t("store.nudge.chip_offers") },
+    ]
 
     const handleWhatsApp = () => {
         storeCooldown(key)
@@ -165,7 +173,7 @@ export function HomeProactiveNudge({
 
     return (
         <div className="fixed bottom-24 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm sm:right-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300">
-            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15">
+            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(2,6,23,0.12)]">
                 <div className="flex items-start gap-3 p-4">
                     {displayAgentAvatar ? (
                         <Image
@@ -196,24 +204,30 @@ export function HomeProactiveNudge({
                         <X className="h-4 w-4" strokeWidth={2} />
                     </button>
                 </div>
-                <div className="flex gap-2 px-4 pb-4">
-                    <button
-                        type="button"
-                        onClick={handleChat}
-                        className="flex-1 rounded-full py-2.5 text-sm font-semibold shadow-sm transition-transform active:scale-[0.98]"
-                        style={{ backgroundColor: primaryColor, color: contrast, transitionTimingFunction: EASE }}
-                    >
-                        {t("store.home.premium_nudge_cta_chat")}
-                    </button>
+                <div className="px-4 pb-4">
+                    <div className="flex flex-wrap gap-2">
+                        {homeChips.map(({ Icon, text }) => (
+                            <button
+                                key={text}
+                                type="button"
+                                onClick={() => handleChip(text)}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition-transform active:scale-[0.97] hover:border-slate-300"
+                                style={{ transitionTimingFunction: EASE }}
+                            >
+                                <Icon className="h-3.5 w-3.5" strokeWidth={1.75} style={{ color: primaryColor }} aria-hidden="true" />
+                                {text}
+                            </button>
+                        ))}
+                    </div>
                     {normalizedPhone ? (
                         <a
                             href={`https://wa.me/${normalizedPhone}?text=${encodeURIComponent(baseGreeting)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={handleWhatsApp}
-                            className="flex-1 rounded-full border border-green-500 py-2.5 text-center text-sm font-semibold text-green-600 transition-colors hover:bg-green-50"
+                            className="mt-3 inline-block text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-slate-700 hover:underline"
                         >
-                            WhatsApp
+                            {t("store.nudge.whatsapp_secondary")}
                         </a>
                     ) : null}
                 </div>
