@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { previewStoreImport, confirmStoreImport, type StoreImportSummary } from "../import-actions"
+import type { ExtractedVariant } from "@/lib/onboarding/store-importer"
 
 interface Row {
     include: boolean
@@ -19,6 +20,7 @@ interface Row {
     price: string
     description: string | null
     imageUrl: string | null
+    variants?: ExtractedVariant[]
 }
 
 type Step = "input" | "loading" | "preview" | "importing" | "done"
@@ -56,6 +58,7 @@ export function StoreImportCard() {
             price: p.price != null ? String(p.price) : "",
             description: p.description,
             imageUrl: p.imageUrl,
+            variants: p.variants,
         })))
         setStep("preview")
     }
@@ -68,6 +71,15 @@ export function StoreImportCard() {
                 price: Number(row.price.replace(/[^\d.]/g, "")),
                 description: row.description,
                 imageUrl: row.imageUrl,
+                variants: row.variants
+                    ?.filter((v) => v.price != null && v.price > 0)
+                    .map((v) => ({
+                        title: v.title,
+                        sku: v.sku ?? null,
+                        price: v.price as number,
+                        compareAtPrice: v.compareAtPrice ?? null,
+                        optionValues: v.optionValues,
+                    })),
             }))
         if (items.length === 0) { toast.error("Selecciona al menos un producto"); return }
 
