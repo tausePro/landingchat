@@ -80,6 +80,7 @@ Un **link-in-bio conversacional**: el visitante de IG/TikTok aterriza **en el ch
 ## 8. Fuera de alcance (v1)
 
 - Builder visual completo (config UI de los mockups).
-- Skills marketplace, lógica dinámica por horario, reorder automático configurable.
+- **Cambio de WhatsApp por horario: DESCARTADO** (no sólo v1). El agente IA responde 24/7 → no hay que ocultar WhatsApp por horario. ChatLink es una herramienta exclusiva de LandingChat con el agente siempre activo.
+- Skills marketplace, reorder automático configurable (eval. en v2).
 - Inbox / CRM / campañas (fase operator suite, depende del team).
 - Personalización por visitante (prematuro para el tráfico SMB).
