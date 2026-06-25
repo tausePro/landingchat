@@ -22,6 +22,7 @@ import { WhatsAppFloatingButton } from "@/components/store/whatsapp-floating-but
 import { ChatAIFloatingButton } from "@/components/store/chat-ai-floating-button"
 import { getSafeStorefrontTemplate, isRealEstateIndustry, type StorefrontTemplateContext } from "@/lib/storefront-templates"
 import { StoreFooter } from "@/components/store/store-footer"
+import { AffiliateRefCapture } from "@/components/store/affiliate-ref-capture"
 import { useT } from "@/lib/i18n/use-tenant-strings"
 import type { ProactiveCouponOffer } from "./actions"
 import type { ProductDetailCROConfig } from "@/lib/storefront/product-detail-cro"
@@ -332,6 +333,7 @@ export function StoreLayoutClient({ slug, organization, products, properties = [
 
     const content = (
         <div className="min-h-screen bg-white dark:bg-gray-950 text-slate-900 dark:text-slate-100" style={{ fontFamily: fontFamily }}>
+            <AffiliateRefCapture />
             {/* --- Header --- */}
             {!hideNavigation && (
                 <EnhancedStoreHeader
