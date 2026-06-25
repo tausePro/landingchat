@@ -244,9 +244,10 @@ async function notifyBuyerOrderStatus(
     organizationId: string,
     status: string,
 ): Promise<void> {
-    const ci = (order.customer_info ?? null) as { email?: string; name?: string } | null
+    const ci = (order.customer_info ?? null) as { email?: string; name?: string; phone?: string } | null
     const customerEmail = typeof ci?.email === "string" ? ci.email : ""
-    if (!customerEmail) return
+    const customerPhone = typeof ci?.phone === "string" ? ci.phone : ""
+    if (!customerEmail && !customerPhone) return
 
     const { data: org } = await supabase
         .from("organizations")
@@ -274,16 +275,40 @@ async function notifyBuyerOrderStatus(
     })
     const orderUrl = appendStorefrontAccessParam(`${storeUrl}/order/${order.id}`, token)
 
-    await sendOrderStatusEmail({
-        orderNumber: order.order_number || order.id,
-        customerName: ci?.name || "Cliente",
-        customerEmail,
-        status,
-        organizationName: org.name || "",
-        orderUrl,
-        locale: tenantLocale.locale,
-        currency: tenantLocale.currency,
-    })
+    if (customerEmail) {
+        await sendOrderStatusEmail({
+            orderNumber: order.order_number || order.id,
+            customerName: ci?.name || "Cliente",
+            customerEmail,
+            status,
+            organizationName: org.name || "",
+            orderUrl,
+            locale: tenantLocale.locale,
+            currency: tenantLocale.currency,
+        })
+    }
+
+    // WhatsApp al comprador (mismo patrón que el cron de reseñas: sendWhatsAppMessage
+    // resuelve la instancia 'corporate' del tenant). Texto libre; en Meta fuera de
+    // la ventana de 24h podría requerir plantilla (gap conocido, igual que reseñas).
+    // Best-effort: no rompe la actualización de estado.
+    const { t } = await import("@/lib/i18n/storefront-strings")
+    const waParams = { customerName: ci?.name || "", orderNumber: order.order_number || order.id, orderUrl }
+    let waMsg: string | null = null
+    switch (status) {
+        case "processing": waMsg = t("store.order_status.wa_processing", tenantLocale.locale, waParams); break
+        case "shipped": waMsg = t("store.order_status.wa_shipped", tenantLocale.locale, waParams); break
+        case "delivered": waMsg = t("store.order_status.wa_delivered", tenantLocale.locale, waParams); break
+        case "cancelled": waMsg = t("store.order_status.wa_cancelled", tenantLocale.locale, waParams); break
+    }
+    if (customerPhone && waMsg) {
+        try {
+            const { sendWhatsAppMessage } = await import("@/lib/whatsapp/provider")
+            await sendWhatsAppMessage(organizationId, customerPhone, waMsg)
+        } catch (e) {
+            console.error("[notifyBuyerOrderStatus] whatsapp failed:", e)
+        }
+    }
 }
 
 /**
