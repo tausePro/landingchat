@@ -290,7 +290,7 @@ async function runPaidOrderSideEffects(params: {
     try {
         const { data: orgRow } = await params.supabase
             .from("organizations")
-            .select("contact_email")
+            .select("contact_email, notification_emails")
             .eq("id", params.organizationId)
             .single()
         const ownerEmail = typeof orgRow?.contact_email === "string" ? orgRow.contact_email : ""
@@ -309,6 +309,7 @@ async function runPaidOrderSideEffects(params: {
                         price: typeof item.unit_price === "number" ? item.unit_price : 0,
                     })),
                 ownerEmail,
+                additionalEmails: Array.isArray(orgRow?.notification_emails) ? orgRow.notification_emails : [],
                 organizationName: organization?.name || "",
                 locale: tenantLocale.locale,
                 currency: tenantLocale.currency,
