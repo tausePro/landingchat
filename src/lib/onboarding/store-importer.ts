@@ -23,11 +23,21 @@ const MAX_IMAGE_CANDIDATES = 40           // URLs de imagen que ve el LLM
 const MAX_PRODUCTS = 50
 const EXTRACTOR_MODEL = "claude-haiku-4-5-20251001"
 
+export interface ExtractedVariant {
+    title: string
+    sku: string | null
+    price: number | null
+    compareAtPrice: number | null
+    optionValues: Array<{ name: string; value: string }>
+}
+
 export interface ExtractedProduct {
     name: string
     price: number | null
     description: string | null
     imageUrl: string | null
+    /** Variantes vendibles (talla/color/…) con precio propio. Solo Shopify por ahora. */
+    variants?: ExtractedVariant[]
 }
 
 export interface ExtractedStore {
@@ -293,7 +303,16 @@ const shopifyProductsSchema = z.object({
     products: z.array(z.object({
         title: z.string().nullish(),
         body_html: z.string().nullish(),
-        variants: z.array(z.object({ price: z.union([z.string(), z.number()]).nullish() })).nullish(),
+        options: z.array(z.object({ name: z.string().nullish() })).nullish(),
+        variants: z.array(z.object({
+            title: z.string().nullish(),
+            sku: z.string().nullish(),
+            price: z.union([z.string(), z.number()]).nullish(),
+            compare_at_price: z.union([z.string(), z.number()]).nullish(),
+            option1: z.string().nullish(),
+            option2: z.string().nullish(),
+            option3: z.string().nullish(),
+        })).nullish(),
         images: z.array(z.object({ src: z.string().nullish() })).nullish(),
     })).nullish(),
 })
@@ -318,11 +337,30 @@ async function fetchShopifyProducts(origin: string): Promise<ExtractedProduct[] 
         for (const raw of parsed.data.products) {
             const name = raw.title?.trim()
             if (!name) continue
+            const rawVariants = raw.variants ?? []
+            const optionNames = (raw.options ?? []).map((o) => o.name?.trim() || "")
+            // Solo tratamos como "con variantes" si hay >1 (talla/color). 1 variante = producto base.
+            let variants: ExtractedVariant[] | undefined
+            if (rawVariants.length > 1) {
+                const mapped = rawVariants
+                    .map((v) => ({
+                        title: v.title?.trim() || "Variante",
+                        sku: v.sku?.trim() || null,
+                        price: normalizePrice(v.price ?? null),
+                        compareAtPrice: normalizePrice(v.compare_at_price ?? null),
+                        optionValues: [v.option1, v.option2, v.option3]
+                            .map((val, i) => ({ name: optionNames[i] || `Opción ${i + 1}`, value: (val ?? "").trim() }))
+                            .filter((o) => o.value.length > 0),
+                    }))
+                    .filter((v) => v.price !== null && v.price > 0)
+                if (mapped.length > 1) variants = mapped
+            }
             products.push({
                 name: name.slice(0, 120),
-                price: normalizePrice(raw.variants?.[0]?.price ?? null),
+                price: normalizePrice(rawVariants[0]?.price ?? null),
                 description: raw.body_html ? stripHtml(raw.body_html).slice(0, 500) || null : null,
                 imageUrl: raw.images?.[0]?.src ?? null,
+                variants,
             })
             if (products.length >= MAX_PRODUCTS) break
         }
