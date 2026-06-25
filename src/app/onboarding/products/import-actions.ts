@@ -17,6 +17,8 @@ import { buildOnboardingOrgUpdates, type ImportedBrand } from "@/lib/onboarding/
 import { type ActionResult, success, failure } from "@/types"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+import { syncVariantDrafts } from "@/lib/commerce/syncVariantDrafts"
+import type { ProductVariantDraft } from "@/lib/commerce/variantDrafts"
 
 async function requireUser() {
     const supabase = await createClient()
@@ -33,11 +35,20 @@ export async function previewStoreImport(url: string): Promise<ActionResult<Extr
     return success(result.data)
 }
 
+const importVariantSchema = z.object({
+    title: z.string().trim().min(1),
+    sku: z.string().nullish(),
+    price: z.number().positive(),
+    compareAtPrice: z.number().positive().nullish(),
+    optionValues: z.array(z.object({ name: z.string(), value: z.string() })).default([]),
+})
+
 const importItemSchema = z.object({
     name: z.string().trim().min(1, "Nombre requerido"),
     price: z.number().positive("Precio debe ser mayor a 0"),
     description: z.string().nullish(),
     imageUrl: z.string().url().nullish(),
+    variants: z.array(importVariantSchema).nullish(),
 })
 
 export interface StoreImportSummary {
@@ -75,6 +86,7 @@ export async function confirmStoreImport(
     }
 
     const summary: StoreImportSummary = { created: 0, failed: 0, errors: [] }
+    const initialStock = options?.initialStock && options.initialStock > 0 ? Math.floor(options.initialStock) : 100
 
     for (const raw of items) {
         const parsed = importItemSchema.safeParse(raw)
@@ -103,12 +115,17 @@ export async function confirmStoreImport(
             image_url: hostedImage ?? undefined,
             // Vendibles por default (inStock = stock > 0). El merchant elige el
             // stock inicial en el import (o ajusta luego en el dashboard).
-            stock: options?.initialStock && options.initialStock > 0 ? Math.floor(options.initialStock) : 100,
+            stock: initialStock,
             is_active: true,
         } as unknown as Parameters<typeof createProduct>[0])
 
         if (result.success) {
             summary.created++
+            // Variantes (talla/color con precio propio): reemplazan la variante
+            // default que createProduct crea. No bloquea el producto si falla.
+            if (orgId && item.variants && item.variants.length > 1) {
+                await createImportedVariants(supabase, result.data.id, orgId, item.variants, initialStock)
+            }
         } else {
             summary.failed++
             // El límite de plan corta el resto: lo reportamos y paramos
@@ -122,6 +139,39 @@ export async function confirmStoreImport(
 }
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>
+type ImportedVariant = z.infer<typeof importVariantSchema>
+
+/**
+ * Crea las variantes importadas (talla/color) reemplazando la variante default
+ * que createProduct genera. syncVariantDrafts actualiza por posición: la default
+ * (posición 0) pasa a ser la 1ª variante real y el resto se inserta. No lanza:
+ * un fallo de variantes no debe tumbar el producto ya creado.
+ */
+async function createImportedVariants(
+    supabase: ServerSupabase,
+    productId: string,
+    organizationId: string,
+    variants: ImportedVariant[],
+    initialStock: number,
+): Promise<void> {
+    try {
+        const drafts: ProductVariantDraft[] = variants.map((v, i) => ({
+            title: v.title.slice(0, 120),
+            sku: v.sku?.trim() || null,
+            position: i,
+            is_default: i === 0,
+            is_active: true,
+            price: v.price,
+            compare_at_price: v.compareAtPrice && v.compareAtPrice > v.price ? v.compareAtPrice : null,
+            stock_quantity: initialStock,
+            image_url: null,
+            option_values: v.optionValues.map((o) => ({ option_name: o.name, value: o.value })),
+        }))
+        await syncVariantDrafts({ client: supabase, productId, organizationId, drafts })
+    } catch (error) {
+        console.error("[createImportedVariants] no-fatal:", error)
+    }
+}
 
 /** Persiste la marca/color/logo extraídos en la organización (RLS: su propia org). */
 async function persistImportedBrand(supabase: ServerSupabase, orgId: string, brand: ImportedBrand): Promise<void> {
