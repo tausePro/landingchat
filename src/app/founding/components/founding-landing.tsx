@@ -493,15 +493,17 @@ export function FoundingLanding({ data }: FoundingLandingProps) {
                                 PLAN FUNDADORES
                             </p>
 
-                            <div className="flex items-baseline gap-2 mb-4">
-                                <span className="text-slate-500 line-through text-xl">
-                                    {formatFoundingPrice(tiers[1]?.regular_price || 315000)}
-                                </span>
-                                <span className="text-4xl font-black text-white">
-                                    {formatFoundingPrice(tiers[1]?.current_price || 126000)}
-                                </span>
-                                <span className="text-slate-400">COP/mes</span>
-                            </div>
+                            {tiers[1] ? (
+                                <div className="flex items-baseline gap-2 mb-4">
+                                    <span className="text-slate-500 line-through text-xl">
+                                        {formatFoundingPrice(tiers[1].regular_price)}
+                                    </span>
+                                    <span className="text-4xl font-black text-white">
+                                        {formatFoundingPrice(tiers[1].current_price)}
+                                    </span>
+                                    <span className="text-slate-400">COP/mes</span>
+                                </div>
+                            ) : null}
 
                             <Badge
                                 className="mb-6"
