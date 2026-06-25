@@ -438,6 +438,105 @@ export async function sendOrderPaidEmail(data: OrderPaidEmailData): Promise<bool
     }
 }
 
+// ============================================================================
+// Email de cambio de estado del pedido al COMPRADOR
+// ============================================================================
+
+function orderStatusLabel(status: string, locale: SupportedLocale): string | null {
+    switch (status) {
+        case "processing": return t("email.order_status.label_processing", locale)
+        case "shipped": return t("email.order_status.label_shipped", locale)
+        case "delivered": return t("email.order_status.label_delivered", locale)
+        case "cancelled": return t("email.order_status.label_cancelled", locale)
+        default: return null
+    }
+}
+
+/**
+ * Email al comprador cuando su pedido cambia de estado (en preparación, enviado,
+ * entregado, cancelado). Estados sin label → no-op (no notifica). Mismo contrato
+ * que los demás: sin API key o sin email → no-op true; false solo en error real.
+ */
+export async function sendOrderStatusEmail(data: {
+    orderNumber: string
+    customerName: string
+    customerEmail: string
+    status: string
+    organizationName: string
+    orderUrl: string
+    locale?: SupportedLocale
+    currency?: SupportedCurrency
+}): Promise<boolean> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping status email`)
+            return true
+        }
+        if (!data.customerEmail || data.customerEmail.trim() === "") {
+            console.log(`[EMAIL] Customer email is empty, skipping status email`)
+            return true
+        }
+        const locale: SupportedLocale = data.locale ?? "es-CO"
+        const statusLabel = orderStatusLabel(data.status, locale)
+        if (!statusLabel) {
+            return true // estado sin notificación al comprador (pending/confirmed/etc.)
+        }
+        const subject = t("email.order_status.subject", locale, {
+            orderNumber: data.orderNumber,
+            statusLabel,
+        })
+        const response = await resend.emails.send({
+            from: `${data.organizationName} <noreply@landingchat.co>`,
+            to: data.customerEmail,
+            subject,
+            html: generateOrderStatusEmailHTML(data, statusLabel, locale),
+        })
+        if (response.error) {
+            console.error("[EMAIL] Resend error (order status):", response.error)
+            return false
+        }
+        console.log(`[EMAIL] Order-status (${data.status}) sent to ${data.customerEmail}`)
+        return true
+    } catch (error) {
+        console.error("[EMAIL] Error sending order status:", error)
+        return false
+    }
+}
+
+function generateOrderStatusEmailHTML(
+    data: { orderNumber: string; organizationName: string; orderUrl: string },
+    statusLabel: string,
+    locale: SupportedLocale,
+): string {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${t("email.order_status.heading", locale)}</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #e5e7eb;">
+            <h1 style="color: #1f2937; margin: 0; font-size: 26px;">${data.organizationName}</h1>
+        </div>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; margin-bottom: 28px;">
+            <h2 style="color: #0f172a; margin: 0 0 8px 0; font-size: 20px;">${t("email.order_status.heading", locale)}</h2>
+            <p style="color: #475569; margin: 0;">${t("email.order_status.body", locale, { orderNumber: data.orderNumber, statusLabel })}</p>
+        </div>
+        <div style="text-align: center; margin-bottom: 28px;">
+            <a href="${data.orderUrl}" style="display: inline-block; background: #0f172a; color: white; padding: 14px 32px; border-radius: 9999px; text-decoration: none; font-weight: 600;">
+                ${t("email.order_status.view_order_cta", locale)}
+            </a>
+        </div>
+        <p style="text-align: center; color: #6b7280; font-size: 14px; margin-top: 36px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            ${t("email.order_status.footer", locale, { organizationName: data.organizationName })}
+        </p>
+    </body>
+    </html>
+    `
+}
+
 interface ReviewRequestEmailData {
     customerName: string
     customerEmail: string

@@ -283,6 +283,43 @@ async function runPaidOrderSideEffects(params: {
             error: error instanceof Error ? error.message : String(error),
         })
     }
+
+    // Email de nueva venta al DUEÑO — paridad con contraentrega: las ventas ONLINE
+    // tambien notifican por email (antes solo WhatsApp, dependiente del webhook +
+    // Evolution, por eso se perdian). No bloquea ni rompe el flow.
+    try {
+        const { data: orgRow } = await params.supabase
+            .from("organizations")
+            .select("contact_email")
+            .eq("id", params.organizationId)
+            .single()
+        const ownerEmail = typeof orgRow?.contact_email === "string" ? orgRow.contact_email : ""
+        if (ownerEmail) {
+            const { sendOrderNotificationToOwner } = await import("@/lib/notifications/email")
+            await sendOrderNotificationToOwner({
+                orderNumber: params.order.order_number || params.order.id,
+                customerName: customer?.name || customerInfo?.name || "Cliente",
+                customerEmail: customer?.email || customerInfo?.email || "",
+                total: Number(params.order.total || 0),
+                items: itemsJsonb
+                    .filter((item) => typeof item.quantity === "number" && item.quantity > 0)
+                    .map((item) => ({
+                        name: typeof item.product_name === "string" ? item.product_name : "Producto",
+                        quantity: item.quantity as number,
+                        price: typeof item.unit_price === "number" ? item.unit_price : 0,
+                    })),
+                ownerEmail,
+                organizationName: organization?.name || "",
+                locale: tenantLocale.locale,
+                currency: tenantLocale.currency,
+            })
+        }
+    } catch (error) {
+        log.error("Error sending owner order email", {
+            orderId: params.order.id,
+            error: error instanceof Error ? error.message : String(error),
+        })
+    }
 }
 
 export async function applyPaymentStatusToOrder(
