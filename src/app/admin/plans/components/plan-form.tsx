@@ -199,7 +199,15 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 type="number"
                                 min="0"
                                 value={formData.price}
-                                onChange={(e) => handleChange("price", parseFloat(e.target.value) || 0)}
+                                onChange={(e) => {
+                                    const newPrice = parseFloat(e.target.value) || 0
+                                    handleChange("price", newPrice)
+                                    // Mantener el precio anual en sync con el mensual (si hay meses gratis).
+                                    const months = formData.yearly_discount_months
+                                    if (months != null && months > 0) {
+                                        handleChange("yearly_price", Math.round(newPrice * (12 - months)))
+                                    }
+                                }}
                             />
                             {errors.price && <p className="text-sm text-destructive">{errors.price}</p>}
                         </div>
@@ -251,7 +259,7 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 placeholder="Ej: 1490000 (paga 10 meses)"
                             />
                             <p className="text-xs text-muted-foreground">
-                                Precio total anual. Dejar vacío si no ofrece plan anual.
+                                Se recalcula al cambiar el precio mensual o los meses gratis. Puedes ajustarlo manualmente.
                             </p>
                         </div>
                         <div className="space-y-2">
@@ -264,7 +272,12 @@ export function PlanForm({ plan, open, onClose }: PlanFormProps) {
                                 value={formData.yearly_discount_months ?? ""}
                                 onChange={(e) => {
                                     const val = e.target.value
-                                    handleChange("yearly_discount_months", val === "" ? null : parseInt(val) || 0)
+                                    const months = val === "" ? null : parseInt(val) || 0
+                                    handleChange("yearly_discount_months", months)
+                                    // Recalcular el precio anual desde el mensual + meses gratis.
+                                    if (months != null && months > 0) {
+                                        handleChange("yearly_price", Math.round(formData.price * (12 - months)))
+                                    }
                                 }}
                                 placeholder="Ej: 2"
                             />
