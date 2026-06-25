@@ -251,6 +251,8 @@ export async function sendOrderNotificationToOwner(data: {
     total: number
     items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null }>
     ownerEmail: string
+    /** Correos adicionales de notificación (además del ownerEmail). */
+    additionalEmails?: string[]
     organizationName: string
     locale?: SupportedLocale
     currency?: SupportedCurrency
@@ -262,9 +264,14 @@ export async function sendOrderNotificationToOwner(data: {
             return true
         }
 
-        // Skip if owner email is empty
-        if (!data.ownerEmail || data.ownerEmail.trim() === '') {
-            console.log(`[EMAIL] Owner email is empty, skipping owner notification`)
+        // Destinatarios: ownerEmail (contact_email) + correos adicionales del merchant.
+        const recipients = Array.from(new Set(
+            [data.ownerEmail, ...(data.additionalEmails ?? [])]
+                .map((e) => (typeof e === "string" ? e.trim() : ""))
+                .filter((e) => e.length > 0)
+        ))
+        if (recipients.length === 0) {
+            console.log(`[EMAIL] No owner recipients, skipping owner notification`)
             return true
         }
 
@@ -280,7 +287,7 @@ export async function sendOrderNotificationToOwner(data: {
 
         const response = await resend.emails.send({
             from: `LandingChat <noreply@landingchat.co>`,
-            to: data.ownerEmail,
+            to: recipients,
             subject,
             html: emailContent,
         })

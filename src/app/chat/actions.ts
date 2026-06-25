@@ -857,7 +857,7 @@ export async function createOrder(params: CreateOrderParams) {
             // en es-CO/COP por default vía `getTenantLocale()`.
             const { data: orgDetails } = await supabase
                 .from("organizations")
-                .select("name, contact_email, custom_domain, locale, currency_code")
+                .select("name, contact_email, notification_emails, custom_domain, locale, currency_code")
                 .eq("id", org.id)
                 .single()
 
@@ -915,6 +915,7 @@ export async function createOrder(params: CreateOrderParams) {
                     total: params.total,
                     items: params.items,
                     ownerEmail: ownerEmail,
+                    additionalEmails: Array.isArray(orgDetails?.notification_emails) ? orgDetails.notification_emails : [],
                     organizationName: organizationName,
                     locale: tenantLocale.locale,
                     currency: tenantLocale.currency,
