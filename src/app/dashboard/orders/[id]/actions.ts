@@ -223,7 +223,67 @@ export async function updateOrderStatus(orderId: string, newStatus: string) {
 
     console.log("[updateOrderStatus] Successfully updated:", data[0])
 
+    // Notificar al COMPRADOR del cambio de estado (email). No bloquea la acción;
+    // sendOrderStatusEmail ignora estados sin notificación (pending/confirmed/…).
+    try {
+        await notifyBuyerOrderStatus(supabase, data[0], profile.organization_id, newStatus)
+    } catch (e) {
+        console.error("[updateOrderStatus] buyer notification failed:", e)
+    }
+
     return { success: true }
+}
+
+/**
+ * Envía al comprador el email de cambio de estado del pedido (enviado/entregado/
+ * cancelado/en preparación). Reúne org + locale + link tokenizado del pedido.
+ */
+async function notifyBuyerOrderStatus(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    order: { id: string; order_number?: string | null; customer_id?: string | null; customer_info?: unknown },
+    organizationId: string,
+    status: string,
+): Promise<void> {
+    const ci = (order.customer_info ?? null) as { email?: string; name?: string } | null
+    const customerEmail = typeof ci?.email === "string" ? ci.email : ""
+    if (!customerEmail) return
+
+    const { data: org } = await supabase
+        .from("organizations")
+        .select("name, slug, custom_domain, locale, currency_code, country_code")
+        .eq("id", organizationId)
+        .single()
+    if (!org) return
+
+    const { getTenantLocale } = await import("@/lib/i18n/tenant-locale")
+    const { createStorefrontOrderAccessToken, appendStorefrontAccessParam } = await import("@/lib/storefrontAccess")
+    const { sendOrderStatusEmail } = await import("@/lib/notifications/email")
+
+    const tenantLocale = getTenantLocale(org)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://landingchat.co"
+    const storeUrl = org.custom_domain
+        ? `https://${org.custom_domain}`
+        : appUrl.includes("localhost")
+            ? `${appUrl}/store/${org.slug}`
+            : `https://${org.slug}.landingchat.co`
+    const token = createStorefrontOrderAccessToken({
+        slug: org.slug,
+        organizationId,
+        orderId: order.id,
+        customerId: order.customer_id ?? null,
+    })
+    const orderUrl = appendStorefrontAccessParam(`${storeUrl}/order/${order.id}`, token)
+
+    await sendOrderStatusEmail({
+        orderNumber: order.order_number || order.id,
+        customerName: ci?.name || "Cliente",
+        customerEmail,
+        status,
+        organizationName: org.name || "",
+        orderUrl,
+        locale: tenantLocale.locale,
+        currency: tenantLocale.currency,
+    })
 }
 
 /**
