@@ -186,6 +186,10 @@ async function runPaidOrderSideEffects(params: {
         oversaleDetected: decrementResult.items.some((item) => !item.wasSufficient),
     })
 
+    // Comisión de afiliado tenant (si el cliente fue referido). Idempotente, no bloquea.
+    const { generateAffiliateCommissionForOrder } = await import("@/lib/affiliates/commissions")
+    await generateAffiliateCommissionForOrder({ orderId: params.order.id, organizationId: params.organizationId })
+
     try {
         const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
         await sendSaleNotification(

@@ -1,4 +1,4 @@
-import { type SupabaseServiceClient } from "@/lib/supabase/server"
+import { createServiceClient, type SupabaseServiceClient } from "@/lib/supabase/server"
 
 /** Comisión = base × rate%, redondeada a centavos. 0 ante valores inválidos. */
 export function computeCommissionAmount(baseAmount: number, rate: number): number {
@@ -89,5 +89,75 @@ export async function generateAffiliateCommissionForSubscriptionPayment(
         }
     } catch (error) {
         console.error("[affiliateCommission] no-fatal:", error)
+    }
+}
+
+/**
+ * Genera la comisión de afiliado TENANT para un pedido confirmado de la tienda.
+ * Busca el referral del cliente (afiliado→cliente) de ESTA tienda y genera la
+ * comisión sobre el SUBTOTAL de productos (sin envío). Recurrente: cada pedido
+ * confirmado del cliente referido genera comisión. Idempotente por order id.
+ * No lanza (efecto secundario del pago). Crea su propio service client.
+ */
+export async function generateAffiliateCommissionForOrder(params: { orderId: string; organizationId: string }): Promise<void> {
+    try {
+        const supabase = createServiceClient()
+        const { data: order } = await supabase
+            .from("orders")
+            .select("subtotal, customer_id")
+            .eq("id", params.orderId)
+            .single()
+        const customerId = order?.customer_id as string | null | undefined
+        const subtotal = Number(order?.subtotal)
+        if (!customerId || !Number.isFinite(subtotal) || subtotal <= 0) return
+
+        // Vínculo persistente afiliado→cliente (creado en createOrder).
+        const { data: referral } = await supabase
+            .from("affiliate_referrals")
+            .select("id, affiliate_id, status")
+            .eq("subject_type", "customer")
+            .eq("subject_id", customerId)
+            .limit(1)
+            .maybeSingle()
+        if (!referral) return
+
+        // El afiliado debe ser 'tenant' activo DE ESTA tienda.
+        const { data: affiliate } = await supabase
+            .from("affiliates")
+            .select("id, commission_rate, status")
+            .eq("id", referral.affiliate_id)
+            .eq("scope", "tenant")
+            .eq("organization_id", params.organizationId)
+            .eq("status", "active")
+            .maybeSingle()
+        if (!affiliate) return
+
+        const rate = Number(affiliate.commission_rate)
+        const amount = computeCommissionAmount(subtotal, rate)
+        const { error } = await supabase
+            .from("affiliate_commissions")
+            .upsert({
+                affiliate_id: affiliate.id,
+                referral_id: referral.id,
+                source_type: "order",
+                source_id: params.orderId,
+                base_amount: subtotal,
+                rate,
+                amount,
+                status: "pending",
+            }, { onConflict: "source_type,source_id", ignoreDuplicates: true })
+        if (error) {
+            console.error("[affiliateCommission order] upsert error:", error.message)
+            return
+        }
+
+        if (referral.status !== "converted") {
+            await supabase
+                .from("affiliate_referrals")
+                .update({ status: "converted", converted_at: new Date().toISOString() })
+                .eq("id", referral.id)
+        }
+    } catch (error) {
+        console.error("[affiliateCommission order] no-fatal:", error)
     }
 }
