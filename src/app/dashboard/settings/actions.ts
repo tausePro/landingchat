@@ -187,6 +187,8 @@ interface UpdateOrganizationInput {
     contact_email?: string
     /** WhatsApp del dueño para notificaciones de la plataforma (Platform Notifier T2). */
     notification_phone?: string
+    /** Correos adicionales (coma-separados) que reciben notificaciones de venta. */
+    notification_emails?: string
     industry?: string
     logo_url?: string
     favicon_url?: string
@@ -268,6 +270,10 @@ export async function updateOrganization(data: UpdateOrganizationInput) {
             slug: data.slug,
             contact_email: data.contact_email,
             notification_phone: data.notification_phone?.replace(/[^\d]/g, "") || null,
+            notification_emails: (data.notification_emails ?? "")
+                .split(",")
+                .map((e) => e.trim())
+                .filter((e) => e.length > 0),
             industry: data.industry,
             logo_url: data.logo_url,
             favicon_url: data.favicon_url,

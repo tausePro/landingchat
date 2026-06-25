@@ -21,6 +21,7 @@ interface OrganizationFormProps {
         slug: string
         contact_email: string | null
         notification_phone?: string | null
+        notification_emails?: string[] | null
         industry: string | null
         logo_url: string | null
         favicon_url: string | null
@@ -63,6 +64,7 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
         slug: organization.slug,
         contact_email: organization.contact_email || "",
         notification_phone: organization.notification_phone || "",
+        notification_emails: (organization.notification_emails || []).join(", "),
         industry: organization.industry || "",
         logo_url: organization.logo_url || "",
         favicon_url: organization.favicon_url || "",
@@ -201,6 +203,19 @@ export function OrganizationForm({ organization }: OrganizationFormProps) {
                                         value={formData.contact_email}
                                         onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="notificationEmails">Correos adicionales de notificación</Label>
+                                    <Input
+                                        id="notificationEmails"
+                                        type="text"
+                                        placeholder="ventas@tutienda.com, equipo@tutienda.com"
+                                        value={formData.notification_emails}
+                                        onChange={(e) => setFormData({ ...formData, notification_emails: e.target.value })}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Reciben los emails de nueva venta además del Email de Contacto. Sepáralos por coma.
+                                    </p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="notificationPhone">WhatsApp para Notificaciones</Label>
