@@ -244,6 +244,7 @@ async function notifyBuyerOrderStatus(
     organizationId: string,
     status: string,
 ): Promise<void> {
+    if (!["processing", "shipped", "delivered", "cancelled"].includes(status)) return
     const ci = (order.customer_info ?? null) as { email?: string; name?: string; phone?: string } | null
     const customerEmail = typeof ci?.email === "string" ? ci.email : ""
     const customerPhone = typeof ci?.phone === "string" ? ci.phone : ""
@@ -275,8 +276,10 @@ async function notifyBuyerOrderStatus(
     })
     const orderUrl = appendStorefrontAccessParam(`${storeUrl}/order/${order.id}`, token)
 
+    const { logNotification } = await import("@/lib/notifications/log")
+
     if (customerEmail) {
-        await sendOrderStatusEmail({
+        const emailOk = await sendOrderStatusEmail({
             orderNumber: order.order_number || order.id,
             customerName: ci?.name || "Cliente",
             customerEmail,
@@ -285,6 +288,16 @@ async function notifyBuyerOrderStatus(
             orderUrl,
             locale: tenantLocale.locale,
             currency: tenantLocale.currency,
+        })
+        await logNotification({
+            organizationId,
+            orderId: order.id,
+            kind: "order_status",
+            channel: "email",
+            recipientType: "buyer",
+            status: emailOk ? "sent" : "failed",
+            channelUsed: "resend",
+            metadata: { orderStatus: status },
         })
     }
 
@@ -302,12 +315,26 @@ async function notifyBuyerOrderStatus(
         case "cancelled": waMsg = t("store.order_status.wa_cancelled", tenantLocale.locale, waParams); break
     }
     if (customerPhone && waMsg) {
+        let waOk = false
+        let waError: string | null = null
         try {
             const { sendWhatsAppMessage } = await import("@/lib/whatsapp/provider")
             await sendWhatsAppMessage(organizationId, customerPhone, waMsg)
+            waOk = true
         } catch (e) {
+            waError = e instanceof Error ? e.message : "unknown"
             console.error("[notifyBuyerOrderStatus] whatsapp failed:", e)
         }
+        await logNotification({
+            organizationId,
+            orderId: order.id,
+            kind: "order_status",
+            channel: "whatsapp",
+            recipientType: "buyer",
+            status: waOk ? "sent" : "failed",
+            error: waError,
+            metadata: { orderStatus: status },
+        })
     }
 }
 
