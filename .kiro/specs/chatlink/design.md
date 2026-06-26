@@ -51,3 +51,30 @@ El **modelo customer/sesión + RLS + el gate**. Es la decisión de §2/B — la 
 - [ ] **Decisión gate**: B1 (anónimo) vs B2 (nombre inline).
 - [ ] **MVP-1**: superficie chat-first + entrada sin gate-modal (según la decisión) + etiquetado de variante.
 - [ ] Medir → decidir el builder visual completo (v2).
+
+## 7. Tracking + acortador de URL
+
+**¿Hace falta un acortador para ChatLink? NO uno separado.** La propia ruta de ChatLink ya es la URL corta, branded y trackeable:
+- `landingchat.co/c/{slug}` (o `{slug}.landingchat.co`) → la landing Visual-First.
+- El **`$pageview` ES el "click en bio"** (métrica first-party, sin Bitly).
+- La fuente se pasa por utm (`?s=ig` / `?s=tiktok` o utm completos) → `use-tracking-params` lo adjunta a los eventos.
+
+**Cadena de rastreo (qué tenemos / qué falta):**
+| Paso | Cómo | Estado |
+|---|---|---|
+| Click en bio | `$pageview` de la ruta ChatLink | ✅ (con la ruta nueva) |
+| Fuente (IG/TikTok) | utm en la URL → eventos | ✅ `use-tracking-params` |
+| Chat abierto | `chat_opened` (smart-trigger) | ✅ |
+| Funnel | `view_content` → `add_to_cart` → `checkout_order_created` | ✅ |
+| Venta → fuente | `orders.utm_data` (utm persistido en la orden) | ✅ (verificar) |
+| Ads (pago) | Meta CAPI server-side | ✅ `meta-conversions-api` |
+
+→ Para el A/B + el rastreo de ChatLink **no necesitamos nada externo**: se arma con lo que hay + la ruta nueva.
+
+**Acortador GENÉRICO (opcional, feature aparte)**: para acortar/trackear *otros* links de la bio (no solo ChatLink) o un dominio corto tipo `lc.link`, lo construimos in-house (mejor que Bitly: first-party):
+- Tabla `short_links` (code, target_url, org_id, clicks) + ruta `/l/{code}` (registra click + redirige con utm) + reusa el proxy. ~1 slice pequeño.
+- **No es prerequisito de ChatLink** — es un add-on para los "smart links" de la bio.
+
+## 8. Actualización: enfoque Visual-First (2026-06-25)
+
+El mockup refinado movió a **Visual-First** (landing visual + chat vía Smart Triggers). Esto **reduce el problema del gate** de §2: el gate-modal existente se dispara **al tocar un trigger** (post-intención), donde pedir el nombre es natural → el MVP **reusa el flujo `?action=chat` existente**, sin tocar el modelo customer/sesión/RLS. La decisión B1/B2 pasa a **polish posterior**, no bloquea. El MVP es ahora **mayormente UI** (la landing bento) + reuso (chips, chat, gate).

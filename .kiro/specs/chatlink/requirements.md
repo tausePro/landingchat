@@ -15,13 +15,15 @@
 - **78% del tráfico social es móvil** (goldcaps).
 - **Hipótesis**: una entrada **chat-first** para el tráfico de bio convierte el tráfico social mejor que el storefront actual.
 
-## 2. Qué es ChatLink
+## 2. Qué es ChatLink (enfoque Visual-First)
 
-Un **link-in-bio conversacional**: el visitante de IG/TikTok aterriza **en el chat** (no en la grilla). Bienvenida con IA + catálogo + smart links (WhatsApp/promo) + el agente, con atribución por fuente.
+Un **link-in-bio VISUAL + conversacional**: el visitante de IG/TikTok aterriza en una **landing de bio bonita** (greeting + **bento de productos** + video + social proof "as seen in") con el chat **tejido vía Smart Triggers** — chips ("Ayúdame a elegir rutina", "¿Hay stock en mi talla?") que **abren el chat con contexto**.
 
-- **Diferenciador vs storefront**: chat-first, mobile/social-optimizado, gancho de bienvenida inmediato.
-- **Diferenciador vs Linktree/genéricos**: conversacional + catálogo + agente IA (no una lista de links).
-- **Objetivo de negocio**: canalizar tráfico social hacia la plataforma y subir la conversión del tráfico que hoy rebota.
+- **Por qué Visual-First (mejor que chat-first puro)**: el visitante ve algo lindo primero y entra al chat **por intención** (un trigger) → esquiva el aterrizaje en frío y hace **natural** el gate de nombre (ocurre post-intención, no antes).
+- **Diferenciador vs Linktree / Beacons / Stan / Shopify Linkpop**: ellos **listan links** (visual pero tonto); ChatLink **cierra la venta conversando** (agente + carrito + checkout + WhatsApp).
+- **Diferenciador vs Manychat / bots**: conversacional pero **sin la capa visual/catálogo**.
+- **El moat**: nadie junta **visual + conversacional + comercio completo**. LandingChat ya tiene las 3.
+- **Objetivo**: canalizar tráfico social hacia la plataforma y subir la conversión del tráfico que hoy rebota (goldcaps 0.08%).
 
 ## 3. Inventario: qué REUSA (no reconstruir)
 
@@ -40,15 +42,15 @@ Un **link-in-bio conversacional**: el visitante de IG/TikTok aterriza **en el ch
 ## 4. MVP (delgado — lo mínimo para correr el A/B)
 
 **Incluye**:
-- Una **ruta/variante pública chat-first** por tenant, optimizada mobile (resuelve org por slug vía proxy; respeta RLS).
-- **Bienvenida** del agente (reusa el mensaje auto-generado existente).
-- **Catálogo + chat** (lo que ya existe) en layout chat-first, con product-cards inline.
-- **Quick-replies de entrada** (reusa la lógica de chips: envío, tallas, precio).
-- **Atribución por fuente** etiquetando la variante (`chatlink` vs `storefront`) en los eventos.
+- Ruta pública **Visual-First** por tenant, mobile (resuelve org por slug vía proxy; respeta RLS).
+- **Greeting** del agente + **bento de catálogo** (data e imágenes ya existen; el *layout* bento es lo nuevo).
+- **Smart Triggers** = los **quick-reply chips existentes** (v1.49.1) → al tocarlos van a `?action=chat` con contexto → el **gate-modal existente** se dispara **post-intención** (natural) → el chat.
+- **Atribución por fuente/variante** (utm → eventos; ver `design.md` §7).
 
-**NO incluye en v1** (sale a v2 sólo si el A/B valida):
+**NO incluye en v1** (a v2 sólo si el A/B valida):
 - El **builder visual** completo (la pantalla de configuración de los mockups).
-- Gestión de smart-links UI, **lógica dinámica** (cambio por horario), **skills marketplace**.
+- Bloques avanzados (video / social-proof se reusan de storefront si aplica), skills marketplace.
+- Cambio de gate (B1 anónimo / B2 inline): **polish posterior** — con Visual-First el gate ya cae post-intención y el flujo existente sirve.
 - Inbox / CRM / campañas (fase *operator suite*).
 
 ## 5. El A/B (la validación — el corazón del MVP)
