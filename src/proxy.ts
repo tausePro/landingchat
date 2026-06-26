@@ -570,7 +570,7 @@ async function handleAuth(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Definir rutas públicas (no requieren autenticación)
-    const publicRoutes = ['/', '/store', '/chat', '/api', '/auth', '/login', '/registro', '/recuperar', '/checkout', '/order', '/founding', '/privacidad', '/terminos', '/seguridad', '/robots.txt', '/sitemap.xml', '/llms.txt', '/.well-known']
+    const publicRoutes = ['/', '/store', '/chat', '/c', '/api', '/auth', '/login', '/registro', '/recuperar', '/checkout', '/order', '/founding', '/privacidad', '/terminos', '/seguridad', '/robots.txt', '/sitemap.xml', '/llms.txt', '/.well-known']
     const isPublicRoute = publicRoutes.some(route =>
         request.nextUrl.pathname === route ||
         request.nextUrl.pathname.startsWith(route + '/')
