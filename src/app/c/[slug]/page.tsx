@@ -167,7 +167,7 @@ export default async function ChatLinkPage({ params }: { params: Promise<{ slug:
                     style={{ backgroundColor: primary, transitionTimingFunction: "cubic-bezier(0.16,1,0.3,1)" }}
                 >
                     <MessageCircle className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-                    Hablar con la tienda
+                    {agentName ? `Hablar con ${agentName}` : "Hablar con la tienda"}
                 </Link>
 
                 <p className="mt-auto pt-8 text-center text-[11px] text-slate-400">
