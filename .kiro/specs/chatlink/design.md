@@ -78,3 +78,11 @@ El **modelo customer/sesión + RLS + el gate**. Es la decisión de §2/B — la 
 ## 8. Actualización: enfoque Visual-First (2026-06-25)
 
 El mockup refinado movió a **Visual-First** (landing visual + chat vía Smart Triggers). Esto **reduce el problema del gate** de §2: el gate-modal existente se dispara **al tocar un trigger** (post-intención), donde pedir el nombre es natural → el MVP **reusa el flujo `?action=chat` existente**, sin tocar el modelo customer/sesión/RLS. La decisión B1/B2 pasa a **polish posterior**, no bloquea. El MVP es ahora **mayormente UI** (la landing bento) + reuso (chips, chat, gate).
+
+## 9. Decisión de dominio (final, 2026-06-25)
+
+- **Tier compartido (todos, AHORA)**: `landingchat.co/c/{slug}` — ruta Next directa, **sin comprar dominio**, canaliza tráfico a la plataforma. Donde corremos el A/B ya.
+- **Premium (white-label)**: los merchants con **custom domain configurado** tienen el ChatLink en SU dominio → `{custom_domain}/insta`. **Reusa la resolución de custom-domain del proxy** (poco código). El "gate premium" = ¿tiene custom domain? (que ya es de pago).
+- **`shopi.chat`: reservado** — no se usa aún. Idea: futuro **marketplace/directorio de tiendas LandingChat** (dominio compartido de descubrimiento).
+- **Path** en custom-domain: configurable; default `/insta` (memorable para bio) o `/c` + utm para multi-plataforma. Detalle de implementación.
+- `lc.link` descartado (no disponible); no comprar `shoplc.link`.
