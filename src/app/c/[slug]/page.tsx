@@ -19,8 +19,15 @@ import { formatCurrency } from "@/lib/utils"
  * `{custom_domain}/insta` (premium white-label).
  */
 
-interface OrgBrandingSettings {
+interface ChatLinkConfig {
+    greeting?: string | null
+    productIds?: string[] | null
+    triggers?: { label: string; context: string }[] | null
+}
+
+interface OrgSettings {
     branding?: { primaryColor?: string | null }
+    chatlink?: ChatLinkConfig | null
 }
 
 async function loadChatLink(slug: string) {
@@ -55,16 +62,20 @@ export default async function ChatLinkPage({ params }: { params: Promise<{ slug:
     const host = h.get("host") || ""
     const isSub = isSubdomain(host)
 
-    const settings = (organization.settings ?? {}) as OrgBrandingSettings
+    const settings = (organization.settings ?? {}) as OrgSettings
+    const cfg = settings.chatlink ?? {}
     const primary = settings.branding?.primaryColor || "#0f172a"
     const orgName = (organization.name as string) || "Tienda"
     const logo = (organization.logo_url as string) || null
     const agentName = (agent?.name as string) || null
     const tenantLocale = getTenantLocale(organization)
 
-    const greeting = agentName
+    const autoGreeting = agentName
         ? `Hola, soy ${agentName} de ${orgName}. ¿En qué te ayudo?`
         : `Bienvenido a ${orgName}. ¿En qué te ayudo?`
+    const greeting = typeof cfg.greeting === "string" && cfg.greeting.trim()
+        ? cfg.greeting.trim()
+        : autoGreeting
 
     // Smart Triggers → abren el chat con contexto (flujo ?action=chat existente).
     const chatHref = (context: string) =>
@@ -74,13 +85,24 @@ export default async function ChatLinkPage({ params }: { params: Promise<{ slug:
             slug,
         )
 
-    const triggers = [
+    const defaultTriggers = [
         { Icon: Sparkles, label: "¿Qué me recomiendas?", context: "¿Qué me recomiendas?" },
         { Icon: Truck, label: "Envíos y pagos", context: "¿Cómo son los envíos y las formas de pago?" },
         { Icon: Tag, label: "¿Tienen ofertas?", context: "¿Tienen ofertas o promociones?" },
     ]
+    const triggers = cfg.triggers && cfg.triggers.length > 0
+        ? cfg.triggers
+            .filter((t) => t && t.label && t.context)
+            .map((t) => ({ Icon: MessageCircle, label: t.label, context: t.context }))
+        : defaultTriggers
 
-    const bento = products.slice(0, 6)
+    // Catálogo: si el merchant curó productos (settings.chatlink.productIds), respeta
+    // esa selección y orden; si no, fallback a los 6 más nuevos.
+    const byId = new Map(products.map((p) => [p.id as string, p]))
+    const curated = (cfg.productIds ?? [])
+        .map((id) => byId.get(id))
+        .filter((p): p is NonNullable<typeof p> => Boolean(p))
+    const bento = (curated.length > 0 ? curated : products).slice(0, 6)
     const fmt = (n: number) => formatCurrency(n, { locale: tenantLocale.locale, currency: tenantLocale.currency })
 
     return (
