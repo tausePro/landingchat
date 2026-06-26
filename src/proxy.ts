@@ -340,6 +340,13 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL(pathname, `https://www.landingchat.co`))
     }
 
+    // ChatLink premium (white-label): {dominio}/insta → /c/{slug} (rewrite = URL bonita).
+    // El "gate premium" es tener custom domain (feature de pago); el routing también
+    // sirve en subdominio. Reusa el slug ya resuelto arriba.
+    if (slug && (pathname === '/insta' || pathname === '/insta/')) {
+        return NextResponse.rewrite(new URL(`/c/${slug}`, request.url))
+    }
+
     // Limpiar URLs redundantes en subdominios Y dominios personalizados
     // Ejemplo: qp.landingchat.co/store/qp/producto/123 → qp.landingchat.co/producto/123
     // Ejemplo: tez.com.co/store/tez/profile → tez.com.co/profile
