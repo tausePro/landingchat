@@ -28,6 +28,8 @@ export interface Organization360 {
     copilot_autonomy_level: string | null
     enabled_modules: string[]
     created_at: string
+    suspend_at: string | null
+    suspended_at: string | null
     subscription: {
         status: string
         price: number
@@ -50,7 +52,7 @@ export async function getOrganization360(id: string): Promise<ActionResult<Organ
 
         const { data: org, error } = await supabase
             .from("organizations")
-            .select("id, name, slug, status, industry, locale, currency_code, custom_domain, notification_phone, copilot_autonomy_level, enabled_modules, created_at, whatsapp_conversations_used")
+            .select("id, name, slug, status, industry, locale, currency_code, custom_domain, notification_phone, copilot_autonomy_level, enabled_modules, created_at, suspend_at, suspended_at, whatsapp_conversations_used")
             .eq("id", id)
             .single()
 
@@ -201,6 +203,39 @@ export async function resetWhatsappConversationCounter(id: string): Promise<Acti
     } catch (error) {
         console.error("[org-360] Error reset whatsapp counter:", error)
         return failure("Error al resetear el contador de conversaciones")
+    }
+}
+
+/**
+ * Programa (o cancela) la suspensión automática de una org por fecha.
+ * El cron /api/cron/suspension/process-scheduled la flipa a 'suspended' al
+ * llegar `suspend_at` (one-shot). Pasar null cancela la programación.
+ */
+export async function scheduleSuspension(id: string, suspendAt: string | null): Promise<ActionResult<void>> {
+    if (!(await requireAdminRole(["tech"]))) return failure("No autorizado")
+
+    try {
+        const parsed = suspendAt ? new Date(suspendAt) : null
+        if (suspendAt && (!parsed || Number.isNaN(parsed.getTime()))) {
+            return failure("Fecha inválida")
+        }
+
+        const supabase = await createServiceClient()
+        const { error } = await supabase
+            .from("organizations")
+            .update({ suspend_at: parsed ? parsed.toISOString() : null })
+            .eq("id", id)
+
+        if (error) {
+            console.error("[org-360] Error scheduling suspension:", error)
+            return failure("Error al programar la suspensión")
+        }
+
+        revalidatePath(`/admin/organizations/${id}`)
+        return success(undefined)
+    } catch (error) {
+        console.error("[org-360] scheduleSuspension error:", error)
+        return failure("Error inesperado al programar la suspensión")
     }
 }
 
