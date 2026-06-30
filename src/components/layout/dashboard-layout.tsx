@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { ReactivateBanner } from "@/components/billing/reactivate-banner"
 import { ModeToggle } from "@/components/ui/mode-toggle"
 import {
     LayoutDashboard,
@@ -398,17 +399,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     </div>
                 </header>
                 <div className="flex-1 overflow-y-auto p-8">
-                    {isSuspended && (
-                        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40 p-4 flex items-start gap-3">
-                            <span className="material-symbols-outlined text-red-600 mt-0.5">lock</span>
-                            <div>
-                                <p className="font-semibold text-red-800 dark:text-red-300">Cuenta suspendida</p>
-                                <p className="text-sm text-red-700 dark:text-red-400 mt-0.5">
-                                    Tu tienda y el chat están fuera de línea para tus clientes. Contacta al equipo de LandingChat para reactivar el servicio.
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                    {isSuspended && <ReactivateBanner />}
                     {children}
                 </div>
             </main>
