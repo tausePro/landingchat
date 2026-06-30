@@ -82,6 +82,10 @@ Variables completas y comandos detallados en `docs/AGENTS_GUIDE.md`.
 - ❌ NO dejar invariantes operativos solo en el chat
 - ✅ Antes de asumir arquitectura o fuentes de datos, leer doc autoridad y luego código
 
+### Zona horaria (LATAM / Colombia) — NO asumir UTC para el usuario
+- ✅ La plataforma es **Colombia-first**: zona horaria de referencia **America/Bogota** (UTC-5), locale `es-CO`. Fechas mostradas al usuario → formatear en `America/Bogota` (`toLocaleString("es-CO", { timeZone: "America/Bogota" })` o `formatBogotaDate`).
+- ⚠️ El server corre en **UTC**. Un `<input type="datetime-local">` da hora **local del browser** → convertir a ISO/UTC **en el cliente** (`new Date(value).toISOString()`) ANTES de mandar al server. NUNCA `new Date(localString)` en el server: lo toma como UTC y desfasa 5h.
+
 ## 📝 Commits
 
 - `feat:` nueva funcionalidad
