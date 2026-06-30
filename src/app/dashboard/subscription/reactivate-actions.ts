@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { getPlatformWompiCredentials } from "@/app/admin/platform-payments/actions"
 import crypto from "crypto"
 import type { WompiWidgetData } from "./actions"
+import { resolveReactivationQuote } from "@/lib/billing/reactivation"
 
 /**
  * Inicia el pago de REACTIVACIÓN self-serve de una org suspendida.
@@ -43,22 +44,13 @@ export async function initiateReactivation(): Promise<{
             return { success: false, error: "La tienda no está suspendida" }
         }
 
-        // Mensualidad = precio de la suscripción vigente (snapshot). 2 meses para reactivar.
-        const { data: subscription } = await serviceSupabase
-            .from("subscriptions")
-            .select("price, currency")
-            .eq("organization_id", organizationId)
-            .in("status", ["active", "trialing", "past_due", "incomplete"])
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-
-        const monthlyPrice = Number(subscription?.price) || 0
-        if (monthlyPrice <= 0) {
+        // Monto = mensualidad × meses que debe (dinámico). Ver lib/billing/reactivation.
+        const quote = await resolveReactivationQuote(serviceSupabase, organizationId)
+        if (!quote) {
             return { success: false, error: "No hay un plan con precio para calcular la reactivación. Contacta a soporte." }
         }
-        const currency = (subscription?.currency as string) || "COP"
-        const amountInCents = Math.round(monthlyPrice * 2 * 100)
+        const currency = quote.currency
+        const amountInCents = quote.amountInCents
 
         const credentials = await getPlatformWompiCredentials()
         if (!credentials.success || !credentials.data) {
@@ -107,5 +99,34 @@ export async function initiateReactivation(): Promise<{
     } catch (error) {
         console.error("[initiateReactivation] Error:", error)
         return { success: false, error: error instanceof Error ? error.message : "Error desconocido" }
+    }
+}
+
+/**
+ * Cotización para mostrar en el banner: cuántos meses debe y el monto, sin
+ * iniciar el pago. Resuelve la org del usuario autenticado.
+ */
+export async function getReactivationQuote(): Promise<{
+    success: boolean
+    data?: { monthsOwed: number; amount: number; currency: string }
+    error?: string
+}> {
+    try {
+        const supabase = await createClient()
+        const serviceSupabase = createServiceClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: "No autenticado" }
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single()
+        if (!profile?.organization_id) return { success: false, error: "Sin organización" }
+
+        const quote = await resolveReactivationQuote(serviceSupabase, profile.organization_id)
+        if (!quote) return { success: false, error: "Sin plan con precio" }
+        return { success: true, data: { monthsOwed: quote.monthsOwed, amount: quote.amount, currency: quote.currency } }
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Error" }
     }
 }

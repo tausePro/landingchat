@@ -2,12 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { initiateReactivation } from "@/app/dashboard/subscription/reactivate-actions"
+import { initiateReactivation, getReactivationQuote } from "@/app/dashboard/subscription/reactivate-actions"
 import type { WompiWidgetData } from "@/app/dashboard/subscription/actions"
 
 // Acceso al widget de Wompi sin redeclarar el global (ya lo declaran otros módulos).
 type WidgetCheckoutCtor = new (config: Record<string, unknown>) => {
     open: (cb: (result: { transaction?: { id: string } }) => void) => void
+}
+
+function formatMoney(amount: number, currency: string): string {
+    try {
+        return new Intl.NumberFormat("es-CO", { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)
+    } catch {
+        return `$${Math.round(amount).toLocaleString("es-CO")}`
+    }
 }
 
 /**
@@ -19,6 +27,13 @@ export function ReactivateBanner() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [fallbackUrl, setFallbackUrl] = useState<string | null>(null)
+    const [quote, setQuote] = useState<{ monthsOwed: number; amount: number; currency: string } | null>(null)
+
+    useEffect(() => {
+        getReactivationQuote().then((res) => {
+            if (res.success && res.data) setQuote(res.data)
+        })
+    }, [])
 
     useEffect(() => {
         if (typeof window === "undefined") return
@@ -89,11 +104,14 @@ export function ReactivateBanner() {
                 <div className="flex-1">
                     <p className="font-semibold text-amber-900 dark:text-amber-200">Cuenta suspendida</p>
                     <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-                        Tu tienda y el chat están fuera de línea para tus clientes. Reactiva tu servicio pagando 2 meses de tu plan.
+                        Tu tienda y el chat están fuera de línea para tus clientes.{" "}
+                        {quote
+                            ? `Debes ${quote.monthsOwed} ${quote.monthsOwed === 1 ? "mes" : "meses"} (${formatMoney(quote.amount, quote.currency)}). Reactívala pagando ahora.`
+                            : "Reactívala pagando lo que debes."}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                         <Button onClick={handlePay} disabled={loading} className="bg-amber-600 text-white hover:bg-amber-700">
-                            {loading ? "Abriendo pago…" : "Pagar reactivación (2 meses)"}
+                            {loading ? "Abriendo pago…" : quote ? `Pagar ${formatMoney(quote.amount, quote.currency)}` : "Pagar reactivación"}
                         </Button>
                         {fallbackUrl && (
                             <a href={fallbackUrl} className="text-sm font-medium text-amber-700 underline" target="_blank" rel="noopener noreferrer">
