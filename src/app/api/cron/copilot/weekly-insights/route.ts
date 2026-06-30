@@ -8,6 +8,8 @@ import { composeWeeklyInsight } from "@/lib/copilot/insightComposer"
 import { emitPlatformEvent } from "@/lib/events/emit"
 import { PLATFORM_EVENT_TYPES } from "@/lib/events/platform-event-types"
 import { sendCopilotInsight } from "@/lib/notifications/whatsapp"
+import { sendCopilotInsightEmail } from "@/lib/notifications/email"
+import { logNotification } from "@/lib/notifications/log"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
 
 export const dynamic = "force-dynamic"
@@ -19,6 +21,9 @@ const log = logger("copilot/weekly")
 interface EligibleOrg {
     id: string
     slug: string
+    name: string | null
+    contact_email: string | null
+    notification_emails: string[] | null
     locale: string | null
     currency_code: string | null
     country_code: string | null
@@ -90,7 +95,7 @@ export async function GET(request: Request) {
 
     const { data: orgs, error: orgsError } = await supabase
         .from("organizations")
-        .select("id, slug, locale, currency_code, country_code, copilot_autonomy_level")
+        .select("id, slug, name, contact_email, notification_emails, locale, currency_code, country_code, copilot_autonomy_level")
         .in("id", activeOrgIds)
         .eq("onboarding_completed", true)
 
@@ -156,6 +161,26 @@ export async function GET(request: Request) {
             })
 
             await sendCopilotInsight({ organizationId: org.id, insightId: insight.id })
+
+            // Canal REDUNDANTE por correo: el insight llega aunque el WhatsApp
+            // del merchant falle. Se registra en notification_logs (channel=email).
+            const emailResult = await sendCopilotInsightEmail({
+                ownerEmail: org.contact_email ?? "",
+                additionalEmails: org.notification_emails ?? [],
+                title: payload.title,
+                body: payload.body,
+                proposedActions: payload.proposed_actions ?? [],
+                organizationName: org.name ?? org.slug,
+            })
+            await logNotification({
+                organizationId: org.id,
+                kind: "copilot_insight",
+                channel: "email",
+                recipientType: "owner",
+                status: emailResult.status,
+                channelUsed: "resend",
+                error: emailResult.error ?? null,
+            })
 
             results.generated++
             log.info("insight generated", { organizationId: org.id, slug: org.slug, isoWeek, insightId: insight.id })
