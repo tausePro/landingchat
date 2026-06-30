@@ -175,7 +175,11 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
     const handleScheduleSuspension = async (clear = false) => {
         setSaving("schedule")
         try {
-            const result = await scheduleSuspension(org.id, clear ? null : (suspendAt || null))
+            // `suspendAt` viene del <input datetime-local> = hora LOCAL del browser
+            // (Colombia). Convertir a ISO/UTC AQUÍ (el browser conoce la zona); el
+            // server corre en UTC y no debe re-interpretar un string sin zona.
+            const isoSuspendAt = clear || !suspendAt ? null : new Date(suspendAt).toISOString()
+            const result = await scheduleSuspension(org.id, isoSuspendAt)
             if (result.success) {
                 if (clear) setSuspendAt("")
                 toast.success(clear ? "Programación cancelada" : "Suspensión programada")
@@ -227,7 +231,7 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
                             Se suspende sola al llegar la fecha (cron horario); reactivar exige pago.
                             {org.suspend_at && (
                                 <span className="block mt-1 font-medium text-amber-700">
-                                    Programada para: {new Date(org.suspend_at).toLocaleString("es-CO")}
+                                    Programada para: {new Date(org.suspend_at).toLocaleString("es-CO", { timeZone: "America/Bogota" })}
                                 </span>
                             )}
                         </CardDescription>
