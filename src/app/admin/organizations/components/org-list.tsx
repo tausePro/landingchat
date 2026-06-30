@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
@@ -27,21 +27,8 @@ import { AssignPlanDialog } from "../../subscriptions/components/assign-plan-dia
 import { LocaleDialog } from "./locale-dialog"
 import { toast } from "sonner"
 import { formatBogotaDate } from "@/lib/utils/date"
-// import { useDebounce } from "@/hooks/use-debounce" // We might need to create this hook or implement debounce manually
 
-// Simple debounce implementation inside component if hook doesn't exist
-function useDebounceValue<T>(value: T, delay: number): T {
-    const [debouncedValue, setDebouncedValue] = useState<T>(value)
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setDebouncedValue(value)
-        }, delay)
-        return () => {
-            clearTimeout(handler)
-        }
-    }, [value, delay])
-    return debouncedValue
-}
+const PAGE_SIZE = 15
 
 interface OrgListProps {
     initialData: {
@@ -49,25 +36,28 @@ interface OrgListProps {
         total: number
         totalPages: number
     }
-    searchParams: { [key: string]: string | string[] | undefined }
 }
 
 export function OrgList({ initialData }: OrgListProps) {
     const router = useRouter()
     const [searchTerm, setSearchTerm] = useState("")
-    const debouncedSearch = useDebounceValue(searchTerm, 500)
+    const [page, setPage] = useState(1)
     const [loading, setLoading] = useState(false)
     const [assigningPlanFor, setAssigningPlanFor] = useState<OrganizationData | null>(null)
     const [editingLocaleFor, setEditingLocaleFor] = useState<OrganizationData | null>(null)
 
-    // Effect to trigger search on debounce
-    useEffect(() => {
-        if (debouncedSearch !== "") {
-            router.push(`/admin/organizations?search=${debouncedSearch}`)
-        } else if (searchTerm === "") {
-            router.push(`/admin/organizations`)
-        }
-    }, [debouncedSearch, router])
+    // Filtro + paginación del lado del cliente: instantáneo y matchea nombre Y slug.
+    const query = searchTerm.trim().toLowerCase()
+    const filtered = query
+        ? initialData.organizations.filter(
+            (org) =>
+                org.name.toLowerCase().includes(query) ||
+                org.slug.toLowerCase().includes(query),
+        )
+        : initialData.organizations
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+    const currentPage = Math.min(page, totalPages)
+    const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
     const handleStatusChange = async (id: string, status: 'active' | 'suspended' | 'archived') => {
         if (confirm(`¿Estás seguro de cambiar el estado a ${status}?`)) {
@@ -112,7 +102,7 @@ export function OrgList({ initialData }: OrgListProps) {
                     <Input
                         placeholder="Buscar organización..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
                         className="h-9"
                     />
                 </div>
@@ -132,7 +122,7 @@ export function OrgList({ initialData }: OrgListProps) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {initialData.organizations.map((org) => (
+                        {pageItems.map((org) => (
                             <TableRow key={org.id}>
                                 <TableCell>
                                     <Link href={`/admin/organizations/${org.id}`} className="flex flex-col group">
@@ -199,7 +189,7 @@ export function OrgList({ initialData }: OrgListProps) {
                                 </TableCell>
                             </TableRow>
                         ))}
-                        {initialData.organizations.length === 0 && (
+                        {filtered.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={7} className="h-24 text-center">
                                     No se encontraron resultados.
@@ -208,6 +198,19 @@ export function OrgList({ initialData }: OrgListProps) {
                         )}
                     </TableBody>
                 </Table>
+            </div>
+
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>{filtered.length} organización{filtered.length === 1 ? "" : "es"}</span>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                        Anterior
+                    </Button>
+                    <span>Página {currentPage} de {totalPages}</span>
+                    <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                        Siguiente
+                    </Button>
+                </div>
             </div>
 
             {assigningPlanFor && (

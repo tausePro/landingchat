@@ -3,15 +3,10 @@ import { OrgList } from "./components/org-list"
 
 export const dynamic = 'force-dynamic'
 
-export default async function OrganizationsPage({
-    searchParams,
-}: {
-    searchParams: { [key: string]: string | string[] | undefined }
-}) {
-    const page = typeof searchParams.page === 'string' ? parseInt(searchParams.page) : 1
-    const search = typeof searchParams.search === 'string' ? searchParams.search : ""
-
-    const data = await getOrganizations(page, 10, search)
+export default async function OrganizationsPage() {
+    // Filtro y paginación del lado del cliente (plataforma con pocas orgs):
+    // cargamos todas para que el buscador sea instantáneo y matchee nombre Y slug.
+    const data = await getOrganizations(1, 1000, "")
 
     return (
         <div className="space-y-6">
@@ -22,7 +17,7 @@ export default async function OrganizationsPage({
                 </p>
             </div>
 
-            <OrgList initialData={data} searchParams={searchParams} />
+            <OrgList initialData={data} />
         </div>
     )
 }
