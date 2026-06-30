@@ -361,6 +361,120 @@ function generateOwnerNotificationHTML(
 }
 
 // ============================================================================
+// Atlas Copilot — insight semanal por correo (canal REDUNDANTE)
+// ============================================================================
+// Llega aunque el WhatsApp del merchant falle. El cuerpo ya viene en el locale
+// del tenant (lo compone insightComposer); el chrome del email es es-CO.
+
+function escapeHtml(input: string): string {
+    return input
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+}
+
+function generateCopilotInsightHTML(data: {
+    title: string
+    body: string
+    proposedActions?: Array<{ human_label: string }>
+    organizationName: string
+}): string {
+    const bodyHtml = escapeHtml(data.body).replace(/\n/g, "<br>")
+    const actions = data.proposedActions ?? []
+    const actionsHtml = actions.length > 0
+        ? `<h3 style="margin: 24px 0 8px 0; color: #1f2937;">Acciones propuestas</h3>
+           <ul style="margin: 0; padding-left: 20px; color: #374151;">
+             ${actions.map((a) => `<li style="margin-bottom: 6px;">${escapeHtml(a.human_label)}</li>`).join("")}
+           </ul>`
+        : ""
+
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Atlas Copilot</title>
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+            <p style="color: #6b7280; margin: 0; font-size: 14px;">Atlas Copilot — Reporte semanal</p>
+            <h1 style="color: #1f2937; margin: 8px 0 0 0; font-size: 22px;">${escapeHtml(data.title)}</h1>
+        </div>
+
+        <div style="color: #374151; font-size: 15px;">${bodyHtml}</div>
+
+        ${actionsHtml}
+
+        <div style="margin-top: 28px; text-align: center;">
+            <a href="https://landingchat.co/dashboard/copilot"
+               style="display: inline-block; background: #1f2937; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600;">
+                Ver y aprobar acciones
+            </a>
+        </div>
+
+        <p style="margin-top: 28px; color: #9ca3af; font-size: 12px; text-align: center;">
+            ${escapeHtml(data.organizationName)} · LandingChat
+        </p>
+    </body>
+    </html>
+    `
+}
+
+/**
+ * Envía el insight semanal de Atlas Copilot por correo al dueño (+ correos
+ * adicionales de `notification_emails`). Canal redundante al WhatsApp.
+ * Devuelve el status para registrarlo en `notification_logs`.
+ */
+export async function sendCopilotInsightEmail(data: {
+    ownerEmail: string
+    additionalEmails?: string[]
+    title: string
+    body: string
+    proposedActions?: Array<{ human_label: string }>
+    organizationName: string
+}): Promise<{ status: "sent" | "skipped" | "failed"; error?: string }> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping copilot insight email`)
+            return { status: "skipped" }
+        }
+
+        const recipients = Array.from(new Set(
+            [data.ownerEmail, ...(data.additionalEmails ?? [])]
+                .map((e) => (typeof e === "string" ? e.trim() : ""))
+                .filter((e) => e.length > 0)
+        ))
+        if (recipients.length === 0) {
+            console.log(`[EMAIL] No owner recipients for copilot insight, skipping`)
+            return { status: "skipped" }
+        }
+
+        const response = await resend.emails.send({
+            from: `Atlas Copilot <noreply@landingchat.co>`,
+            to: recipients,
+            subject: `Atlas Copilot — ${data.title}`,
+            html: generateCopilotInsightHTML(data),
+        })
+
+        if (response.error) {
+            console.error("[EMAIL] Resend error for copilot insight:", response.error)
+            return {
+                status: "failed",
+                error: JSON.stringify(response.error),
+            }
+        }
+
+        console.log(`[EMAIL] Copilot insight sent to ${recipients.length} recipient(s), ID: ${response.data?.id}`)
+        return { status: "sent" }
+    } catch (error) {
+        console.error("[EMAIL] Error sending copilot insight:", error)
+        return { status: "failed", error: error instanceof Error ? error.message : "unknown" }
+    }
+}
+
+// ============================================================================
 // Email order-paid (T1.6 — markOrderAsPaid)
 // ============================================================================
 // Se dispara desde `runPaidOrderSideEffects` cada vez que una orden pasa a
