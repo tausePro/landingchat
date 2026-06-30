@@ -95,6 +95,49 @@ async function handleCreditPurchase(
     return NextResponse.json(result.body, { status: result.httpStatus })
 }
 
+/**
+ * Procesa el pago de REACTIVACIÓN self-serve (reference reactivate_{orgId}_{ts}).
+ * Si fue aprobado, reactiva la org (status='active', limpia suspend_at/suspended_at).
+ * Idempotente: re-procesar el mismo pago deja la org igual (active).
+ */
+async function handleReactivationPayment(
+    supabase: SupabaseServiceClient,
+    transaction: WompiWebhookPayload["data"]["transaction"]
+) {
+    const parts = transaction.reference.split("_")
+    const organizationId = parts.length >= 3 ? parts.slice(1, -1).join("_") : null
+    if (!organizationId) {
+        console.error("[Wompi Billing] Invalid reactivation reference:", transaction.reference)
+        return NextResponse.json({ error: "Invalid reference" }, { status: 400 })
+    }
+
+    // Auditoría del pago (idempotente por provider_transaction_id).
+    await supabase.from("payment_transactions").upsert({
+        organization_id: organizationId,
+        provider_transaction_id: transaction.id,
+        amount: transaction.amount_in_cents / 100,
+        currency: transaction.currency,
+        status: WOMPI_STATUS_MAP[transaction.status],
+        provider: "wompi",
+        provider_reference: transaction.reference,
+        updated_at: new Date().toISOString(),
+    }, { onConflict: "provider_transaction_id" })
+
+    if (transaction.status === "APPROVED") {
+        const { error } = await supabase
+            .from("organizations")
+            .update({ status: "active", suspended_at: null, suspend_at: null })
+            .eq("id", organizationId)
+        if (error) {
+            console.error("[Wompi Billing] Error reactivating org:", error)
+            return NextResponse.json({ error: "Reactivation failed" }, { status: 500 })
+        }
+        console.log(`[Wompi Billing] Organization ${organizationId} reactivated via payment`)
+    }
+
+    return NextResponse.json({ received: true })
+}
+
 export async function POST(request: NextRequest) {
     try {
         const payload: WompiWebhookPayload = await request.json()
@@ -143,6 +186,11 @@ export async function POST(request: NextRequest) {
         // Compras de packs de créditos de conversaciones (reference credits_*)
         if (transaction.reference.startsWith("credits_")) {
             return await handleCreditPurchase(supabase, transaction)
+        }
+
+        // Reactivación self-serve de orgs suspendidas (reference reactivate_*)
+        if (transaction.reference.startsWith("reactivate_")) {
+            return await handleReactivationPayment(supabase, transaction)
         }
 
         // Registrar la transacción en payment_transactions
