@@ -19,6 +19,7 @@ import {
     getOrganizationAddons,
     assignAddonToOrganization,
     updateOrgAddonStatus,
+    scheduleSuspension,
     type Organization360,
     type OrgAddon,
     type AddonCatalogItem,
@@ -28,6 +29,15 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
     active: { label: "Activa", className: "bg-green-100 text-green-800" },
     suspended: { label: "Suspendida", className: "bg-red-100 text-red-800" },
     archived: { label: "Archivada", className: "bg-slate-200 text-slate-600" },
+}
+
+/** Convierte un ISO (UTC) al formato local que espera <input type="datetime-local">. */
+function toLocalInputValue(iso: string | null): string {
+    if (!iso) return ""
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ""
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 export function Org360Client({ initial }: { initial: Organization360 }) {
@@ -40,6 +50,7 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
     const [addonCatalog, setAddonCatalog] = useState<AddonCatalogItem[]>([])
     const [newAddonId, setNewAddonId] = useState("")
     const [newAddonPrice, setNewAddonPrice] = useState("")
+    const [suspendAt, setSuspendAt] = useState<string>(toLocalInputValue(org.suspend_at))
 
     const loadAddons = async () => {
         const result = await getOrganizationAddons(org.id)
@@ -161,6 +172,22 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
         }
     }
 
+    const handleScheduleSuspension = async (clear = false) => {
+        setSaving("schedule")
+        try {
+            const result = await scheduleSuspension(org.id, clear ? null : (suspendAt || null))
+            if (result.success) {
+                if (clear) setSuspendAt("")
+                toast.success(clear ? "Programación cancelada" : "Suspensión programada")
+                router.refresh()
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setSaving(null)
+        }
+    }
+
     const groups = [...new Set(MODULE_CATALOG.map((module) => module.group))]
 
     return (
@@ -190,6 +217,39 @@ export function Org360Client({ initial }: { initial: Organization360 }) {
                     {isSuspended ? "Reactivar" : "Suspender"}
                 </Button>
             </div>
+
+            {/* Suspensión programada (Admin) */}
+            {!isSuspended && (
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2"><Power className="h-4 w-4" /> Suspensión programada</CardTitle>
+                        <CardDescription>
+                            Se suspende sola al llegar la fecha (cron horario); reactivar exige pago.
+                            {org.suspend_at && (
+                                <span className="block mt-1 font-medium text-amber-700">
+                                    Programada para: {new Date(org.suspend_at).toLocaleString("es-CO")}
+                                </span>
+                            )}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-wrap items-center gap-2">
+                        <Input
+                            type="datetime-local"
+                            value={suspendAt}
+                            onChange={(event) => setSuspendAt(event.target.value)}
+                            className="w-56"
+                        />
+                        <Button size="sm" onClick={() => handleScheduleSuspension(false)} disabled={!suspendAt || saving === "schedule"}>
+                            {saving === "schedule" ? "..." : "Programar"}
+                        </Button>
+                        {org.suspend_at && (
+                            <Button size="sm" variant="ghost" onClick={() => handleScheduleSuspension(true)} disabled={saving === "schedule"}>
+                                Cancelar programación
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Métricas rápidas */}
             <div className="grid gap-4 sm:grid-cols-4">
