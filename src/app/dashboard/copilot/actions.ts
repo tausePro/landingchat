@@ -1,14 +1,20 @@
 "use server"
 
 import { z } from "zod"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { type ActionResult, success, failure } from "@/types"
 import { executeProposedAction } from "@/lib/copilot/actionExecutor"
 import { emitPlatformEvent } from "@/lib/events/emit"
 import { PLATFORM_EVENT_TYPES } from "@/lib/events/platform-event-types"
 import { COPILOT_AUTONOMY_LEVELS, type CopilotInsightRow, type CopilotProposedAction } from "@/lib/copilot/types"
-import { ATLAS_SKILLS, type AtlasSkillId, type AtlasSkillsConfig } from "@/lib/copilot/atlas-skills"
+import { ATLAS_SKILLS, isAtlasSkillEnabled, type AtlasSkillId, type AtlasSkillsConfig } from "@/lib/copilot/atlas-skills"
+import { loadWeeklyMetrics } from "@/lib/copilot/weeklyMetrics"
+import { composeWeeklyInsight } from "@/lib/copilot/insightComposer"
+import { sendCopilotInsight } from "@/lib/notifications/whatsapp"
+import { sendCopilotInsightEmail } from "@/lib/notifications/email"
+import { logNotification } from "@/lib/notifications/log"
+import type { SupportedLocale } from "@/types/organization"
 
 const decideSchema = z.object({
     insightId: z.string().uuid(),
@@ -317,5 +323,134 @@ export async function getCopilotInsights(): Promise<ActionResult<{ pending: Copi
     } catch (error) {
         console.error("[copilot/feed] Error:", error)
         return failure("Error al cargar los insights")
+    }
+}
+
+/**
+ * Genera un insight ON-DEMAND (a discreción del merchant) sin esperar al cron
+ * del lunes. Rate-limit: 1 cada 24h por org (control de costo LLM). NO lo envía
+ * — queda como preview en el feed; el envío es una acción aparte (sendInsightToOwner).
+ *
+ * Patrón de seguridad: autentica con cliente de usuario (obtiene org_id), luego
+ * opera con service client acotado a ese org_id (igual que el cron crea insights).
+ */
+export async function generateOnDemandInsight(): Promise<ActionResult<{ insightId: string }>> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return failure("No autorizado")
+
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single()
+        if (!profile?.organization_id) return failure("Organización no encontrada")
+        const orgId = profile.organization_id
+
+        const service = createServiceClient()
+
+        // Rate-limit: máximo 1 on-demand en las últimas 24h
+        const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        const { count } = await service
+            .from("copilot_insights")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", orgId)
+            .eq("scope", "on_demand")
+            .gte("generated_at", since)
+        if ((count ?? 0) >= 1) {
+            return failure("Ya generaste un reporte on-demand en las últimas 24h. Revisa el que tienes en Pendientes.")
+        }
+
+        const { data: org } = await service
+            .from("organizations")
+            .select("locale, settings")
+            .eq("id", orgId)
+            .single()
+        const locale: SupportedLocale = org?.locale === "en-US" ? "en-US" : "es-CO"
+        const growthEnabled = isAtlasSkillEnabled(
+            "growth",
+            ((org?.settings as Record<string, unknown> | null)?.atlas_skills as AtlasSkillsConfig) ?? null
+        )
+
+        const metrics = await loadWeeklyMetrics(orgId)
+        const payload = await composeWeeklyInsight({ organizationId: orgId, locale, metrics, growthEnabled })
+
+        const { data: insight, error } = await service
+            .from("copilot_insights")
+            .insert({
+                organization_id: orgId,
+                scope: "on_demand",
+                status: "proposed",
+                title: payload.title,
+                body: payload.body,
+                proposed_actions: payload.proposed_actions,
+                metrics_snapshot: payload.metrics_snapshot,
+            })
+            .select("id")
+            .single()
+        if (error || !insight) return failure("No se pudo generar el reporte")
+
+        revalidatePath("/dashboard/copilot")
+        return success({ insightId: insight.id })
+    } catch (error) {
+        console.error("[copilot/on-demand] Error:", error)
+        return failure("Error inesperado al generar el reporte")
+    }
+}
+
+/**
+ * Envía un insight (típicamente on-demand) al owner por WhatsApp + email, a
+ * discreción del merchant. Reusa la entrega del cron (sendCopilotInsight) + email
+ * redundante. RLS: solo puede enviar insights de su propio org.
+ */
+export async function sendInsightToOwner(insightId: string): Promise<ActionResult<void>> {
+    try {
+        if (!insightId || typeof insightId !== "string") return failure("Datos inválidos")
+
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return failure("No autorizado")
+
+        // RLS: retorna vacío si el insight es de otro org
+        const { data: insight } = await supabase
+            .from("copilot_insights")
+            .select("id, organization_id, title, body, proposed_actions")
+            .eq("id", insightId)
+            .maybeSingle()
+        if (!insight) return failure("not_found")
+
+        // WhatsApp (respeta toggles + loguea internamente)
+        await sendCopilotInsight({ organizationId: insight.organization_id, insightId: insight.id })
+
+        // Email redundante + log
+        const service = createServiceClient()
+        const { data: org } = await service
+            .from("organizations")
+            .select("name, slug, contact_email, notification_emails")
+            .eq("id", insight.organization_id)
+            .single()
+        const emailResult = await sendCopilotInsightEmail({
+            ownerEmail: org?.contact_email ?? "",
+            additionalEmails: org?.notification_emails ?? [],
+            title: insight.title,
+            body: insight.body,
+            proposedActions: (insight.proposed_actions as Array<{ human_label: string }>) ?? [],
+            organizationName: org?.name ?? org?.slug ?? "LandingChat",
+        })
+        await logNotification({
+            organizationId: insight.organization_id,
+            kind: "copilot_insight",
+            channel: "email",
+            recipientType: "owner",
+            status: emailResult.status,
+            channelUsed: "resend",
+            error: emailResult.error ?? null,
+        })
+
+        return success(undefined)
+    } catch (error) {
+        console.error("[copilot/send-insight] Error:", error)
+        return failure("Error inesperado al enviar el reporte")
     }
 }

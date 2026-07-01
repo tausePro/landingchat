@@ -17,7 +17,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { decideCopilotInsight } from "../actions"
+import { decideCopilotInsight, sendInsightToOwner } from "../actions"
 import type { CopilotInsightRow } from "@/lib/copilot/types"
 
 const STATUS_LABELS: Record<CopilotInsightRow["status"], { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -46,6 +46,7 @@ export function InsightCard({ insight, mode }: InsightCardProps) {
     const [dismissOpen, setDismissOpen] = useState(false)
     const [note, setNote] = useState("")
     const [submitting, setSubmitting] = useState(false)
+    const [sending, setSending] = useState(false)
 
     const generatedDate = new Date(insight.generated_at).toLocaleDateString("es-CO", {
         day: "numeric",
@@ -86,6 +87,22 @@ export function InsightCard({ insight, mode }: InsightCardProps) {
             toast.error("Error inesperado")
         } finally {
             setSubmitting(false)
+        }
+    }
+
+    const handleSend = async () => {
+        setSending(true)
+        try {
+            const result = await sendInsightToOwner(insight.id)
+            if (result.success) {
+                toast.success("Reporte enviado a tu WhatsApp y correo")
+            } else {
+                toast.error(result.error)
+            }
+        } catch {
+            toast.error("Error al enviar el reporte")
+        } finally {
+            setSending(false)
         }
     }
 
@@ -140,13 +157,18 @@ export function InsightCard({ insight, mode }: InsightCardProps) {
                 )}
 
                 {mode === "pending" && (
-                    <div className="flex gap-3 pt-1">
+                    <div className="flex flex-wrap gap-3 pt-1">
                         <Button onClick={() => setApproveOpen(true)} disabled={submitting}>
                             Aprobar{selectedActions.length > 0 ? ` (${selectedActions.length})` : ""}
                         </Button>
                         <Button variant="outline" onClick={() => setDismissOpen(true)} disabled={submitting}>
                             Rechazar
                         </Button>
+                        {insight.scope === "on_demand" && (
+                            <Button variant="outline" onClick={handleSend} disabled={submitting || sending}>
+                                {sending ? "Enviando..." : "Enviar a mi WhatsApp/email"}
+                            </Button>
+                        )}
                     </div>
                 )}
             </CardContent>
