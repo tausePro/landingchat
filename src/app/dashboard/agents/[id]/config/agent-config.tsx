@@ -824,13 +824,13 @@ export function AgentConfig({ agent, orgContext }: AgentConfigProps) {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <Label>Documentos de Conocimiento</Label>
-                                            <p className="text-xs text-muted-foreground mt-0.5">PDF, TXT, MD o CSV — El agente usará el contenido para responder</p>
+                                            <p className="text-xs text-muted-foreground mt-0.5">PDF, TXT, MD, CSV o Excel (XLSX) — El agente usará el contenido para responder</p>
                                         </div>
                                         <div>
                                             <input
                                                 ref={fileInputRef}
                                                 type="file"
-                                                accept=".pdf,.txt,.md,.csv"
+                                                accept=".pdf,.txt,.md,.csv,.xlsx"
                                                 className="hidden"
                                                 onChange={(e) => {
                                                     const file = e.target.files?.[0]

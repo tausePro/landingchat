@@ -4,7 +4,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const MAX_TEXT_LENGTH = 50000 // ~50k chars para no saturar el contexto
 
-const VALID_EXTENSIONS = [".pdf", ".txt", ".md", ".csv"]
+const VALID_EXTENSIONS = [".pdf", ".txt", ".md", ".csv", ".xlsx"]
 
 /**
  * POST /api/agents/documents
@@ -107,8 +107,11 @@ export async function POST(request: NextRequest) {
                 const pdfData = await pdfParse(buffer)
                 extractedText = pdfData.text
             } else if (fileExt === ".csv") {
-                // xlsx: parse Excel/CSV to text
                 extractedText = buffer.toString("utf-8")
+            } else if (fileExt === ".xlsx") {
+                // Excel: parsear todas las hojas → texto (helper testeable, exceljs lazy).
+                const { xlsxBufferToText } = await import("@/lib/ai/xlsx-to-text")
+                extractedText = await xlsxBufferToText(buffer)
             } else {
                 // TXT, MD: read as UTF-8
                 extractedText = buffer.toString("utf-8")
