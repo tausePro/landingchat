@@ -164,6 +164,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [enabledModules, setEnabledModules] = React.useState<string[]>([])
     const [industrySlug, setIndustrySlug] = React.useState<string>("")
     const [isSuspended, setIsSuspended] = React.useState(false)
+    const [scheduledSuspendAt, setScheduledSuspendAt] = React.useState<string | null>(null)
 
     React.useEffect(() => {
         const checkOnboarding = async () => {
@@ -186,7 +187,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 if (profile?.organization_id) {
                     const { data: org } = await supabase
                         .from("organizations")
-                        .select("onboarding_completed, enabled_modules, industry, status")
+                        .select("onboarding_completed, enabled_modules, industry, status, suspend_at")
                         .eq("id", profile.organization_id)
                         .single()
 
@@ -198,6 +199,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         setEnabledModules(org.enabled_modules || [])
                         setIndustrySlug(org.industry || "")
                         setIsSuspended(org.status === "suspended")
+                        setScheduledSuspendAt((org as { suspend_at?: string | null }).suspend_at ?? null)
                     }
                 }
             } catch (error) {
@@ -399,7 +401,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     </div>
                 </header>
                 <div className="flex-1 overflow-y-auto p-8">
-                    {isSuspended && <ReactivateBanner />}
+                    {isSuspended
+                        ? <ReactivateBanner />
+                        : (scheduledSuspendAt && new Date(scheduledSuspendAt).getTime() > Date.now())
+                            ? <ReactivateBanner scheduledFor={scheduledSuspendAt} />
+                            : null}
                     {children}
                 </div>
             </main>
