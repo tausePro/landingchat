@@ -34,14 +34,15 @@ export async function initiateReactivation(): Promise<{
         if (!profile?.organization_id) return { success: false, error: "No pertenece a ninguna organización" }
         const organizationId = profile.organization_id
 
-        // Solo orgs realmente suspendidas pueden iniciar la reactivación.
+        // Puede pagar si está suspendida O tiene suspensión programada (pagar = reactivar
+        // o evitar la suspensión). Otros casos no aplican.
         const { data: org } = await serviceSupabase
             .from("organizations")
-            .select("status")
+            .select("status, suspend_at")
             .eq("id", organizationId)
             .single()
-        if (org?.status !== "suspended") {
-            return { success: false, error: "La tienda no está suspendida" }
+        if (org?.status !== "suspended" && !org?.suspend_at) {
+            return { success: false, error: "La tienda no está suspendida ni programada para suspensión" }
         }
 
         // Monto = mensualidad × meses que debe (dinámico). Ver lib/billing/reactivation.
