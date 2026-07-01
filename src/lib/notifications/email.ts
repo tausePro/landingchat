@@ -475,6 +475,94 @@ export async function sendCopilotInsightEmail(data: {
 }
 
 // ============================================================================
+// Email de avisos de suspensión/reactivación de cuenta (al merchant)
+// ============================================================================
+
+function generateSuspensionNoticeHTML(data: {
+    heading: string
+    body: string
+    ctaLabel: string
+    ctaUrl: string
+    organizationName: string
+}): string {
+    return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid #e5e7eb;">
+            <h1 style="color: #1f2937; margin: 0; font-size: 22px;">${escapeHtml(data.heading)}</h1>
+        </div>
+        <div style="color: #374151; font-size: 15px;">${escapeHtml(data.body).replace(/\n/g, "<br>")}</div>
+        <div style="margin-top: 28px; text-align: center;">
+            <a href="${data.ctaUrl}"
+               style="display: inline-block; background: #1f2937; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600;">
+                ${escapeHtml(data.ctaLabel)}
+            </a>
+        </div>
+        <p style="margin-top: 28px; color: #9ca3af; font-size: 12px; text-align: center;">
+            ${escapeHtml(data.organizationName)} · LandingChat
+        </p>
+    </body>
+    </html>
+    `
+}
+
+/**
+ * Envía un aviso de suspensión/reactivación al dueño (+ `notification_emails`).
+ * El copy llega ya armado desde `suspension-notices.ts` (fuente única es/en).
+ * Devuelve el status para registrarlo en `notification_logs`.
+ */
+export async function sendSuspensionNoticeEmail(data: {
+    ownerEmail: string
+    additionalEmails?: string[]
+    subject: string
+    heading: string
+    body: string
+    ctaLabel: string
+    ctaUrl: string
+    organizationName: string
+}): Promise<{ status: "sent" | "skipped" | "failed"; error?: string }> {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.log(`[EMAIL] Resend API key not configured, skipping suspension notice`)
+            return { status: "skipped" }
+        }
+
+        const recipients = Array.from(new Set(
+            [data.ownerEmail, ...(data.additionalEmails ?? [])]
+                .map((e) => (typeof e === "string" ? e.trim() : ""))
+                .filter((e) => e.length > 0)
+        ))
+        if (recipients.length === 0) {
+            console.log(`[EMAIL] No owner recipients for suspension notice, skipping`)
+            return { status: "skipped" }
+        }
+
+        const response = await resend.emails.send({
+            from: `LandingChat <noreply@landingchat.co>`,
+            to: recipients,
+            subject: data.subject,
+            html: generateSuspensionNoticeHTML(data),
+        })
+
+        if (response.error) {
+            console.error("[EMAIL] Resend error for suspension notice:", response.error)
+            return { status: "failed", error: JSON.stringify(response.error) }
+        }
+
+        console.log(`[EMAIL] Suspension notice sent to ${recipients.length} recipient(s), ID: ${response.data?.id}`)
+        return { status: "sent" }
+    } catch (error) {
+        console.error("[EMAIL] Error sending suspension notice:", error)
+        return { status: "failed", error: error instanceof Error ? error.message : "unknown" }
+    }
+}
+
+// ============================================================================
 // Email order-paid (T1.6 — markOrderAsPaid)
 // ============================================================================
 // Se dispara desde `runPaidOrderSideEffects` cada vez que una orden pasa a
