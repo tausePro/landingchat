@@ -81,11 +81,6 @@ export default async function StoreLayout({
                     <h1 className="text-xl font-bold text-slate-900">
                         {isEnglish ? "Store temporarily unavailable" : "Tienda no disponible temporalmente"}
                     </h1>
-                    <p className="mt-2 text-sm text-slate-500">
-                        {isEnglish
-                            ? "This store is currently suspended. If you are the owner, please contact LandingChat support."
-                            : "Esta tienda se encuentra suspendida. Si eres el propietario, contacta al soporte de LandingChat."}
-                    </p>
                 </div>
             </div>
         )
