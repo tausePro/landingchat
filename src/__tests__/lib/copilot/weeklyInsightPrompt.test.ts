@@ -71,4 +71,16 @@ describe("buildWeeklyInsightPrompt — skill Crecimiento (Growth Operator)", () 
         expect(prompt).toContain("Respond ONLY in English")
         expect(prompt).toContain("GROWTH OPERATOR")
     })
+
+    it("growthEnabled=false omite el LENS (skill Crecimiento apagado) sin romper el contrato", () => {
+        const prompt = buildWeeklyInsightPrompt(buildMetrics(), "es-CO", false)
+        expect(prompt).not.toContain("GROWTH OPERATOR")
+        expect(prompt).toContain("Return JSON only")
+        expect(prompt).toContain("Orders:")
+    })
+
+    it("growthEnabled=true o default incluye el LENS", () => {
+        expect(buildWeeklyInsightPrompt(buildMetrics(), "es-CO", true)).toContain("GROWTH OPERATOR")
+        expect(buildWeeklyInsightPrompt(buildMetrics(), "es-CO")).toContain("GROWTH OPERATOR")
+    })
 })

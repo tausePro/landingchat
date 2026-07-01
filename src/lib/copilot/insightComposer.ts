@@ -34,6 +34,8 @@ export interface ComposeWeeklyInsightInput {
     organizationId: string
     locale: SupportedLocale
     metrics: WeeklyMetrics
+    /** Skill "Crecimiento" del hub de Atlas (default ON). Si false, el prompt omite el LENS. */
+    growthEnabled?: boolean
 }
 
 function buildMetricsSnapshot(metrics: WeeklyMetrics): Record<string, unknown> {
@@ -94,7 +96,7 @@ function stripMarkdownFences(text: string): string {
 }
 
 export async function composeWeeklyInsight(input: ComposeWeeklyInsightInput): Promise<CopilotInsightPayload> {
-    const { organizationId, locale, metrics } = input
+    const { organizationId, locale, metrics, growthEnabled } = input
 
     // Datos demasiado pobres: no quemamos tokens — insight determinista.
     // Vertical-aware: inmobiliaria/servicios no tienen órdenes, su "thin" es
@@ -109,7 +111,7 @@ export async function composeWeeklyInsight(input: ComposeWeeklyInsightInput): Pr
     }
 
     try {
-        const prompt = buildWeeklyInsightPrompt(metrics, locale)
+        const prompt = buildWeeklyInsightPrompt(metrics, locale, growthEnabled)
         const response = await createMessage({
             model: COMPOSER_MODEL,
             max_tokens: MAX_TOKENS,
