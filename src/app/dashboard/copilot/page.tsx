@@ -4,6 +4,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCopilotInsights } from "./actions"
 import { InsightCard } from "./components/insight-card"
+import { GenerateInsightButton } from "./components/generate-insight-button"
 import type { CopilotInsightRow } from "@/lib/copilot/types"
 
 export const dynamic = "force-dynamic"
@@ -34,13 +35,16 @@ export default async function CopilotPage() {
                             Insights semanales sobre tu tienda con acciones que tú apruebas.
                         </p>
                     </div>
-                    <Link
-                        href="/dashboard/copilot/settings"
-                        className="flex h-10 items-center gap-2 rounded-lg border border-border-light dark:border-border-dark px-4 text-sm font-medium text-text-light-primary dark:text-text-dark-primary hover:bg-background-light dark:hover:bg-background-dark"
-                    >
-                        <span className="material-symbols-outlined text-lg">settings</span>
-                        Configuración
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        <GenerateInsightButton />
+                        <Link
+                            href="/dashboard/copilot/settings"
+                            className="flex h-10 items-center gap-2 rounded-lg border border-border-light dark:border-border-dark px-4 text-sm font-medium text-text-light-primary dark:text-text-dark-primary hover:bg-background-light dark:hover:bg-background-dark"
+                        >
+                            <span className="material-symbols-outlined text-lg">settings</span>
+                            Configuración
+                        </Link>
+                    </div>
                 </div>
 
                 <Tabs defaultValue="pending" className="space-y-4">
@@ -62,6 +66,9 @@ export default async function CopilotPage() {
                                     Cada lunes el copilot analiza tu semana (ventas, conversaciones, carritos
                                     abandonados) y te propone acciones concretas. También te llega por WhatsApp.
                                 </p>
+                                <div className="mt-6 flex justify-center">
+                                    <GenerateInsightButton variant="default" label="Generar mi primer reporte ahora" />
+                                </div>
                             </div>
                         ) : (
                             pending.map((insight) => (
