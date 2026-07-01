@@ -23,7 +23,7 @@ function formatMoney(amount: number, currency: string): string {
  * Reusa el widget de Wompi (mismo patrón que buy-credits-dialog). El webhook
  * y la result page reactivan la org tras el pago aprobado.
  */
-export function ReactivateBanner() {
+export function ReactivateBanner({ scheduledFor = null }: { scheduledFor?: string | null }) {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [fallbackUrl, setFallbackUrl] = useState<string | null>(null)
@@ -102,12 +102,16 @@ export function ReactivateBanner() {
             <div className="flex items-start gap-3">
                 <span className="material-symbols-outlined mt-0.5 text-amber-600">lock</span>
                 <div className="flex-1">
-                    <p className="font-semibold text-amber-900 dark:text-amber-200">Cuenta suspendida</p>
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">
+                        {scheduledFor ? "Suspensión programada" : "Cuenta suspendida"}
+                    </p>
                     <p className="mt-1 text-sm text-amber-800 dark:text-amber-300">
-                        Tu tienda y el chat están fuera de línea para tus clientes.{" "}
+                        {scheduledFor
+                            ? `Tu tienda se suspenderá el ${new Date(scheduledFor).toLocaleString("es-CO", { timeZone: "America/Bogota" })}.`
+                            : "Tu tienda y el chat están fuera de línea para tus clientes."}{" "}
                         {quote
-                            ? `Debes ${quote.monthsOwed} ${quote.monthsOwed === 1 ? "mes" : "meses"} (${formatMoney(quote.amount, quote.currency)}). Reactívala pagando ahora.`
-                            : "Reactívala pagando lo que debes."}
+                            ? `Debes ${quote.monthsOwed} ${quote.monthsOwed === 1 ? "mes" : "meses"} (${formatMoney(quote.amount, quote.currency)}). ${scheduledFor ? "Paga ahora para evitarlo." : "Reactívala pagando ahora."}`
+                            : (scheduledFor ? "Paga ahora para evitarlo." : "Reactívala pagando lo que debes.")}
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                         <Button onClick={handlePay} disabled={loading} className="bg-amber-600 text-white hover:bg-amber-700">
