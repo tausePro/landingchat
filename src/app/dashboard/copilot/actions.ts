@@ -8,6 +8,7 @@ import { executeProposedAction } from "@/lib/copilot/actionExecutor"
 import { emitPlatformEvent } from "@/lib/events/emit"
 import { PLATFORM_EVENT_TYPES } from "@/lib/events/platform-event-types"
 import { COPILOT_AUTONOMY_LEVELS, type CopilotInsightRow, type CopilotProposedAction } from "@/lib/copilot/types"
+import { ATLAS_SKILLS, type AtlasSkillId, type AtlasSkillsConfig } from "@/lib/copilot/atlas-skills"
 
 const decideSchema = z.object({
     insightId: z.string().uuid(),
@@ -144,6 +145,7 @@ export interface CopilotSettingsData {
     autonomyLevel: (typeof COPILOT_AUTONOMY_LEVELS)[number]
     notifyOnInsight: boolean
     hasPersonalInstance: boolean
+    atlasSkills: AtlasSkillsConfig
 }
 
 /** Lee la config del copilot del org del usuario (RLS scoping). */
@@ -163,7 +165,7 @@ export async function getCopilotSettings(): Promise<ActionResult<CopilotSettings
         const [{ data: org }, { data: instance }] = await Promise.all([
             supabase
                 .from("organizations")
-                .select("copilot_autonomy_level")
+                .select("copilot_autonomy_level, settings")
                 .eq("id", profile.organization_id)
                 .single(),
             supabase
@@ -179,10 +181,13 @@ export async function getCopilotSettings(): Promise<ActionResult<CopilotSettings
             ? org!.copilot_autonomy_level
             : "level_1_propose"
 
+        const atlasSkills = ((org?.settings as Record<string, unknown> | null)?.atlas_skills as AtlasSkillsConfig) ?? {}
+
         return success({
             autonomyLevel: level,
             notifyOnInsight: instance?.notify_on_copilot_insight !== false,
             hasPersonalInstance: Boolean(instance),
+            atlasSkills,
         })
     } catch (error) {
         console.error("[copilot/settings] Error:", error)
@@ -228,6 +233,64 @@ export async function updateCopilotSettings(input: CopilotSettingsInput): Promis
     } catch (error) {
         console.error("[copilot/settings] Error updating:", error)
         return failure("Error inesperado al guardar la configuración")
+    }
+}
+
+const atlasSkillSchema = z.object({
+    skillId: z.enum(["growth", "paid_social", "creative", "aeo"]),
+    enabled: z.boolean(),
+})
+
+/**
+ * Activa/desactiva un skill de Atlas para el org (persistido en
+ * organizations.settings.atlas_skills, deep-merge sin pisar otras llaves).
+ * Solo skills "active" son toggleables; los "coming_soon" se rechazan.
+ */
+export async function setAtlasSkillEnabled(input: { skillId: AtlasSkillId; enabled: boolean }): Promise<ActionResult<void>> {
+    try {
+        const validation = atlasSkillSchema.safeParse(input)
+        if (!validation.success) return failure("Datos inválidos")
+        const { skillId, enabled } = validation.data
+
+        const def = ATLAS_SKILLS.find((s) => s.id === skillId)
+        if (!def || def.status !== "active") return failure("Esa habilidad aún no está disponible")
+
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return failure("No autorizado")
+
+        const { data: profile } = await supabase
+            .from("profiles")
+            .select("organization_id")
+            .eq("id", user.id)
+            .single()
+        if (!profile?.organization_id) return failure("Organización no encontrada")
+
+        const { data: org } = await supabase
+            .from("organizations")
+            .select("settings")
+            .eq("id", profile.organization_id)
+            .single()
+
+        const currentSettings = (org?.settings as Record<string, unknown> | null) ?? {}
+        const currentSkills = (currentSettings.atlas_skills as AtlasSkillsConfig | undefined) ?? {}
+        const nextSettings = {
+            ...currentSettings,
+            atlas_skills: { ...currentSkills, [skillId]: { ...currentSkills[skillId], enabled } },
+        }
+
+        const { error } = await supabase
+            .from("organizations")
+            .update({ settings: nextSettings })
+            .eq("id", profile.organization_id)
+        if (error) return failure("No se pudo guardar la habilidad")
+
+        revalidatePath("/dashboard/copilot/settings")
+        revalidatePath("/dashboard/copilot")
+        return success(undefined)
+    } catch (error) {
+        console.error("[copilot/atlas-skill] Error:", error)
+        return failure("Error inesperado al guardar la habilidad")
     }
 }
 

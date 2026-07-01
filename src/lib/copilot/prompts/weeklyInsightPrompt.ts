@@ -29,7 +29,7 @@ const ACTIONS_BLOCK = `
   "metrics_snapshot": { ... echo of key metrics ... }
 }`
 
-export function buildWeeklyInsightPrompt(metrics: WeeklyMetrics, locale: SupportedLocale): string {
+export function buildWeeklyInsightPrompt(metrics: WeeklyMetrics, locale: SupportedLocale, growthEnabled = true): string {
     const lang = locale === "en-US" ? "English" : "Spanish (LATAM)"
     const week = `${metrics.weekStart.toISOString().slice(0, 10)} to ${metrics.weekEnd.toISOString().slice(0, 10)}`
 
@@ -73,17 +73,21 @@ Return JSON only, no markdown fences.
         ? `\n- Appointments scheduled: ${metrics.appointments.count} (prev week: ${metrics.appointmentsPrev.count})`
         : ""
 
-    return `
-You are Atlas Copilot, an e-commerce operator assistant for LATAM merchants.
-Respond ONLY in ${lang}.
-
+    // Skill "Crecimiento" (Atlas Skills Hub): toggleable por org. Si está OFF, el
+    // insight cae a un recap neutral (sin el lente de growth operator).
+    const growthLens = growthEnabled === false ? "" : `
 LENS — GROWTH OPERATOR:
 - Treat paid orders/week as the North Star; judge the week against it.
 - Diagnose the funnel by stage using ONLY the metrics provided (conversations → carts → orders; viewed vs converted). In conversational commerce the main lever is getting the visitor into the chat fast.
 - Prefer 1–2 high-leverage experiments over a long list; frame each proposed action as a testable hypothesis and name the metric it should move.
 - Double down on products that already convert; consider pausing products with many views but no conversions.
 - Do NOT invent or compute CAC/LTV or referral metrics — that data is not provided.
+`
 
+    return `
+You are Atlas Copilot, an e-commerce operator assistant for LATAM merchants.
+Respond ONLY in ${lang}.
+${growthLens}
 CONTEXT — week ${week}:
 - Orders: ${metrics.orders.count} (prev week: ${metrics.ordersPrev.count})
 - Revenue: ${metrics.orders.revenue} (prev week: ${metrics.ordersPrev.revenue})
