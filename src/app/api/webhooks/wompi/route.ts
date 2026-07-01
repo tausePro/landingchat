@@ -16,6 +16,7 @@ import { type WompiWebhookPayload, WOMPI_STATUS_MAP } from "@/lib/wompi/types"
 import { decrypt } from "@/lib/utils/encryption"
 import { applyConversationCreditPayment } from "@/lib/payments/conversation-credit-payment"
 import { generateAffiliateCommissionForSubscriptionPayment } from "@/lib/affiliates/commissions"
+import { notifyMerchantSuspension } from "@/lib/notifications/suspension-notices"
 
 interface PlatformConfigRow {
     value: {
@@ -124,15 +125,22 @@ async function handleReactivationPayment(
     }, { onConflict: "provider_transaction_id" })
 
     if (transaction.status === "APPROVED") {
-        const { error } = await supabase
+        // Solo flipa si estaba suspendida → idempotente: el webhook y el fallback
+        // (verifyReactivation) no duplican el aviso — quien flipa primero notifica.
+        const { data: flipped, error } = await supabase
             .from("organizations")
             .update({ status: "active", suspended_at: null, suspend_at: null })
             .eq("id", organizationId)
+            .eq("status", "suspended")
+            .select("id")
         if (error) {
             console.error("[Wompi Billing] Error reactivating org:", error)
             return NextResponse.json({ error: "Reactivation failed" }, { status: 500 })
         }
-        console.log(`[Wompi Billing] Organization ${organizationId} reactivated via payment`)
+        if (flipped && flipped.length > 0) {
+            console.log(`[Wompi Billing] Organization ${organizationId} reactivated via payment`)
+            await notifyMerchantSuspension({ organizationId, type: "reactivated" })
+        }
     }
 
     return NextResponse.json({ received: true })

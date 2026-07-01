@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { logger } from "@/lib/logger"
+import { notifyMerchantSuspension } from "@/lib/notifications/suspension-notices"
 
 export const dynamic = "force-dynamic"
 
@@ -53,6 +54,8 @@ export async function GET(request: Request) {
         } else {
             results.suspended++
             log.info("org suspended on schedule", { organizationId: org.id, slug: org.slug })
+            // Aviso al merchant (email + WhatsApp) de que la cuenta quedó suspendida.
+            await notifyMerchantSuspension({ organizationId: org.id, type: "executed" })
         }
     }
 

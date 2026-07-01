@@ -12,6 +12,7 @@ import { z } from "zod"
 import { type ActionResult, success, failure } from "@/types"
 import { requireAdminRole } from "@/lib/admin/roles"
 import { fetchAllPages } from "@/lib/supabase/fetch-all"
+import { notifyMerchantSuspension } from "@/lib/notifications/suspension-notices"
 
 import { VALID_MODULE_IDS } from "./module-catalog"
 
@@ -229,6 +230,15 @@ export async function scheduleSuspension(id: string, suspendAt: string | null): 
         if (error) {
             console.error("[org-360] Error scheduling suspension:", error)
             return failure("Error al programar la suspensión")
+        }
+
+        // Aviso al merchant (email + WhatsApp) solo al PROGRAMAR (no al cancelar).
+        if (parsed) {
+            await notifyMerchantSuspension({
+                organizationId: id,
+                type: "scheduled",
+                suspendAt: parsed.toISOString(),
+            })
         }
 
         revalidatePath(`/admin/organizations/${id}`)

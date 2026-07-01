@@ -2,6 +2,7 @@
 
 import { createServiceClient } from "@/lib/supabase/server"
 import { getPlatformWompiCredentials } from "@/app/admin/platform-payments/actions"
+import { notifyMerchantSuspension } from "@/lib/notifications/suspension-notices"
 
 /**
  * Verifica el pago de reactivación en Wompi y, si fue aprobado, reactiva la org
@@ -38,10 +39,17 @@ export async function verifyReactivation(transactionId: string): Promise<{
             const organizationId = parts.length >= 3 ? parts.slice(1, -1).join("_") : null
             if (organizationId) {
                 const supabase = createServiceClient()
-                await supabase
+                // Idempotente: solo flipa si estaba suspendida y notifica solo quien flipa
+                // (evita duplicar el aviso con el webhook).
+                const { data: flipped } = await supabase
                     .from("organizations")
                     .update({ status: "active", suspended_at: null, suspend_at: null })
                     .eq("id", organizationId)
+                    .eq("status", "suspended")
+                    .select("id")
+                if (flipped && flipped.length > 0) {
+                    await notifyMerchantSuspension({ organizationId, type: "reactivated" })
+                }
             }
         }
 
