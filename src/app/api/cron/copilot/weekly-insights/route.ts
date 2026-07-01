@@ -11,6 +11,7 @@ import { sendCopilotInsight } from "@/lib/notifications/whatsapp"
 import { sendCopilotInsightEmail } from "@/lib/notifications/email"
 import { logNotification } from "@/lib/notifications/log"
 import { getTenantLocale } from "@/lib/i18n/tenant-locale"
+import { isAtlasSkillEnabled, type AtlasSkillsConfig } from "@/lib/copilot/atlas-skills"
 
 export const dynamic = "force-dynamic"
 // El batch llama al LLM por org: darle aire más allá del default
@@ -28,6 +29,7 @@ interface EligibleOrg {
     currency_code: string | null
     country_code: string | null
     copilot_autonomy_level: string | null
+    settings: Record<string, unknown> | null
 }
 
 /**
@@ -95,7 +97,7 @@ export async function GET(request: Request) {
 
     const { data: orgs, error: orgsError } = await supabase
         .from("organizations")
-        .select("id, slug, name, contact_email, notification_emails, locale, currency_code, country_code, copilot_autonomy_level")
+        .select("id, slug, name, contact_email, notification_emails, locale, currency_code, country_code, copilot_autonomy_level, settings")
         .in("id", activeOrgIds)
         .eq("onboarding_completed", true)
 
@@ -129,10 +131,15 @@ export async function GET(request: Request) {
 
             const tenantLocale = getTenantLocale(org)
             const metrics = await loadWeeklyMetrics(org.id)
+            const growthEnabled = isAtlasSkillEnabled(
+                "growth",
+                (org.settings?.atlas_skills as AtlasSkillsConfig | undefined) ?? null
+            )
             const payload = await composeWeeklyInsight({
                 organizationId: org.id,
                 locale: tenantLocale.locale,
                 metrics,
+                growthEnabled,
             })
 
             const { data: insight, error: insertError } = await supabase

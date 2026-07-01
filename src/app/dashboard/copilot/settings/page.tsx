@@ -3,6 +3,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCopilotSettings } from "../actions"
 import { CopilotSettingsForm } from "./settings-form"
+import { AtlasSkillsPanel } from "./atlas-skills-panel"
 
 export const dynamic = "force-dynamic"
 
@@ -16,7 +17,7 @@ export default async function CopilotSettingsPage() {
 
     const settings = result.success
         ? result.data
-        : { autonomyLevel: "level_1_propose" as const, notifyOnInsight: true, hasPersonalInstance: false }
+        : { autonomyLevel: "level_1_propose" as const, notifyOnInsight: true, hasPersonalInstance: false, atlasSkills: {} }
 
     return (
         <DashboardLayout>
@@ -40,6 +41,8 @@ export default async function CopilotSettingsPage() {
                     initialNotifyOnInsight={settings.notifyOnInsight}
                     hasPersonalInstance={settings.hasPersonalInstance}
                 />
+
+                <AtlasSkillsPanel initialConfig={settings.atlasSkills} />
             </div>
         </DashboardLayout>
     )
