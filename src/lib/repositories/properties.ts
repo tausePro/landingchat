@@ -12,6 +12,7 @@
  * - property/[code]/page.tsx, bookings/create, chat-agent, dashboard-actions, cron, asesor/actions
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 
 const log = logger("repositories/properties")
@@ -62,7 +63,7 @@ const SUMMARY_SELECT = "id, title, external_code, property_type, property_class,
  * Buscar propiedades con filtros (para search_properties tool)
  */
 export async function searchProperties(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     filters: PropertySearchFilters
 ): Promise<{ data: PropertySummary[]; error: string | null }> {
@@ -147,13 +148,45 @@ export async function searchProperties(
 }
 
 /**
+ * Fila de propiedad tal como la consumen los executors (subset tipado del
+ * row real de `properties` — select("*") trae más campos, estos son los
+ * que el dominio usa).
+ */
+export interface PropertyRow {
+    id: string
+    title: string | null
+    description: string | null
+    property_type: string | null
+    property_class: string | null
+    status: string | null
+    city: string | null
+    neighborhood: string | null
+    address: string | null
+    department: string | null
+    stratum: number | null
+    bedrooms: number | null
+    bathrooms: number | null
+    area_m2: number | null
+    parking_spots: number | null
+    floor_number: number | null
+    age_years: number | null
+    price_rent: number | null
+    price_sale: number | null
+    price_admin: number | null
+    images: Array<{ url: string }> | null
+    features: Array<{ description?: string | null; value?: string | null; valueText?: string | null }> | null
+    is_featured: boolean | null
+    external_code: string | null
+}
+
+/**
  * Obtener una propiedad por ID, external_code o título (para show_property tool)
  */
 export async function findProperty(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     identifier: string
-): Promise<{ data: any | null; error: string | null }> {
+): Promise<{ data: PropertyRow | null; error: string | null }> {
     // 1. UUID
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier)
     if (isUUID) {
@@ -194,7 +227,7 @@ export async function findProperty(
  * Contar propiedades activas (para dashboard y chat-agent)
  */
 export async function countActiveProperties(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string
 ): Promise<number> {
     const { count } = await supabase
@@ -209,7 +242,7 @@ export async function countActiveProperties(
  * Obtener propiedades activas con ciudad y barrio (para dashboard RE: top zonas)
  */
 export async function getActivePropertiesWithZones(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string
 ): Promise<{ id: string; city: string | null; neighborhood: string | null }[]> {
     const { data } = await supabase
@@ -224,7 +257,7 @@ export async function getActivePropertiesWithZones(
  * Obtener slug y custom_domain de la org (para construir URLs de propiedades)
  */
 export async function getOrgUrlInfo(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string
 ): Promise<{ slug: string | null; customDomain: string | null }> {
     const { data } = await supabase
