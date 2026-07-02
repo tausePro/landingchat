@@ -93,8 +93,8 @@ const showProperty: ToolHandler = async (supabase, input, context) => {
     const formatPrice = (price: number) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(price)
 
     const features = (property.features || [])
-        .filter((f: any) => f.value && f.value !== "0" && f.value !== "No")
-        .map((f: any) => `${f.description}: ${f.valueText || f.value}`)
+        .filter((f) => f.value && f.value !== "0" && f.value !== "No")
+        .map((f) => `${f.description}: ${f.valueText || f.value}`)
 
     return {
         success: true,
@@ -127,7 +127,7 @@ const showProperty: ToolHandler = async (supabase, input, context) => {
                     sale: property.price_sale ? formatPrice(property.price_sale) : null,
                     admin: property.price_admin ? formatPrice(property.price_admin) : null
                 },
-                images: (property.images || []).slice(0, 10).map((img: any) => img.url),
+                images: (property.images || []).slice(0, 10).map((img) => img.url),
                 features: features.slice(0, 15),
                 is_featured: property.is_featured,
                 external_code: property.external_code,

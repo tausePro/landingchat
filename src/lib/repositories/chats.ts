@@ -14,6 +14,7 @@
  * - dashboard/chats/actions.ts, ai-chat/route.ts, webhook-utils.ts, etc.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 
 const log = logger("repositories/chats")
@@ -26,7 +27,7 @@ const log = logger("repositories/chats")
  * Obtener info básica del chat para procesamiento de mensajes (unified.ts)
  */
 export async function getChatForProcessing(
-    supabase: any,
+    supabase: SupabaseClient,
     chatId: string
 ): Promise<{ organization_id: string; customer_id: string | null; agent_id: string | null; ai_enabled: boolean } | null> {
     const { data, error } = await supabase
@@ -43,7 +44,7 @@ export async function getChatForProcessing(
  * Obtener canal y metadata del chat (tool-executor identifyCustomer)
  */
 export async function getChatChannelInfo(
-    supabase: any,
+    supabase: SupabaseClient,
     chatId: string
 ): Promise<{ channel: string | null; customer_id: string | null; whatsapp_chat_id: string | null; metadata: Record<string, unknown> | null } | null> {
     const { data } = await supabase
@@ -58,7 +59,7 @@ export async function getChatChannelInfo(
  * Obtener número de teléfono del chat (para enviar respuesta WhatsApp)
  */
 export async function getChatPhoneNumber(
-    supabase: any,
+    supabase: SupabaseClient,
     chatId: string
 ): Promise<{ phone_number: string | null; whatsapp_chat_id: string | null } | null> {
     const { data } = await supabase
@@ -73,7 +74,7 @@ export async function getChatPhoneNumber(
  * Obtener social recipient ID del chat (para Instagram/Messenger)
  */
 export async function getChatSocialInfo(
-    supabase: any,
+    supabase: SupabaseClient,
     chatId: string
 ): Promise<{ whatsapp_chat_id: string | null; metadata: Record<string, unknown> | null } | null> {
     const { data } = await supabase
@@ -88,7 +89,7 @@ export async function getChatSocialInfo(
  * Obtener metadata del chat (para shipping details en checkout)
  */
 export async function getChatMetadata(
-    supabase: any,
+    supabase: SupabaseClient,
     chatId: string
 ): Promise<{ metadata: Record<string, unknown> | null; customer_id: string | null; channel: string | null } | null> {
     const { data } = await supabase
@@ -103,7 +104,7 @@ export async function getChatMetadata(
  * Obtener info del chat para envío de respuesta (unified.ts sendResponse)
  */
 export async function getChatForResponse(
-    supabase: any,
+    supabase: SupabaseClient,
     chatId: string
 ): Promise<{ organization_id: string; channel: string | null; phone_number: string | null } | null> {
     const { data } = await supabase
@@ -122,7 +123,7 @@ export async function getChatForResponse(
  * Vincular un customer a un chat
  */
 export async function linkCustomerToChat(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     chatId: string,
     customerId: string
@@ -144,7 +145,7 @@ export async function linkCustomerToChat(
  * Reasignar todos los chats de un customer a otro (merge de shell customers)
  */
 export async function reassignChatsToCustomer(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     fromCustomerId: string,
     toCustomerId: string
@@ -166,7 +167,7 @@ export async function reassignChatsToCustomer(
  * Actualizar metadata del chat (merge con metadata existente)
  */
 export async function updateChatMetadata(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     chatId: string,
     newMetadata: Record<string, unknown>
@@ -200,7 +201,7 @@ export async function updateChatMetadata(
  * Actualizar status del chat (para escalamiento a humano)
  */
 export async function updateChatStatus(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     chatId: string,
     status: string
@@ -222,7 +223,7 @@ export async function updateChatStatus(
  * Asignar agente a un chat
  */
 export async function assignAgentToChat(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     chatId: string,
     agentId: string
