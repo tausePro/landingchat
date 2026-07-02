@@ -14,6 +14,7 @@
  * - webhook-utils.ts, identify route, chat init, dashboard, leads, etc.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 
 const log = logger("repositories/customers")
@@ -51,10 +52,10 @@ export interface CustomerUpdateInput {
  * Incluye órdenes para determinar si es returning customer.
  */
 export async function findCustomerByEmailThenPhone(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     options: { email?: string | null; phone?: string | null }
-): Promise<any | null> {
+): Promise<Record<string, unknown> | null> {
     const { email, phone } = options
 
     // Prioridad: email primero (como tool-executor.ts)
@@ -90,7 +91,7 @@ export async function findCustomerByEmailThenPhone(
  * canales WhatsApp priorizan phone.
  */
 export async function findCustomerByPhoneThenEmail(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     options: { phone?: string | null; email?: string | null }
 ): Promise<{ id: string } | null> {
@@ -125,10 +126,10 @@ export async function findCustomerByPhoneThenEmail(
  * Buscar cliente por ID dentro de una organización
  */
 export async function findCustomerById(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     customerId: string
-): Promise<any | null> {
+): Promise<Record<string, unknown> | null> {
     const { data } = await supabase
         .from("customers")
         .select("full_name, email, phone, metadata, total_orders, total_spent, document_type, document_number, person_type, business_name")
@@ -142,9 +143,9 @@ export async function findCustomerById(
  * Crear un nuevo cliente. Retorna la fila creada (id + campos).
  */
 export async function createCustomer(
-    supabase: any,
+    supabase: SupabaseClient,
     input: CustomerCreateInput
-): Promise<any | null> {
+): Promise<Record<string, unknown> | null> {
     const { data, error } = await supabase
         .from("customers")
         .insert({
@@ -171,11 +172,11 @@ export async function createCustomer(
  * Actualizar un cliente existente. Retorna la fila actualizada o null.
  */
 export async function updateCustomer(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     customerId: string,
     fields: CustomerUpdateInput
-): Promise<any | null> {
+): Promise<Record<string, unknown> | null> {
     const updateData: Record<string, unknown> = {}
     if (fields.fullName !== undefined) updateData.full_name = fields.fullName
     if (fields.email !== undefined) updateData.email = fields.email
@@ -209,7 +210,7 @@ export async function updateCustomer(
  * Eliminar un cliente dentro de una organización (para merge de shell customers)
  */
 export async function deleteCustomer(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     customerId: string
 ): Promise<boolean> {
@@ -230,7 +231,7 @@ export async function deleteCustomer(
  * Contar clientes nuevos en un período (para dashboard)
  */
 export async function countNewCustomers(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     since: string
 ): Promise<number> {
@@ -246,7 +247,7 @@ export async function countNewCustomers(
  * Obtener leads recientes con canal (para dashboard RE)
  */
 export async function getRecentLeadsWithChannel(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     since: string
 ): Promise<{ id: string; channel?: string }[]> {

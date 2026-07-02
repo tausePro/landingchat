@@ -16,6 +16,7 @@
  * - api/webhooks/payments/ (wompi, epayco)
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 
 const log = logger("repositories/orders")
@@ -31,7 +32,7 @@ const PROTECTED_FIELDS = ["organization_id", "id"]
  * Obtener orden por ID o por order_number (para getOrderStatus tool)
  */
 export async function findOrder(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     identifier: string
 ): Promise<any | null> {
@@ -61,7 +62,7 @@ export async function findOrder(
  * Obtener órdenes recientes de un cliente (para getCustomerHistory tool)
  */
 export async function getCustomerOrders(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     customerId: string
 ): Promise<any[]> {
@@ -79,7 +80,7 @@ export async function getCustomerOrders(
  * Verificar si un cliente tiene órdenes (para merge de shell customers)
  */
 export async function customerHasOrders(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     customerId: string
 ): Promise<boolean> {
@@ -96,7 +97,7 @@ export async function customerHasOrders(
  * Obtener todas las órdenes de una org en un período (para dashboard/analytics)
  */
 export async function getOrgOrders(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     options?: { since?: string; statuses?: string[] }
 ): Promise<any[]> {
@@ -126,10 +127,10 @@ export async function getOrgOrders(
  * organization_id se establece desde el parámetro (previene override).
  */
 export async function createOrder(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     data: Record<string, unknown>
-): Promise<{ data: any | null; error: string | null }> {
+): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
     const sanitized = { ...data }
     for (const field of PROTECTED_FIELDS) {
         delete sanitized[field]
@@ -156,7 +157,7 @@ export async function createOrder(
  * Campos protegidos (organization_id, id) se eliminan automáticamente.
  */
 export async function updateOrder(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     orderId: string,
     fields: Record<string, unknown>

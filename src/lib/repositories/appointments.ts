@@ -17,6 +17,7 @@
  * - lib/advisors/assignment.ts
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { logger } from "@/lib/logger"
 
 const log = logger("repositories/appointments")
@@ -32,7 +33,7 @@ const PROTECTED_FIELDS = ["organization_id", "id"]
  * Obtener citas en un rango de fechas con status activo (para checkAvailability)
  */
 export async function getActiveAppointmentsInRange(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     startDate: string,
     endDate: string
@@ -54,7 +55,7 @@ export async function getActiveAppointmentsInRange(
  * Citas pegadas al borde (ej: una termina a 10:00, otra empieza a 10:00) NO son conflicto.
  */
 export async function getConflictingAppointments(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     startDate: string,
     endDate: string
@@ -73,7 +74,7 @@ export async function getConflictingAppointments(
  * Obtener citas recientes con status (para dashboard RE KPIs)
  */
 export async function getRecentAppointments(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     since: string
 ): Promise<{ id: string; status: string }[]> {
@@ -94,10 +95,10 @@ export async function getRecentAppointments(
  * organization_id se establece desde el parámetro, no desde data (previene override).
  */
 export async function createAppointment(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     data: Record<string, unknown>
-): Promise<{ data: any | null; error: string | null }> {
+): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
     // Sanitizar: no permitir override de organization_id desde data
     const sanitized = { ...data }
     for (const field of PROTECTED_FIELDS) {
@@ -127,7 +128,7 @@ export async function createAppointment(
  * Campos protegidos (organization_id, id) se eliminan automáticamente de fields.
  */
 export async function updateAppointment(
-    supabase: any,
+    supabase: SupabaseClient,
     organizationId: string,
     appointmentId: string,
     fields: Record<string, unknown>
