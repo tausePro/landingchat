@@ -8,7 +8,62 @@ export interface StorefrontShippingConfig {
     free_shipping_zones: string[] | null
     default_shipping_rate: number | null
     estimated_delivery_days?: number | null
+    estimated_delivery_days_max?: number | null
     express_delivery_days?: number | null
+}
+
+// ============================================================================
+// Promesa de entrega configurable (min/max en días hábiles, 0 = hoy mismo)
+// ============================================================================
+
+/** Subset mínimo para calcular la promesa — reusable desde rows crudos. */
+export interface DeliveryEstimateSource {
+    estimated_delivery_days?: number | null
+    estimated_delivery_days_max?: number | null
+}
+
+export interface DeliveryEstimate {
+    kind: "today" | "single" | "range"
+    minDays: number
+    maxDays: number
+}
+
+/**
+ * Promesa de entrega configurada por el merchant.
+ * - NULL/no configurada → null (NO se inventa una promesa).
+ * - min=0 y sin max (o max=0) → "hoy mismo".
+ * - max < min o inválido → se normaliza a min (sin rango).
+ */
+export function getDeliveryEstimate(
+    source: DeliveryEstimateSource | null | undefined
+): DeliveryEstimate | null {
+    const rawMin = source?.estimated_delivery_days
+    if (rawMin === null || rawMin === undefined || Number.isNaN(Number(rawMin))) return null
+    const minDays = Math.max(0, Math.trunc(Number(rawMin)))
+
+    const rawMax = source?.estimated_delivery_days_max
+    const maxDays = rawMax === null || rawMax === undefined || Number.isNaN(Number(rawMax))
+        ? minDays
+        : Math.max(minDays, Math.trunc(Number(rawMax)))
+
+    if (maxDays === 0) return { kind: "today", minDays: 0, maxDays: 0 }
+    if (minDays === maxDays) return { kind: "single", minDays, maxDays }
+    return { kind: "range", minDays, maxDays }
+}
+
+/**
+ * Texto es para el chat/agente: "hoy mismo" | "1 día hábil" | "2 a 4 días
+ * hábiles" | "entre hoy y 2 días hábiles". El storefront usa i18n (keys
+ * store.product_detail.trust_rail_*), esto es para mensajes del agente.
+ */
+export function formatDeliveryEstimateEs(estimate: DeliveryEstimate | null): string | null {
+    if (!estimate) return null
+    if (estimate.kind === "today") return "hoy mismo"
+    if (estimate.kind === "single") {
+        return estimate.minDays === 1 ? "1 día hábil" : `${estimate.minDays} días hábiles`
+    }
+    if (estimate.minDays === 0) return `entre hoy y ${estimate.maxDays} días hábiles`
+    return `${estimate.minDays} a ${estimate.maxDays} días hábiles`
 }
 
 export interface FreeShippingProgress {

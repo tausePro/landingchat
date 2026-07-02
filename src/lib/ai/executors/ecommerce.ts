@@ -10,7 +10,7 @@ import {
 import { getVariantPriceRange, findApplicableTier } from "@/lib/commerce/variantPricing"
 import type { PriceTier } from "@/types/product"
 import { calculateCouponDiscount, type CouponMetadata, type CartItemForCoupon } from "@/lib/utils/coupon"
-import { getShippingAvailability } from "@/lib/utils/shipping"
+import { getShippingAvailability, getDeliveryEstimate, formatDeliveryEstimateEs } from "@/lib/utils/shipping"
 import {
     ApplyDiscountSchema,
     CreatePaymentLinkSchema,
@@ -1140,7 +1140,8 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
     const freeShippingEnabled = shippingSettings?.free_shipping_enabled || false
     const freeShippingMinAmount = Number(shippingSettings?.free_shipping_min_amount) || 0
     const freeShippingZones: string[] = shippingSettings?.free_shipping_zones || []
-    const estimatedDays = shippingSettings?.estimated_delivery_days || 3
+    // Promesa REAL del merchant (0 = hoy mismo, rango min-max). Sin config → no se inventa.
+    const deliveryDays = formatDeliveryEstimateEs(getDeliveryEstimate(shippingSettings)) ?? "por confirmar con la tienda"
 
     const options: Array<{ id: string; name: string; price: number; days: string }> = []
 
@@ -1179,7 +1180,7 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
             id: "free",
             name: "Envío Gratis",
             price: 0,
-            days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
+            days: deliveryDays
         })
     }
 
@@ -1188,7 +1189,7 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
             id: "standard",
             name: "Envío Estándar",
             price: defaultRate,
-            days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
+            days: deliveryDays
         })
     }
 
@@ -1197,7 +1198,7 @@ const getShippingOptions: ToolHandler = async (supabase, input, context) => {
             id: "standard",
             name: "Envío Estándar",
             price: 0,
-            days: `${estimatedDays}-${estimatedDays + 2} días hábiles`
+            days: deliveryDays
         })
     }
 

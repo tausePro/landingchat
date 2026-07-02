@@ -1,4 +1,5 @@
 import { stripHtml } from "@/lib/utils/stripHtml"
+import { getDeliveryEstimate } from "@/lib/utils/shipping"
 import type { ProductReview, ProductReviewSummary, ProductVariantRow, ProductWithVariantsReadModel } from "@/types/product"
 
 /**
@@ -48,6 +49,7 @@ export interface ProductJsonLdShipping {
     free_shipping_min_amount?: number | null
     default_shipping_rate?: number | null
     estimated_delivery_days?: number | null
+    estimated_delivery_days_max?: number | null
     /** NULL = política de devoluciones no configurada → no se emite. */
     returns_accepted?: boolean | null
     return_window_days?: number | null
@@ -120,16 +122,28 @@ function buildShippingDetails(
             "@type": "DefinedRegion",
             addressCountry: countryCode,
         },
-        ...(shipping.estimated_delivery_days && shipping.estimated_delivery_days > 0 && {
-            deliveryTime: {
-                "@type": "ShippingDeliveryTime",
-                transitTime: {
-                    "@type": "QuantitativeValue",
-                    value: shipping.estimated_delivery_days,
-                    unitCode: "DAY",
+        ...(() => {
+            // Promesa real del merchant: valor único o rango min-max (0 = hoy mismo)
+            const deliveryEstimate = getDeliveryEstimate(shipping)
+            if (!deliveryEstimate) return {}
+            return {
+                deliveryTime: {
+                    "@type": "ShippingDeliveryTime",
+                    transitTime: deliveryEstimate.minDays === deliveryEstimate.maxDays
+                        ? {
+                            "@type": "QuantitativeValue",
+                            value: deliveryEstimate.minDays,
+                            unitCode: "DAY",
+                        }
+                        : {
+                            "@type": "QuantitativeValue",
+                            minValue: deliveryEstimate.minDays,
+                            maxValue: deliveryEstimate.maxDays,
+                            unitCode: "DAY",
+                        },
                 },
-            },
-        }),
+            }
+        })(),
     }
 }
 
