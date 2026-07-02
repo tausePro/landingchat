@@ -145,19 +145,15 @@ export function TrackingProvider({
                 })
             },
             trackPurchase: (value, currency, contentIds, orderId) => {
+                // F0.1: purchase se emite SERVER-SIDE en el seam de pago confirmado
+                // (first-party + PostHog con dedupe por order_id) — cubre contraentrega,
+                // chat/WhatsApp y compradores que no vuelven a la thank-you page.
+                // Aquí solo Meta Pixel, que requiere cookies del browser.
                 const resolvedCurrency = currency || "COP"
                 const eventId = orderId ? `purchase_${orderId}` : createMetaEventId("Purchase")
                 if (metaPixelEnabled) {
                     metaPixel.trackPurchase(value, resolvedCurrency, contentIds, orderId, eventId)
                 }
-                posthogTracking.trackPurchase(value, currency, contentIds, orderId)
-                trackFirstPartyAnalyticsEvent(organizationSlug, {
-                    eventName: "purchase",
-                    contentIds,
-                    orderId,
-                    value,
-                    currency: resolvedCurrency,
-                })
             },
             trackPageView: (path, props) => {
                 posthogTracking.trackPageView(path, props)
