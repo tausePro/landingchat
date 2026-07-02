@@ -339,3 +339,28 @@ export async function registerMetaPhoneNumber(input: { pin: string }): Promise<A
         return failure(error instanceof Error ? error.message : "Error registrando el número")
     }
 }
+
+/**
+ * Suscribe la app al webhook del WABA (una sola vez). Sin esto, los mensajes
+ * que los merchants envían al número de la plataforma NO llegan a
+ * /api/webhooks/whatsapp-meta → el loop "responde 1/2/3" del copilot queda mudo.
+ */
+export async function subscribeMetaWebhookToWaba(): Promise<ActionResult<void>> {
+    if (!(await checkSuperAdmin())) return failure("No autorizado")
+
+    try {
+        const config = await getPlatformNotificationsConfig()
+        if (!config.meta_waba_id || !config.meta_access_token_encrypted) {
+            return failure("Guarda primero WABA ID y Access Token")
+        }
+
+        const token = decrypt(config.meta_access_token_encrypted)
+        const client = new MetaCloudClient()
+        await client.subscribeAppToWaba(config.meta_waba_id, token)
+
+        return success(undefined)
+    } catch (error) {
+        console.error("[platform-notifications] Subscribe error:", error)
+        return failure(error instanceof Error ? error.message : "Error suscribiendo el webhook")
+    }
+}

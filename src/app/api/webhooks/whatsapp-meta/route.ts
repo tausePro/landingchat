@@ -32,6 +32,7 @@ import {
 } from "@/lib/whatsapp/webhook-utils"
 import type { MetaSocialWebhookPayload, MetaSocialWebhookMessaging } from "@/lib/messaging/meta-social-types"
 import { findSocialChannelByPageId } from "@/lib/messaging/meta-social-client"
+import { handlePlatformNumberInbound } from "@/lib/copilot/platform-inbound"
 import { logger } from "@/lib/logger"
 
 const log = logger("webhooks/whatsapp-meta")
@@ -159,6 +160,13 @@ async function handleWhatsAppWebhook(
             const instance = await findInstanceByMetaPhoneNumberId(phoneNumberId)
 
             if (!instance) {
+                // ¿Es el número de la PLATAFORMA (no un tenant)? Respuestas de
+                // merchants al copilot (loop Hermes) + receipts de templates.
+                const platformHandled = await handlePlatformNumberInbound(phoneNumberId, value)
+                if (platformHandled) {
+                    await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, "success", undefined)
+                    continue
+                }
                 log.error("No instance found for phone_number_id", { phoneNumberId })
                 await updateWebhookLog(supabase, "whatsapp-meta", phoneNumberId, "warning", "Instance not found")
                 continue
