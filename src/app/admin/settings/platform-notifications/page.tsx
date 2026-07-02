@@ -18,6 +18,7 @@ import {
     sendTestNotification,
     verifyMetaCredentials,
     registerMetaPhoneNumber,
+    subscribeMetaWebhookToWaba,
     type PlatformChannelStatus,
     type MetaVerificationResult,
 } from "./actions"
@@ -50,6 +51,21 @@ export default function PlatformNotificationsPage() {
     const [verification, setVerification] = useState<MetaVerificationResult | null>(null)
     const [registerPin, setRegisterPin] = useState("")
     const [registering, setRegistering] = useState(false)
+    const [subscribing, setSubscribing] = useState(false)
+
+    const handleSubscribeWebhook = async () => {
+        setSubscribing(true)
+        try {
+            const result = await subscribeMetaWebhookToWaba()
+            if (result.success) {
+                toast.success("Webhook suscrito al WABA — ya recibes respuestas de merchants")
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setSubscribing(false)
+        }
+    }
 
     const handleRegister = async () => {
         if (!/^\d{6}$/.test(registerPin.trim())) {
@@ -326,6 +342,13 @@ export default function PlatformNotificationsPage() {
                                         {registering ? "Registrando..." : "Registrar número"}
                                     </Button>
                                 </div>
+                                <p className="text-xs text-slate-500 pt-1">
+                                    Para RECIBIR respuestas de merchants (loop &quot;responde 1/2/3&quot; y Atlas
+                                    conversacional), la app debe estar suscrita al webhook del WABA (una sola vez):
+                                </p>
+                                <Button variant="outline" onClick={handleSubscribeWebhook} disabled={subscribing}>
+                                    {subscribing ? "Suscribiendo..." : "Suscribir webhook (recibir respuestas)"}
+                                </Button>
                             </div>
 
                             <div className="space-y-1">

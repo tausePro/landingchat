@@ -315,6 +315,26 @@ export class MetaCloudClient {
   }
 
   /**
+   * Suscribe la app (dueña del token) al webhook del WABA
+   * (POST /{waba-id}/subscribed_apps). Sin esta suscripción, los mensajes
+   * entrantes a los números del WABA NUNCA llegan al webhook de la app.
+   */
+  async subscribeAppToWaba(wabaId: string, token: string): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/${wabaId}/subscribed_apps`,
+      {
+        method: "POST",
+        headers: this.getHeaders(token),
+      }
+    )
+
+    if (!response.ok) {
+      const error = await this.parseError(response)
+      throw new Error(`Meta API error (${response.status}): ${error}`)
+    }
+  }
+
+  /**
    * Obtiene las plantillas de mensaje de un WABA
    */
   async getMessageTemplates(
