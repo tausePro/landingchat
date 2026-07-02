@@ -15,6 +15,19 @@ vi.mock("@/lib/notifications/platform-whatsapp", () => ({
 const replyMock = vi.fn()
 vi.mock("@/lib/copilot/whatsappReplyHandler", () => ({
     handleCopilotWhatsAppReply: (...args: unknown[]) => replyMock(...args),
+    // Parser real-ish (estricto) para el gate de ruteo
+    parseReplyIntent: (text: string) => {
+        const normalized = text.trim().toLowerCase()
+        if (/^[1-5]$/.test(normalized)) return { kind: "action", index: Number(normalized) - 1 }
+        if (normalized === "todas") return { kind: "all" }
+        if (normalized === "no") return { kind: "dismiss" }
+        return { kind: "unknown" }
+    },
+}))
+
+const agentMock = vi.fn()
+vi.mock("@/lib/copilot/merchant-agent", () => ({
+    processMerchantMessage: (...args: unknown[]) => agentMock(...args),
 }))
 
 import { handlePlatformNumberInbound } from "@/lib/copilot/platform-inbound"
@@ -43,10 +56,11 @@ beforeEach(() => {
         meta_phone_number_id: "PN-PLATFORM",
     })
     replyMock.mockResolvedValue({ handled: true, replied: true })
+    agentMock.mockResolvedValue({ handled: true, replied: true })
 })
 
 describe("handlePlatformNumberInbound", () => {
-    it("número platform + texto → rutea al handler del copilot y devuelve true", async () => {
+    it("número platform + intent claro ('1') → rutea al loop de aprobación", async () => {
         const handled = await handlePlatformNumberInbound(
             "PN-PLATFORM",
             buildValue({ messages: [textMessage("573007801382", "1", "wamid.abc")] as MetaWebhookValue["messages"] })
@@ -57,6 +71,23 @@ describe("handlePlatformNumberInbound", () => {
             text: "1",
             messageId: "wamid.abc",
         })
+        expect(agentMock).not.toHaveBeenCalled()
+    })
+
+    it("número platform + texto libre → rutea a Atlas conversacional", async () => {
+        const handled = await handlePlatformNumberInbound(
+            "PN-PLATFORM",
+            buildValue({
+                messages: [textMessage("573007801382", "¿cómo van mis ventas?", "wamid.free")] as MetaWebhookValue["messages"],
+            })
+        )
+        expect(handled).toBe(true)
+        expect(agentMock).toHaveBeenCalledWith({
+            senderPhone: "573007801382",
+            text: "¿cómo van mis ventas?",
+            messageId: "wamid.free",
+        })
+        expect(replyMock).not.toHaveBeenCalled()
     })
 
     it("phone_number_id de un tenant (no platform) → false y no toca el handler", async () => {
