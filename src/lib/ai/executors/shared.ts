@@ -330,7 +330,7 @@ export async function getOrgPaymentMethodsSummary(
 async function loadRealShippingSettings(supabase: ToolSupabaseClient, organizationId: string) {
     const { data } = await supabase
         .from("shipping_settings")
-        .select("free_shipping_enabled, free_shipping_min_amount, default_shipping_rate, estimated_delivery_days, express_delivery_days, returns_accepted, return_window_days, return_fees")
+        .select("free_shipping_enabled, free_shipping_min_amount, default_shipping_rate, estimated_delivery_days, estimated_delivery_days_max, express_delivery_days, returns_accepted, return_window_days, return_fees")
         .eq("organization_id", organizationId)
         .maybeSingle()
     return data
@@ -359,6 +359,7 @@ const getStoreInfo: ToolHandler = async (supabase, input, context) => {
                 ? {
                     standard_rate: shipping.default_shipping_rate,
                     estimated_delivery_days: shipping.estimated_delivery_days,
+                    estimated_delivery_days_max: shipping.estimated_delivery_days_max,
                     express_delivery_days: shipping.express_delivery_days,
                     free_shipping: shipping.free_shipping_enabled
                         ? { enabled: true, min_amount: shipping.free_shipping_min_amount }

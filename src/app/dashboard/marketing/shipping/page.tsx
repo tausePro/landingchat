@@ -17,6 +17,7 @@ export default function ShippingConfigPage() {
     const [defaultShippingRate, setDefaultShippingRate] = useState("")
     const [expressShippingRate, setExpressShippingRate] = useState("")
     const [estimatedDeliveryDays, setEstimatedDeliveryDays] = useState("3")
+    const [estimatedDeliveryDaysMax, setEstimatedDeliveryDaysMax] = useState("")
     const [expressDeliveryDays, setExpressDeliveryDays] = useState("1")
     // Política de devoluciones: "" = no configurada (no se publica en el SEO de productos)
     const [returnsAccepted, setReturnsAccepted] = useState<"" | "yes" | "no">("")
@@ -33,7 +34,8 @@ export default function ShippingConfigPage() {
                     setFreeShippingZones(data.free_shipping_zones?.join(", ") || "")
                     setDefaultShippingRate(data.default_shipping_rate?.toString() || "")
                     setExpressShippingRate(data.express_shipping_rate?.toString() || "")
-                    setEstimatedDeliveryDays(data.estimated_delivery_days?.toString() || "3")
+                    setEstimatedDeliveryDays(data.estimated_delivery_days?.toString() ?? "3")
+                    setEstimatedDeliveryDaysMax(data.estimated_delivery_days_max?.toString() ?? "")
                     setExpressDeliveryDays(data.express_delivery_days?.toString() || "1")
                     setReturnsAccepted(data.returns_accepted == null ? "" : data.returns_accepted ? "yes" : "no")
                     setReturnWindowDays(data.return_window_days?.toString() || "5")
@@ -57,7 +59,9 @@ export default function ShippingConfigPage() {
                 free_shipping_zones: freeShippingZones ? freeShippingZones.split(",").map(z => z.trim()) : null,
                 default_shipping_rate: parseFloat(defaultShippingRate) || 0,
                 express_shipping_rate: expressShippingRate ? parseFloat(expressShippingRate) : null,
-                estimated_delivery_days: parseInt(estimatedDeliveryDays) || 3,
+                // parseInt + isNaN (no ||): 0 es válido = entrega hoy mismo
+                estimated_delivery_days: Number.isNaN(parseInt(estimatedDeliveryDays)) ? 3 : Math.max(0, parseInt(estimatedDeliveryDays)),
+                estimated_delivery_days_max: Number.isNaN(parseInt(estimatedDeliveryDaysMax)) ? null : Math.max(0, parseInt(estimatedDeliveryDaysMax)),
                 express_delivery_days: parseInt(expressDeliveryDays) || 1,
                 returns_accepted: returnsAccepted === "" ? null : returnsAccepted === "yes",
                 return_window_days: returnsAccepted === "yes" && returnWindowDays ? parseInt(returnWindowDays) : null,
@@ -204,17 +208,37 @@ export default function ShippingConfigPage() {
 
                         <div>
                             <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
-                                Días de Entrega Estándar
+                                Entrega Estándar — mínimo (días)
                             </label>
                             <input
                                 type="number"
-                                min="1"
+                                min="0"
                                 placeholder="3"
                                 value={estimatedDeliveryDays}
                                 onChange={e => setEstimatedDeliveryDays(e.target.value)}
                                 className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent"
                                 required
                             />
+                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                <strong>0 = entrega hoy mismo.</strong> Se muestra en la página del producto, el chat y el SEO.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium text-text-light-primary dark:text-text-dark-primary">
+                                Entrega Estándar — máximo (opcional)
+                            </label>
+                            <input
+                                type="number"
+                                min="0"
+                                placeholder="Ej: 5 → muestra 3-5 días"
+                                value={estimatedDeliveryDaysMax}
+                                onChange={e => setEstimatedDeliveryDaysMax(e.target.value)}
+                                className="form-input mt-2 w-full rounded-lg bg-background-light dark:bg-background-dark text-text-light-primary dark:text-text-dark-primary focus:outline-none focus:ring-2 focus:ring-primary border-transparent"
+                            />
+                            <p className="text-xs text-text-light-secondary dark:text-text-dark-secondary mt-1">
+                                Vacío = sin rango (se muestra solo el mínimo)
+                            </p>
                         </div>
 
                         <div>

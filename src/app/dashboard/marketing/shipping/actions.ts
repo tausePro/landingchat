@@ -12,6 +12,8 @@ export interface ShippingSettings {
     default_shipping_rate: number
     express_shipping_rate: number | null
     estimated_delivery_days: number
+    /** Máximo opcional del rango de entrega (NULL = sin rango). 0 en min = hoy mismo. */
+    estimated_delivery_days_max: number | null
     express_delivery_days: number
     // Política de devoluciones (NULL = no configurada → no se emite en JSON-LD)
     returns_accepted: boolean | null

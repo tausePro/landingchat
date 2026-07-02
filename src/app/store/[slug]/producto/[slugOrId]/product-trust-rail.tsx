@@ -1,7 +1,8 @@
 "use client"
 
 import { useT } from "@/lib/i18n/use-tenant-strings"
-import type { StorefrontShippingConfig } from "@/lib/utils/shipping"
+import { getDeliveryEstimate, type StorefrontShippingConfig } from "@/lib/utils/shipping"
+import { deliveryEstimateLabel } from "./delivery-estimate-label"
 import type { ProductSectionLink } from "./product-detail-types"
 
 interface ProductTrustRailProps {
@@ -27,19 +28,17 @@ export function ProductTrustRail({ whatsappLink, sectionLinks, shippingConfig, h
     // useT() funciona porque el archivo es 'use client' y ProductTrustRail
     // se renderiza dentro del provider tree de TenantStringsProvider.
     const t = useT()
-    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
+    // Promesa configurable del merchant (0 = hoy mismo, rango min-max)
+    const deliveryEstimate = getDeliveryEstimate(shippingConfig)
     const trustBadges: TrustBadgeItem[] = []
     const resolvedInventoryLabel = inventoryLabel ?? t("store.product_detail.inventory_confirmed")
 
-    if (estimatedDeliveryDays) {
+    if (deliveryEstimate) {
         trustBadges.push({
             id: "shipping",
             icon: "local_shipping",
             title: t("store.product_detail.trust_rail_fast_shipping"),
-            description: t("store.product_detail.trust_rail_days_label", {
-                count: estimatedDeliveryDays,
-                plural: estimatedDeliveryDays === 1 ? "" : "s",
-            }),
+            description: deliveryEstimateLabel(t, deliveryEstimate),
         })
     } else if (hasFreeShipping) {
         trustBadges.push({

@@ -586,6 +586,9 @@ export const storefrontStrings = {
     // Trust rail (T1.3j.3) — strings adicionales del componente ProductTrustRail
     "store.product_detail.trust_rail_fast_shipping": "Envío rápido",
     "store.product_detail.trust_rail_days_label": "{{count}} día{{plural}}",
+    "store.product_detail.trust_rail_delivery_today": "Entrega hoy mismo",
+    "store.product_detail.trust_rail_days_range": "{{min}}-{{max}} días hábiles",
+    "store.product_detail.trust_rail_days_range_from_today": "Hoy a {{max}} días",
     "store.product_detail.trust_rail_free_shipping": "Envío gratis",
     "store.product_detail.trust_rail_active_purchase": "Activo para esta compra",
     "store.product_detail.trust_rail_real_inventory": "Inventario real",
@@ -1306,6 +1309,9 @@ export const storefrontStrings = {
     // Trust rail (T1.3j.3) — strings adicionales del componente ProductTrustRail
     "store.product_detail.trust_rail_fast_shipping": "Fast shipping",
     "store.product_detail.trust_rail_days_label": "{{count}} day{{plural}}",
+    "store.product_detail.trust_rail_delivery_today": "Same-day delivery",
+    "store.product_detail.trust_rail_days_range": "{{min}}-{{max}} business days",
+    "store.product_detail.trust_rail_days_range_from_today": "Today to {{max}} days",
     "store.product_detail.trust_rail_free_shipping": "Free shipping",
     "store.product_detail.trust_rail_active_purchase": "Active for this purchase",
     "store.product_detail.trust_rail_real_inventory": "Real inventory",
