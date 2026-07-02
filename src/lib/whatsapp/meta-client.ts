@@ -286,6 +286,35 @@ export class MetaCloudClient {
   }
 
   /**
+   * Registra el número en la Cloud API (POST /{phone-number-id}/register).
+   * Paso requerido UNA vez antes de poder enviar (error #133010 "Account not
+   * registered" si falta). El pin de 6 dígitos fija/usa la verificación en
+   * dos pasos del número.
+   */
+  async registerPhoneNumber(
+    phoneNumberId: string,
+    token: string,
+    pin: string
+  ): Promise<void> {
+    const response = await fetch(
+      `${this.baseUrl}/${phoneNumberId}/register`,
+      {
+        method: "POST",
+        headers: this.getHeaders(token),
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          pin,
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const error = await this.parseError(response)
+      throw new Error(`Meta API error (${response.status}): ${error}`)
+    }
+  }
+
+  /**
    * Obtiene las plantillas de mensaje de un WABA
    */
   async getMessageTemplates(
