@@ -1,6 +1,8 @@
 "use client"
 
-import { getFreeShippingProgress, type StorefrontShippingConfig } from "@/lib/utils/shipping"
+import { useT } from "@/lib/i18n/use-tenant-strings"
+import { getFreeShippingProgress, getDeliveryEstimate, type StorefrontShippingConfig } from "@/lib/utils/shipping"
+import { deliveryEstimateLabel } from "./delivery-estimate-label"
 import type { FormatPriceFn, ProductShippingCardLabels } from "./product-detail-types"
 
 interface ProductShippingCardProps {
@@ -13,8 +15,9 @@ interface ProductShippingCardProps {
 }
 
 export function ProductShippingCard({ shippingConfig, subtotal, primaryColor, hasProductLevelFreeShipping, formatPrice, labels }: ProductShippingCardProps) {
+    const t = useT()
     const progress = getFreeShippingProgress(shippingConfig, subtotal)
-    const estimatedDeliveryDays = shippingConfig?.estimated_delivery_days
+    const deliveryEstimate = getDeliveryEstimate(shippingConfig)
     const shippingQualified = hasProductLevelFreeShipping || (progress.enabled && (!progress.hasMinimum || progress.qualified))
 
     if (!hasProductLevelFreeShipping && !progress.enabled) {
@@ -41,8 +44,8 @@ export function ProductShippingCard({ shippingConfig, subtotal, primaryColor, ha
                 ) : (
                     <span>{description}</span>
                 )}
-                {estimatedDeliveryDays ? (
-                    <span className="text-slate-500 dark:text-slate-400">· {estimatedDeliveryDays} día{estimatedDeliveryDays === 1 ? "" : "s"}</span>
+                {deliveryEstimate ? (
+                    <span className="text-slate-500 dark:text-slate-400">· {deliveryEstimateLabel(t, deliveryEstimate)}</span>
                 ) : null}
             </p>
             <div className="mt-2 h-[5px] overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
