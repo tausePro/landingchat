@@ -109,6 +109,62 @@ async function sendViaMeta(config: PlatformNotificationsConfig, to: string, mess
 }
 
 /**
+ * Texto libre por Meta (SIN template). Solo funciona dentro de la ventana de
+ * 24h de servicio (merchant-initiated) — para respuestas conversacionales
+ * de Atlas. Fuera de ventana, Meta lo rechaza y el caller hace fallback.
+ */
+async function sendTextViaMeta(config: PlatformNotificationsConfig, to: string, message: string): Promise<PlatformSendResult> {
+    if (!config.meta_phone_number_id || !config.meta_access_token_encrypted) {
+        return { delivered: false, error: "meta_not_configured" }
+    }
+    const token = decrypt(config.meta_access_token_encrypted)
+    const client = new MetaCloudClient()
+    await client.sendTextMessage(config.meta_phone_number_id, token, to, message)
+    return { delivered: true }
+}
+
+/**
+ * Respuesta conversacional desde el WhatsApp de LandingChat (free-form).
+ * Meta: intenta texto libre (ventana 24h abierta porque el merchant escribió);
+ * si falla (ventana cerrada u otro error), fallback al template de
+ * notificaciones. Evolution: siempre es texto libre.
+ */
+export async function sendPlatformText(
+    to: string,
+    message: string
+): Promise<PlatformSendResult> {
+    try {
+        const config = await getPlatformNotificationsConfig()
+        if (!config.enabled) {
+            return { delivered: false, error: "platform_channel_disabled" }
+        }
+
+        const normalized = to.replace(/[^\d]/g, "")
+        if (normalized.length < 10) {
+            return { delivered: false, error: "invalid_phone" }
+        }
+
+        if (config.provider !== "meta") {
+            return await sendViaEvolution(config, normalized, message)
+        }
+
+        try {
+            const result = await sendTextViaMeta(config, normalized, message)
+            if (result.delivered) return result
+        } catch (error) {
+            log.info("free-form failed, falling back to template", {
+                error: error instanceof Error ? error.message : "unknown",
+            })
+        }
+        return await sendViaMeta(config, normalized, message)
+    } catch (error) {
+        const messageText = error instanceof Error ? error.message : "unknown"
+        log.error("platform text failed", { error: messageText })
+        return { delivered: false, error: messageText }
+    }
+}
+
+/**
  * Envía un mensaje desde el WhatsApp de LandingChat al número indicado
  * (E.164 sin '+', ej: 573001234567).
  */

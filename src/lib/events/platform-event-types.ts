@@ -24,6 +24,8 @@ export const PLATFORM_EVENT_TYPES = {
     COPILOT_INSIGHT_APPROVED: 'copilot.insight_approved',
     COPILOT_INSIGHT_DISMISSED: 'copilot.insight_dismissed',
     COPILOT_ACTION_EXECUTED: 'copilot.action_executed',
+    /** Mensaje de texto libre de un merchant al número platform, procesado por Atlas (dedupe + rate limit). */
+    ATLAS_CHAT_REPLY: 'copilot.atlas_chat_reply',
 } as const
 
 export type PlatformEventType = typeof PLATFORM_EVENT_TYPES[keyof typeof PLATFORM_EVENT_TYPES]

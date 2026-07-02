@@ -62,8 +62,12 @@ interface MatchedMerchant {
     orgName: string
 }
 
-/** Match del remitente contra merchants conocidos (ambas vías de la cadena). */
-async function matchMerchantByPhone(
+/**
+ * Match del remitente contra merchants conocidos (ambas vías de la cadena).
+ * Exportado: también identifica al merchant en el agente conversacional
+ * (merchant-agent.ts) — misma política de seguridad para todo inbound.
+ */
+export async function matchMerchantByPhone(
     supabase: Awaited<ReturnType<typeof createServiceClient>>,
     senderPhone: string
 ): Promise<MatchedMerchant[]> {

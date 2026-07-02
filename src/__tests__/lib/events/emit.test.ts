@@ -96,9 +96,10 @@ describe("emitPlatformEvent", () => {
 })
 
 describe("catálogo de event types", () => {
-    it("cubre los 13 eventos v0 sin duplicados", () => {
-        expect(ALL_PLATFORM_EVENT_TYPES).toHaveLength(13)
-        expect(new Set(ALL_PLATFORM_EVENT_TYPES).size).toBe(13)
+    it("cubre los 14 eventos (13 v0 + atlas_chat_reply) sin duplicados", () => {
+        expect(ALL_PLATFORM_EVENT_TYPES).toHaveLength(14)
+        expect(new Set(ALL_PLATFORM_EVENT_TYPES).size).toBe(14)
+        expect(ALL_PLATFORM_EVENT_TYPES).toContain("copilot.atlas_chat_reply")
         // Áreas representadas
         expect(ALL_PLATFORM_EVENT_TYPES).toContain("order.paid")
         expect(ALL_PLATFORM_EVENT_TYPES).toContain("chat.started")
