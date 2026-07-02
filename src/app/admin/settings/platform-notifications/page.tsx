@@ -236,11 +236,11 @@ export default function PlatformNotificationsPage() {
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="space-y-1">
                                     <Label htmlFor="metaWabaId">WABA ID</Label>
-                                    <Input id="metaWabaId" value={metaWabaId} onChange={(event) => setMetaWabaId(event.target.value)} placeholder="(WhatsApp Business Account ID)" className="font-mono" />
+                                    <Input id="metaWabaId" value={metaWabaId} onChange={(event) => setMetaWabaId(event.target.value)} placeholder={status?.metaWabaId ? `(configurado: ${status.metaWabaId} — escribe para reemplazar)` : "(WhatsApp Business Account ID)"} className="font-mono" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label htmlFor="metaPhoneId">Phone Number ID</Label>
-                                    <Input id="metaPhoneId" value={metaPhoneNumberId} onChange={(event) => setMetaPhoneNumberId(event.target.value)} placeholder={status?.metaConfigured ? "(configurado — escribe para reemplazar)" : "1234567890"} className="font-mono" />
+                                    <Input id="metaPhoneId" value={metaPhoneNumberId} onChange={(event) => setMetaPhoneNumberId(event.target.value)} placeholder={status?.metaPhoneNumberId ? `(configurado: ${status.metaPhoneNumberId} — escribe para reemplazar)` : "1234567890"} className="font-mono" />
                                 </div>
                             </div>
                             <div className="space-y-1">

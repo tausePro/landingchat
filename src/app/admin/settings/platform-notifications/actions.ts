@@ -36,6 +36,9 @@ export interface PlatformChannelStatus {
     /** Meta: credenciales y template configurados (el token nunca viaja al cliente). */
     metaConfigured: boolean
     metaTemplateName: string | null
+    /** IDs guardados (no sensibles — visibles en el UI de Meta). El token NUNCA viaja. */
+    metaWabaId: string | null
+    metaPhoneNumberId: string | null
 }
 
 /** Estado completo del canal para la página del admin. */
@@ -58,6 +61,8 @@ export async function getPlatformChannelStatus(): Promise<ActionResult<PlatformC
                 phoneDisplay: null,
                 metaConfigured: Boolean(config.meta_phone_number_id && config.meta_access_token_encrypted),
                 metaTemplateName: config.meta_template_name ?? null,
+                metaWabaId: config.meta_waba_id ?? null,
+                metaPhoneNumberId: config.meta_phone_number_id ?? null,
             })
         }
 
@@ -89,6 +94,8 @@ export async function getPlatformChannelStatus(): Promise<ActionResult<PlatformC
             phoneDisplay,
             metaConfigured: Boolean(config.meta_phone_number_id && config.meta_access_token_encrypted),
             metaTemplateName: config.meta_template_name ?? null,
+            metaWabaId: config.meta_waba_id ?? null,
+            metaPhoneNumberId: config.meta_phone_number_id ?? null,
         })
     } catch (error) {
         console.error("[platform-notifications] Status error:", error)
