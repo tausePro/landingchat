@@ -17,6 +17,7 @@ import {
     connectPlatformInstance,
     sendTestNotification,
     verifyMetaCredentials,
+    registerMetaPhoneNumber,
     type PlatformChannelStatus,
     type MetaVerificationResult,
 } from "./actions"
@@ -47,6 +48,26 @@ export default function PlatformNotificationsPage() {
     const [saving, setSaving] = useState(false)
     const [verifying, setVerifying] = useState(false)
     const [verification, setVerification] = useState<MetaVerificationResult | null>(null)
+    const [registerPin, setRegisterPin] = useState("")
+    const [registering, setRegistering] = useState(false)
+
+    const handleRegister = async () => {
+        if (!/^\d{6}$/.test(registerPin.trim())) {
+            toast.error("El PIN debe ser de 6 dígitos")
+            return
+        }
+        setRegistering(true)
+        try {
+            const result = await registerMetaPhoneNumber({ pin: registerPin.trim() })
+            if (result.success) {
+                toast.success("Número registrado en la Cloud API — prueba el envío")
+            } else {
+                toast.error(result.error)
+            }
+        } finally {
+            setRegistering(false)
+        }
+    }
 
     const handleVerifyMeta = async () => {
         setVerifying(true)
@@ -285,6 +306,27 @@ export default function PlatformNotificationsPage() {
                                     )}
                                 </div>
                             )}
+
+                            <div className="rounded-lg border border-dashed p-3 space-y-2">
+                                <p className="text-xs text-slate-500">
+                                    ¿Error <code>#133010 Account not registered</code> al enviar? El número debe
+                                    registrarse en la Cloud API (una sola vez). Elige un PIN de 6 dígitos — queda
+                                    como verificación en dos pasos del número, <strong>guárdalo</strong>. Si el
+                                    número ya tenía PIN, usa ese.
+                                </p>
+                                <div className="flex gap-2">
+                                    <Input
+                                        value={registerPin}
+                                        onChange={(event) => setRegisterPin(event.target.value)}
+                                        placeholder="PIN 6 dígitos"
+                                        maxLength={6}
+                                        className="font-mono w-40"
+                                    />
+                                    <Button variant="outline" onClick={handleRegister} disabled={registering}>
+                                        {registering ? "Registrando..." : "Registrar número"}
+                                    </Button>
+                                </div>
+                            </div>
 
                             <div className="space-y-1">
                                 <Label htmlFor="metaTemplate">Template seleccionado (body con {"{{1}}"})</Label>
