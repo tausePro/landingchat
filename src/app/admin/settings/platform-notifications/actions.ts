@@ -304,3 +304,38 @@ export async function verifyMetaCredentials(input?: {
         return failure(error instanceof Error ? error.message : "Error verificando credenciales")
     }
 }
+
+const registerPinSchema = z.object({
+    pin: z.string().trim().regex(/^\d{6}$/, "El PIN debe ser de 6 dígitos"),
+})
+
+/**
+ * Registra el número guardado en la Cloud API. Necesario UNA vez: agregar el
+ * número en el WhatsApp Manager no basta — sin este paso, enviar devuelve
+ * #133010 "Account not registered". El PIN fija/usa la verificación en dos
+ * pasos del número (si ya tenía PIN, debe coincidir).
+ */
+export async function registerMetaPhoneNumber(input: { pin: string }): Promise<ActionResult<void>> {
+    if (!(await checkSuperAdmin())) return failure("No autorizado")
+
+    try {
+        const validation = registerPinSchema.safeParse(input)
+        if (!validation.success) {
+            return failure(validation.error.issues[0]?.message || "PIN inválido")
+        }
+
+        const config = await getPlatformNotificationsConfig()
+        if (!config.meta_phone_number_id || !config.meta_access_token_encrypted) {
+            return failure("Guarda primero Phone Number ID y Access Token")
+        }
+
+        const token = decrypt(config.meta_access_token_encrypted)
+        const client = new MetaCloudClient()
+        await client.registerPhoneNumber(config.meta_phone_number_id, token, validation.data.pin)
+
+        return success(undefined)
+    } catch (error) {
+        console.error("[platform-notifications] Register error:", error)
+        return failure(error instanceof Error ? error.message : "Error registrando el número")
+    }
+}
