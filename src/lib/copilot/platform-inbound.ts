@@ -14,7 +14,8 @@
  */
 
 import { getPlatformNotificationsConfig } from "@/lib/notifications/platform-whatsapp"
-import { handleCopilotWhatsAppReply } from "./whatsappReplyHandler"
+import { handleCopilotWhatsAppReply, parseReplyIntent } from "./whatsappReplyHandler"
+import { processMerchantMessage } from "./merchant-agent"
 import { logger } from "@/lib/logger"
 import type { MetaWebhookValue } from "@/lib/whatsapp"
 
@@ -41,11 +42,16 @@ export async function handlePlatformNumberInbound(
         for (const message of value.messages ?? []) {
             if (message.type !== "text" || !message.text?.body) continue
             try {
-                const result = await handleCopilotWhatsAppReply({
+                // Intents claros ("1".."5", "todas", "no") → loop de aprobación
+                // existente. Texto libre → Atlas conversacional.
+                const params = {
                     senderPhone: message.from,
                     text: message.text.body,
                     messageId: message.id,
-                })
+                }
+                const result = parseReplyIntent(message.text.body).kind !== "unknown"
+                    ? await handleCopilotWhatsAppReply(params)
+                    : await processMerchantMessage(params)
                 log.info("platform inbound processed", {
                     handled: result.handled,
                     replied: result.replied,
