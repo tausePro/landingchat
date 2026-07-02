@@ -248,8 +248,16 @@ export async function sendOrderNotificationToOwner(data: {
     orderNumber: string
     customerName: string
     customerEmail: string
+    /** Teléfono del comprador — contacto rápido del merchant (se linkea como tel:). */
+    customerPhone?: string | null
+    /** Dirección de envío formateada (dirección, ciudad, departamento). */
+    customerAddress?: string | null
+    /** Método de pago elegido (contraentrega, wompi, etc.). */
+    paymentMethod?: string | null
+    /** Link directo al pedido en el dashboard del merchant. */
+    orderUrl?: string | null
     total: number
-    items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null }>
+    items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null; image?: string | null }>
     ownerEmail: string
     /** Correos adicionales de notificación (además del ownerEmail). */
     additionalEmails?: string[]
@@ -307,18 +315,24 @@ export async function sendOrderNotificationToOwner(data: {
 }
 
 /**
- * Genera el HTML del email de notificación al owner.
+ * Genera el HTML del email de notificación al owner: comprador completo
+ * (teléfono, dirección), método de pago, tabla de productos CON foto y
+ * CTA al pedido en el dashboard. Exportada para tests.
  *
  * @param locale  Locale del tenant (BCP 47).
  * @param currency Currency del tenant (ISO 4217).
  */
-function generateOwnerNotificationHTML(
+export function generateOwnerNotificationHTML(
     data: {
         orderNumber: string
         customerName: string
         customerEmail: string
+        customerPhone?: string | null
+        customerAddress?: string | null
+        paymentMethod?: string | null
+        orderUrl?: string | null
         total: number
-        items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null }>
+        items: Array<{ name: string; quantity: number; price: number; variant_title?: string | null; image?: string | null }>
         organizationName: string
     },
     locale: SupportedLocale,
@@ -327,9 +341,38 @@ function generateOwnerNotificationHTML(
     const formatPrice = (amount: number) =>
         formatCurrency(amount, { locale, currency })
 
-    const itemsHTML = data.items.map(item => `
-        <li>${item.quantity}x ${appendVariantToItemName(item.name, item.variant_title)} - ${formatPrice(item.price * item.quantity)}</li>
-    `).join('')
+    const itemsHTML = data.items.map(item => {
+        const itemName = escapeHtml(appendVariantToItemName(item.name, item.variant_title))
+        const imageCell = item.image
+            ? `<img src="${escapeHtml(item.image)}" alt="${itemName}" width="48" height="48" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px; display: block;" />`
+            : `<div style="width: 48px; height: 48px; border-radius: 6px; background: #f3f4f6;"></div>`
+        return `
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 10px 12px; width: 56px;">${imageCell}</td>
+                    <td style="padding: 10px 12px; color: #111827;">${itemName}</td>
+                    <td style="padding: 10px 12px; text-align: center; color: #374151; white-space: nowrap;">x${item.quantity}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #111827; white-space: nowrap;">${formatPrice(item.price * item.quantity)}</td>
+                </tr>`
+    }).join("")
+
+    const paymentLine = data.paymentMethod
+        ? `<p style="margin: 8px 0 0 0; color: #166534;"><strong>${t("email.owner_notification.payment_method_label", locale)}</strong> ${escapeHtml(data.paymentMethod)}</p>`
+        : ""
+    const phoneLine = data.customerPhone
+        ? `<p style="margin: 4px 0;"><strong>${t("email.owner_notification.phone_label", locale)}</strong> <a href="tel:${escapeHtml(data.customerPhone)}" style="color: #111827;">${escapeHtml(data.customerPhone)}</a></p>`
+        : ""
+    const addressLine = data.customerAddress
+        ? `<p style="margin: 4px 0;"><strong>${t("email.owner_notification.address_label", locale)}</strong> ${escapeHtml(data.customerAddress)}</p>`
+        : ""
+    const ctaButton = data.orderUrl
+        ? `
+        <div style="margin: 28px 0 8px 0; text-align: center;">
+            <a href="${escapeHtml(data.orderUrl)}"
+               style="display: inline-block; background: #1f2937; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600;">
+                ${t("email.owner_notification.view_order_button", locale)}
+            </a>
+        </div>`
+        : ""
 
     return `
     <!DOCTYPE html>
@@ -341,19 +384,39 @@ function generateOwnerNotificationHTML(
     <body style="font-family: sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
             <h2 style="color: #166534; margin: 0;">${t("email.owner_notification.heading", locale)}</h2>
+            <p style="margin: 8px 0 0 0; color: #166534;">
+                <strong>${t("email.owner_notification.number_label", locale)}</strong> ${escapeHtml(data.orderNumber)}
+                &nbsp;·&nbsp;
+                <strong>${t("email.owner_notification.total_label", locale)}</strong> ${formatPrice(data.total)}
+            </p>
+            ${paymentLine}
         </div>
-        
-        <h3>${t("email.owner_notification.order_details_heading", locale)}</h3>
-        <p><strong>${t("email.owner_notification.number_label", locale)}</strong> ${data.orderNumber}</p>
-        <p><strong>${t("email.owner_notification.customer_label", locale)}</strong> ${data.customerName}</p>
-        <p><strong>${t("email.owner_notification.email_label", locale)}</strong> ${data.customerEmail}</p>
-        <p><strong>${t("email.owner_notification.total_label", locale)}</strong> ${formatPrice(data.total)}</p>
-        
-        <h3>${t("email.owner_notification.products_heading", locale)}</h3>
-        <ul>${itemsHTML}</ul>
-        
-        <p style="margin-top: 30px; padding: 15px; background: #f3f4f6; border-radius: 6px;">
-            ${t("email.owner_notification.dashboard_hint", locale, { organizationName: data.organizationName })}
+
+        <h3 style="margin: 24px 0 8px 0;">${t("email.owner_notification.buyer_heading", locale)}</h3>
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px;">
+            <p style="margin: 4px 0;"><strong>${t("email.owner_notification.customer_label", locale)}</strong> ${escapeHtml(data.customerName)}</p>
+            <p style="margin: 4px 0;"><strong>${t("email.owner_notification.email_label", locale)}</strong> ${escapeHtml(data.customerEmail)}</p>
+            ${phoneLine}
+            ${addressLine}
+        </div>
+
+        <h3 style="margin: 24px 0 8px 0;">${t("email.owner_notification.products_heading", locale)}</h3>
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+            <tbody>
+                ${itemsHTML}
+            </tbody>
+            <tfoot>
+                <tr style="background: #f3f4f6;">
+                    <td colspan="3" style="padding: 12px; font-weight: 600; text-align: right;">${t("email.owner_notification.total_label", locale)}</td>
+                    <td style="padding: 12px; font-weight: 700; text-align: right; color: #059669; white-space: nowrap;">${formatPrice(data.total)}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        ${ctaButton}
+
+        <p style="margin-top: 24px; padding: 15px; background: #f3f4f6; border-radius: 6px; color: #4b5563;">
+            ${t("email.owner_notification.dashboard_hint", locale, { organizationName: escapeHtml(data.organizationName) })}
         </p>
     </body>
     </html>

@@ -912,8 +912,20 @@ export async function createOrder(params: CreateOrderParams) {
                     orderNumber: order.order_number || `#${order.id.slice(0, 8)}`,
                     customerName: params.customerInfo.name,
                     customerEmail: params.customerInfo.email,
+                    customerPhone: params.customerInfo.phone,
+                    customerAddress: [params.customerInfo.address, params.customerInfo.city, params.customerInfo.state]
+                        .filter((part) => typeof part === "string" && part.trim().length > 0)
+                        .join(", "),
+                    paymentMethod: params.paymentMethod,
+                    orderUrl: `https://landingchat.co/dashboard/orders/${order.id}`,
                     total: params.total,
-                    items: params.items,
+                    items: params.items.map((item) => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        price: item.price,
+                        variant_title: item.variant_title ?? null,
+                        image: item.image_url || item.image || null,
+                    })),
                     ownerEmail: ownerEmail,
                     additionalEmails: Array.isArray(orgDetails?.notification_emails) ? orgDetails.notification_emails : [],
                     organizationName: organizationName,
