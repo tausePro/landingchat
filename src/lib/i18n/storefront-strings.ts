@@ -637,6 +637,11 @@ export const storefrontStrings = {
     "email.owner_notification.total_label": "Total:",
     "email.owner_notification.products_heading": "Productos:",
     "email.owner_notification.dashboard_hint": "Revisa los detalles completos en tu dashboard de {{organizationName}}.",
+    "email.owner_notification.buyer_heading": "Datos del comprador",
+    "email.owner_notification.phone_label": "Teléfono:",
+    "email.owner_notification.address_label": "Dirección de envío:",
+    "email.owner_notification.payment_method_label": "Método de pago:",
+    "email.owner_notification.view_order_button": "Ver pedido en el dashboard",
     // ========================================================================
     // Email order-paid (T1.6 — markOrderAsPaid)
     // ========================================================================
@@ -1352,6 +1357,11 @@ export const storefrontStrings = {
     "email.owner_notification.total_label": "Total:",
     "email.owner_notification.products_heading": "Products:",
     "email.owner_notification.dashboard_hint": "Review full details in your {{organizationName}} dashboard.",
+    "email.owner_notification.buyer_heading": "Buyer details",
+    "email.owner_notification.phone_label": "Phone:",
+    "email.owner_notification.address_label": "Shipping address:",
+    "email.owner_notification.payment_method_label": "Payment method:",
+    "email.owner_notification.view_order_button": "View order in dashboard",
     // ========================================================================
     // Email order-paid (T1.6 — markOrderAsPaid)
     // ========================================================================

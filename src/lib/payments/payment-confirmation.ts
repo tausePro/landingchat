@@ -60,6 +60,7 @@ interface CustomerInfo {
     name?: string | null
     email?: string | null
     phone?: string | null
+    address?: string | null
     city?: string | null
     state?: string | null
 }
@@ -75,6 +76,9 @@ interface OrderItemJsonb {
     product_name?: string | null
     quantity?: number | null
     unit_price?: number | null
+    variant_title?: string | null
+    image?: string | null
+    image_url?: string | null
 }
 
 interface AttributionData {
@@ -300,6 +304,12 @@ async function runPaidOrderSideEffects(params: {
                 orderNumber: params.order.order_number || params.order.id,
                 customerName: customer?.name || customerInfo?.name || "Cliente",
                 customerEmail: customer?.email || customerInfo?.email || "",
+                customerPhone: customer?.phone || customerInfo?.phone || null,
+                customerAddress: [customerInfo?.address, customerInfo?.city, customerInfo?.state]
+                    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+                    .join(", ") || null,
+                paymentMethod: typeof params.order.payment_method === "string" ? params.order.payment_method : null,
+                orderUrl: `https://landingchat.co/dashboard/orders/${params.order.id}`,
                 total: Number(params.order.total || 0),
                 items: itemsJsonb
                     .filter((item) => typeof item.quantity === "number" && item.quantity > 0)
@@ -307,6 +317,8 @@ async function runPaidOrderSideEffects(params: {
                         name: typeof item.product_name === "string" ? item.product_name : "Producto",
                         quantity: item.quantity as number,
                         price: typeof item.unit_price === "number" ? item.unit_price : 0,
+                        variant_title: typeof item.variant_title === "string" ? item.variant_title : null,
+                        image: optionalString(item.image_url) || optionalString(item.image) || null,
                     })),
                 ownerEmail,
                 additionalEmails: Array.isArray(orgRow?.notification_emails) ? orgRow.notification_emails : [],
