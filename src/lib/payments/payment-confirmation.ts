@@ -39,6 +39,7 @@ interface OrderPaymentState {
     payment_status?: PaymentStatus | null
     payment_method?: string | null
     total?: number | string | null
+    source_channel?: string | null
     items?: unknown
     customer_info?: unknown
     utm_data?: unknown
@@ -193,6 +194,35 @@ async function runPaidOrderSideEffects(params: {
     // Comisión de afiliado tenant (si el cliente fue referido). Idempotente, no bloquea.
     const { generateAffiliateCommissionForOrder } = await import("@/lib/affiliates/commissions")
     await generateAffiliateCommissionForOrder({ orderId: params.order.id, organizationId: params.organizationId })
+
+    // F0.1 — purchase SERVER-SIDE (fuente de verdad del conteo de ventas).
+    // El cliente solo emite Meta Pixel; first-party + PostHog salen de aquí,
+    // cubriendo contraentrega/chat/WhatsApp y compradores que no vuelven a
+    // la página de confirmación. Dedupe interno por order_id. No bloquea.
+    try {
+        const { emitServerPurchaseEvent } = await import("@/lib/analytics/server-purchase")
+        const rawChannel = params.order.source_channel
+        const sourceChannel = rawChannel === "chat" || rawChannel === "whatsapp" || rawChannel === "instagram" || rawChannel === "messenger" || rawChannel === "web"
+            ? rawChannel
+            : null
+        await emitServerPurchaseEvent(params.supabase, {
+            organizationId: params.organizationId,
+            orderId: params.order.id,
+            total: Number(params.order.total || 0),
+            currency: tenantLocale.currency,
+            contentIds: itemsJsonb
+                .map((item) => item.product_id)
+                .filter((id): id is string => typeof id === "string" && id.length > 0),
+            paymentMethod: typeof params.order.payment_method === "string" ? params.order.payment_method : null,
+            sourceChannel,
+            customerKey: customer?.email || customerInfo?.email || null,
+        })
+    } catch (error) {
+        log.error("Error emitting server purchase event", {
+            orderId: params.order.id,
+            error: error instanceof Error ? error.message : String(error),
+        })
+    }
 
     try {
         const { sendSaleNotification } = await import("@/lib/notifications/whatsapp")
